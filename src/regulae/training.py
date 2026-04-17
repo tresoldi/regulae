@@ -37,6 +37,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from regulae.priors import TypologicalPrior
 
+from regulae.config import BICConfig
 from regulae.model import (
     CognateSet,
     LearnedModel,
@@ -101,12 +102,13 @@ def train_model(
     segment_weight: float = DEFAULT_SEGMENT_WEIGHT,
     displacement_weight: float = DEFAULT_DISPLACEMENT_WEIGHT,
     tone_weight: float = DEFAULT_TONE_WEIGHT,
-    multi_lect_bic_correction: bool = True,
-    multi_lect_min_commit_scale: float = 0.5,
+    multi_lect_bic_correction: bool | None = None,
+    multi_lect_min_commit_scale: float | None = None,
     chunk_min_transparency: float = 0.0,
     bootstrap_n: int = 0,
     bootstrap_seed: int = 0,
     typological_prior: "TypologicalPrior | None" = None,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel | MultiLectModel:
     """Train a layered alignment model on a training corpus.
 
@@ -127,16 +129,21 @@ def train_model(
 
     * ``multi_lect_bic_correction``: add an AICc-style small-sample
       correction ``2/max(n-1, 1)`` to the class-discovery BIC
-      penalty. Default True — without it, tiny pivot buckets pass
-      BIC too easily.
+      penalty. ``None`` (the default) uses the ``bic_config`` value;
+      pass ``True``/``False`` to override.
     * ``multi_lect_min_commit_scale``: scales the adaptive floor
       for per-sister-tuple emissions in the class-discovery loop.
-      The floor is ``max(2, ceil(scale * log2(n+1)))`` where
-      ``n`` is the pivot's observation count. Default ``0.5``
-      (gentle sub-linear scaling, tuned on multi-lect real-data
-      experiments); set to ``0.0`` to disable the adaptive floor
-      entirely (structural minimum of 2); set higher to tighten
-      further.
+      ``None`` (the default) uses the ``bic_config`` value; pass
+      a number to override.
+
+    BIC-tuning knob:
+
+    * ``bic_config``: :class:`regulae.config.BICConfig` bundling
+      every BIC threshold in the pipeline. ``None`` (the default)
+      uses ``BICConfig()`` — the historical constants. Tighten
+      fields to reject more commits on noisy data, or loosen them
+      to commit more rules on sparse data. See the config module
+      docstring for per-field rationale.
 
     Chunk diagnostics knob:
 
@@ -181,6 +188,18 @@ def train_model(
             concentration=concentration,
         )
 
+    # Resolve BIC config: explicit kwargs override specific fields.
+    if bic_config is None:
+        bic_config = BICConfig()
+    if multi_lect_bic_correction is not None or multi_lect_min_commit_scale is not None:
+        from dataclasses import replace as _dc_replace
+        overrides: dict = {}
+        if multi_lect_bic_correction is not None:
+            overrides["multi_lect_bic_small_sample_correction"] = multi_lect_bic_correction
+        if multi_lect_min_commit_scale is not None:
+            overrides["multi_lect_min_commit_scale"] = multi_lect_min_commit_scale
+        bic_config = _dc_replace(bic_config, **overrides)
+
     train_kwargs = dict(
         feature_system=feature_system,
         max_chunk_size=max_chunk_size,
@@ -193,14 +212,13 @@ def train_model(
         tone_weight=tone_weight,
         chunk_min_transparency=chunk_min_transparency,
         typological_prior=typological_prior,
+        bic_config=bic_config,
     )
 
     if isinstance(corpus[0], CognateSet):
         _validate_cognate_sets(corpus)  # type: ignore[arg-type]
         base = _train_multi_lect(
             corpus,  # type: ignore[arg-type]
-            multi_lect_bic_correction=multi_lect_bic_correction,
-            multi_lect_min_commit_scale=multi_lect_min_commit_scale,
             **train_kwargs,
         )
         if bootstrap_n > 0:
@@ -210,8 +228,6 @@ def train_model(
                 corpus=corpus,  # type: ignore[arg-type]
                 bootstrap_n=bootstrap_n,
                 bootstrap_seed=bootstrap_seed,
-                multi_lect_bic_correction=multi_lect_bic_correction,
-                multi_lect_min_commit_scale=multi_lect_min_commit_scale,
                 **train_kwargs,
             )
         return base
@@ -281,12 +297,15 @@ def _train_pairwise_legacy(
     tone_weight: float,
     chunk_min_transparency: float = 0.0,
     typological_prior: "TypologicalPrior | None" = None,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel:
     """Internal: the pair-based training pipeline."""
     if pair_weights is None:
         pair_weights = [1.0] * len(corpus)
     if len(pair_weights) != len(corpus):
         raise ValueError("pair_weights must have the same length as corpus")
+    if bic_config is None:
+        bic_config = BICConfig()
 
     initial = _initial_model(
         corpus=corpus,
@@ -320,6 +339,7 @@ def _train_pairwise_legacy(
         pair_weights=pair_weights,
         model=after_displacement,
         max_chunk_size=max_chunk_size,
+        bic_config=bic_config,
     )
 
     after_chunks = _chunk_promotion(
@@ -328,6 +348,7 @@ def _train_pairwise_legacy(
         model=after_context,
         max_chunk_size=max_chunk_size,
         chunk_min_transparency=chunk_min_transparency,
+        bic_config=bic_config,
     )
 
     after_tonal = _tonal_aggregation(
@@ -341,6 +362,7 @@ def _train_pairwise_legacy(
         corpus=corpus,
         pair_weights=pair_weights,
         model=after_tonal,
+        bic_config=bic_config,
     )
 
     after_long_range = _long_range_discovery(
@@ -348,6 +370,7 @@ def _train_pairwise_legacy(
         pair_weights=pair_weights,
         model=after_cross_dim,
         max_chunk_size=max_chunk_size,
+        bic_config=bic_config,
     )
 
     return after_long_range

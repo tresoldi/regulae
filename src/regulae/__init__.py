@@ -58,6 +58,7 @@ from regulae.types import (
     Link,
     Segment,
 )
+from regulae.config import BICConfig
 from regulae.uncertainty import (
     UncertaintyEstimate,
     percentile_interval,
@@ -68,6 +69,7 @@ from regulae.priors import TypologicalPrior
 
 __all__ = [
     "Alignment",
+    "BICConfig",
     "ChunkPhraseTable",
     "ChunkProcessFamilyReport",
     "ChunkProcessSubtypeReport",

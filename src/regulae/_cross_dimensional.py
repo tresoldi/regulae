@@ -6,6 +6,7 @@ from dataclasses import replace
 import merkmal
 
 from regulae._discovery import DELTA_BIC_THRESHOLD
+from regulae.config import BICConfig
 from regulae.model import (
     CrossDimensionalLink,
     CrossDimensionalLinkTable,
@@ -43,6 +44,7 @@ def _cross_dimensional_discovery(
     model: LearnedModel,
     *,
     random_seed: int = 0,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel:
     """Discover cross-dimensional correspondence rules from
     residual mutual information in the training corpus.
@@ -78,8 +80,15 @@ def _cross_dimensional_discovery(
     """
     from regulae.anomaly import find_residual_patterns
 
+    if bic_config is None:
+        bic_config = BICConfig()
+    max_iterations = bic_config.cross_dim_max_iterations
+    min_rule_count = bic_config.cross_dim_min_rule_count
+    min_rule_confidence = bic_config.cross_dim_min_rule_confidence
+    delta_threshold = bic_config.delta_bic_threshold
+
     current_model = model
-    for _iteration in range(_CROSS_DIM_MAX_ITERATIONS):
+    for _iteration in range(max_iterations):
         hypotheses = find_residual_patterns(
             corpus,
             current_model,
@@ -110,7 +119,7 @@ def _cross_dimensional_discovery(
 
         # Evaluate every hypothesis and track the best.
         best_link: CrossDimensionalLink | None = None
-        best_delta_bic: float = DELTA_BIC_THRESHOLD
+        best_delta_bic: float = delta_threshold
         for hyp in hypotheses:
             trial_link = _hypothesis_to_cross_dimensional_link(
                 hyp, corpus, pair_weights, current_model
@@ -123,9 +132,9 @@ def _cross_dimensional_discovery(
             # admits count=1/N "anomaly" rules that aren't real
             # phonological patterns; require both a minimum absolute
             # count and a minimum confidence to commit.
-            if trial_link.count < _CROSS_DIM_MIN_RULE_COUNT:
+            if trial_link.count < min_rule_count:
                 continue
-            if trial_link.confidence < _CROSS_DIM_MIN_RULE_CONFIDENCE:
+            if trial_link.confidence < min_rule_confidence:
                 continue
 
             trial_entries = (

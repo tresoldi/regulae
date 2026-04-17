@@ -240,8 +240,6 @@ def bootstrap_multi_lect_uncertainty(
     corpus: Sequence[CognateSet],
     bootstrap_n: int,
     bootstrap_seed: int,
-    multi_lect_bic_correction: bool,
-    multi_lect_min_commit_scale: float,
     **train_kwargs: Any,
 ) -> MultiLectModel:
     """Resample the cognate-set corpus and replace intervals on the
@@ -289,8 +287,6 @@ def bootstrap_multi_lect_uncertainty(
         resample = [corpus[rng.randrange(n)] for _ in range(n)]
         sample_model = _train_multi_lect(
             resample,
-            multi_lect_bic_correction=multi_lect_bic_correction,
-            multi_lect_min_commit_scale=multi_lect_min_commit_scale,
             **train_kwargs,
         )
         for key, pm in sample_model.pairwise_models.items():

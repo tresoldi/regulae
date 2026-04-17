@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from regulae.priors import TypologicalPrior
 
+from regulae.config import BICConfig
 from regulae.model import (
     ChunkPhraseTable,
     CognateSet,
@@ -376,6 +377,7 @@ def _multi_lect_context_discovery(
     *,
     bic_small_sample_correction: bool = True,
     min_commit_scale: float = 1.0,
+    bic_config: BICConfig | None = None,
 ) -> tuple[MultiLectCorrespondenceClass, ...]:
     """Multi-lect class-level context discovery.
 
@@ -454,6 +456,7 @@ def _multi_lect_context_discovery(
         if fc.feature == "stress"
     })
 
+    cfg = bic_config if bic_config is not None else BICConfig()
     for (pivot_lect, pivot_g), obs in pivot_buckets.items():
         target_set = {t for t, *_rest in obs}
         if len(target_set) < 2 or sum(_obs_weight(o) for o in obs) < 4.0:
@@ -467,6 +470,7 @@ def _multi_lect_context_discovery(
             use_bic_small_sample_correction=bic_small_sample_correction,
             min_commit_scale=min_commit_scale,
             observed_stress_values=observed_stress_values,
+            bic_config=cfg,
         )
         # Also try long-range predicates on the same pivot bucket.
         # Stricter thresholds (mirroring the per-pair
@@ -478,6 +482,7 @@ def _multi_lect_context_discovery(
             sister_by_key=sister_by_key,
             committed=committed,
             min_commit_scale=min_commit_scale,
+            bic_config=cfg,
         )
 
     # Build MultiLectCorrespondenceClass entries from committed splits,
@@ -614,6 +619,7 @@ def _commit_multi_lect_splits_for_pivot(
     use_bic_small_sample_correction: bool,
     min_commit_scale: float,
     observed_stress_values: frozenset[str] | None = None,
+    bic_config: BICConfig | None = None,
 ) -> None:
     """Sequential greedy context splitting for one pivot (lect, grapheme).
 
@@ -633,6 +639,12 @@ def _commit_multi_lect_splits_for_pivot(
       count below which a class is not emitted. See
       :func:`_multi_lect_min_commit_count`.
     """
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_obs = bic_config.min_split_observations
+    max_depth = bic_config.max_split_depth
+    delta_threshold = bic_config.delta_bic_threshold
+
     remaining = list(observations)
     n_total = sum(_obs_weight(obs) for obs in observations)
     if n_total < 4:
@@ -644,18 +656,18 @@ def _commit_multi_lect_splits_for_pivot(
     min_commit = _multi_lect_min_commit_count(n_total, min_commit_scale)
     committed_count = 0
     while (
-        committed_count < MAX_SPLIT_DEPTH * 4
-        and sum(_obs_weight(obs) for obs in remaining) >= MIN_SPLIT_OBSERVATIONS
+        committed_count < max_depth * 4
+        and sum(_obs_weight(obs) for obs in remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
-        best_delta = DELTA_BIC_THRESHOLD
+        best_delta = delta_threshold
         for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                sum(_obs_weight(obs) for obs in yes_obs) < MIN_SPLIT_OBSERVATIONS
-                or sum(_obs_weight(obs) for obs in no_obs) < MIN_SPLIT_OBSERVATIONS
+                sum(_obs_weight(obs) for obs in yes_obs) < min_obs
+                or sum(_obs_weight(obs) for obs in no_obs) < min_obs
             ):
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
@@ -695,6 +707,7 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     ],
     *,
     min_commit_scale: float,
+    bic_config: BICConfig | None = None,
 ) -> None:
     """Long-range parallel of the multi-lect class-discovery
     pivot split loop.
@@ -713,8 +726,15 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     loop already saw — long-range commits are additive overlays,
     not partitions of the residual.
     """
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_obs = bic_config.long_range_min_split_observations
+    max_depth = bic_config.max_split_depth
+    delta_threshold = bic_config.long_range_delta_bic_threshold
+    dominant_fraction = bic_config.long_range_min_dominant_fraction
+
     n_total = sum(_obs_weight(obs) for obs in observations)
-    if n_total < _LONG_RANGE_MIN_SPLIT_OBS:
+    if n_total < min_obs:
         return
     ln_n = math.log(n_total)
     # Long-range multi-lect commits use a strict floor independent
@@ -723,27 +743,26 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     # for small pivot buckets — too lax for long-range, which
     # already has many candidate predicates and is prone to
     # 3-observation noise commits. Use the per-pair long-range
-    # floor (``_LONG_RANGE_MIN_SPLIT_OBS = 5``) as the firm
-    # minimum.
+    # floor as the firm minimum.
     min_commit = max(
         _multi_lect_min_commit_count(n_total, min_commit_scale),
-        _LONG_RANGE_MIN_SPLIT_OBS,
+        min_obs,
     )
     remaining = list(observations)
     committed_count = 0
     while (
-        committed_count < MAX_SPLIT_DEPTH * 4
-        and sum(_obs_weight(obs) for obs in remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
+        committed_count < max_depth * 4
+        and sum(_obs_weight(obs) for obs in remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
-        best_delta = _LONG_RANGE_DELTA_BIC_THRESHOLD
+        best_delta = delta_threshold
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                sum(_obs_weight(obs) for obs in yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
-                or sum(_obs_weight(obs) for obs in no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                sum(_obs_weight(obs) for obs in yes_obs) < min_obs
+                or sum(_obs_weight(obs) for obs in no_obs) < min_obs
             ):
                 continue
             yes_target_counts: dict[str, float] = defaultdict(float)
@@ -751,7 +770,7 @@ def _commit_multi_lect_long_range_splits_for_pivot(
                 yes_target_counts[obs[0]] += _obs_weight(obs)
             yes_mode = max(yes_target_counts.values())
             yes_weight = sum(_obs_weight(obs) for obs in yes_obs)
-            if yes_weight <= 0.0 or yes_mode / yes_weight < _LONG_RANGE_MIN_DOMINANT_FRACTION:
+            if yes_weight <= 0.0 or yes_mode / yes_weight < dominant_fraction:
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
             reduction = baseline_cost - split_cost
@@ -790,10 +809,9 @@ def _train_multi_lect(
     segment_weight: float,
     displacement_weight: float,
     tone_weight: float,
-    multi_lect_bic_correction: bool,
-    multi_lect_min_commit_scale: float,
     chunk_min_transparency: float = 0.0,
     typological_prior: "TypologicalPrior | None" = None,
+    bic_config: BICConfig | None = None,
 ) -> MultiLectModel:
     """Multi-lect training.
 
@@ -839,6 +857,7 @@ def _train_multi_lect(
             tone_weight=tone_weight,
             chunk_min_transparency=chunk_min_transparency,
             typological_prior=typological_prior,
+            bic_config=bic_config,
         )
         pairwise_models[frozenset({lect_a, lect_b})] = pair_model
 
@@ -857,13 +876,15 @@ def _train_multi_lect(
     unconditioned = _aggregate_unconditioned_classes(all_observations)
 
     # Multi-lect class-level context discovery.
+    cfg = bic_config if bic_config is not None else BICConfig()
     conditioned = _multi_lect_context_discovery(
         corpus=corpus,
         observations=per_lect_observations,
         feature_system=feature_system,
         start_class_id=len(unconditioned),
-        bic_small_sample_correction=multi_lect_bic_correction,
-        min_commit_scale=multi_lect_min_commit_scale,
+        bic_small_sample_correction=cfg.multi_lect_bic_small_sample_correction,
+        min_commit_scale=cfg.multi_lect_min_commit_scale,
+        bic_config=cfg,
     )
 
     # Lift per-pair cross-dimensional rules to the multi-lect

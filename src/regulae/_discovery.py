@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import replace
 
+from regulae.config import BICConfig
 from regulae.model import (
     ChunkPhraseTable,
     ConditionedCorrespondence,
@@ -139,6 +140,7 @@ def _context_discovery(
     model: LearnedModel,
     *,
     max_chunk_size: int,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel:
     """Discover immediate-neighbor context splits for segment correspondences.
 
@@ -154,6 +156,9 @@ def _context_discovery(
     """
     from regulae.training import align_corpus
     from regulae._em import _replace_segment_table
+
+    if bic_config is None:
+        bic_config = BICConfig()
 
     alignments = align_corpus(corpus, model, max_chunk_size=max_chunk_size)
 
@@ -235,8 +240,9 @@ def _context_discovery(
             new_counts=new_counts,
             new_src_totals=new_src_totals,
             ln_n=ln_n,
-            max_depth=MAX_SPLIT_DEPTH,
+            max_depth=bic_config.max_split_depth,
             observed_stress_values=observed_stress_values,
+            bic_config=bic_config,
         )
 
     new_segment_table = SegmentCorrespondenceTable(
@@ -296,6 +302,7 @@ def _commit_splits_for_source(
     ln_n: float,
     max_depth: int,
     observed_stress_values: frozenset[str] | None = None,
+    bic_config: BICConfig | None = None,
 ) -> None:
     """Sequential greedy context splitting for a single source grapheme.
 
@@ -319,23 +326,28 @@ def _commit_splits_for_source(
     split by ``_[front]``, then inside that split further by
     ``_[front, open]``).
     """
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_obs = bic_config.min_split_observations
+    delta_threshold = bic_config.delta_bic_threshold
+
     remaining = list(observations)
     committed_count = 0
     # Cap the number of top-level splits per source to prevent
     # pathological loops on messy data.
     while (
         committed_count < max_depth * 4
-        and _observation_weight(remaining) >= MIN_SPLIT_OBSERVATIONS
+        and _observation_weight(remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
-        best_delta = DELTA_BIC_THRESHOLD
+        best_delta = delta_threshold
         for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
-                or _observation_weight(no_obs) < MIN_SPLIT_OBSERVATIONS
+                _observation_weight(yes_obs) < min_obs
+                or _observation_weight(no_obs) < min_obs
             ):
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
@@ -361,6 +373,7 @@ def _commit_splits_for_source(
             ln_n=ln_n,
             max_depth=max_depth,
             observed_stress_values=observed_stress_values,
+            bic_config=bic_config,
         )
         remaining = no_obs
         committed_count += 1
@@ -375,6 +388,7 @@ def _refine_split(
     ln_n: float,
     max_depth: int,
     observed_stress_values: frozenset[str] | None = None,
+    bic_config: BICConfig | None = None,
 ) -> None:
     """Recursively refine an already-committed conditioned entry.
 
@@ -389,17 +403,22 @@ def _refine_split(
     explode combinatorially; the framework handles most real cases
     well enough with one refinement level per branch.
     """
-    if depth >= max_depth or _observation_weight(observations) < MIN_SPLIT_OBSERVATIONS:
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_obs = bic_config.min_split_observations
+    delta_threshold = bic_config.delta_bic_threshold
+
+    if depth >= max_depth or _observation_weight(observations) < min_obs:
         return
     baseline_cost = _group_cost(observations)
     best_predicate: tuple[str, str, str | None] | None = None
     best_partitions: tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]] | None = None
-    best_delta = DELTA_BIC_THRESHOLD
+    best_delta = delta_threshold
     for predicate in _candidate_predicates(base_context, observed_stress_values):
         yes_obs, no_obs = _partition(observations, predicate)
         if (
-            _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
-            or _observation_weight(no_obs) < MIN_SPLIT_OBSERVATIONS
+            _observation_weight(yes_obs) < min_obs
+            or _observation_weight(no_obs) < min_obs
         ):
             continue
         split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
@@ -421,6 +440,7 @@ def _refine_split(
         depth=depth + 1,
         new_counts=new_counts,
         ln_n=ln_n,
+        bic_config=bic_config,
         observed_stress_values=observed_stress_values,
         max_depth=max_depth,
     )
@@ -763,6 +783,7 @@ def _long_range_discovery(
     model: LearnedModel,
     *,
     max_chunk_size: int,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel:
     """Discover long-range context splits for segment correspondences.
 
@@ -786,6 +807,9 @@ def _long_range_discovery(
     """
     from regulae.training import align_corpus
     from regulae._em import _replace_segment_table
+
+    if bic_config is None:
+        bic_config = BICConfig()
 
     alignments = align_corpus(corpus, model, max_chunk_size=max_chunk_size)
 
@@ -821,7 +845,8 @@ def _long_range_discovery(
             observations=obs,
             new_counts=new_counts,
             ln_n=ln_n,
-            max_depth=MAX_SPLIT_DEPTH,
+            max_depth=bic_config.max_split_depth,
+            bic_config=bic_config,
         )
 
     new_segment_table = SegmentCorrespondenceTable(
@@ -840,6 +865,7 @@ def _commit_long_range_splits_for_source(
     new_counts: dict[ConditionedCorrespondence, float],
     ln_n: float,
     max_depth: int,
+    bic_config: BICConfig | None = None,
 ) -> None:
     """Sequential greedy long-range context splitting for one source.
 
@@ -849,21 +875,27 @@ def _commit_long_range_splits_for_source(
     (the long-range entries live in parallel — they're more
     specific overlays that fire only when their predicate holds).
     """
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_obs = bic_config.long_range_min_split_observations
+    delta_threshold = bic_config.long_range_delta_bic_threshold
+    dominant_fraction = bic_config.long_range_min_dominant_fraction
+
     remaining = list(observations)
     committed_count = 0
     while (
         committed_count < max_depth * 4
-        and _observation_weight(remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
+        and _observation_weight(remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
-        best_delta = _LONG_RANGE_DELTA_BIC_THRESHOLD
+        best_delta = delta_threshold
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                _observation_weight(yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
-                or _observation_weight(no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                _observation_weight(yes_obs) < min_obs
+                or _observation_weight(no_obs) < min_obs
             ):
                 continue
             # Dominance filter: the YES group must be carried by a
@@ -874,7 +906,7 @@ def _commit_long_range_splits_for_source(
                 yes_target_counts[t] += weight
             yes_mode = max(yes_target_counts.values())
             yes_weight = _observation_weight(yes_obs)
-            if yes_weight <= 0.0 or yes_mode / yes_weight < _LONG_RANGE_MIN_DOMINANT_FRACTION:
+            if yes_weight <= 0.0 or yes_mode / yes_weight < dominant_fraction:
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
             reduction = baseline_cost - split_cost

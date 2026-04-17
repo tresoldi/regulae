@@ -3,6 +3,7 @@ from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import replace
 
+from regulae.config import BICConfig
 from regulae.model import (
     ChunkPhraseTable,
     LearnedModel,
@@ -17,11 +18,9 @@ from regulae.types import (
     Segment,
 )
 
-# Minimum number of times a chunk must appear in the corpus before it
-# can be considered for promotion. Prevents BIC from promoting
-# chunks that only appear once, where Laplace-smoothed MLE gives an
-# over-confident probability (P = 1). Not strictly principled, but a
-# pragmatic necessity for low-data settings.
+# Backward-compat alias. The authoritative value lives on
+# BICConfig.min_chunk_observations; old code that imports this
+# constant keeps working.
 MIN_CHUNK_OBSERVATIONS: int = 2
 
 
@@ -32,6 +31,7 @@ def _chunk_promotion(
     *,
     max_chunk_size: int,
     chunk_min_transparency: float = 0.0,
+    bic_config: BICConfig | None = None,
 ) -> LearnedModel:
     """Extract candidate chunks from corpus alignments and promote
     those that improve BIC.
@@ -50,6 +50,10 @@ def _chunk_promotion(
     before they reach downstream consumers like historia.
     """
     from regulae.training import align_corpus
+
+    if bic_config is None:
+        bic_config = BICConfig()
+    min_chunk_obs = bic_config.min_chunk_observations
 
     alignments = align_corpus(corpus, model, max_chunk_size=max_chunk_size)
 
@@ -79,7 +83,7 @@ def _chunk_promotion(
         # Hard minimum count: below this, Laplace-smoothed MLE is too
         # optimistic (P = 1 from a single observation) and BIC cannot
         # reliably reject the spurious promotion.
-        if n_c < MIN_CHUNK_OBSERVATIONS:
+        if n_c < min_chunk_obs:
             continue
         comp_cost_per = _compositional_chunk_cost_raw(src_chunk, tgt_chunk, model)
         promoted_cost_per = _promoted_chunk_cost(src_chunk, tgt_chunk, candidates)
