@@ -2,8 +2,12 @@ import math
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import merkmal
+
+if TYPE_CHECKING:
+    from regulae.priors import TypologicalPrior
 
 from regulae.model import (
     ChunkPhraseTable,
@@ -33,6 +37,7 @@ def _initial_model(
     concentration: float,
     segment_weight: float,
     displacement_weight: float,
+    typological_prior: "TypologicalPrior | None" = None,
 ) -> LearnedModel:
     """Build the starting model: no counts, merkmal-derived Dirichlet
     prior, empty displacement distribution and chunk table.
@@ -48,6 +53,12 @@ def _initial_model(
     inventory so that confidence=0 cognate sets do not shape the
     prior candidate space. Unknown graphemes encountered at alignment
     time still fall back to merkmal.
+
+    If ``typological_prior`` is supplied, its return value (in nats)
+    is added to the merkmal-distance logit for each pair before the
+    softmax. ``None`` (or :func:`regulae.priors.uniform`) preserves
+    the merkmal-only behavior. The prior must be a deterministic
+    function of ``(src, tgt)`` so training stays reproducible.
     """
     if pair_weights is None:
         pair_weights = [1.0] * len(corpus)
@@ -80,7 +91,10 @@ def _initial_model(
                 # Skip unknown graphemes in the prior; they'll fall
                 # back to merkmal at scoring time if encountered.
                 continue
-            logits[t] = -temperature * d
+            logit = -temperature * d
+            if typological_prior is not None:
+                logit += typological_prior(s, t)
+            logits[t] = logit
         if not logits:
             continue
         # log-sum-exp for numerical stability

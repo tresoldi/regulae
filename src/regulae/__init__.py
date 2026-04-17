@@ -63,6 +63,8 @@ from regulae.uncertainty import (
     percentile_interval,
     wilson_interval,
 )
+from regulae import priors  # noqa: F401  (submodule re-export)
+from regulae.priors import TypologicalPrior
 
 __all__ = [
     "Alignment",
@@ -93,6 +95,7 @@ __all__ = [
     "SegmentCorrespondenceTable",
     "TonalCorrespondence",
     "TonalCorrespondenceTable",
+    "TypologicalPrior",
     "UncertaintyEstimate",
     "UnknownGrapheme",
     "analyze_promoted_chunks",

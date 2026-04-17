@@ -2,6 +2,10 @@ import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from regulae.priors import TypologicalPrior
 
 from regulae.model import (
     ChunkPhraseTable,
@@ -789,6 +793,7 @@ def _train_multi_lect(
     multi_lect_bic_correction: bool,
     multi_lect_min_commit_scale: float,
     chunk_min_transparency: float = 0.0,
+    typological_prior: "TypologicalPrior | None" = None,
 ) -> MultiLectModel:
     """Multi-lect training.
 
@@ -833,6 +838,7 @@ def _train_multi_lect(
             displacement_weight=displacement_weight,
             tone_weight=tone_weight,
             chunk_min_transparency=chunk_min_transparency,
+            typological_prior=typological_prior,
         )
         pairwise_models[frozenset({lect_a, lect_b})] = pair_model
 

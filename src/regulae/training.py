@@ -32,6 +32,10 @@ corpus.
 
 import warnings
 from collections.abc import Sequence
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from regulae.priors import TypologicalPrior
 
 from regulae.model import (
     CognateSet,
@@ -102,6 +106,7 @@ def train_model(
     chunk_min_transparency: float = 0.0,
     bootstrap_n: int = 0,
     bootstrap_seed: int = 0,
+    typological_prior: "TypologicalPrior | None" = None,
 ) -> LearnedModel | MultiLectModel:
     """Train a layered alignment model on a training corpus.
 
@@ -156,6 +161,17 @@ def train_model(
       careful analysis, 0 for iteration.
     * ``bootstrap_seed``: seeds the resampler for reproducibility.
 
+    Typological prior knob:
+
+    * ``typological_prior``: optional callable
+      ``(src_grapheme, tgt_grapheme) -> float`` returning a log-prior
+      adjustment in nats added to the merkmal feature-distance
+      logit at prior construction time. ``None`` (the default)
+      preserves merkmal-only behavior. See :mod:`regulae.priors`
+      for helpers (``uniform``, ``combine``). The framework ships
+      no opinionated priors — typological asymmetries are the
+      caller's responsibility.
+
     Training is deterministic given the corpus and hyperparameters.
     """
     if not corpus:
@@ -176,6 +192,7 @@ def train_model(
         displacement_weight=displacement_weight,
         tone_weight=tone_weight,
         chunk_min_transparency=chunk_min_transparency,
+        typological_prior=typological_prior,
     )
 
     if isinstance(corpus[0], CognateSet):
@@ -263,6 +280,7 @@ def _train_pairwise_legacy(
     displacement_weight: float,
     tone_weight: float,
     chunk_min_transparency: float = 0.0,
+    typological_prior: "TypologicalPrior | None" = None,
 ) -> LearnedModel:
     """Internal: the pair-based training pipeline."""
     if pair_weights is None:
@@ -278,6 +296,7 @@ def _train_pairwise_legacy(
         concentration=concentration,
         segment_weight=segment_weight,
         displacement_weight=displacement_weight,
+        typological_prior=typological_prior,
     )
 
     after_em = _segment_em(
