@@ -29,6 +29,7 @@ _DATASETS = [
     ("georgian_svan", "georgian", "svan"),
     ("mandarin_historical", "middle_chinese", "mandarin"),
     ("swahili_zulu", "swahili", "zulu"),
+    ("navajo_chipewyan", "navajo", "chipewyan"),
 ]
 
 
@@ -113,6 +114,44 @@ def test_mandarin_recovers_voicing_tonogenesis() -> None:
         "expected voiced=+ → tone=2 rule (MC voiced-onset tonogenesis); "
         f"got rules: {[(r.src_feature, r.tgt_value) for r in rules]}"
     )
+
+
+# ----- Athabaskan-specific: tones extracted into .tone --------------------
+
+
+def test_athabaskan_tones_extracted_into_segment_tone() -> None:
+    """COMMITMENT: the Navajo-Chipewyan parser extracts combining
+    acute/grave diacritics as ``Segment.tone = "H"`` / ``"L"``,
+    not as separate segments. The tonal correspondence table
+    should therefore be non-empty."""
+    labeled = _load("navajo_chipewyan")
+    if labeled is None:
+        pytest.skip("navajo_chipewyan experiment not available")
+    # At least one form should carry a tone.
+    _, src, tgt = labeled[0]
+    # Check that no segment is a bare combining diacritic.
+    for seg in src.segments:
+        assert seg.grapheme not in ("\u0301", "\u0300"), (
+            "combining tone mark leaked into grapheme"
+        )
+    for seg in tgt.segments:
+        assert seg.grapheme not in ("\u0301", "\u0300"), (
+            "combining tone mark leaked into grapheme"
+        )
+    # Some segments should carry a tone across the corpus.
+    has_tone = any(
+        seg.tone is not None
+        for _, src, tgt in labeled
+        for seg in (*src.segments, *tgt.segments)
+    )
+    assert has_tone, "expected at least some tones extracted"
+
+    pairs = [(s, t) for _, s, t in labeled]
+    corpus = cognate_sets_from_pairs(pairs, ("navajo", "chipewyan"))
+    model = train_model(corpus)
+    assert isinstance(model, MultiLectModel)
+    pair = model.pairwise_models[frozenset({"navajo", "chipewyan"})]
+    assert len(pair.tonal_table.counts) > 0
 
 
 # ----- Contaminated-cognates fixture --------------------------------------

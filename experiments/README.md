@@ -24,6 +24,7 @@ narrative findings documents rather than pass/fail assertions.
 | [`georgian_svan/`](georgian_svan/) | Georgian -- Svan | Kartvelian. Ejectives, consonant clusters, Geo-t/Svan-šd correspondence. |
 | [`mandarin_historical/`](mandarin_historical/) | Middle Chinese -- Mandarin | **Real-data tonogenesis.** Recovers MC voiced-onset → Mandarin tone-2 as a cross-dimensional rule. |
 | [`swahili_zulu/`](swahili_zulu/) | Swahili -- Zulu | Bantu. Noun-class prefixes (boundaries annotated), implosives, spirantization. |
+| [`navajo_chipewyan/`](navajo_chipewyan/) | Navajo -- Chipewyan | Athabaskan. Complex ejectives, lateral fricatives, tones (parser extracts combining acute/grave into `Segment.tone`). |
 
 **Multi-lect experiments:**
 
