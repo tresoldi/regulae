@@ -129,6 +129,16 @@ class Context:
     * ``previous_syllable``: constraints on any segment in the syllable
       before the link's first position.
 
+    Suprasegmental slots (populated from ``Segment.stress`` directly,
+    not via merkmal features):
+
+    * ``self_stress``: constraints on the link's own segment's stress
+      value. Only meaningful for 1-to-1 links; left empty for chunks.
+    * ``preceding_stress``: constraints on the immediately preceding
+      segment's stress value. Same 1-to-1 restriction.
+    * ``following_stress``: same, for the immediately following
+      segment.
+
     Empty tuples mean "no constraint at this slot." ``None`` for
     ``position`` or ``morphological`` likewise means unconstrained.
     """
@@ -144,6 +154,9 @@ class Context:
     same_syllable: tuple[FeatureConstraint, ...] = ()
     next_syllable: tuple[FeatureConstraint, ...] = ()
     previous_syllable: tuple[FeatureConstraint, ...] = ()
+    self_stress: tuple[FeatureConstraint, ...] = ()
+    preceding_stress: tuple[FeatureConstraint, ...] = ()
+    following_stress: tuple[FeatureConstraint, ...] = ()
 
     def is_subset_of(self, other: "Context") -> bool:
         """Return True if every constraint in ``self`` is satisfied by
@@ -184,6 +197,12 @@ class Context:
             return False
         if any(c not in other.previous_syllable for c in self.previous_syllable):
             return False
+        if any(c not in other.self_stress for c in self.self_stress):
+            return False
+        if any(c not in other.preceding_stress for c in self.preceding_stress):
+            return False
+        if any(c not in other.following_stress for c in self.following_stress):
+            return False
         return True
 
     def constraint_count(self) -> int:
@@ -207,6 +226,9 @@ class Context:
         count += len(self.same_syllable)
         count += len(self.next_syllable)
         count += len(self.previous_syllable)
+        count += len(self.self_stress)
+        count += len(self.preceding_stress)
+        count += len(self.following_stress)
         return count
 
 

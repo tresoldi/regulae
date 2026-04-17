@@ -275,6 +275,26 @@ def align_forms(
                                 next_syl = syl_features[s_idx + 1]
                             if s_idx > 0:
                                 prev_syl = syl_features[s_idx - 1]
+                        # Stress predicates are populated from
+                        # ``Segment.stress`` (user-supplied), not
+                        # merkmal features. Only 1-to-1 links carry
+                        # these; chunks span multiple positions and
+                        # the notion of "own stress" is ambiguous.
+                        self_stress: tuple[FeatureConstraint, ...] = ()
+                        preceding_stress: tuple[FeatureConstraint, ...] = ()
+                        following_stress: tuple[FeatureConstraint, ...] = ()
+                        if k == 1 and l == 1:
+                            own = source.segments[src_start].stress
+                            if own is not None:
+                                self_stress = (FeatureConstraint("stress", own),)
+                            if src_start > 0:
+                                pre_s = source.segments[src_start - 1].stress
+                                if pre_s is not None:
+                                    preceding_stress = (FeatureConstraint("stress", pre_s),)
+                            if src_end < n:
+                                fol_s = source.segments[src_end].stress
+                                if fol_s is not None:
+                                    following_stress = (FeatureConstraint("stress", fol_s),)
                         link_context = Context(
                             position=position,
                             preceding=preceding,
@@ -286,6 +306,9 @@ def align_forms(
                             same_syllable=same_syl,
                             next_syllable=next_syl,
                             previous_syllable=prev_syl,
+                            self_stress=self_stress,
+                            preceding_stress=preceding_stress,
+                            following_stress=following_stress,
                         )
                     else:
                         link_context = Context()
@@ -397,6 +420,21 @@ def _compute_link_context(
             next_syl = syl_features[s_idx + 1]
         if s_idx > 0:
             prev_syl = syl_features[s_idx - 1]
+    self_stress: tuple[FeatureConstraint, ...] = ()
+    preceding_stress: tuple[FeatureConstraint, ...] = ()
+    following_stress: tuple[FeatureConstraint, ...] = ()
+    if (src_end - src_start) == 1:
+        own = source_form.segments[src_start].stress
+        if own is not None:
+            self_stress = (FeatureConstraint("stress", own),)
+        if src_start > 0:
+            pre_s = source_form.segments[src_start - 1].stress
+            if pre_s is not None:
+                preceding_stress = (FeatureConstraint("stress", pre_s),)
+        if src_end < n:
+            fol_s = source_form.segments[src_end].stress
+            if fol_s is not None:
+                following_stress = (FeatureConstraint("stress", fol_s),)
     return Context(
         position=position,
         preceding=preceding,
@@ -408,6 +446,9 @@ def _compute_link_context(
         same_syllable=same_syl,
         next_syllable=next_syl,
         previous_syllable=prev_syl,
+        self_stress=self_stress,
+        preceding_stress=preceding_stress,
+        following_stress=following_stress,
     )
 
 

@@ -415,6 +415,18 @@ def _multi_lect_context_discovery(
         tuple[str, str, Context, tuple[tuple[str, str], ...], float, float]
     ] = []  # (pivot_lect, pivot_g, ctx, sister_tuple, count, pivot_bucket_size)
 
+    # Harvest every distinct stress value the pivot observations
+    # carry, so stress-conditioned splits are candidate predicates
+    # per pivot. Empty when no observation has a stress annotation.
+    observed_stress_values: frozenset[str] = frozenset({
+        fc.value
+        for _, ctxs in pivot_buckets.items()
+        for (_, ctx, _) in ctxs
+        for slot in (ctx.self_stress, ctx.preceding_stress, ctx.following_stress)
+        for fc in slot
+        if fc.feature == "stress"
+    })
+
     for (pivot_lect, pivot_g), obs in pivot_buckets.items():
         target_set = {t for t, *_rest in obs}
         if len(target_set) < 2 or sum(_obs_weight(o) for o in obs) < 4.0:
@@ -427,6 +439,7 @@ def _multi_lect_context_discovery(
             committed=committed,
             use_bic_small_sample_correction=bic_small_sample_correction,
             min_commit_scale=min_commit_scale,
+            observed_stress_values=observed_stress_values,
         )
         # Also try long-range predicates on the same pivot bucket.
         # Stricter thresholds (mirroring the per-pair
@@ -573,6 +586,7 @@ def _commit_multi_lect_splits_for_pivot(
     *,
     use_bic_small_sample_correction: bool,
     min_commit_scale: float,
+    observed_stress_values: frozenset[str] | None = None,
 ) -> None:
     """Sequential greedy context splitting for one pivot (lect, grapheme).
 
@@ -610,7 +624,7 @@ def _commit_multi_lect_splits_for_pivot(
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
         best_delta = DELTA_BIC_THRESHOLD
-        for predicate in _candidate_predicates(Context()):
+        for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
                 sum(_obs_weight(obs) for obs in yes_obs) < MIN_SPLIT_OBSERVATIONS

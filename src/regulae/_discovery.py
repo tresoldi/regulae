@@ -217,6 +217,11 @@ def _context_discovery(
         return model
     ln_n = math.log(n_total)
 
+    # Distinct stress values observed across any context slot. Empty
+    # if no cognate sets supplied stress marks; non-empty turns on
+    # stress-conditioned split candidates for every source.
+    observed_stress_values = _collect_stress_values(observations)
+
     # Process each source greedily.
     for src, obs in by_source.items():
         # Only attempt splits on sources with multiple targets and
@@ -231,6 +236,7 @@ def _context_discovery(
             new_src_totals=new_src_totals,
             ln_n=ln_n,
             max_depth=MAX_SPLIT_DEPTH,
+            observed_stress_values=observed_stress_values,
         )
 
     new_segment_table = SegmentCorrespondenceTable(
@@ -241,6 +247,27 @@ def _context_discovery(
         uncertainty=_segment_counts_uncertainty(new_counts, new_src_totals),
     )
     return _replace_segment_table(model, new_segment_table)
+
+
+def _collect_stress_values(
+    observations: list[tuple[str, str, Context, float]],
+) -> frozenset[str]:
+    """Return every distinct stress value seen in the observation
+    contexts' ``self_stress`` / ``preceding_stress`` /
+    ``following_stress`` slots.
+
+    Returns an empty frozenset when no observation carries a stress
+    annotation — in which case stress-conditioned split candidates
+    are not emitted, and the training run behaves exactly as it did
+    before the stress feature was wired in.
+    """
+    values: set[str] = set()
+    for _, _, ctx, _ in observations:
+        for slot in (ctx.self_stress, ctx.preceding_stress, ctx.following_stress):
+            for fc in slot:
+                if fc.feature == "stress":
+                    values.add(fc.value)
+    return frozenset(values)
 
 
 def _segment_counts_uncertainty(
@@ -268,6 +295,7 @@ def _commit_splits_for_source(
     new_src_totals: dict[str, float],
     ln_n: float,
     max_depth: int,
+    observed_stress_values: frozenset[str] | None = None,
 ) -> None:
     """Sequential greedy context splitting for a single source grapheme.
 
@@ -303,7 +331,7 @@ def _commit_splits_for_source(
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
         best_delta = DELTA_BIC_THRESHOLD
-        for predicate in _candidate_predicates(Context()):
+        for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
                 _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
@@ -332,6 +360,7 @@ def _commit_splits_for_source(
             new_counts=new_counts,
             ln_n=ln_n,
             max_depth=max_depth,
+            observed_stress_values=observed_stress_values,
         )
         remaining = no_obs
         committed_count += 1
@@ -345,6 +374,7 @@ def _refine_split(
     new_counts: dict[ConditionedCorrespondence, float],
     ln_n: float,
     max_depth: int,
+    observed_stress_values: frozenset[str] | None = None,
 ) -> None:
     """Recursively refine an already-committed conditioned entry.
 
@@ -365,7 +395,7 @@ def _refine_split(
     best_predicate: tuple[str, str, str | None] | None = None
     best_partitions: tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]] | None = None
     best_delta = DELTA_BIC_THRESHOLD
-    for predicate in _candidate_predicates(base_context):
+    for predicate in _candidate_predicates(base_context, observed_stress_values):
         yes_obs, no_obs = _partition(observations, predicate)
         if (
             _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
@@ -391,6 +421,7 @@ def _refine_split(
         depth=depth + 1,
         new_counts=new_counts,
         ln_n=ln_n,
+        observed_stress_values=observed_stress_values,
         max_depth=max_depth,
     )
 
@@ -435,6 +466,7 @@ def _group_cost(observations: list[tuple[str, Context, float]]) -> float:
 
 def _candidate_predicates(
     base_context: Context,
+    observed_stress_values: frozenset[str] | None = None,
 ) -> list[tuple[str, str, str | None]]:
     """Return candidate split predicates not already in ``base_context``.
 
@@ -443,6 +475,16 @@ def _candidate_predicates(
     * ``("following", feature_name, "+")`` for a following-segment feature
     * ``("preceding", feature_name, "+")`` for a preceding-segment feature
     * ``("position", position_name, None)`` for word position
+    * ``("self_stress", "stress", value)``,
+      ``("preceding_stress", "stress", value)``,
+      ``("following_stress", "stress", value)`` — only emitted when
+      ``observed_stress_values`` is provided and the base context does
+      not already constrain the matching slot. One predicate per
+      distinct observed stress value.
+
+    Passing ``observed_stress_values=None`` disables stress
+    enumeration entirely; passing ``frozenset()`` disables it in the
+    same way.
     """
     candidates: list[tuple[str, str, str | None]] = []
     existing_following = {c.feature for c in base_context.following}
@@ -457,6 +499,18 @@ def _candidate_predicates(
     if base_context.position is None:
         for pos in _SPLIT_POSITIONS:
             candidates.append(("position", pos, None))
+    # Stress splits: one candidate per observed value per slot.
+    if observed_stress_values:
+        for slot, base_slot in (
+            ("self_stress", base_context.self_stress),
+            ("preceding_stress", base_context.preceding_stress),
+            ("following_stress", base_context.following_stress),
+        ):
+            existing_values = {c.value for c in base_slot if c.feature == "stress"}
+            for value in sorted(observed_stress_values):
+                if value in existing_values:
+                    continue
+                candidates.append((slot, "stress", value))
     return candidates
 
 
@@ -521,6 +575,12 @@ def _predicate_holds(
         return any(c.feature == feature and c.value == value for c in ctx.next_syllable)
     if slot == "previous_syllable":
         return any(c.feature == feature and c.value == value for c in ctx.previous_syllable)
+    if slot == "self_stress":
+        return any(c.feature == feature and c.value == value for c in ctx.self_stress)
+    if slot == "preceding_stress":
+        return any(c.feature == feature and c.value == value for c in ctx.preceding_stress)
+    if slot == "following_stress":
+        return any(c.feature == feature and c.value == value for c in ctx.following_stress)
     return False
 
 
@@ -581,6 +641,18 @@ def _apply_predicate(
     if slot == "previous_syllable":
         return dataclasses.replace(
             base_context, previous_syllable=base_context.previous_syllable + (fc,)
+        )
+    if slot == "self_stress":
+        return dataclasses.replace(
+            base_context, self_stress=base_context.self_stress + (fc,)
+        )
+    if slot == "preceding_stress":
+        return dataclasses.replace(
+            base_context, preceding_stress=base_context.preceding_stress + (fc,)
+        )
+    if slot == "following_stress":
+        return dataclasses.replace(
+            base_context, following_stress=base_context.following_stress + (fc,)
         )
     return base_context
 
