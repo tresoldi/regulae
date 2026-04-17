@@ -6,9 +6,15 @@ from regulae.anomaly import (
     find_residual_patterns,
 )
 from regulae.chunk_diagnostics import (
+    ChunkProcessFamilyReport,
+    ChunkProcessSubtypeReport,
     ChunkTransparencyReport,
     analyze_promoted_chunks,
+    describe_chunk_process_families,
+    describe_chunk_process_subtypes,
     describe_promoted_chunk,
+    summarize_chunk_process_families,
+    summarize_chunk_process_subtypes,
 )
 from regulae.diagnostics import CognateOutlierReport, find_cognate_outliers
 from regulae.format import (
@@ -56,6 +62,8 @@ from regulae.types import (
 __all__ = [
     "Alignment",
     "ChunkPhraseTable",
+    "ChunkProcessFamilyReport",
+    "ChunkProcessSubtypeReport",
     "ChunkTransparencyReport",
     "CognateOutlierReport",
     "CognateSet",
@@ -89,6 +97,8 @@ __all__ = [
     "compute_displacement",
     "compute_syllable_breaks",
     "describe_cross_dimensional_rule",
+    "describe_chunk_process_families",
+    "describe_chunk_process_subtypes",
     "describe_multi_lect_class",
     "describe_promoted_chunk",
     "describe_source",
@@ -103,5 +113,7 @@ __all__ = [
     "load_cognates_from_tsv",
     "load_gled",
     "score_link",
+    "summarize_chunk_process_families",
+    "summarize_chunk_process_subtypes",
     "train_model",
 ]

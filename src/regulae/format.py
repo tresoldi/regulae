@@ -10,7 +10,11 @@ and understand it without writing ad-hoc loops every time.
 correspondences, displacement vectors, and promoted chunks.
 """
 
-from regulae.chunk_diagnostics import analyze_promoted_chunks
+from regulae.chunk_diagnostics import (
+    analyze_promoted_chunks,
+    summarize_chunk_process_families,
+    summarize_chunk_process_subtypes,
+)
 from regulae.model import LearnedModel, MultiLectCorrespondenceClass, MultiLectModel
 from regulae.scoring import score_link
 from regulae.types import Alignment, Context, FeatureDisplacement, Link, Segment
@@ -65,6 +69,8 @@ def format_model(
     min_count: float = 1.0,
     annotate_chunks: bool = False,
     chunk_warning_threshold: float = 0.35,
+    summarize_chunk_processes: bool = False,
+    summarize_chunk_subtypes: bool = False,
 ) -> str:
     """Summary of a ``LearnedModel`` as a multi-line string.
 
@@ -216,12 +222,66 @@ def format_model(
             line = f"  ({s}, {t}): cost={cost:.3f}"
             report = chunk_reports.get((src, tgt))
             if report is not None:
-                line += f" score={report.transparency_score:.2f}"
+                line += (
+                    f" score={report.transparency_score:.2f}"
+                    f" profile={report.process_profile}"
+                    f" subtype={report.process_subtype}"
+                    f" conf={report.process_confidence:.2f}"
+                )
+                if report.process_evidence:
+                    line += f" evidence={'; '.join(report.process_evidence)}"
                 if report.notes:
                     line += f" notes={'; '.join(report.notes)}"
                 if report.transparency_score < chunk_warning_threshold:
                     line += " WARNING"
             lines.append(line)
+
+    if summarize_chunk_processes:
+        families = summarize_chunk_process_families(model)
+        lines.append(f"Chunk process families ({len(families)}):")
+        if not families:
+            lines.append("  (none)")
+        else:
+            for family in families:
+                line = (
+                    f"  {family.process_profile}: count={family.chunk_count} "
+                    f"support={family.weighted_support:.2f} "
+                    f"avg_score={family.average_transparency:.2f} "
+                    f"avg_conf={family.average_process_confidence:.2f}"
+                )
+                if family.representative_chunks:
+                    examples = ", ".join(
+                        f"{src}->{tgt}" for src, tgt in family.representative_chunks
+                    )
+                    line += f" examples={examples}"
+                if family.evidence_signatures:
+                    line += f" evidence={'; '.join(family.evidence_signatures)}"
+                lines.append(line)
+
+    if summarize_chunk_subtypes:
+        subtypes = summarize_chunk_process_subtypes(model)
+        lines.append(f"Chunk process subtypes ({len(subtypes)}):")
+        if not subtypes:
+            lines.append("  (none)")
+        else:
+            for subtype in subtypes:
+                line = (
+                    f"  {subtype.process_profile}/{subtype.process_subtype}: "
+                    f"count={subtype.chunk_count} "
+                    f"support={subtype.weighted_support:.2f} "
+                    f"avg_score={subtype.average_transparency:.2f} "
+                    f"avg_conf={subtype.average_process_confidence:.2f}"
+                )
+                if subtype.representative_chunks:
+                    examples = ", ".join(
+                        f"{src}->{tgt}" for src, tgt in subtype.representative_chunks
+                    )
+                    line += f" examples={examples}"
+                if subtype.evidence_signatures:
+                    line += f" evidence={'; '.join(subtype.evidence_signatures)}"
+                if subtype.context_signatures:
+                    line += f" contexts={'; '.join(subtype.context_signatures)}"
+                lines.append(line)
 
     return "\n".join(lines)
 
