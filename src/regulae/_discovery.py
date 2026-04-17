@@ -46,18 +46,26 @@ DELTA_BIC_THRESHOLD: float = -1.0
 # Candidate feature dimensions tried as context split criteria.
 # Each entry is ("preceding" | "following", feature_name, value).
 # Position splits are handled separately.
+#
+# ``long`` is included so the discovery layer can condition on vowel
+# or consonant length in the neighbourhood — compensatory-lengthening
+# triggers, length-harmony-like effects. A segment's own length is
+# captured separately through the grapheme distinction (``a`` vs
+# ``aː`` as different source keys).
 _SPLIT_FEATURE_INVENTORY: tuple[tuple[str, str, str], ...] = (
     ("following", "vowel", "+"),
     ("following", "front", "+"),
     ("following", "back", "+"),
     ("following", "close", "+"),
     ("following", "open", "+"),
+    ("following", "long", "+"),
     ("preceding", "vowel", "+"),
     ("preceding", "front", "+"),
     ("preceding", "back", "+"),
     ("preceding", "voiced", "+"),
     ("preceding", "voiceless", "+"),
     ("preceding", "consonant", "+"),
+    ("preceding", "long", "+"),
 )
 
 _SPLIT_POSITIONS: tuple[str, ...] = ("initial", "medial", "final")
@@ -80,6 +88,7 @@ _LONG_RANGE_FEATURES: tuple[str, ...] = (
     "open",
     "voiced",
     "voiceless",
+    "long",
 )
 
 # Stricter thresholds than immediate-neighbour context discovery

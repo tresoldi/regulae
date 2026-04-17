@@ -43,10 +43,22 @@ from regulae.types import Form, Segment
 def parse_segments(ipa: str) -> tuple[Segment, ...]:
     """Parse an IPA string into Segments, handling multi-char graphemes.
 
-    Merkmal has diphthong entries like aɪ and oʊ as single graphemes, so
-    we match those first before falling back to single characters.
+    Merkmal handles long vowels (aː, eː, iː, oː, uː) and diphthongs
+    (aɪ, oʊ, aʊ, ɔɪ, eɪ) as single graphemes in the descriptive
+    system, so we match those first before falling back to single
+    characters.
+
+    Length marks are preserved: OE /aː/ is distinct from OE /a/, and
+    the length distinction is what drives the Great Vowel Shift
+    conditioning. Earlier versions of this experiment stripped ː to
+    work around an import-time misconception — ``merkmal`` does in
+    fact cover long vowels natively.
     """
-    multi = ["aɪ", "oʊ", "aʊ", "ɔɪ", "eɪ", "tʃ", "dʒ"]
+    multi = (
+        "aː", "æː", "ɑː", "eː", "iː", "oː", "ɔː", "uː", "yː",
+        "aɪ", "oʊ", "aʊ", "ɔɪ", "eɪ",
+        "tʃ", "dʒ",
+    )
     segments: list[Segment] = []
     i = 0
     while i < len(ipa):
@@ -58,16 +70,6 @@ def parse_segments(ipa: str) -> tuple[Segment, ...]:
                 matched = True
                 break
         if not matched:
-            # Skip length marks since we use explicit long-vowel forms
-            # like "oː" etc. Treat ː as part of the preceding segment.
-            if ipa[i] == "ː":
-                # Length marker — merkmal doesn't have vowel+ː as a single
-                # grapheme in descriptive system, so we drop it and fall
-                # back on the bare vowel. This collapses OE /aː/ with /a/
-                # from the framework's perspective, which is a small
-                # compromise.
-                i += 1
-                continue
             segments.append(Segment(ipa[i]))
             i += 1
     return tuple(segments)

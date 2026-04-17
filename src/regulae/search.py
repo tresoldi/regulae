@@ -68,6 +68,7 @@ _CONTEXT_FEATURES: frozenset[str] = frozenset(
         "fricative",
         "nasal",
         "sonorant",
+        "long",
     )
 )
 
