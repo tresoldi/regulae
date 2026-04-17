@@ -109,12 +109,12 @@ def test_oe_modern_english_preserves_long_short_distinction() -> None:
     pairs = []
     with tsv.open() as f:
         header = f.readline().strip().split("\t")
-        assert header == ["gloss", "old_english", "modern_english"]
+        assert header[:3] == ["gloss", "old_english", "modern_english"]
         for line in f:
             parts = line.strip().split("\t")
-            if len(parts) != 3:
+            if len(parts) < 3:
                 continue
-            _, oe, me = parts
+            _, oe, me = parts[0], parts[1], parts[2]
             pairs.append((
                 Form("oe", _parse(oe, multi)),
                 Form("me", _parse(me, multi)),

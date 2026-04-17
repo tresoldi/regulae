@@ -61,14 +61,23 @@ class Segment:
 class Form:
     """A phonological form in some lect: a sequence of segments.
 
-    Optionally carries syllable break indices (positions where a new syllable
-    starts; index 0 is implied as a syllable start). No morphological
-    structure yet.
+    Optionally carries:
+
+    * ``syllable_breaks``: positions where a new syllable starts;
+      index 0 is implied as a syllable start.
+    * ``morpheme_breaks``: positions where a new morpheme starts;
+      index 0 is implied as a stem-initial position. Each entry is
+      a position ``b`` meaning the morpheme starts at index ``b``
+      (so the boundary lies between segment ``b-1`` and segment
+      ``b``). Used by chunk promotion to reject chunks that
+      straddle morpheme boundaries — those are morphological
+      artifacts, not phonological correspondences.
     """
 
     lect_id: str
     segments: tuple[Segment, ...]
     syllable_breaks: tuple[int, ...] = ()
+    morpheme_breaks: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)

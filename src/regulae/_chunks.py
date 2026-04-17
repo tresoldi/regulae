@@ -165,13 +165,41 @@ def _extract_chunk_candidates(
     * both sides are non-empty (no pure insertion/deletion),
     * both sides are within ``max_chunk_size``,
     * the combined length is at least 3 (excludes plain 1-to-1 links
-      that belong to the segment table, not the chunk table).
+      that belong to the segment table, not the chunk table),
+    * neither side's span crosses a morpheme boundary on its
+      respective form (when ``Form.morpheme_breaks`` is supplied).
+      A boundary lies *between* segments, so a chunk covering
+      source positions ``[a, b)`` is rejected if any boundary
+      ``a < k < b`` is present. Same for the target side.
+
+    The morpheme-boundary filter is opt-in: forms without breaks
+    behave as before. Boundaries are honoured per-side, so e.g.
+    Old English stems can be annotated while Modern English
+    forms remain un-annotated (asymmetric case from
+    Theme 6 plan).
     """
     counts: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = defaultdict(float)
     for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
         if pair_weight <= 0.0:
             continue
         links = alignment.links
+        # Precompute per-link source/target spans so chunk extents
+        # can be checked against morpheme breaks below.
+        src_starts: list[int] = []
+        src_ends: list[int] = []
+        tgt_starts: list[int] = []
+        tgt_ends: list[int] = []
+        s_pos = 0
+        t_pos = 0
+        for link in links:
+            src_starts.append(s_pos)
+            tgt_starts.append(t_pos)
+            s_pos += len(link.source_chunk)
+            t_pos += len(link.target_chunk)
+            src_ends.append(s_pos)
+            tgt_ends.append(t_pos)
+        src_breaks = frozenset(alignment.source_form.morpheme_breaks)
+        tgt_breaks = frozenset(alignment.target_form.morpheme_breaks)
         for i in range(len(links)):
             src_chunk: tuple[Segment, ...] = ()
             tgt_chunk: tuple[Segment, ...] = ()
@@ -184,8 +212,26 @@ def _extract_chunk_candidates(
                     continue
                 if len(src_chunk) + len(tgt_chunk) < 3:
                     continue
+                # Reject the candidate if it straddles a morpheme
+                # boundary on either side.
+                if _spans_break(src_starts[i], src_ends[j], src_breaks):
+                    continue
+                if _spans_break(tgt_starts[i], tgt_ends[j], tgt_breaks):
+                    continue
                 counts[(src_chunk, tgt_chunk)] += pair_weight
     return counts
+
+
+def _spans_break(start: int, end: int, breaks: frozenset[int]) -> bool:
+    """Return True iff any boundary index strictly inside ``(start, end)``
+    is present in ``breaks``. A boundary at exactly ``start`` or
+    ``end`` is on the chunk's edge and does not count as crossed."""
+    if not breaks:
+        return False
+    for b in breaks:
+        if start < b < end:
+            return True
+    return False
 
 
 def _compositional_chunk_cost_raw(

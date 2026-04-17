@@ -57,17 +57,33 @@ def load_corpus(tsv_path: Path) -> list[tuple[str, Form, Form]]:
     corpus: list[tuple[str, Form, Form]] = []
     with tsv_path.open() as f:
         header = f.readline().strip().split("\t")
-        assert header == ["gloss", "latin", "french"]
+        assert header[:3] == ["gloss", "latin", "french"]
+        has_breaks = header[3:] == ["latin_breaks", "french_breaks"]
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 3:
+            if len(parts) < 3:
                 continue
-            gloss, latin, french = parts
-            src = Form(lect_id="latin", segments=parse_segments(latin))
-            tgt = Form(lect_id="french", segments=parse_segments(french))
+            gloss, latin, french = parts[0], parts[1], parts[2]
+            lat_breaks: tuple[int, ...] = ()
+            fr_breaks: tuple[int, ...] = ()
+            if has_breaks and len(parts) >= 5:
+                if parts[3] != "-":
+                    lat_breaks = tuple(int(x) for x in parts[3].split(","))
+                if parts[4] != "-":
+                    fr_breaks = tuple(int(x) for x in parts[4].split(","))
+            src = Form(
+                lect_id="latin",
+                segments=parse_segments(latin),
+                morpheme_breaks=lat_breaks,
+            )
+            tgt = Form(
+                lect_id="french",
+                segments=parse_segments(french),
+                morpheme_breaks=fr_breaks,
+            )
             corpus.append((gloss, src, tgt))
     return corpus
 

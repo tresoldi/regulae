@@ -103,14 +103,37 @@ def _subset_for_pair(
     corpus: Sequence[CognateSet], lect_a: str, lect_b: str
 ) -> tuple[list[tuple[Form, Form]], list[float]]:
     """Extract the pairwise (form_a, form_b) list for cognate sets
-    where both lects are present."""
+    where both lects are present.
+
+    Propagates ``CognateSet.morpheme_boundaries`` onto each Form's
+    ``morpheme_breaks`` field if the Form does not already have
+    boundaries set. This means consumers can supply boundaries
+    either on the Form (preferred) or on the CognateSet (legacy);
+    both routes flow into chunk promotion.
+    """
     out: list[tuple[Form, Form]] = []
     weights: list[float] = []
     for cs in corpus:
         if lect_a in cs.forms and lect_b in cs.forms:
-            out.append((cs.forms[lect_a], cs.forms[lect_b]))
+            form_a = _form_with_boundaries(cs.forms[lect_a], cs, lect_a)
+            form_b = _form_with_boundaries(cs.forms[lect_b], cs, lect_b)
+            out.append((form_a, form_b))
             weights.append(cs.confidence)
     return out, weights
+
+
+def _form_with_boundaries(form: Form, cs: CognateSet, lect_id: str) -> Form:
+    """Return ``form`` with ``morpheme_breaks`` populated from
+    ``cs.morpheme_boundaries[lect_id]`` if the form does not already
+    carry breaks. No-op when neither source has boundary info."""
+    if form.morpheme_breaks:
+        return form
+    if cs.morpheme_boundaries is None:
+        return form
+    bounds = cs.morpheme_boundaries.get(lect_id)
+    if not bounds:
+        return form
+    return replace(form, morpheme_breaks=tuple(bounds))
 
 
 def _pair_alignment_edges(

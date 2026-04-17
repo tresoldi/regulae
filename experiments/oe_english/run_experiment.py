@@ -76,20 +76,34 @@ def parse_segments(ipa: str) -> tuple[Segment, ...]:
 
 
 def load_corpus(tsv_path: Path) -> list[tuple[str, Form, Form]]:
-    """Load the cognates TSV."""
+    """Load the cognates TSV.
+
+    The TSV optionally carries an ``old_english_breaks`` column with
+    morpheme-boundary positions for the OE form (Modern English is
+    not annotated — its morphology is largely lost relative to OE,
+    so symmetric annotation isn't recoverable from these cognates).
+    """
     corpus: list[tuple[str, Form, Form]] = []
     with tsv_path.open() as f:
         header = f.readline().strip().split("\t")
-        assert header == ["gloss", "old_english", "modern_english"]
+        assert header[:3] == ["gloss", "old_english", "modern_english"]
+        has_breaks = header[3:] == ["old_english_breaks"]
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 3:
+            if len(parts) < 3:
                 continue
-            gloss, oe, me = parts
-            src = Form(lect_id="old_english", segments=parse_segments(oe))
+            gloss, oe, me = parts[0], parts[1], parts[2]
+            oe_breaks: tuple[int, ...] = ()
+            if has_breaks and len(parts) >= 4 and parts[3] != "-":
+                oe_breaks = tuple(int(x) for x in parts[3].split(","))
+            src = Form(
+                lect_id="old_english",
+                segments=parse_segments(oe),
+                morpheme_breaks=oe_breaks,
+            )
             tgt = Form(lect_id="modern_english", segments=parse_segments(me))
             corpus.append((gloss, src, tgt))
     return corpus

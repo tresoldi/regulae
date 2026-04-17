@@ -354,10 +354,16 @@ def cognate_sets_from_pairs(
     out: list[CognateSet] = []
     for i, (src, tgt) in enumerate(pairs):
         src_form = Form(
-            lect_id=src_lect, segments=src.segments, syllable_breaks=src.syllable_breaks
+            lect_id=src_lect,
+            segments=src.segments,
+            syllable_breaks=src.syllable_breaks,
+            morpheme_breaks=src.morpheme_breaks,
         )
         tgt_form = Form(
-            lect_id=tgt_lect, segments=tgt.segments, syllable_breaks=tgt.syllable_breaks
+            lect_id=tgt_lect,
+            segments=tgt.segments,
+            syllable_breaks=tgt.syllable_breaks,
+            morpheme_breaks=tgt.morpheme_breaks,
         )
         out.append(
             CognateSet(

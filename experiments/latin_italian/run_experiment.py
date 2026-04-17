@@ -53,17 +53,33 @@ def load_corpus(tsv_path: Path) -> list[tuple[str, Form, Form]]:
     corpus: list[tuple[str, Form, Form]] = []
     with tsv_path.open() as f:
         header = f.readline().strip().split("\t")
-        assert header == ["gloss", "latin", "italian"]
+        assert header[:3] == ["gloss", "latin", "italian"]
+        has_breaks = header[3:] == ["latin_breaks", "italian_breaks"]
         for line in f:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 3:
+            if len(parts) < 3:
                 continue
-            gloss, latin, italian = parts
-            src = Form(lect_id="latin", segments=parse_segments(latin))
-            tgt = Form(lect_id="italian", segments=parse_segments(italian))
+            gloss, latin, italian = parts[0], parts[1], parts[2]
+            lat_breaks: tuple[int, ...] = ()
+            it_breaks: tuple[int, ...] = ()
+            if has_breaks and len(parts) >= 5:
+                if parts[3] != "-":
+                    lat_breaks = tuple(int(x) for x in parts[3].split(","))
+                if parts[4] != "-":
+                    it_breaks = tuple(int(x) for x in parts[4].split(","))
+            src = Form(
+                lect_id="latin",
+                segments=parse_segments(latin),
+                morpheme_breaks=lat_breaks,
+            )
+            tgt = Form(
+                lect_id="italian",
+                segments=parse_segments(italian),
+                morpheme_breaks=it_breaks,
+            )
             corpus.append((gloss, src, tgt))
     return corpus
 
