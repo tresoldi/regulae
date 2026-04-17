@@ -18,6 +18,12 @@ narrative findings documents rather than pass/fail assertions.
 | [`oe_english/`](oe_english/) | Old English -- Modern English | Third family (Germanic). Tests chain shifts (Great Vowel Shift) rather than mergers. |
 | [`latin_french/`](latin_french/) | Latin -- French | Extreme reductive Romance. Tests whether context discovery finds *different* conditioning profile than Spanish (same family). |
 | [`latin_italian/`](latin_italian/) | Latin -- Italian | Conservative Romance. Completes the 3-way Romance comparison (French extreme, Spanish moderate, Italian conservative). |
+| [`finnish_estonian/`](finnish_estonian/) | Finnish -- Estonian | Uralic. Vowel harmony (long-range), vowel length, consonant gradation. |
+| [`turkish_azerbaijani/`](turkish_azerbaijani/) | Turkish -- Azerbaijani | Turkic. Vowel harmony, agglutinative morphology (verb infinitives annotated), k/q alternation. |
+| [`arabic_hebrew/`](arabic_hebrew/) | Arabic -- Hebrew | Semitic (non-IE/non-Austronesian). Pharyngeals, emphatics, ḍād/ṣade correspondence. |
+| [`georgian_svan/`](georgian_svan/) | Georgian -- Svan | Kartvelian. Ejectives, consonant clusters, Geo-t/Svan-šd correspondence. |
+| [`mandarin_historical/`](mandarin_historical/) | Middle Chinese -- Mandarin | **Real-data tonogenesis.** Recovers MC voiced-onset → Mandarin tone-2 as a cross-dimensional rule. |
+| [`swahili_zulu/`](swahili_zulu/) | Swahili -- Zulu | Bantu. Noun-class prefixes (boundaries annotated), implosives, spirantization. |
 
 **Multi-lect experiments:**
 
@@ -44,6 +50,10 @@ narrative findings documents rather than pass/fail assertions.
 |---|---|---|
 | [`umlaut_synthetic/`](umlaut_synthetic/) | synthetic | Vowel fronting conditioned by following-syllable vowel (long-range context) |
 | [`harmony_synthetic/`](harmony_synthetic/) | synthetic | Vowel harmony conditioning (long-range context) |
+| [`length_conditioned_synthetic/`](length_conditioned_synthetic/) | synthetic | Length-conditioned consonant lenition (`b → β / [long:+]_`) |
+| [`stress_conditioned_synthetic/`](stress_conditioned_synthetic/) | synthetic | Stress-conditioned vowel lowering (`e → ɛ / [stress:+]`) |
+| [`morph_boundary_synthetic/`](morph_boundary_synthetic/) | synthetic | Morpheme-boundary chunk filter (rejects stem-suffix straddles) |
+| [`contaminated_cognates_synthetic/`](contaminated_cognates_synthetic/) | synthetic | Confidence-weighted training suppresses mis-labeled pairs |
 
 Each experiment directory contains:
 
