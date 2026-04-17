@@ -269,6 +269,28 @@ span multiple positions and the "same/next/previous syllable"
 predicates become ambiguous over a span. Chunks are silently
 skipped.
 
+## Confidence weighting
+
+`CognateSet.confidence ∈ [0, 1]` threads through every stage above
+as an evidence weight. A set with `confidence = c` contributes `c`
+to every count it would otherwise add by one: segment EM counts,
+displacement counts, chunk candidate counts, context-split and
+long-range observation masses, tonal counts, cross-dimensional BIC
+(`ln N` and per-corpus cost), and multi-lect class aggregation.
+`c = 0` is equivalent to excluding the set from training — the set
+is retained in the corpus for auditability but contributes nothing
+to any table.
+
+**Threshold semantics.** The minimum-observation constants
+(`MIN_CHUNK_OBSERVATIONS = 2`, `MIN_SPLIT_OBSERVATIONS = 3`,
+`_LONG_RANGE_MIN_SPLIT_OBS = 5`) now compare against weight *sums*
+rather than integer cardinalities. On uniform-confidence corpora
+the behaviour is unchanged. On mixed-confidence corpora this means
+two cognate sets at `confidence = 0.75` sum to `1.5` and will not
+clear the `MIN_CHUNK_OBSERVATIONS` floor — which is the intended
+semantics: the evidence is downweighted and so is the threshold it
+has to clear.
+
 ## Multi-lect training
 
 When training on cognate sets (N lects rather than 2), the pipeline

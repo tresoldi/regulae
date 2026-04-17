@@ -38,6 +38,14 @@ class ChunkTransparencyReport:
 
     ``transparency_score`` is a heuristic in ``[0, 1]`` where higher is
     more historically transparent. The score is advisory only.
+
+    ``transparency_score`` and ``process_confidence`` are independent
+    axes and should not be read as a single quality number. The score
+    reflects structural transparency (shortness, balance, gap ratio),
+    while ``process_confidence`` reflects how well the chunk matches
+    one of the named process profiles. A chunk can score high on one
+    and low on the other — an unclassified short balanced chunk will
+    show a high score and ``process_confidence`` around 0.45.
     """
 
     src_chunk: tuple[Segment, ...]

@@ -226,6 +226,7 @@ def _train_pairwise_legacy(
 
     initial = _initial_model(
         corpus=corpus,
+        pair_weights=pair_weights,
         feature_system=feature_system,
         temperature=temperature,
         concentration=concentration,

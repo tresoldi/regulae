@@ -26,6 +26,7 @@ from regulae.types import (
 def _initial_model(
     corpus: Sequence[tuple[Form, Form]],
     *,
+    pair_weights: Sequence[float] | None = None,
     feature_system: str,
     temperature: float,
     concentration: float,
@@ -41,10 +42,19 @@ def _initial_model(
     only on one side are still given priors over the other side's
     inventory so the model can score any link encountered during
     alignment.
+
+    Pairs with ``pair_weight <= 0`` are excluded from the grapheme
+    inventory so that confidence=0 cognate sets do not shape the
+    prior candidate space. Unknown graphemes encountered at alignment
+    time still fall back to merkmal.
     """
+    if pair_weights is None:
+        pair_weights = [1.0] * len(corpus)
     src_graphemes: set[str] = set()
     tgt_graphemes: set[str] = set()
-    for src_form, tgt_form in corpus:
+    for (src_form, tgt_form), pair_weight in zip(corpus, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         src_graphemes.update(seg.grapheme for seg in src_form.segments)
         tgt_graphemes.update(seg.grapheme for seg in tgt_form.segments)
 
