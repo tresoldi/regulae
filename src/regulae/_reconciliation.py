@@ -2,12 +2,27 @@ import math
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 if TYPE_CHECKING:
     from regulae.priors import TypologicalPrior
 
 from regulae.config import BICConfig
+
+
+class _MergedEntry(TypedDict):
+    """Accumulator for merging per-pivot multi-lect class commits.
+
+    Phase 2b will replace this with a proper dataclass. For now it
+    gives mypy --strict visibility into the dict-as-record pattern.
+    """
+
+    segments: dict[str, str]
+    contexts: dict[str, "Context"]
+    count: float
+    confidence: float
+    bucket_size: float
+    winning_count: float
 from regulae.model import (
     ChunkPhraseTable,
     CognateSet,
@@ -38,14 +53,14 @@ from regulae._discovery import (
 )
 
 
-def _obs_weight(obs: tuple) -> float:
+def _obs_weight(obs: tuple[object, ...]) -> float:
     """Return the weight of an observation tuple.
 
     Backward-compatible with older 2-tuples ``(target, Context)``
     used by internal helper tests; those implicitly carry weight 1.0.
     """
     if len(obs) >= 3:
-        return float(obs[2])
+        return float(obs[2])  # type: ignore[arg-type]
     return 1.0
 
 
@@ -62,7 +77,7 @@ class _UnionFind:
             self._parent[x] = x
             return x
         while self._parent[x] != x:
-            self._parent[x] = self._parent[self._parent[x]]  # type: ignore[index]
+            self._parent[x] = self._parent[self._parent[x]]
             x = self._parent[x]
         return x
 
@@ -406,7 +421,7 @@ def _multi_lect_context_discovery(
     # pairs so that we can reuse the per-pair string-target split machinery.
     pivot_buckets: dict[
         tuple[str, str],
-        list[tuple[str, str, Context, float]],
+        list[tuple[str, Context, float]],
     ] = defaultdict(list)
     # Remember the sister tuple behind each string key so we can build
     # classes back out at the end.
@@ -496,10 +511,7 @@ def _multi_lect_context_discovery(
     # different pivots are merged per-lect, keeping the most specific
     # non-empty context for each lect. Count is the maximum observed
     # across contributing commits (the strongest single pivot's view).
-    merged: dict[
-        tuple[tuple[str, str], ...],
-        dict,
-    ] = {}
+    merged: dict[tuple[tuple[str, str], ...], _MergedEntry] = {}
     for pivot_lect, pivot_g, ctx, sister, count, pivot_bucket_size in committed:
         segments_map: dict[str, str] = {pivot_lect: pivot_g}
         for l, g in sister:
@@ -578,7 +590,7 @@ def _multi_lect_context_discovery(
     return tuple(classes)
 
 
-def _multi_lect_min_commit_count(n_total: int, scale: float) -> int:
+def _multi_lect_min_commit_count(n_total: float, scale: float) -> int:
     """Adaptive floor for per-sister-tuple emissions in the
     multi-lect class-discovery loop.
 
@@ -661,7 +673,10 @@ def _commit_multi_lect_splits_for_pivot(
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
-        best_partitions: tuple[list, list] | None = None
+        best_partitions: tuple[
+            list[tuple[str, Context, float]],
+            list[tuple[str, Context, float]],
+        ] | None = None
         best_delta = delta_threshold
         for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
@@ -756,7 +771,10 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
-        best_partitions: tuple[list, list] | None = None
+        best_partitions: tuple[
+            list[tuple[str, Context, float]],
+            list[tuple[str, Context, float]],
+        ] | None = None
         best_delta = delta_threshold
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)

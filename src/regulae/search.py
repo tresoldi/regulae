@@ -44,6 +44,7 @@ from regulae.types import (
     Alignment,
     Context,
     FeatureConstraint,
+    FeatureDisplacement,
     Form,
     Link,
     Segment,
@@ -214,7 +215,7 @@ def align_forms(
                     tgt_chunk = target.segments[j - l : j]
 
                     # Populate feature displacement only for 1-to-1 links.
-                    displacement: tuple = ()
+                    displacement: tuple[FeatureDisplacement, ...] = ()
                     if k == 1 and l == 1:
                         displacement = compute_displacement(
                             src_chunk[0],

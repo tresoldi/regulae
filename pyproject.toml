@@ -35,6 +35,9 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+# merkmal ships no py.typed marker; suppress that one upstream gap.
+# Every other import must still resolve.
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

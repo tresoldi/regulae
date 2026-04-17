@@ -381,10 +381,10 @@ def _find_cross_dimensional_tonogenesis(
                     for src_tone_value in sorted_src_tones:
                         for tgt_offset in (0, 1, 2):
                             for tgt_tone_value in sorted_tgt_tones:
-                                xs: list[int] = []
+                                xs = []
                                 xs_a: list[int] = []
                                 xs_b: list[int] = []
-                                ys: list[int] = []
+                                ys = []
                                 for obs in observations:
                                     has_feat = _segment_has_feature(
                                         obs.src_form,

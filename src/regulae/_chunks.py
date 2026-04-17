@@ -134,12 +134,15 @@ def _chunk_promotion(
         displacement_weight=model.displacement_weight,
         tone_weight=model.tone_weight,
     )
-    from regulae.chunk_diagnostics import analyze_promoted_chunks
+    from regulae.chunk_diagnostics import (
+        ChunkTransparencyReport,
+        analyze_promoted_chunks,
+    )
 
     reports = analyze_promoted_chunks(provisional) if promoted else ()
     kept: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = {}
     diagnostics: dict[
-        tuple[tuple[Segment, ...], tuple[Segment, ...]], "ChunkTransparencyReport"
+        tuple[tuple[Segment, ...], tuple[Segment, ...]], ChunkTransparencyReport
     ] = {}
     for report in reports:
         if report.transparency_score < chunk_min_transparency:

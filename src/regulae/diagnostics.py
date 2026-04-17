@@ -48,6 +48,7 @@ from dataclasses import dataclass
 
 from regulae.model import CognateSet, LearnedModel, MultiLectModel
 from regulae.search import align_forms, alignment_cost
+from regulae.types import Form
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ class CognateOutlierReport:
 
 
 def _pair_cost_per_segment(
-    form_a, form_b, model: LearnedModel, max_chunk_size: int
+    form_a: Form, form_b: Form, model: LearnedModel, max_chunk_size: int
 ) -> float:
     """Compute length-normalized alignment cost for one pair.
 

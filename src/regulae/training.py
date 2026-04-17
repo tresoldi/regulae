@@ -32,7 +32,7 @@ corpus.
 
 import warnings
 from collections.abc import Sequence
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from regulae.priors import TypologicalPrior
@@ -193,14 +193,14 @@ def train_model(
         bic_config = BICConfig()
     if multi_lect_bic_correction is not None or multi_lect_min_commit_scale is not None:
         from dataclasses import replace as _dc_replace
-        overrides: dict = {}
+        overrides: dict[str, Any] = {}
         if multi_lect_bic_correction is not None:
             overrides["multi_lect_bic_small_sample_correction"] = multi_lect_bic_correction
         if multi_lect_min_commit_scale is not None:
             overrides["multi_lect_min_commit_scale"] = multi_lect_min_commit_scale
         bic_config = _dc_replace(bic_config, **overrides)
 
-    train_kwargs = dict(
+    train_kwargs: dict[str, Any] = dict(
         feature_system=feature_system,
         max_chunk_size=max_chunk_size,
         temperature=temperature,
@@ -217,20 +217,20 @@ def train_model(
 
     if isinstance(corpus[0], CognateSet):
         _validate_cognate_sets(corpus)  # type: ignore[arg-type]
-        base = _train_multi_lect(
+        ml_base = _train_multi_lect(
             corpus,  # type: ignore[arg-type]
             **train_kwargs,
         )
         if bootstrap_n > 0:
             from regulae._bootstrap import bootstrap_multi_lect_uncertainty
-            base = bootstrap_multi_lect_uncertainty(
-                base,
+            ml_base = bootstrap_multi_lect_uncertainty(
+                ml_base,
                 corpus=corpus,  # type: ignore[arg-type]
                 bootstrap_n=bootstrap_n,
                 bootstrap_seed=bootstrap_seed,
                 **train_kwargs,
             )
-        return base
+        return ml_base
 
     warnings.warn(
         "Passing a list of (Form, Form) pairs to train_model is "
@@ -240,20 +240,20 @@ def train_model(
         DeprecationWarning,
         stacklevel=2,
     )
-    base = _train_pairwise_legacy(
+    pw_base = _train_pairwise_legacy(
         corpus,  # type: ignore[arg-type]
         **train_kwargs,
     )
     if bootstrap_n > 0:
         from regulae._bootstrap import bootstrap_pairwise_uncertainty
-        base = bootstrap_pairwise_uncertainty(
-            base,
+        pw_base = bootstrap_pairwise_uncertainty(
+            pw_base,
             corpus=corpus,  # type: ignore[arg-type]
             bootstrap_n=bootstrap_n,
             bootstrap_seed=bootstrap_seed,
             **train_kwargs,
         )
-    return base
+    return pw_base
 
 
 def _validate_cognate_sets(corpus: Sequence[CognateSet]) -> None:

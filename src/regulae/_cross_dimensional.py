@@ -2,8 +2,12 @@ import math
 from collections import defaultdict
 from collections.abc import Sequence
 from dataclasses import replace
+from typing import TYPE_CHECKING
 
 import merkmal
+
+if TYPE_CHECKING:
+    from regulae.anomaly import PatternHypothesis
 
 from regulae._discovery import DELTA_BIC_THRESHOLD
 from regulae.config import BICConfig
@@ -211,11 +215,15 @@ def _dedup_dual_framings(
     negative) src_offset — the most canonical "leftmost" framing.
     Ties broken by keeping the first-committed entry.
     """
-    groups: dict[tuple, list[tuple[int, int, "CrossDimensionalLink"]]] = defaultdict(list)
+    GroupKey = tuple[
+        str, str, str, str, int, str | None, str | None, int | None
+    ]
+    groups: dict[GroupKey, list[tuple[int, int, CrossDimensionalLink]]] = defaultdict(list)
     for idx, entry in enumerate(entries):
         src_off = _parse_relative_position_offset(entry.src_position)
         delta = entry.tgt_position_offset - src_off
-        if entry.src_feature_2 is None:
+        key: GroupKey
+        if entry.src_feature_2 is None or entry.src_position_2 is None:
             key = (
                 entry.src_feature.feature,
                 entry.src_feature.value,
@@ -292,7 +300,7 @@ def _count_1to1_observations(
 
 
 def _hypothesis_to_cross_dimensional_link(
-    hypothesis,  # PatternHypothesis — annotation deferred to avoid circular import
+    hypothesis: "PatternHypothesis",
     corpus: Sequence[tuple[Form, Form]],
     pair_weights: Sequence[float],
     model: LearnedModel,
@@ -330,20 +338,24 @@ def _hypothesis_to_cross_dimensional_link(
 
     # Joint-predictor support. A hypothesis with
     # ``src_feature_2`` set describes a conjunctive rule.
-    is_joint = hypothesis.src_feature_2 is not None
+    is_joint = (
+        hypothesis.src_feature_2 is not None
+        and hypothesis.src_position_spec_2 is not None
+    )
     if is_joint:
-        src_offset_2 = _parse_relative_position_offset(
+        assert hypothesis.src_position_spec_2 is not None  # narrowed by is_joint
+        src_offset_2: int | None = _parse_relative_position_offset(
             hypothesis.src_position_spec_2
         )
-        feature_name_2 = hypothesis.src_feature_2
-        src_value_2 = hypothesis.src_value_2 or "+"
+        feature_name_2: str | None = hypothesis.src_feature_2
+        src_value_2: str | None = hypothesis.src_value_2 or "+"
     else:
         src_offset_2 = None
         feature_name_2 = None
         src_value_2 = None
 
     def _predicate_holds(
-        seg_form,
+        seg_form: Form,
         seg_idx: int,
         name: str,
         value: str,
@@ -359,7 +371,7 @@ def _hypothesis_to_cross_dimensional_link(
             features = merkmal.get_features(seg.grapheme, system=feature_system)
         except KeyError:
             return False
-        return features is not None and name in features
+        return bool(features is not None and name in features)
 
     src_count = 0.0
     count = 0.0
@@ -379,7 +391,13 @@ def _hypothesis_to_cross_dimensional_link(
                     feature_name,
                     src_value,
                 )
-                if holds and is_joint:
+                if (
+                    holds
+                    and is_joint
+                    and src_offset_2 is not None
+                    and feature_name_2 is not None
+                    and src_value_2 is not None
+                ):
                     holds = _predicate_holds(
                         src_form,
                         link_src_pos + src_offset_2,
@@ -417,7 +435,14 @@ def _hypothesis_to_cross_dimensional_link(
         # ("voiced → tone 4") on the same iteration.
         return None
 
-    kwargs: dict = dict(
+    base_feature_2: FeatureConstraint | None = None
+    base_position_2: str | None = None
+    if is_joint and feature_name_2 is not None and src_value_2 is not None:
+        base_feature_2 = FeatureConstraint(
+            feature=feature_name_2, value=src_value_2
+        )
+        base_position_2 = hypothesis.src_position_spec_2
+    return CrossDimensionalLink(
         src_feature=FeatureConstraint(feature=feature_name, value=src_value),
         src_position=hypothesis.src_position_spec,
         tgt_dimension=tgt_dimension,
@@ -426,14 +451,10 @@ def _hypothesis_to_cross_dimensional_link(
         count=float(count),
         src_count=float(src_count),
         confidence=count / src_count,
+        src_feature_2=base_feature_2,
+        src_position_2=base_position_2,
         uncertainty=wilson_interval(float(count), float(src_count)),
     )
-    if is_joint:
-        kwargs["src_feature_2"] = FeatureConstraint(
-            feature=feature_name_2, value=src_value_2
-        )
-        kwargs["src_position_2"] = hypothesis.src_position_spec_2
-    return CrossDimensionalLink(**kwargs)
 
 
 def _parse_relative_position_offset(spec: str) -> int:
@@ -447,7 +468,7 @@ def _parse_relative_position_offset(spec: str) -> int:
 
 def _rule_signature(
     rule: CrossDimensionalLink,
-) -> tuple:
+) -> tuple[str, str, str, str, str, int, str | None, str | None, str | None]:
     """Return a hashable signature for a cross-dimensional rule,
     used to dedup commits across cross-dimensional iterations.
 

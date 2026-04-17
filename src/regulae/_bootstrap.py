@@ -49,6 +49,12 @@ if TYPE_CHECKING:
     pass
 
 
+CrossDimKey = tuple[Any, ...]
+CondClassKey = tuple[Any, ...]
+MLCrossKey = tuple[Any, ...]
+ContextSignature = tuple[Any, ...]
+
+
 # ----- pairwise path ------------------------------------------------------
 
 
@@ -86,7 +92,7 @@ def bootstrap_pairwise_uncertainty(
     chunk_samples: dict[
         tuple[tuple[Segment, ...], tuple[Segment, ...]], list[float]
     ] = {key: [] for key in base.chunk_table.entries}
-    cross_dim_samples: dict[tuple, list[float]] = {
+    cross_dim_samples: dict[CrossDimKey, list[float]] = {
         _cross_dim_key(r): [] for r in base.cross_dimensional_table.entries
     }
 
@@ -120,7 +126,7 @@ def _accumulate_pair_model_samples(
     chunk_samples: dict[
         tuple[tuple[Segment, ...], tuple[Segment, ...]], list[float]
     ],
-    cross_dim_samples: dict[tuple, list[float]],
+    cross_dim_samples: dict[CrossDimKey, list[float]],
 ) -> None:
     """Record one sample's rate for each base-model key.
 
@@ -131,32 +137,32 @@ def _accumulate_pair_model_samples(
     """
     seg_counts = sample_model.segment_table.counts
     seg_src_totals = sample_model.segment_table.src_totals
-    for key, samples in segment_samples.items():
-        n = seg_src_totals.get(key.src, 0.0)
-        c = seg_counts.get(key, 0.0)
-        samples.append(c / n if n > 0.0 else 0.0)
+    for seg_key, seg_bucket in segment_samples.items():
+        n = seg_src_totals.get(seg_key.src, 0.0)
+        c = seg_counts.get(seg_key, 0.0)
+        seg_bucket.append(c / n if n > 0.0 else 0.0)
     disp_counts = sample_model.displacement_dist.counts
     disp_total = sample_model.displacement_dist.total
-    for key, samples in displacement_samples.items():
-        c = disp_counts.get(key, 0.0)
-        samples.append(c / disp_total if disp_total > 0.0 else 0.0)
+    for disp_key, disp_bucket in displacement_samples.items():
+        dc = disp_counts.get(disp_key, 0.0)
+        disp_bucket.append(dc / disp_total if disp_total > 0.0 else 0.0)
     tone_counts = sample_model.tonal_table.counts
     tone_src_totals = sample_model.tonal_table.src_totals
-    for key, samples in tonal_samples.items():
-        n = tone_src_totals.get(key.src_tone, 0.0)
-        c = tone_counts.get(key, 0.0)
-        samples.append(c / n if n > 0.0 else 0.0)
+    for tone_key, tone_bucket in tonal_samples.items():
+        tn = tone_src_totals.get(tone_key.src_tone, 0.0)
+        tc = tone_counts.get(tone_key, 0.0)
+        tone_bucket.append(tc / tn if tn > 0.0 else 0.0)
     chunk_counts = sample_model.chunk_table.observation_counts
     chunk_denom = _chunk_bootstrap_denominator(sample_model)
-    for key, samples in chunk_samples.items():
-        c = chunk_counts.get(key, 0.0)
-        samples.append(c / chunk_denom if chunk_denom > 0.0 else 0.0)
+    for chunk_key, chunk_bucket in chunk_samples.items():
+        cc = chunk_counts.get(chunk_key, 0.0)
+        chunk_bucket.append(cc / chunk_denom if chunk_denom > 0.0 else 0.0)
     sample_cd_by_key = {
         _cross_dim_key(r): r for r in sample_model.cross_dimensional_table.entries
     }
-    for key, samples in cross_dim_samples.items():
-        rule = sample_cd_by_key.get(key)
-        samples.append(rule.confidence if rule is not None else 0.0)
+    for cd_key, cd_bucket in cross_dim_samples.items():
+        rule = sample_cd_by_key.get(cd_key)
+        cd_bucket.append(rule.confidence if rule is not None else 0.0)
 
 
 def _apply_pair_bootstrap(
@@ -165,25 +171,25 @@ def _apply_pair_bootstrap(
     displacement_samples: Mapping[tuple[FeatureDisplacement, ...], list[float]],
     tonal_samples: Mapping[TonalCorrespondence, list[float]],
     chunk_samples: Mapping[tuple[tuple[Segment, ...], tuple[Segment, ...]], list[float]],
-    cross_dim_samples: Mapping[tuple, list[float]],
+    cross_dim_samples: Mapping[CrossDimKey, list[float]],
 ) -> LearnedModel:
     seg_unc: dict[ConditionedCorrespondence, UncertaintyEstimate] = {}
-    for key, samples in segment_samples.items():
-        n = base.segment_table.src_totals.get(key.src, 0.0)
-        seg_unc[key] = bootstrap_rate_interval(samples, n=n)
+    for seg_key, seg_sam in segment_samples.items():
+        n = base.segment_table.src_totals.get(seg_key.src, 0.0)
+        seg_unc[seg_key] = bootstrap_rate_interval(seg_sam, n=n)
     disp_unc: dict[tuple[FeatureDisplacement, ...], UncertaintyEstimate] = {}
-    for key, samples in displacement_samples.items():
-        disp_unc[key] = bootstrap_rate_interval(samples, n=base.displacement_dist.total)
+    for disp_key, disp_sam in displacement_samples.items():
+        disp_unc[disp_key] = bootstrap_rate_interval(disp_sam, n=base.displacement_dist.total)
     tone_unc: dict[TonalCorrespondence, UncertaintyEstimate] = {}
-    for key, samples in tonal_samples.items():
-        n = base.tonal_table.src_totals.get(key.src_tone, 0.0)
-        tone_unc[key] = bootstrap_rate_interval(samples, n=n)
+    for tone_key, tone_sam in tonal_samples.items():
+        n = base.tonal_table.src_totals.get(tone_key.src_tone, 0.0)
+        tone_unc[tone_key] = bootstrap_rate_interval(tone_sam, n=n)
     chunk_unc: dict[
         tuple[tuple[Segment, ...], tuple[Segment, ...]], UncertaintyEstimate
     ] = {}
     chunk_denominator = _chunk_bootstrap_denominator(base)
-    for key, samples in chunk_samples.items():
-        chunk_unc[key] = bootstrap_rate_interval(samples, n=chunk_denominator)
+    for chunk_key, chunk_sam in chunk_samples.items():
+        chunk_unc[chunk_key] = bootstrap_rate_interval(chunk_sam, n=chunk_denominator)
 
     new_segment_table = dc_replace(base.segment_table, uncertainty=seg_unc)
     new_displacement = dc_replace(base.displacement_dist, uncertainty=disp_unc)
@@ -216,7 +222,7 @@ def _chunk_bootstrap_denominator(model: LearnedModel) -> float:
     return float(sum(model.segment_table.src_totals.values()))
 
 
-def _cross_dim_key(rule: CrossDimensionalLink | MultiLectCrossDimensionalLink) -> tuple:
+def _cross_dim_key(rule: CrossDimensionalLink | MultiLectCrossDimensionalLink) -> CrossDimKey:
     """Return a canonical hashable identity for a cross-dim rule."""
     return (
         rule.src_feature.feature,
@@ -263,7 +269,7 @@ def bootstrap_multi_lect_uncertainty(
         frozenset[str],
         dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], list[float]],
     ] = {}
-    pair_crossdim: dict[frozenset[str], dict[tuple, list[float]]] = {}
+    pair_crossdim: dict[frozenset[str], dict[CrossDimKey, list[float]]] = {}
     for key, pm in base.pairwise_models.items():
         pair_seg[key] = {k: [] for k in pm.segment_table.counts}
         pair_disp[key] = {k: [] for k in pm.displacement_dist.counts}
@@ -275,10 +281,10 @@ def bootstrap_multi_lect_uncertainty(
     uncond_samples: dict[tuple[tuple[str, str], ...], list[float]] = {
         tuple(sorted(c.segments.items())): [] for c in base.unconditioned_classes
     }
-    cond_samples: dict[tuple, list[float]] = {
+    cond_samples: dict[CondClassKey, list[float]] = {
         _cond_class_key(c): [] for c in base.conditioned_classes
     }
-    ml_cross_samples: dict[tuple, list[float]] = {
+    ml_cross_samples: dict[MLCrossKey, list[float]] = {
         _ml_cross_key(r): []
         for r in base.cross_dimensional_table.entries
     }
@@ -381,7 +387,7 @@ def bootstrap_multi_lect_uncertainty(
     )
 
 
-def _cond_class_key(c: MultiLectCorrespondenceClass) -> tuple:
+def _cond_class_key(c: MultiLectCorrespondenceClass) -> CondClassKey:
     """Canonical hashable identity for a conditioned multi-lect class.
 
     Includes segments AND per-lect contexts (by constraint count and
@@ -398,7 +404,7 @@ def _cond_class_key(c: MultiLectCorrespondenceClass) -> tuple:
     )
 
 
-def _context_signature(ctx: Any) -> tuple:
+def _context_signature(ctx: Any) -> ContextSignature:
     """Hashable signature for a Context (for bootstrap key matching)."""
     return (
         ctx.position,
@@ -414,5 +420,5 @@ def _context_signature(ctx: Any) -> tuple:
     )
 
 
-def _ml_cross_key(r: MultiLectCrossDimensionalLink) -> tuple:
+def _ml_cross_key(r: MultiLectCrossDimensionalLink) -> MLCrossKey:
     return (r.src_lect, r.tgt_lect) + _cross_dim_key(r)

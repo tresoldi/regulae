@@ -341,7 +341,10 @@ def _commit_splits_for_source(
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
-        best_partitions: tuple[list, list] | None = None
+        best_partitions: tuple[
+            list[tuple[str, Context, float]],
+            list[tuple[str, Context, float]],
+        ] | None = None
         best_delta = delta_threshold
         for predicate in _candidate_predicates(Context(), observed_stress_values):
             yes_obs, no_obs = _partition(remaining, predicate)
@@ -446,14 +449,14 @@ def _refine_split(
     )
 
 
-def _obs_weight(obs: tuple) -> float:
+def _obs_weight(obs: tuple[object, ...]) -> float:
     """Return the weight of one observation tuple.
 
     Backward-compatible with older internal tests that pass
     ``(target, Context)`` pairs without an explicit weight.
     """
     if len(obs) >= 3:
-        return float(obs[2])
+        return float(obs[2])  # type: ignore[arg-type]
     return 1.0
 
 
@@ -889,7 +892,10 @@ def _commit_long_range_splits_for_source(
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
-        best_partitions: tuple[list, list] | None = None
+        best_partitions: tuple[
+            list[tuple[str, Context, float]],
+            list[tuple[str, Context, float]],
+        ] | None = None
         best_delta = delta_threshold
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)

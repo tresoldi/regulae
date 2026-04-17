@@ -43,10 +43,13 @@ from regulae.model import (
     TonalCorrespondence,
     TonalCorrespondenceTable,
 )
+from regulae.model import CrossDimensionalLink
 from regulae.types import (
     Alignment,
     Context,
+    FeatureConstraint,
     FeatureDisplacement,
+    Form,
     Link,
     Segment,
 )
@@ -386,7 +389,7 @@ def apply_cross_dimensional_adjustments(
 
 
 def _precompute_rule_adjustments(
-    rule: "CrossDimensionalLink",  # noqa: F821 (string avoids circular import)
+    rule: CrossDimensionalLink,
     tonal_table: TonalCorrespondenceTable,
 ) -> tuple[float, float]:
     """Return ``(pos_adj, neg_adj)`` for a rule against a tonal
@@ -446,12 +449,12 @@ def _precompute_rule_adjustments(
 
 def _apply_rule_to_link(
     *,
-    rule: "CrossDimensionalLink",  # noqa: F821
+    rule: CrossDimensionalLink,
     pos_adj: float,
     neg_adj: float,
-    src_form,
+    src_form: Form,
     src_pos: int,
-    tgt_form,
+    tgt_form: Form,
     tgt_pos: int,
     feature_system: str,
 ) -> float:
@@ -512,9 +515,9 @@ def _apply_rule_to_link(
 
 
 def _source_predicate_holds(
-    feature_constraint: "FeatureConstraint",  # noqa: F821
+    feature_constraint: FeatureConstraint,
     position_spec: str,
-    src_form,
+    src_form: Form,
     src_pos: int,
     feature_system: str,
 ) -> bool:
@@ -542,7 +545,7 @@ def _source_predicate_holds(
         return False
     if features is None:
         return False
-    return feature_constraint.feature in features
+    return bool(feature_constraint.feature in features)
 
 
 def _parse_relative_offset(spec: str) -> int:

@@ -11,13 +11,26 @@ correspondences, displacement vectors, and promoted chunks.
 """
 
 from regulae.chunk_diagnostics import (
+    ChunkTransparencyReport,
     analyze_promoted_chunks,
     summarize_chunk_process_families,
     summarize_chunk_process_subtypes,
 )
-from regulae.model import LearnedModel, MultiLectCorrespondenceClass, MultiLectModel
+from regulae.model import (
+    ConditionedCorrespondence,
+    LearnedModel,
+    MultiLectCorrespondenceClass,
+    MultiLectModel,
+)
 from regulae.scoring import score_link
-from regulae.types import Alignment, Context, FeatureDisplacement, Link, Segment
+from regulae.types import (
+    Alignment,
+    Context,
+    FeatureConstraint,
+    FeatureDisplacement,
+    Link,
+    Segment,
+)
 
 # The symbol used to render an empty chunk (0-to-N or N-to-0 link).
 # Epsilon is conventional for the empty string in formal language theory.
@@ -124,7 +137,7 @@ def format_model(
         lines.append(
             f"Context-conditioned splits ({len(conditioned)} entries):"
         )
-        by_src: dict[str, list[tuple]] = {}
+        by_src: dict[str, list[tuple[ConditionedCorrespondence, float]]] = {}
         for k, v in conditioned.items():
             by_src.setdefault(k.src, []).append((k, v))
         for src in sorted(by_src):
@@ -132,9 +145,9 @@ def format_model(
                 by_src[src],
                 key=lambda kv: (-kv[0].context.constraint_count(), -kv[1], kv[0].tgt),
             )
-            for key, n in entries:
-                ctx_str = _compact_context(key.context)
-                lines.append(f"  {key.src} -> {key.tgt}{ctx_str}: {_fmt_count(n)}")
+            for ckey, cn in entries:
+                ctx_str = _compact_context(ckey.context)
+                lines.append(f"  {ckey.src} -> {ckey.tgt}{ctx_str}: {_fmt_count(cn)}")
 
     # Tonal correspondences
     tonal_counts = model.tonal_table.counts
@@ -143,10 +156,10 @@ def format_model(
         lines.append("  (none yet)")
     else:
         top_tonal = sorted(tonal_counts.items(), key=lambda kv: -kv[1])[:top_segments]
-        for key, n in top_tonal:
-            src = key.src_tone if key.src_tone is not None else "∅"
-            tgt = key.tgt_tone if key.tgt_tone is not None else "∅"
-            lines.append(f"  {src} -> {tgt}: {_fmt_count(n)}")
+        for tkey, tn in top_tonal:
+            tsrc = tkey.src_tone if tkey.src_tone is not None else "∅"
+            ttgt = tkey.tgt_tone if tkey.tgt_tone is not None else "∅"
+            lines.append(f"  {tsrc} -> {ttgt}: {_fmt_count(tn)}")
 
     # Cross-dimensional links
     cd_entries = model.cross_dimensional_table.entries
@@ -173,7 +186,7 @@ def format_model(
             src_label = _render_src_predicate(
                 e.src_feature, e.src_position
             )
-            if e.src_feature_2 is not None:
+            if e.src_feature_2 is not None and e.src_position_2 is not None:
                 src_label += " & " + _render_src_predicate(
                     e.src_feature_2, e.src_position_2
                 )
@@ -210,17 +223,20 @@ def format_model(
     if not chunks:
         lines.append("  (none promoted)")
     else:
-        chunk_reports = {}
+        chunk_reports: dict[
+            tuple[tuple[Segment, ...], tuple[Segment, ...]],
+            ChunkTransparencyReport,
+        ] = {}
         if annotate_chunks:
             chunk_reports = {
                 (report.src_chunk, report.tgt_chunk): report
                 for report in analyze_promoted_chunks(model)
             }
-        for (src, tgt), cost in sorted(chunks.items(), key=lambda kv: kv[1]):
-            s = "".join(x.grapheme for x in src) or EMPTY_CHUNK_SYMBOL
-            t = "".join(x.grapheme for x in tgt) or EMPTY_CHUNK_SYMBOL
+        for (src_ch, tgt_ch), cost in sorted(chunks.items(), key=lambda kv: kv[1]):
+            s = "".join(x.grapheme for x in src_ch) or EMPTY_CHUNK_SYMBOL
+            t = "".join(x.grapheme for x in tgt_ch) or EMPTY_CHUNK_SYMBOL
             line = f"  ({s}, {t}): cost={cost:.3f}"
-            report = chunk_reports.get((src, tgt))
+            report = chunk_reports.get((src_ch, tgt_ch))
             if report is not None:
                 line += (
                     f" score={report.transparency_score:.2f}"
@@ -337,16 +353,21 @@ def describe_source(model: LearnedModel, source_grapheme: str) -> str:
     else:
         # Group by context so multiple targets under the same context
         # are shown together.
-        by_context: dict[tuple, list[tuple]] = {}
+        CtxKey = tuple[
+            str | None,
+            tuple[tuple[str, str], ...],
+            tuple[tuple[str, str], ...],
+        ]
+        by_context: dict[CtxKey, list[tuple[ConditionedCorrespondence, float]]] = {}
         for k, v in conditioned:
-            key = (
+            ctx_key: CtxKey = (
                 k.context.position,
                 tuple(sorted((c.feature, c.value) for c in k.context.preceding)),
                 tuple(sorted((c.feature, c.value) for c in k.context.following)),
             )
-            by_context.setdefault(key, []).append((k, v))
+            by_context.setdefault(ctx_key, []).append((k, v))
         # Sort contexts by specificity descending, then by total mass
-        def _context_spec(ctx_key: tuple) -> int:
+        def _context_spec(ctx_key: CtxKey) -> int:
             return (
                 (1 if ctx_key[0] is not None else 0)
                 + len(ctx_key[1])
@@ -443,7 +464,9 @@ def describe_cross_dimensional_rule(
     return "\n".join(lines)
 
 
-def _render_src_predicate(feature_constraint, position_spec: str) -> str:
+def _render_src_predicate(
+    feature_constraint: FeatureConstraint, position_spec: str
+) -> str:
     """Render one source predicate for a cross-dimensional rule.
 
     Segmental features: ``voiced=+@relative_-1``.
@@ -723,7 +746,7 @@ def format_multi_lect_model(
             src_label = _render_src_predicate(
                 rule.src_feature, rule.src_position
             )
-            if rule.src_feature_2 is not None:
+            if rule.src_feature_2 is not None and rule.src_position_2 is not None:
                 src_label += " & " + _render_src_predicate(
                     rule.src_feature_2, rule.src_position_2
                 )

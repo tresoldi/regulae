@@ -19,7 +19,7 @@ import merkmal
 from regulae.model import ChunkPhraseTable, LearnedModel
 from regulae.scoring import compute_displacement
 from regulae.search import align_forms
-from regulae.types import Alignment, Segment
+from regulae.types import Alignment, Context, FeatureDisplacement, Form, Segment
 
 CHUNK_PROCESS_PROFILES = (
     "compact_fusion",
@@ -440,9 +440,7 @@ def describe_chunk_process_subtypes(model: LearnedModel) -> str:
     return "\n".join(lines)
 
 
-def _pseudo_form(lect_id: str, segments: tuple[Segment, ...]):
-    from regulae.types import Form
-
+def _pseudo_form(lect_id: str, segments: tuple[Segment, ...]) -> Form:
     return Form(lect_id=lect_id, segments=segments)
 
 
@@ -795,7 +793,10 @@ def _segment_features(
     feature_system: str,
 ) -> frozenset[str] | None:
     try:
-        return merkmal.get_features(grapheme, system=feature_system)
+        result: frozenset[str] | None = merkmal.get_features(
+            grapheme, system=feature_system
+        )
+        return result
     except Exception:
         return None
 
@@ -804,7 +805,7 @@ def _safe_displacement(
     src: Segment,
     tgt: Segment,
     feature_system: str,
-):
+) -> tuple["FeatureDisplacement", ...]:
     try:
         return compute_displacement(src, tgt, feature_system=feature_system)
     except Exception:
@@ -873,7 +874,7 @@ def _top_context_signatures(
     return tuple(signature for signature, _ in ranked[:3])
 
 
-def _compact_context_signature(ctx) -> str:
+def _compact_context_signature(ctx: Context) -> str:
     if ctx.constraint_count() == 0:
         return ""
     has_immediate = bool(ctx.preceding or ctx.following)
