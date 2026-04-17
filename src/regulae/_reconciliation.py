@@ -751,6 +751,7 @@ def _train_multi_lect(
     tone_weight: float,
     multi_lect_bic_correction: bool,
     multi_lect_min_commit_scale: float,
+    chunk_min_transparency: float = 0.0,
 ) -> MultiLectModel:
     """Multi-lect training.
 
@@ -794,6 +795,7 @@ def _train_multi_lect(
             segment_weight=segment_weight,
             displacement_weight=displacement_weight,
             tone_weight=tone_weight,
+            chunk_min_transparency=chunk_min_transparency,
         )
         pairwise_models[frozenset({lect_a, lect_b})] = pair_model
 

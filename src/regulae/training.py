@@ -99,6 +99,7 @@ def train_model(
     tone_weight: float = DEFAULT_TONE_WEIGHT,
     multi_lect_bic_correction: bool = True,
     multi_lect_min_commit_scale: float = 0.5,
+    chunk_min_transparency: float = 0.0,
     bootstrap_n: int = 0,
     bootstrap_seed: int = 0,
 ) -> LearnedModel | MultiLectModel:
@@ -132,6 +133,16 @@ def train_model(
       entirely (structural minimum of 2); set higher to tighten
       further.
 
+    Chunk diagnostics knob:
+
+    * ``chunk_min_transparency``: minimum transparency score in
+      ``[0, 1]`` required to retain a BIC-promoted chunk. Default
+      ``0.0`` (keep all BIC-promoted chunks; purely advisory
+      diagnostics). Set to e.g. ``0.3`` to drop bundled-reduction
+      and morphology-like chunks before they reach downstream
+      consumers. The remaining chunks still carry their diagnostics
+      on ``chunk_table.diagnostics`` for inspection.
+
     Uncertainty knobs:
 
     * ``bootstrap_n``: number of resampled trainings to run after
@@ -164,6 +175,7 @@ def train_model(
         segment_weight=segment_weight,
         displacement_weight=displacement_weight,
         tone_weight=tone_weight,
+        chunk_min_transparency=chunk_min_transparency,
     )
 
     if isinstance(corpus[0], CognateSet):
@@ -175,9 +187,7 @@ def train_model(
             **train_kwargs,
         )
         if bootstrap_n > 0:
-            from regulae._bootstrap import (
-                bootstrap_multi_lect_uncertainty,
-            )
+            from regulae._bootstrap import bootstrap_multi_lect_uncertainty
             base = bootstrap_multi_lect_uncertainty(
                 base,
                 corpus=corpus,  # type: ignore[arg-type]
@@ -252,6 +262,7 @@ def _train_pairwise_legacy(
     segment_weight: float,
     displacement_weight: float,
     tone_weight: float,
+    chunk_min_transparency: float = 0.0,
 ) -> LearnedModel:
     """Internal: the pair-based training pipeline."""
     if pair_weights is None:
@@ -297,6 +308,7 @@ def _train_pairwise_legacy(
         pair_weights=pair_weights,
         model=after_context,
         max_chunk_size=max_chunk_size,
+        chunk_min_transparency=chunk_min_transparency,
     )
 
     after_tonal = _tonal_aggregation(

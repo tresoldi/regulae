@@ -31,7 +31,7 @@ during training.
 """
 
 from dataclasses import dataclass, field
-from typing import Mapping
+from typing import TYPE_CHECKING, Mapping
 
 from regulae.types import (
     Context,
@@ -41,6 +41,9 @@ from regulae.types import (
     Segment,
 )
 from regulae.uncertainty import UncertaintyEstimate
+
+if TYPE_CHECKING:
+    from regulae.chunk_diagnostics import ChunkTransparencyReport
 
 
 @dataclass(frozen=True)
@@ -365,6 +368,15 @@ class ChunkPhraseTable:
     cost. Only chunks that passed the BIC promotion test appear
     here. Entries override the compositional fallback for their
     specific chunk pair when scoring.
+
+    ``diagnostics`` carries a parallel :class:`ChunkTransparencyReport`
+    per entry, produced by :func:`regulae.analyze_promoted_chunks`
+    at promotion time. Consumers can read ``.transparency_score``,
+    ``.process_profile``, ``.process_subtype``, and
+    ``.process_confidence`` to filter or rank chunks by historical
+    interpretability without recomputing the analysis. The map is
+    excluded from equality and hashing so two otherwise-identical
+    tables compare equal regardless of diagnostics population.
     """
 
     entries: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = field(
@@ -384,6 +396,15 @@ class ChunkPhraseTable:
     #: chunk-promotion time; empty on an empty table.
     uncertainty: dict[
         tuple[tuple[Segment, ...], tuple[Segment, ...]], UncertaintyEstimate
+    ] = field(default_factory=dict, compare=False, hash=False)
+    #: Parallel map of :class:`ChunkTransparencyReport` per entry,
+    #: produced by :func:`regulae.analyze_promoted_chunks` at
+    #: promotion time. Consumers can read ``.transparency_score``,
+    #: ``.process_profile``, ``.process_subtype``, and
+    #: ``.process_confidence`` to filter or rank chunks by
+    #: historical interpretability without recomputing the analysis.
+    diagnostics: Mapping[
+        tuple[tuple[Segment, ...], tuple[Segment, ...]], "ChunkTransparencyReport"
     ] = field(default_factory=dict, compare=False, hash=False)
 
 
@@ -454,6 +475,90 @@ class LearnedModel:
             temperature=temperature,
             concentration=concentration,
         )
+
+    def posterior_for(
+        self,
+        src: str,
+        context: Context | None = None,
+    ) -> dict[str, float]:
+        """Return the posterior ``P(tgt | src, context)`` for every
+        target grapheme the model could emit for ``src``.
+
+        **Semantics.** If any conditioned entry matches ``context``
+        (i.e., its constraints are a subset of ``context``'s
+        constraints), the method restricts attention to the set of
+        entries at the maximum specificity. Unconditioned entries
+        are used as the fallback only when no conditioned entry
+        matches, to avoid mixing counts from heterogeneous contexts.
+
+        This differs from the scoring-time lookup in
+        :mod:`regulae.scoring`, which resolves per-target independently
+        and may therefore return an unconditioned count for one
+        target while using a conditioned count for another. For
+        scoring that's acceptable because each link pays its own
+        cost; for a posterior query across targets it would produce
+        incoherent distributions (two targets' counts drawn from
+        different observation subsets).
+
+        Probabilities are Dirichlet-smoothed with pseudo-counts from
+        the winning entries and the model's ``concentration``. Pass
+        ``context=None`` (the default) or ``Context()`` for the
+        unconditioned posterior.
+
+        Returns an empty dict when ``src`` has no entries. The
+        returned distribution does not include the merkmal fallback
+        used at scoring time for unknown ``(src, tgt)`` pairs.
+        """
+        from regulae.scoring import _find_most_specific_match
+
+        link_context = context if context is not None else Context()
+        # Find every entry whose context is a subset of the query
+        # context. Group by specificity (number of constraints).
+        matches: dict[str, ConditionedCorrespondence] = {}
+        max_specificity = -1
+        for key in self.segment_table.counts:
+            if key.src != src:
+                continue
+            if not key.context.is_subset_of(link_context):
+                continue
+            spec = key.context.constraint_count()
+            if spec > max_specificity:
+                max_specificity = spec
+                matches = {}
+            if spec == max_specificity:
+                # If multiple entries for the same tgt exist at this
+                # specificity, _find_most_specific_match will pick the
+                # canonical one; but at a single specificity layer they
+                # should be mutually exclusive by context hash.
+                if key.tgt not in matches:
+                    matches[key.tgt] = key
+                else:
+                    existing = matches[key.tgt]
+                    if key.context.constraint_count() > existing.context.constraint_count():
+                        matches[key.tgt] = key
+        if max_specificity < 0:
+            # No entry matches at all; try prior pseudo-counts with
+            # empty context as the unconditioned fallback.
+            for key in self.segment_table.prior_pseudo_counts:
+                if key.src == src and key.context.constraint_count() == 0:
+                    matches[key.tgt] = key
+        # Compute denominator from the retained entries only. This
+        # makes the returned distribution coherent (sums consistent
+        # with the retained observations rather than mixing contexts).
+        count_sum = 0.0
+        alpha_sum = 0.0
+        for key in matches.values():
+            count_sum += self.segment_table.counts.get(key, 0.0)
+            alpha_sum += self.segment_table.prior_pseudo_counts.get(key, 0.0)
+        denominator = alpha_sum + count_sum
+        if denominator <= 0.0:
+            return {}
+        out: dict[str, float] = {}
+        for tgt, key in matches.items():
+            alpha = self.segment_table.prior_pseudo_counts.get(key, 0.0)
+            n = self.segment_table.counts.get(key, 0.0)
+            out[tgt] = (alpha + n) / denominator
+        return out
 
 
 # ----- multi-lect types ---------------------------------------------------
@@ -618,3 +723,68 @@ class MultiLectModel:
             cognate_corpus=(),
             lect_ids=(),
         )
+
+    def class_by_id(self, class_id: int) -> MultiLectCorrespondenceClass | None:
+        """Return the class with the given ``class_id``, or ``None``
+        if no such class exists.
+
+        Searches both ``unconditioned_classes`` and
+        ``conditioned_classes``. ``class_id`` is unique within a
+        model — no collision between the two tables.
+        """
+        for klass in self.unconditioned_classes:
+            if klass.class_id == class_id:
+                return klass
+        for klass in self.conditioned_classes:
+            if klass.class_id == class_id:
+                return klass
+        return None
+
+    def classes_for_segment(
+        self,
+        lect_id: str,
+        grapheme: str,
+        *,
+        include_unconditioned: bool = True,
+        include_conditioned: bool = True,
+    ) -> tuple[MultiLectCorrespondenceClass, ...]:
+        """Return every class that binds ``grapheme`` to ``lect_id``.
+
+        Filters both ``unconditioned_classes`` and
+        ``conditioned_classes`` by ``lect_id → grapheme`` membership.
+        The returned tuple preserves the source-table order: all
+        unconditioned matches first (if ``include_unconditioned``),
+        then all conditioned matches (if ``include_conditioned``).
+
+        Each class lists its full segment tuple, its count, its
+        optional per-lect contexts, its confidence, and (if
+        populated) its uncertainty. Downstream consumers can walk
+        this tuple to answer "what does lect A's /p/ correspond to
+        in the other lects of this family?".
+
+        The helper is O(number of classes). For performance-sensitive
+        consumers, build your own index; otherwise this is the
+        canonical lookup.
+        """
+        out: list[MultiLectCorrespondenceClass] = []
+        if include_unconditioned:
+            for klass in self.unconditioned_classes:
+                if klass.segments.get(lect_id) == grapheme:
+                    out.append(klass)
+        if include_conditioned:
+            for klass in self.conditioned_classes:
+                if klass.segments.get(lect_id) == grapheme:
+                    out.append(klass)
+        return tuple(out)
+
+    def cognate_set_by_id(self, cognate_id: str) -> CognateSet | None:
+        """Return the cognate set with the given ID from the retained
+        corpus, or ``None`` if not present.
+
+        Used to walk back from a class's ``supporting_cognates``
+        tuple to the original forms. Pure lookup, no alignment.
+        """
+        for cs in self.cognate_corpus:
+            if cs.cognate_id == cognate_id:
+                return cs
+        return None

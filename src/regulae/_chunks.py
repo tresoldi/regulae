@@ -31,6 +31,7 @@ def _chunk_promotion(
     model: LearnedModel,
     *,
     max_chunk_size: int,
+    chunk_min_transparency: float = 0.0,
 ) -> LearnedModel:
     """Extract candidate chunks from corpus alignments and promote
     those that improve BIC.
@@ -39,6 +40,14 @@ def _chunk_promotion(
     promotion: at each step, the candidate with the most negative BIC
     delta is promoted; the loop terminates when no remaining candidate
     has a negative delta.
+
+    When ``chunk_min_transparency > 0.0``, each BIC-promoted chunk is
+    additionally screened by its :class:`ChunkTransparencyReport`
+    score; chunks below the threshold are dropped. This is a
+    linguistics-driven filter: chunks that the process-classifier
+    flags as opaque (low transparency, bundled reduction,
+    morphology-like straddling) can be excluded from the model
+    before they reach downstream consumers like historia.
     """
     from regulae.training import align_corpus
 
@@ -102,7 +111,10 @@ def _chunk_promotion(
         for key, c in promoted_counts.items()
     }
 
-    return LearnedModel(
+    # Build a provisional model so we can run the transparency
+    # analyzer against the promoted entries, then optionally filter
+    # out opaque chunks and attach diagnostics to the survivors.
+    provisional = LearnedModel(
         segment_table=model.segment_table,
         displacement_dist=model.displacement_dist,
         chunk_table=ChunkPhraseTable(
@@ -117,6 +129,24 @@ def _chunk_promotion(
         segment_weight=model.segment_weight,
         displacement_weight=model.displacement_weight,
         tone_weight=model.tone_weight,
+    )
+    from regulae.chunk_diagnostics import analyze_promoted_chunks
+
+    reports = analyze_promoted_chunks(provisional) if promoted else ()
+    kept: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = {}
+    diagnostics: dict[
+        tuple[tuple[Segment, ...], tuple[Segment, ...]], "ChunkTransparencyReport"
+    ] = {}
+    for report in reports:
+        if report.transparency_score < chunk_min_transparency:
+            continue
+        key = (report.src_chunk, report.tgt_chunk)
+        kept[key] = promoted[key]
+        diagnostics[key] = report
+
+    return replace(
+        provisional,
+        chunk_table=ChunkPhraseTable(entries=kept, diagnostics=diagnostics),
     )
 
 
