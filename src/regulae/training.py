@@ -99,6 +99,8 @@ def train_model(
     tone_weight: float = DEFAULT_TONE_WEIGHT,
     multi_lect_bic_correction: bool = True,
     multi_lect_min_commit_scale: float = 0.5,
+    bootstrap_n: int = 0,
+    bootstrap_seed: int = 0,
 ) -> LearnedModel | MultiLectModel:
     """Train a layered alignment model on a training corpus.
 
@@ -130,6 +132,19 @@ def train_model(
       entirely (structural minimum of 2); set higher to tighten
       further.
 
+    Uncertainty knobs:
+
+    * ``bootstrap_n``: number of resampled trainings to run after
+      the base training. Default ``0`` (no bootstrap; every count
+      carries a closed-form Wilson interval). When ``> 0``, the
+      Wilson intervals on every count-bearing entry are replaced
+      by percentile intervals over the bootstrap distribution.
+      Training time scales as ``(1 + bootstrap_n)`` × base. Useful
+      for corpora where sampling error dominates small-n
+      calibration error; recommended values are 100 for a
+      careful analysis, 0 for iteration.
+    * ``bootstrap_seed``: seeds the resampler for reproducibility.
+
     Training is deterministic given the corpus and hyperparameters.
     """
     if not corpus:
@@ -139,33 +154,7 @@ def train_model(
             concentration=concentration,
         )
 
-    if isinstance(corpus[0], CognateSet):
-        _validate_cognate_sets(corpus)  # type: ignore[arg-type]
-        return _train_multi_lect(
-            corpus,  # type: ignore[arg-type]
-            feature_system=feature_system,
-            max_chunk_size=max_chunk_size,
-            temperature=temperature,
-            concentration=concentration,
-            max_iter=max_iter,
-            convergence_eps=convergence_eps,
-            segment_weight=segment_weight,
-            displacement_weight=displacement_weight,
-            tone_weight=tone_weight,
-            multi_lect_bic_correction=multi_lect_bic_correction,
-            multi_lect_min_commit_scale=multi_lect_min_commit_scale,
-        )
-
-    warnings.warn(
-        "Passing a list of (Form, Form) pairs to train_model is "
-        "deprecated; use cognate_sets_from_pairs(pairs, lect_ids) to "
-        "convert to a list[CognateSet] and pass that instead. The "
-        "pair-input branch may be removed in a future release.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return _train_pairwise_legacy(
-        corpus,  # type: ignore[arg-type]
+    train_kwargs = dict(
         feature_system=feature_system,
         max_chunk_size=max_chunk_size,
         temperature=temperature,
@@ -176,6 +165,52 @@ def train_model(
         displacement_weight=displacement_weight,
         tone_weight=tone_weight,
     )
+
+    if isinstance(corpus[0], CognateSet):
+        _validate_cognate_sets(corpus)  # type: ignore[arg-type]
+        base = _train_multi_lect(
+            corpus,  # type: ignore[arg-type]
+            multi_lect_bic_correction=multi_lect_bic_correction,
+            multi_lect_min_commit_scale=multi_lect_min_commit_scale,
+            **train_kwargs,
+        )
+        if bootstrap_n > 0:
+            from regulae._bootstrap import (
+                bootstrap_multi_lect_uncertainty,
+            )
+            base = bootstrap_multi_lect_uncertainty(
+                base,
+                corpus=corpus,  # type: ignore[arg-type]
+                bootstrap_n=bootstrap_n,
+                bootstrap_seed=bootstrap_seed,
+                multi_lect_bic_correction=multi_lect_bic_correction,
+                multi_lect_min_commit_scale=multi_lect_min_commit_scale,
+                **train_kwargs,
+            )
+        return base
+
+    warnings.warn(
+        "Passing a list of (Form, Form) pairs to train_model is "
+        "deprecated; use cognate_sets_from_pairs(pairs, lect_ids) to "
+        "convert to a list[CognateSet] and pass that instead. The "
+        "pair-input branch may be removed in a future release.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    base = _train_pairwise_legacy(
+        corpus,  # type: ignore[arg-type]
+        **train_kwargs,
+    )
+    if bootstrap_n > 0:
+        from regulae._bootstrap import bootstrap_pairwise_uncertainty
+        base = bootstrap_pairwise_uncertainty(
+            base,
+            corpus=corpus,  # type: ignore[arg-type]
+            bootstrap_n=bootstrap_n,
+            bootstrap_seed=bootstrap_seed,
+            **train_kwargs,
+        )
+    return base
 
 
 def _validate_cognate_sets(corpus: Sequence[CognateSet]) -> None:

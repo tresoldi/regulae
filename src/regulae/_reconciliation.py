@@ -13,6 +13,7 @@ from regulae.model import (
     MultiLectModel,
 )
 from regulae.search import align_forms
+from regulae.uncertainty import wilson_interval
 from regulae.types import (
     Context,
     Form,
@@ -291,6 +292,14 @@ def _aggregate_unconditioned_classes(
         count, support = buckets.get(key, (0, []))
         buckets[key] = (count + weight, support + [cog_id])
 
+    # Per participating-lect set, total observations across all
+    # classes with that same set. Used as the Wilson denominator:
+    # "within cognate sets where these lects all contribute,
+    # what fraction shows this segment tuple?".
+    participant_totals: dict[frozenset[str], float] = defaultdict(float)
+    for key, (count, _support) in buckets.items():
+        participant_totals[frozenset(lect for lect, _ in key)] += count
+
     classes: list[MultiLectCorrespondenceClass] = []
     for class_id, (key, (count, support)) in enumerate(
         sorted(
@@ -298,6 +307,8 @@ def _aggregate_unconditioned_classes(
             key=lambda kv: (-kv[1][0], kv[0]),
         )
     ):
+        participants = frozenset(lect for lect, _ in key)
+        n = participant_totals.get(participants, 0.0)
         classes.append(
             MultiLectCorrespondenceClass(
                 class_id=class_id,
@@ -305,6 +316,7 @@ def _aggregate_unconditioned_classes(
                 contexts=None,
                 count=count,
                 supporting_cognates=tuple(support),
+                uncertainty=wilson_interval(count, n),
             )
         )
     return tuple(classes)
@@ -462,6 +474,11 @@ def _multi_lect_context_discovery(
                 "contexts": {pivot_lect: ctx},
                 "count": count,
                 "confidence": coverage,
+                # ``bucket_size`` is the ``n`` used as the Wilson
+                # denominator. It tracks the pivot whose coverage
+                # won — the clearest witness.
+                "bucket_size": pivot_bucket_size,
+                "winning_count": count,
             }
             merged[seg_key] = entry
         else:
@@ -477,6 +494,8 @@ def _multi_lect_context_discovery(
                 entry["count"] = count
             if coverage > entry["confidence"]:
                 entry["confidence"] = coverage
+                entry["bucket_size"] = pivot_bucket_size
+                entry["winning_count"] = count
             existing_ctx = entry["contexts"].get(pivot_lect)
             if existing_ctx is None or ctx.constraint_count() > existing_ctx.constraint_count():
                 entry["contexts"][pivot_lect] = ctx
@@ -496,6 +515,10 @@ def _multi_lect_context_discovery(
                 contexts=contexts_map,
                 count=float(entry["count"]),
                 confidence=float(entry["confidence"]),
+                uncertainty=wilson_interval(
+                    float(entry["winning_count"]),
+                    float(entry["bucket_size"]),
+                ),
             )
         )
 
@@ -857,6 +880,7 @@ def _lift_cross_dimensional_rules(
                     confidence=rule.confidence,
                     src_feature_2=rule.src_feature_2,
                     src_position_2=rule.src_position_2,
+                    uncertainty=rule.uncertainty,
                 )
             )
     return MultiLectCrossDimensionalLinkTable(entries=tuple(entries))

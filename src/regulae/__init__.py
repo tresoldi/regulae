@@ -58,6 +58,11 @@ from regulae.types import (
     Link,
     Segment,
 )
+from regulae.uncertainty import (
+    UncertaintyEstimate,
+    percentile_interval,
+    wilson_interval,
+)
 
 __all__ = [
     "Alignment",
@@ -88,6 +93,7 @@ __all__ = [
     "SegmentCorrespondenceTable",
     "TonalCorrespondence",
     "TonalCorrespondenceTable",
+    "UncertaintyEstimate",
     "UnknownGrapheme",
     "analyze_promoted_chunks",
     "align_corpus",
@@ -112,8 +118,10 @@ __all__ = [
     "load_arcaverborum",
     "load_cognates_from_tsv",
     "load_gled",
+    "percentile_interval",
     "score_link",
     "summarize_chunk_process_families",
     "summarize_chunk_process_subtypes",
     "train_model",
+    "wilson_interval",
 ]

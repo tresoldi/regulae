@@ -9,6 +9,7 @@ from regulae.model import (
     SegmentCorrespondenceTable,
 )
 from regulae.search import align_forms
+from regulae.uncertainty import wilson_interval
 from regulae.types import (
     Alignment,
     Context,
@@ -64,6 +65,7 @@ def _chunk_promotion(
     # promotion because our compositional cost uses only the segment
     # table, which is unchanged during this phase.
     promoted: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = {}
+    promoted_counts: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = {}
     for (src_chunk, tgt_chunk), n_c in candidates.items():
         # Hard minimum count: below this, Laplace-smoothed MLE is too
         # optimistic (P = 1 from a single observation) and BIC cannot
@@ -93,11 +95,21 @@ def _chunk_promotion(
                 for s in src_chunk
             )
             promoted[(src_chunk, tgt_chunk)] = promoted_cost_per - log_z_sum
+            promoted_counts[(src_chunk, tgt_chunk)] = n_c
+
+    chunk_uncertainty = {
+        key: wilson_interval(c, float(n_observations))
+        for key, c in promoted_counts.items()
+    }
 
     return LearnedModel(
         segment_table=model.segment_table,
         displacement_dist=model.displacement_dist,
-        chunk_table=ChunkPhraseTable(entries=promoted),
+        chunk_table=ChunkPhraseTable(
+            entries=promoted,
+            observation_counts=promoted_counts,
+            uncertainty=chunk_uncertainty,
+        ),
         tonal_table=model.tonal_table,
         feature_system=model.feature_system,
         temperature=model.temperature,

@@ -17,6 +17,7 @@ from regulae.types import (
     FeatureConstraint,
     Form,
 )
+from regulae.uncertainty import UncertaintyEstimate, wilson_interval
 
 
 # Minimum observation count for a split branch to be considered.
@@ -228,8 +229,27 @@ def _context_discovery(
         prior_pseudo_counts=model.segment_table.prior_pseudo_counts,
         src_totals=new_src_totals,
         log_normalizers=model.segment_table.log_normalizers,
+        uncertainty=_segment_counts_uncertainty(new_counts, new_src_totals),
     )
     return _replace_segment_table(model, new_segment_table)
+
+
+def _segment_counts_uncertainty(
+    counts: dict[ConditionedCorrespondence, float],
+    src_totals: dict[str, float],
+) -> dict[ConditionedCorrespondence, UncertaintyEstimate]:
+    """Wilson interval on ``P(tgt | src, context)`` for every entry.
+
+    Context-conditioned entries share ``src_totals[src]`` with the
+    unconditioned entry, so the denominator is the total observations
+    of the source grapheme across all contexts. That matches how the
+    posterior is computed at scoring time.
+    """
+    out: dict[ConditionedCorrespondence, UncertaintyEstimate] = {}
+    for key, c in counts.items():
+        n = src_totals.get(key.src, 0.0)
+        out[key] = wilson_interval(c, n)
+    return out
 
 
 def _commit_splits_for_source(
@@ -621,6 +641,10 @@ def _tonal_aggregation(
         counts=dict(counts),
         prior_pseudo_counts={k: 1.0 for k in counts},  # symmetric uniform prior
         src_totals=dict(src_totals),
+        uncertainty={
+            k: wilson_interval(c, src_totals.get(k.src_tone, 0.0))
+            for k, c in counts.items()
+        },
     )
     # Use dataclasses.replace so any unrelated fields
     # (cross_dimensional_table, etc.) are preserved from
@@ -724,6 +748,7 @@ def _long_range_discovery(
         prior_pseudo_counts=model.segment_table.prior_pseudo_counts,
         src_totals=new_src_totals,
         log_normalizers=model.segment_table.log_normalizers,
+        uncertainty=_segment_counts_uncertainty(new_counts, new_src_totals),
     )
     return _replace_segment_table(model, new_segment_table)
 

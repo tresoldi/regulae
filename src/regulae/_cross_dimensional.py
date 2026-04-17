@@ -12,6 +12,7 @@ from regulae.model import (
     LearnedModel,
 )
 from regulae.search import align_forms, alignment_cost
+from regulae.uncertainty import wilson_interval
 from regulae.types import (
     FeatureConstraint,
     Form,
@@ -416,6 +417,7 @@ def _hypothesis_to_cross_dimensional_link(
         count=float(count),
         src_count=float(src_count),
         confidence=count / src_count,
+        uncertainty=wilson_interval(float(count), float(src_count)),
     )
     if is_joint:
         kwargs["src_feature_2"] = FeatureConstraint(

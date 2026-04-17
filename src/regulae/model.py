@@ -40,6 +40,7 @@ from regulae.types import (
     Form,
     Segment,
 )
+from regulae.uncertainty import UncertaintyEstimate
 
 
 @dataclass(frozen=True)
@@ -89,6 +90,14 @@ class TonalCorrespondenceTable:
     counts: dict[TonalCorrespondence, float] = field(default_factory=dict)
     prior_pseudo_counts: dict[TonalCorrespondence, float] = field(default_factory=dict)
     src_totals: dict[str | None, float] = field(default_factory=dict)
+    #: Parallel map from each ``counts`` key to a Wilson (or bootstrap)
+    #: interval on the rate ``count / src_totals[src_tone]``. Populated
+    #: at training time; empty on an empty table. Excluded from
+    #: equality and hashing so two otherwise-identical tables compare
+    #: equal regardless of uncertainty population.
+    uncertainty: dict[TonalCorrespondence, UncertaintyEstimate] = field(
+        default_factory=dict, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)
@@ -183,6 +192,13 @@ class CrossDimensionalLink:
     #: rule is a single-predictor rule.
     src_feature_2: FeatureConstraint | None = None
     src_position_2: str | None = None
+    #: Interval on ``confidence`` (= ``count / src_count``). Populated
+    #: at rule-commit time. Excluded from equality and hashing so two
+    #: otherwise-identical rules compare equal regardless of
+    #: uncertainty population.
+    uncertainty: UncertaintyEstimate | None = field(
+        default=None, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)
@@ -238,6 +254,11 @@ class MultiLectCrossDimensionalLink:
     #: :class:`CrossDimensionalLink`.
     src_feature_2: FeatureConstraint | None = None
     src_position_2: str | None = None
+    #: Interval on ``confidence``. Propagated from the underlying
+    #: per-pair :class:`CrossDimensionalLink`.
+    uncertainty: UncertaintyEstimate | None = field(
+        default=None, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)
@@ -292,6 +313,13 @@ class SegmentCorrespondenceTable:
     prior_pseudo_counts: dict[ConditionedCorrespondence, float] = field(default_factory=dict)
     src_totals: dict[str, float] = field(default_factory=dict)
     log_normalizers: dict[str, float] = field(default_factory=dict)
+    #: Parallel map from each ``counts`` key to an interval on the rate
+    #: ``count / src_totals[key.src]`` (the conditional probability
+    #: ``P(tgt | src, context)``). Populated at training time; empty on
+    #: a freshly constructed table. Excluded from equality and hashing.
+    uncertainty: dict[ConditionedCorrespondence, UncertaintyEstimate] = field(
+        default_factory=dict, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)
@@ -321,6 +349,12 @@ class DisplacementDistribution:
     counts: dict[tuple[FeatureDisplacement, ...], float] = field(default_factory=dict)
     total: float = 0.0
     prior_pseudo_count: float = 1.0
+    #: Parallel map from each ``counts`` key to an interval on the rate
+    #: ``count / total``. Populated after displacement aggregation;
+    #: empty on an empty distribution.
+    uncertainty: dict[tuple[FeatureDisplacement, ...], UncertaintyEstimate] = field(
+        default_factory=dict, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)
@@ -336,6 +370,21 @@ class ChunkPhraseTable:
     entries: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = field(
         default_factory=dict
     )
+    #: Parallel map from each ``entries`` key to the number of corpus
+    #: observations of that chunk at promotion time. The chunk table
+    #: itself stores the promoted cost (on the search scale), not the
+    #: count; this map recovers the raw count for downstream consumers
+    #: and for the bootstrap uncertainty path.
+    observation_counts: dict[
+        tuple[tuple[Segment, ...], tuple[Segment, ...]], float
+    ] = field(default_factory=dict)
+    #: Parallel map from each ``entries`` key to an interval on the
+    #: rate ``chunk_observations / total_1to1_observations`` used as
+    #: the BIC denominator during promotion. Populated at
+    #: chunk-promotion time; empty on an empty table.
+    uncertainty: dict[
+        tuple[tuple[Segment, ...], tuple[Segment, ...]], UncertaintyEstimate
+    ] = field(default_factory=dict, compare=False, hash=False)
 
 
 @dataclass(frozen=True)
@@ -509,6 +558,12 @@ class MultiLectCorrespondenceClass:
     count: float = 0.0
     supporting_cognates: tuple[str, ...] = ()
     confidence: float = 1.0
+    #: Interval on the rate ``count / pivot_bucket_size`` (for
+    #: conditioned classes) or ``count / total_observations_of_lect_combo``
+    #: (for unconditioned classes). Populated at class-discovery time.
+    uncertainty: UncertaintyEstimate | None = field(
+        default=None, compare=False, hash=False
+    )
 
 
 @dataclass(frozen=True)

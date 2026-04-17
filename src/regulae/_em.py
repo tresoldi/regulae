@@ -15,6 +15,7 @@ from regulae.model import (
 )
 from regulae.scoring import compute_displacement
 from regulae.search import align_forms, alignment_cost
+from regulae.uncertainty import UncertaintyEstimate, wilson_interval
 from regulae.types import (
     Alignment,
     Context,
@@ -198,8 +199,22 @@ def _update_segment_table(
         prior_pseudo_counts=model.segment_table.prior_pseudo_counts,
         src_totals=dict(src_totals),
         log_normalizers=model.segment_table.log_normalizers,
+        uncertainty=_segment_uncertainty(counts, src_totals),
     )
     return _replace_segment_table(model, new_segment_table)
+
+
+def _segment_uncertainty(
+    counts: dict[ConditionedCorrespondence, float],
+    src_totals: dict[str, float],
+) -> dict[ConditionedCorrespondence, UncertaintyEstimate]:
+    """Wilson intervals on ``P(tgt | src, context) = count / src_totals[src]``
+    for every entry in ``counts``."""
+    out: dict[ConditionedCorrespondence, UncertaintyEstimate] = {}
+    for key, c in counts.items():
+        n = src_totals.get(key.src, 0.0)
+        out[key] = wilson_interval(c, n)
+    return out
 
 
 def _replace_segment_table(
@@ -256,6 +271,7 @@ def _displacement_aggregation(
         counts=dict(counts),
         total=total,
         prior_pseudo_count=model.displacement_dist.prior_pseudo_count,
+        uncertainty={d: wilson_interval(c, total) for d, c in counts.items()},
     )
     return LearnedModel(
         segment_table=model.segment_table,
