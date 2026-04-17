@@ -5,6 +5,11 @@ from regulae.anomaly import (
     PatternHypothesis,
     find_residual_patterns,
 )
+from regulae.chunk_diagnostics import (
+    ChunkTransparencyReport,
+    analyze_promoted_chunks,
+    describe_promoted_chunk,
+)
 from regulae.diagnostics import CognateOutlierReport, find_cognate_outliers
 from regulae.format import (
     describe_cross_dimensional_rule,
@@ -51,6 +56,7 @@ from regulae.types import (
 __all__ = [
     "Alignment",
     "ChunkPhraseTable",
+    "ChunkTransparencyReport",
     "CognateOutlierReport",
     "CognateSet",
     "ConditionedCorrespondence",
@@ -75,6 +81,7 @@ __all__ = [
     "TonalCorrespondence",
     "TonalCorrespondenceTable",
     "UnknownGrapheme",
+    "analyze_promoted_chunks",
     "align_corpus",
     "align_forms",
     "alignment_cost",
@@ -83,6 +90,7 @@ __all__ = [
     "compute_syllable_breaks",
     "describe_cross_dimensional_rule",
     "describe_multi_lect_class",
+    "describe_promoted_chunk",
     "describe_source",
     "find_cognate_outliers",
     "find_residual_patterns",

@@ -109,6 +109,7 @@ def _initial_model(
 
 def _segment_em(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     initial_model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -143,12 +144,17 @@ def _segment_em(
         prev_cost = total_cost
 
         # M-step: rebuild the segment table from scratch.
-        model = _update_segment_table(model, alignments)
+        model = _update_segment_table(model, alignments, pair_weights=pair_weights)
 
     return model
 
 
-def _update_segment_table(model: LearnedModel, alignments: Sequence[Alignment]) -> LearnedModel:
+def _update_segment_table(
+    model: LearnedModel,
+    alignments: Sequence[Alignment],
+    *,
+    pair_weights: Sequence[float] | None = None,
+) -> LearnedModel:
     """Produce a new model with the segment table updated from alignments.
 
     Only 1-to-1 links contribute. Chunks and gaps are ignored at this
@@ -163,14 +169,19 @@ def _update_segment_table(model: LearnedModel, alignments: Sequence[Alignment]) 
     src_totals: dict[str, float] = defaultdict(float)
 
     empty_context = Context()
-    for alignment in alignments:
+    if pair_weights is None:
+        pair_weights = [1.0] * len(alignments)
+
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         for link in alignment.links:
             if len(link.source_chunk) == 1 and len(link.target_chunk) == 1:
                 s = link.source_chunk[0].grapheme
                 t = link.target_chunk[0].grapheme
                 key = ConditionedCorrespondence(src=s, tgt=t, context=empty_context)
-                counts[key] += 1.0
-                src_totals[s] += 1.0
+                counts[key] += pair_weight
+                src_totals[s] += pair_weight
 
     new_segment_table = SegmentCorrespondenceTable(
         counts=dict(counts),
@@ -195,6 +206,7 @@ def _replace_segment_table(
 
 def _displacement_aggregation(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -213,7 +225,9 @@ def _displacement_aggregation(
     counts: dict[tuple[FeatureDisplacement, ...], float] = defaultdict(float)
     total = 0.0
 
-    for alignment in alignments:
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         for link in alignment.links:
             if len(link.source_chunk) != 1 or len(link.target_chunk) != 1:
                 continue
@@ -225,8 +239,8 @@ def _displacement_aggregation(
                 )
             except Exception:
                 continue
-            counts[disp] += 1.0
-            total += 1.0
+            counts[disp] += pair_weight
+            total += pair_weight
 
     new_dist = DisplacementDistribution(
         counts=dict(counts),

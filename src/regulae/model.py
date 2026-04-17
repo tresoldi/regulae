@@ -447,11 +447,13 @@ class CognateSet:
     * ``morpheme_boundaries``: reserved for future morph-aware
       alignment. Captured by loaders when present but not currently
       consumed.
-    * ``confidence``: membership confidence in [0, 1]. Currently
-      stored but not weighted into counts. Intended for cases where
-      the user has graded cognacy evidence and wants to mark some
-      sets as less certain than others; a future training extension
-      may weight the loss by this field.
+    * ``confidence``: membership confidence in [0, 1]. Training uses
+      this as an evidence weight: lower-confidence cognate sets still
+      align and remain in the retained corpus for auditability, but
+      contribute proportionally less mass to pairwise correspondence
+      counts, chunk promotion, tonal/cross-dimensional discovery, and
+      multi-lect class aggregation. ``0.0`` means "inspect but do not
+      learn from this set"; ``1.0`` is the default full contribution.
     """
 
     cognate_id: str

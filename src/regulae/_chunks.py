@@ -26,6 +26,7 @@ MIN_CHUNK_OBSERVATIONS: int = 2
 
 def _chunk_promotion(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -42,12 +43,16 @@ def _chunk_promotion(
 
     alignments = align_corpus(corpus, model, max_chunk_size=max_chunk_size)
 
-    candidates = _extract_chunk_candidates(alignments, max_chunk_size=max_chunk_size)
+    candidates = _extract_chunk_candidates(
+        alignments,
+        pair_weights=pair_weights,
+        max_chunk_size=max_chunk_size,
+    )
 
     # Count of 1-to-1 observations is our proxy for corpus size N.
     n_observations = sum(
-        1
-        for a in alignments
+        pair_weight
+        for a, pair_weight in zip(alignments, pair_weights, strict=True)
         for link in a.links
         if len(link.source_chunk) == 1 and len(link.target_chunk) == 1
     )
@@ -106,8 +111,9 @@ def _chunk_promotion(
 def _extract_chunk_candidates(
     alignments: Sequence[Alignment],
     *,
+    pair_weights: Sequence[float],
     max_chunk_size: int,
-) -> dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], int]:
+) -> dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float]:
     """Enumerate contiguous sub-alignments as candidate chunks.
 
     For each alignment, iterate over every contiguous subsequence of
@@ -119,8 +125,10 @@ def _extract_chunk_candidates(
     * the combined length is at least 3 (excludes plain 1-to-1 links
       that belong to the segment table, not the chunk table).
     """
-    counts: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], int] = defaultdict(int)
-    for alignment in alignments:
+    counts: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float] = defaultdict(float)
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         links = alignment.links
         for i in range(len(links)):
             src_chunk: tuple[Segment, ...] = ()
@@ -134,7 +142,7 @@ def _extract_chunk_candidates(
                     continue
                 if len(src_chunk) + len(tgt_chunk) < 3:
                     continue
-                counts[(src_chunk, tgt_chunk)] += 1
+                counts[(src_chunk, tgt_chunk)] += pair_weight
     return counts
 
 
@@ -213,7 +221,7 @@ def _compositional_chunk_cost_raw(
 def _promoted_chunk_cost(
     src_chunk: tuple[Segment, ...],
     tgt_chunk: tuple[Segment, ...],
-    candidates: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], int],
+    candidates: dict[tuple[tuple[Segment, ...], tuple[Segment, ...]], float],
     alpha: float = 1.0,
 ) -> float:
     """MLE chunk cost with Laplace smoothing: -log P(tgt | src).
@@ -223,7 +231,7 @@ def _promoted_chunk_cost(
     it, apply add-alpha smoothing, and take the negative log.
     """
     # Counts for this source chunk across all observed target chunks.
-    src_counts: dict[tuple[Segment, ...], int] = {}
+    src_counts: dict[tuple[Segment, ...], float] = {}
     for (s, t), n in candidates.items():
         if s == src_chunk:
             src_counts[t] = n

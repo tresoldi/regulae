@@ -125,6 +125,7 @@ _LONG_RANGE_EXISTENTIAL_SLOTS: tuple[str, ...] = (
 
 def _context_discovery(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -156,14 +157,16 @@ def _context_discovery(
     #    structurally 1-to-1 with gaps. Without this, context discovery
     #    is blind to cases like OE ``sk → ʃ`` (absorbed as a 2-to-1 chunk) and
     #    intervocalic fricative voicing packaged into longer chunks.
-    observations: list[tuple[str, str, Context]] = []
+    observations: list[tuple[str, str, Context, float]] = []
     no_chunks_model = replace(model, chunk_table=ChunkPhraseTable())
-    for alignment in alignments:
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         for link in alignment.links:
             sc, tc = link.source_chunk, link.target_chunk
             if len(sc) == 1 and len(tc) == 1:
                 observations.append(
-                    (sc[0].grapheme, tc[0].grapheme, link.context)
+                    (sc[0].grapheme, tc[0].grapheme, link.context, pair_weight)
                 )
                 continue
             if not sc or not tc:
@@ -181,7 +184,7 @@ def _context_discovery(
                     # its own but it's relative to the chunk's internal
                     # position, not the full form's).
                     observations.append(
-                        (sub_sc[0].grapheme, sub_tc[0].grapheme, link.context)
+                        (sub_sc[0].grapheme, sub_tc[0].grapheme, link.context, pair_weight)
                     )
 
     if not observations:
@@ -189,9 +192,9 @@ def _context_discovery(
 
     # Group by source grapheme so we can consider each source's
     # target distribution independently.
-    by_source: dict[str, list[tuple[str, Context]]] = defaultdict(list)
-    for s, t, c in observations:
-        by_source[s].append((t, c))
+    by_source: dict[str, list[tuple[str, Context, float]]] = defaultdict(list)
+    for s, t, c, w in observations:
+        by_source[s].append((t, c, w))
 
     # The starting set of conditioned correspondences is the
     # unconditioned ones from the segment-level EM table.
@@ -199,7 +202,7 @@ def _context_discovery(
     new_src_totals: dict[str, float] = dict(model.segment_table.src_totals)
 
     # Total observation count (ln N baseline for BIC).
-    n_total = len(observations)
+    n_total = sum(w for _, _, _, w in observations)
     if n_total == 0:
         return model
     ln_n = math.log(n_total)
@@ -208,8 +211,8 @@ def _context_discovery(
     for src, obs in by_source.items():
         # Only attempt splits on sources with multiple targets and
         # enough observations to support any split at all.
-        target_set = {t for t, _ in obs}
-        if len(target_set) < 2 or len(obs) < 4:
+        target_set = {t for t, _, _ in obs}
+        if len(target_set) < 2 or sum(w for _, _, w in obs) < 4.0:
             continue
         _commit_splits_for_source(
             src=src,
@@ -231,7 +234,7 @@ def _context_discovery(
 
 def _commit_splits_for_source(
     src: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     new_counts: dict[ConditionedCorrespondence, float],
     new_src_totals: dict[str, float],
     ln_n: float,
@@ -263,7 +266,10 @@ def _commit_splits_for_source(
     committed_count = 0
     # Cap the number of top-level splits per source to prevent
     # pathological loops on messy data.
-    while committed_count < max_depth * 4 and len(remaining) >= MIN_SPLIT_OBSERVATIONS:
+    while (
+        committed_count < max_depth * 4
+        and _observation_weight(remaining) >= MIN_SPLIT_OBSERVATIONS
+    ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
@@ -271,8 +277,8 @@ def _commit_splits_for_source(
         for predicate in _candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                len(yes_obs) < MIN_SPLIT_OBSERVATIONS
-                or len(no_obs) < MIN_SPLIT_OBSERVATIONS
+                _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
+                or _observation_weight(no_obs) < MIN_SPLIT_OBSERVATIONS
             ):
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
@@ -304,7 +310,7 @@ def _commit_splits_for_source(
 
 def _refine_split(
     src: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     base_context: Context,
     depth: int,
     new_counts: dict[ConditionedCorrespondence, float],
@@ -324,15 +330,18 @@ def _refine_split(
     explode combinatorially; the framework handles most real cases
     well enough with one refinement level per branch.
     """
-    if depth >= max_depth or len(observations) < MIN_SPLIT_OBSERVATIONS:
+    if depth >= max_depth or _observation_weight(observations) < MIN_SPLIT_OBSERVATIONS:
         return
     baseline_cost = _group_cost(observations)
     best_predicate: tuple[str, str, str | None] | None = None
-    best_partitions: tuple[list[tuple[str, Context]], list[tuple[str, Context]]] | None = None
+    best_partitions: tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]] | None = None
     best_delta = DELTA_BIC_THRESHOLD
     for predicate in _candidate_predicates(base_context):
         yes_obs, no_obs = _partition(observations, predicate)
-        if len(yes_obs) < MIN_SPLIT_OBSERVATIONS or len(no_obs) < MIN_SPLIT_OBSERVATIONS:
+        if (
+            _observation_weight(yes_obs) < MIN_SPLIT_OBSERVATIONS
+            or _observation_weight(no_obs) < MIN_SPLIT_OBSERVATIONS
+        ):
             continue
         split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
         reduction = baseline_cost - split_cost
@@ -357,7 +366,23 @@ def _refine_split(
     )
 
 
-def _group_cost(observations: list[tuple[str, Context]]) -> float:
+def _obs_weight(obs: tuple) -> float:
+    """Return the weight of one observation tuple.
+
+    Backward-compatible with older internal tests that pass
+    ``(target, Context)`` pairs without an explicit weight.
+    """
+    if len(obs) >= 3:
+        return float(obs[2])
+    return 1.0
+
+
+def _observation_weight(observations: list[tuple[str, Context, float]]) -> float:
+    """Return the total confidence-weighted mass of the observations."""
+    return sum(_obs_weight(obs) for obs in observations)
+
+
+def _group_cost(observations: list[tuple[str, Context, float]]) -> float:
     """Negative log-likelihood of a group of (target, context) observations
     under a single unconditioned correspondence for them.
 
@@ -367,10 +392,10 @@ def _group_cost(observations: list[tuple[str, Context]]) -> float:
     """
     if not observations:
         return 0.0
-    target_counts: dict[str, int] = defaultdict(int)
-    for t, _ in observations:
-        target_counts[t] += 1
-    total = len(observations)
+    target_counts: dict[str, float] = defaultdict(float)
+    for obs in observations:
+        target_counts[obs[0]] += _obs_weight(obs)
+    total = _observation_weight(observations)
     cost = 0.0
     for _, n in target_counts.items():
         p = n / total
@@ -407,18 +432,21 @@ def _candidate_predicates(
 
 
 def _partition(
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     predicate: tuple[str, str, str | None],
-) -> tuple[list[tuple[str, Context]], list[tuple[str, Context]]]:
+) -> tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]]:
     """Split the observations by whether the predicate is satisfied."""
     slot, feature, value = predicate
-    yes_obs: list[tuple[str, Context]] = []
-    no_obs: list[tuple[str, Context]] = []
-    for t, ctx in observations:
+    yes_obs: list[tuple[str, Context, float]] = []
+    no_obs: list[tuple[str, Context, float]] = []
+    for obs in observations:
+        t = obs[0]
+        ctx = obs[1]
+        weight = _obs_weight(obs)
         if _predicate_holds(ctx, slot, feature, value):
-            yes_obs.append((t, ctx))
+            yes_obs.append((t, ctx, weight))
         else:
-            no_obs.append((t, ctx))
+            no_obs.append((t, ctx, weight))
     return yes_obs, no_obs
 
 
@@ -530,22 +558,23 @@ def _apply_predicate(
 
 def _commit_group(
     src: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     context: Context,
     new_counts: dict[ConditionedCorrespondence, float],
 ) -> None:
     """Write counts for each observed target in this group as new
     conditioned correspondence entries under the given context."""
-    target_counts: dict[str, int] = defaultdict(int)
-    for t, _ in observations:
-        target_counts[t] += 1
+    target_counts: dict[str, float] = defaultdict(float)
+    for obs in observations:
+        target_counts[obs[0]] += _obs_weight(obs)
     for t, n in target_counts.items():
         key = ConditionedCorrespondence(src=src, tgt=t, context=context)
-        new_counts[key] = float(n)
+        new_counts[key] = n
 
 
 def _tonal_aggregation(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -569,7 +598,9 @@ def _tonal_aggregation(
     src_totals: dict[str | None, float] = defaultdict(float)
 
     any_toned = False
-    for alignment in alignments:
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         for link in alignment.links:
             if len(link.source_chunk) != 1 or len(link.target_chunk) != 1:
                 continue
@@ -579,8 +610,8 @@ def _tonal_aggregation(
                 continue  # untoned — skip entirely
             any_toned = True
             key = TonalCorrespondence(src_tone=src_tone, tgt_tone=tgt_tone)
-            counts[key] += 1.0
-            src_totals[src_tone] += 1.0
+            counts[key] += pair_weight
+            src_totals[src_tone] += pair_weight
 
     if not any_toned:
         # Non-tonal corpus: leave the tonal table empty.
@@ -623,6 +654,7 @@ def _long_range_candidate_predicates(
 
 def _long_range_discovery(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     max_chunk_size: int,
@@ -652,30 +684,32 @@ def _long_range_discovery(
 
     alignments = align_corpus(corpus, model, max_chunk_size=max_chunk_size)
 
-    observations: list[tuple[str, str, Context]] = []
-    for alignment in alignments:
+    observations: list[tuple[str, str, Context, float]] = []
+    for alignment, pair_weight in zip(alignments, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         for link in alignment.links:
             sc, tc = link.source_chunk, link.target_chunk
             if len(sc) == 1 and len(tc) == 1:
                 observations.append(
-                    (sc[0].grapheme, tc[0].grapheme, link.context)
+                    (sc[0].grapheme, tc[0].grapheme, link.context, pair_weight)
                 )
 
     if not observations:
         return model
 
-    by_source: dict[str, list[tuple[str, Context]]] = defaultdict(list)
-    for s, t, c in observations:
-        by_source[s].append((t, c))
+    by_source: dict[str, list[tuple[str, Context, float]]] = defaultdict(list)
+    for s, t, c, w in observations:
+        by_source[s].append((t, c, w))
 
     new_counts: dict[ConditionedCorrespondence, float] = dict(model.segment_table.counts)
     new_src_totals: dict[str, float] = dict(model.segment_table.src_totals)
-    n_total = len(observations)
+    n_total = sum(w for _, _, _, w in observations)
     ln_n = math.log(n_total)
 
     for src, obs in by_source.items():
-        target_set = {t for t, _ in obs}
-        if len(target_set) < 2 or len(obs) < 4:
+        target_set = {t for t, _, _ in obs}
+        if len(target_set) < 2 or _observation_weight(obs) < 4.0:
             continue
         _commit_long_range_splits_for_source(
             src=src,
@@ -696,7 +730,7 @@ def _long_range_discovery(
 
 def _commit_long_range_splits_for_source(
     src: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     new_counts: dict[ConditionedCorrespondence, float],
     ln_n: float,
     max_depth: int,
@@ -713,7 +747,7 @@ def _commit_long_range_splits_for_source(
     committed_count = 0
     while (
         committed_count < max_depth * 4
-        and len(remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
+        and _observation_weight(remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
@@ -722,18 +756,19 @@ def _commit_long_range_splits_for_source(
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                len(yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
-                or len(no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                _observation_weight(yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                or _observation_weight(no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
             ):
                 continue
             # Dominance filter: the YES group must be carried by a
             # single target outcome, otherwise this is a grab-bag
             # anomaly bucket rather than a real rule.
-            yes_target_counts: dict[str, int] = defaultdict(int)
-            for t, _ in yes_obs:
-                yes_target_counts[t] += 1
+            yes_target_counts: dict[str, float] = defaultdict(float)
+            for t, _, weight in yes_obs:
+                yes_target_counts[t] += weight
             yes_mode = max(yes_target_counts.values())
-            if yes_mode / len(yes_obs) < _LONG_RANGE_MIN_DOMINANT_FRACTION:
+            yes_weight = _observation_weight(yes_obs)
+            if yes_weight <= 0.0 or yes_mode / yes_weight < _LONG_RANGE_MIN_DOMINANT_FRACTION:
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
             reduction = baseline_cost - split_cost

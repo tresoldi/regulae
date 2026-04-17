@@ -197,11 +197,17 @@ def _validate_cognate_sets(corpus: Sequence[CognateSet]) -> None:
                     f"CognateSet {cs.cognate_id!r}, lect {lect_id!r}: "
                     f"form has no segments."
                 )
+        if not 0.0 <= cs.confidence <= 1.0:
+            raise ValueError(
+                f"CognateSet {cs.cognate_id!r}: confidence must be in [0, 1], "
+                f"got {cs.confidence!r}."
+            )
 
 
 def _train_pairwise_legacy(
     corpus: Sequence[tuple[Form, Form]],
     *,
+    pair_weights: Sequence[float] | None = None,
     feature_system: str,
     max_chunk_size: int,
     temperature: float,
@@ -213,6 +219,11 @@ def _train_pairwise_legacy(
     tone_weight: float,
 ) -> LearnedModel:
     """Internal: the pair-based training pipeline."""
+    if pair_weights is None:
+        pair_weights = [1.0] * len(corpus)
+    if len(pair_weights) != len(corpus):
+        raise ValueError("pair_weights must have the same length as corpus")
+
     initial = _initial_model(
         corpus=corpus,
         feature_system=feature_system,
@@ -224,6 +235,7 @@ def _train_pairwise_legacy(
 
     after_em = _segment_em(
         corpus=corpus,
+        pair_weights=pair_weights,
         initial_model=initial,
         max_chunk_size=max_chunk_size,
         max_iter=max_iter,
@@ -232,35 +244,41 @@ def _train_pairwise_legacy(
 
     after_displacement = _displacement_aggregation(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_em,
         max_chunk_size=max_chunk_size,
     )
 
     after_context = _context_discovery(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_displacement,
         max_chunk_size=max_chunk_size,
     )
 
     after_chunks = _chunk_promotion(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_context,
         max_chunk_size=max_chunk_size,
     )
 
     after_tonal = _tonal_aggregation(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_chunks,
         max_chunk_size=max_chunk_size,
     )
 
     after_cross_dim = _cross_dimensional_discovery(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_tonal,
     )
 
     after_long_range = _long_range_discovery(
         corpus=corpus,
+        pair_weights=pair_weights,
         model=after_cross_dim,
         max_chunk_size=max_chunk_size,
     )

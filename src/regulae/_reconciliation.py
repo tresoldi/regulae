@@ -32,6 +32,17 @@ from regulae._discovery import (
 )
 
 
+def _obs_weight(obs: tuple) -> float:
+    """Return the weight of an observation tuple.
+
+    Backward-compatible with older 2-tuples ``(target, Context)``
+    used by internal helper tests; those implicitly carry weight 1.0.
+    """
+    if len(obs) >= 3:
+        return float(obs[2])
+    return 1.0
+
+
 class _UnionFind:
     """Tiny union-find over hashable nodes, used only by the
     multi-lect reconciliation stage. Nodes are added implicitly
@@ -89,14 +100,16 @@ def _collect_lect_ids(corpus: Sequence[CognateSet]) -> tuple[str, ...]:
 
 def _subset_for_pair(
     corpus: Sequence[CognateSet], lect_a: str, lect_b: str
-) -> list[tuple[Form, Form]]:
+) -> tuple[list[tuple[Form, Form]], list[float]]:
     """Extract the pairwise (form_a, form_b) list for cognate sets
     where both lects are present."""
     out: list[tuple[Form, Form]] = []
+    weights: list[float] = []
     for cs in corpus:
         if lect_a in cs.forms and lect_b in cs.forms:
             out.append((cs.forms[lect_a], cs.forms[lect_b]))
-    return out
+            weights.append(cs.confidence)
+    return out, weights
 
 
 def _pair_alignment_edges(
@@ -254,12 +267,12 @@ def _reconcile_cognate_set(
 
 
 def _aggregate_unconditioned_classes(
-    observations: Sequence[tuple[str, dict[str, str]]],
+    observations: Sequence[tuple[str, dict[str, str], float]],
 ) -> tuple[MultiLectCorrespondenceClass, ...]:
     """Group observations by their segment tuple and produce
     unconditioned :class:`MultiLectCorrespondenceClass` entries.
 
-    ``observations`` is a list of ``(cognate_id, segments_dict)``.
+    ``observations`` is a list of ``(cognate_id, segments_dict, weight)``.
     The key for grouping is the sorted tuple of ``(lect_id, grapheme)``
     pairs, which makes two observations with the same participating
     lects and the same graphemes fall into the same class.
@@ -269,12 +282,14 @@ def _aggregate_unconditioned_classes(
     """
     buckets: dict[
         tuple[tuple[str, str], ...],
-        tuple[int, list[str]],
+        tuple[float, list[str]],
     ] = {}
-    for cog_id, segments in observations:
+    for cog_id, segments, weight in observations:
+        if weight <= 0.0:
+            continue
         key = tuple(sorted(segments.items()))
         count, support = buckets.get(key, (0, []))
-        buckets[key] = (count + 1, support + [cog_id])
+        buckets[key] = (count + weight, support + [cog_id])
 
     classes: list[MultiLectCorrespondenceClass] = []
     for class_id, (key, (count, support)) in enumerate(
@@ -288,7 +303,7 @@ def _aggregate_unconditioned_classes(
                 class_id=class_id,
                 segments=dict(key),
                 contexts=None,
-                count=float(count),
+                count=count,
                 supporting_cognates=tuple(support),
             )
         )
@@ -316,7 +331,7 @@ def _compute_single_position_context(
 
 def _multi_lect_context_discovery(
     corpus: Sequence[CognateSet],
-    observations: list[tuple[str, dict[str, str], dict[str, int]]],
+    observations: list[tuple[str, dict[str, str], dict[str, int], float]],
     feature_system: str,
     start_class_id: int,
     *,
@@ -350,7 +365,7 @@ def _multi_lect_context_discovery(
     # pairs so that we can reuse the per-pair string-target split machinery.
     pivot_buckets: dict[
         tuple[str, str],
-        list[tuple[str, str, Context]],
+        list[tuple[str, str, Context, float]],
     ] = defaultdict(list)
     # Remember the sister tuple behind each string key so we can build
     # classes back out at the end.
@@ -361,7 +376,9 @@ def _multi_lect_context_discovery(
         tuple[str, str, Context, tuple[tuple[str, str], ...]], list[str]
     ] = defaultdict(list)
 
-    for cog_id, segments, positions in observations:
+    for cog_id, segments, positions, obs_weight in observations:
+        if obs_weight <= 0.0:
+            continue
         cs = corpus_by_id[cog_id]
         for pivot_lect, pivot_g in segments.items():
             sister = tuple(
@@ -374,7 +391,7 @@ def _multi_lect_context_discovery(
             form = cs.forms[pivot_lect]
             pos = positions[pivot_lect]
             ctx = _compute_single_position_context(form, pos, feature_system)
-            pivot_buckets[(pivot_lect, pivot_g)].append((sister_key, ctx))
+            pivot_buckets[(pivot_lect, pivot_g)].append((sister_key, ctx, obs_weight))
 
     # Now run a per-pivot greedy split loop. For each pivot bucket
     # with multiple distinct sister targets and enough observations,
@@ -383,12 +400,12 @@ def _multi_lect_context_discovery(
     # count so we can later compute the coverage-based confidence
     # (count / pivot_bucket_size) of the resulting class.
     committed: list[
-        tuple[str, str, Context, tuple[tuple[str, str], ...], int, int]
+        tuple[str, str, Context, tuple[tuple[str, str], ...], float, float]
     ] = []  # (pivot_lect, pivot_g, ctx, sister_tuple, count, pivot_bucket_size)
 
     for (pivot_lect, pivot_g), obs in pivot_buckets.items():
-        target_set = {t for t, _ in obs}
-        if len(target_set) < 2 or len(obs) < 4:
+        target_set = {t for t, *_rest in obs}
+        if len(target_set) < 2 or sum(_obs_weight(o) for o in obs) < 4.0:
             continue
         _commit_multi_lect_splits_for_pivot(
             pivot_lect=pivot_lect,
@@ -525,10 +542,10 @@ def _multi_lect_min_commit_count(n_total: int, scale: float) -> int:
 def _commit_multi_lect_splits_for_pivot(
     pivot_lect: str,
     pivot_grapheme: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     sister_by_key: dict[str, tuple[tuple[str, str], ...]],
     committed: list[
-        tuple[str, str, Context, tuple[tuple[str, str], ...], int, int]
+        tuple[str, str, Context, tuple[tuple[str, str], ...], float, float]
     ],
     *,
     use_bic_small_sample_correction: bool,
@@ -553,7 +570,7 @@ def _commit_multi_lect_splits_for_pivot(
       :func:`_multi_lect_min_commit_count`.
     """
     remaining = list(observations)
-    n_total = len(observations)
+    n_total = sum(_obs_weight(obs) for obs in observations)
     if n_total < 4:
         return
     ln_n = math.log(n_total)
@@ -562,7 +579,10 @@ def _commit_multi_lect_splits_for_pivot(
         penalty += 2.0 / max(n_total - 1, 1)
     min_commit = _multi_lect_min_commit_count(n_total, min_commit_scale)
     committed_count = 0
-    while committed_count < MAX_SPLIT_DEPTH * 4 and len(remaining) >= MIN_SPLIT_OBSERVATIONS:
+    while (
+        committed_count < MAX_SPLIT_DEPTH * 4
+        and sum(_obs_weight(obs) for obs in remaining) >= MIN_SPLIT_OBSERVATIONS
+    ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
         best_partitions: tuple[list, list] | None = None
@@ -570,8 +590,8 @@ def _commit_multi_lect_splits_for_pivot(
         for predicate in _candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                len(yes_obs) < MIN_SPLIT_OBSERVATIONS
-                or len(no_obs) < MIN_SPLIT_OBSERVATIONS
+                sum(_obs_weight(obs) for obs in yes_obs) < MIN_SPLIT_OBSERVATIONS
+                or sum(_obs_weight(obs) for obs in no_obs) < MIN_SPLIT_OBSERVATIONS
             ):
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
@@ -587,9 +607,10 @@ def _commit_multi_lect_splits_for_pivot(
         yes_ctx = _apply_predicate(Context(), best_predicate)
         # Emit one class per distinct sister tuple in the yes partition
         # whose count meets the adaptive minimum.
-        sister_counts: dict[tuple[tuple[str, str], ...], int] = defaultdict(int)
-        for sister_key, _ctx in yes_obs:
-            sister_counts[sister_by_key[sister_key]] += 1
+        sister_counts: dict[tuple[tuple[str, str], ...], float] = defaultdict(float)
+        for obs in yes_obs:
+            sister_key = obs[0]
+            sister_counts[sister_by_key[sister_key]] += _obs_weight(obs)
         for sister, count in sister_counts.items():
             if count < min_commit:
                 continue
@@ -603,10 +624,10 @@ def _commit_multi_lect_splits_for_pivot(
 def _commit_multi_lect_long_range_splits_for_pivot(
     pivot_lect: str,
     pivot_grapheme: str,
-    observations: list[tuple[str, Context]],
+    observations: list[tuple[str, Context, float]],
     sister_by_key: dict[str, tuple[tuple[str, str], ...]],
     committed: list[
-        tuple[str, str, Context, tuple[tuple[str, str], ...], int, int]
+        tuple[str, str, Context, tuple[tuple[str, str], ...], float, float]
     ],
     *,
     min_commit_scale: float,
@@ -628,7 +649,7 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     loop already saw — long-range commits are additive overlays,
     not partitions of the residual.
     """
-    n_total = len(observations)
+    n_total = sum(_obs_weight(obs) for obs in observations)
     if n_total < _LONG_RANGE_MIN_SPLIT_OBS:
         return
     ln_n = math.log(n_total)
@@ -648,7 +669,7 @@ def _commit_multi_lect_long_range_splits_for_pivot(
     committed_count = 0
     while (
         committed_count < MAX_SPLIT_DEPTH * 4
-        and len(remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
+        and sum(_obs_weight(obs) for obs in remaining) >= _LONG_RANGE_MIN_SPLIT_OBS
     ):
         baseline_cost = _group_cost(remaining)
         best_predicate: tuple[str, str, str | None] | None = None
@@ -657,15 +678,16 @@ def _commit_multi_lect_long_range_splits_for_pivot(
         for predicate in _long_range_candidate_predicates(Context()):
             yes_obs, no_obs = _partition(remaining, predicate)
             if (
-                len(yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
-                or len(no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                sum(_obs_weight(obs) for obs in yes_obs) < _LONG_RANGE_MIN_SPLIT_OBS
+                or sum(_obs_weight(obs) for obs in no_obs) < _LONG_RANGE_MIN_SPLIT_OBS
             ):
                 continue
-            yes_target_counts: dict[str, int] = defaultdict(int)
-            for t, _ in yes_obs:
-                yes_target_counts[t] += 1
+            yes_target_counts: dict[str, float] = defaultdict(float)
+            for obs in yes_obs:
+                yes_target_counts[obs[0]] += _obs_weight(obs)
             yes_mode = max(yes_target_counts.values())
-            if yes_mode / len(yes_obs) < _LONG_RANGE_MIN_DOMINANT_FRACTION:
+            yes_weight = sum(_obs_weight(obs) for obs in yes_obs)
+            if yes_weight <= 0.0 or yes_mode / yes_weight < _LONG_RANGE_MIN_DOMINANT_FRACTION:
                 continue
             split_cost = _group_cost(yes_obs) + _group_cost(no_obs)
             reduction = baseline_cost - split_cost
@@ -678,9 +700,10 @@ def _commit_multi_lect_long_range_splits_for_pivot(
             break
         yes_obs, no_obs = best_partitions
         yes_ctx = _apply_predicate(Context(), best_predicate)
-        sister_counts: dict[tuple[tuple[str, str], ...], int] = defaultdict(int)
-        for sister_key, _ctx in yes_obs:
-            sister_counts[sister_by_key[sister_key]] += 1
+        sister_counts: dict[tuple[tuple[str, str], ...], float] = defaultdict(float)
+        for obs in yes_obs:
+            sister_key = obs[0]
+            sister_counts[sister_by_key[sister_key]] += _obs_weight(obs)
         for sister, count in sister_counts.items():
             if count < min_commit:
                 continue
@@ -733,11 +756,12 @@ def _train_multi_lect(
 
     pairwise_models: dict[frozenset[str], LearnedModel] = {}
     for lect_a, lect_b in itertools.combinations(lect_ids, 2):
-        pair_corpus = _subset_for_pair(corpus, lect_a, lect_b)
+        pair_corpus, pair_weights = _subset_for_pair(corpus, lect_a, lect_b)
         if not pair_corpus:
             continue
         pair_model = _train_pairwise_legacy(
             pair_corpus,
+            pair_weights=pair_weights,
             feature_system=feature_system,
             max_chunk_size=max_chunk_size,
             temperature=temperature,
@@ -753,15 +777,15 @@ def _train_multi_lect(
     # Reconcile pairwise alignments into multi-lect
     # correspondence class observations, then aggregate across
     # the corpus.
-    all_observations: list[tuple[str, dict[str, str]]] = []
-    per_lect_observations: list[tuple[str, dict[str, str], dict[str, int]]] = []
+    all_observations: list[tuple[str, dict[str, str], float]] = []
+    per_lect_observations: list[tuple[str, dict[str, str], dict[str, int], float]] = []
     for cs in corpus:
         rows = _reconcile_cognate_set(
             cs, pairwise_models, max_chunk_size=max_chunk_size
         )
         for segments, positions in rows:
-            all_observations.append((cs.cognate_id, segments))
-            per_lect_observations.append((cs.cognate_id, segments, positions))
+            all_observations.append((cs.cognate_id, segments, cs.confidence))
+            per_lect_observations.append((cs.cognate_id, segments, positions, cs.confidence))
     unconditioned = _aggregate_unconditioned_classes(all_observations)
 
     # Multi-lect class-level context discovery.

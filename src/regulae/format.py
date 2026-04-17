@@ -10,6 +10,7 @@ and understand it without writing ad-hoc loops every time.
 correspondences, displacement vectors, and promoted chunks.
 """
 
+from regulae.chunk_diagnostics import analyze_promoted_chunks
 from regulae.model import LearnedModel, MultiLectCorrespondenceClass, MultiLectModel
 from regulae.scoring import score_link
 from regulae.types import Alignment, Context, FeatureDisplacement, Link, Segment
@@ -62,6 +63,8 @@ def format_model(
     top_segments: int = 15,
     top_displacements: int = 5,
     min_count: float = 1.0,
+    annotate_chunks: bool = False,
+    chunk_warning_threshold: float = 0.35,
 ) -> str:
     """Summary of a ``LearnedModel`` as a multi-line string.
 
@@ -201,10 +204,24 @@ def format_model(
     if not chunks:
         lines.append("  (none promoted)")
     else:
+        chunk_reports = {}
+        if annotate_chunks:
+            chunk_reports = {
+                (report.src_chunk, report.tgt_chunk): report
+                for report in analyze_promoted_chunks(model)
+            }
         for (src, tgt), cost in sorted(chunks.items(), key=lambda kv: kv[1]):
             s = "".join(x.grapheme for x in src) or EMPTY_CHUNK_SYMBOL
             t = "".join(x.grapheme for x in tgt) or EMPTY_CHUNK_SYMBOL
-            lines.append(f"  ({s}, {t}): cost={cost:.3f}")
+            line = f"  ({s}, {t}): cost={cost:.3f}"
+            report = chunk_reports.get((src, tgt))
+            if report is not None:
+                line += f" score={report.transparency_score:.2f}"
+                if report.notes:
+                    line += f" notes={'; '.join(report.notes)}"
+                if report.transparency_score < chunk_warning_threshold:
+                    line += " WARNING"
+            lines.append(line)
 
     return "\n".join(lines)
 

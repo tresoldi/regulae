@@ -38,6 +38,7 @@ _CROSS_DIM_MIN_RULE_CONFIDENCE: float = 0.5
 
 def _cross_dimensional_discovery(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
     *,
     random_seed: int = 0,
@@ -88,8 +89,8 @@ def _cross_dimensional_discovery(
             break
 
         # Baseline: total corpus cost under the current model.
-        baseline_cost = _total_corpus_cost(corpus, current_model)
-        n_obs = _count_1to1_observations(corpus, current_model)
+        baseline_cost = _total_corpus_cost(corpus, pair_weights, current_model)
+        n_obs = _count_1to1_observations(corpus, pair_weights, current_model)
         if n_obs <= 0:
             break
         ln_n = math.log(n_obs)
@@ -111,7 +112,7 @@ def _cross_dimensional_discovery(
         best_delta_bic: float = DELTA_BIC_THRESHOLD
         for hyp in hypotheses:
             trial_link = _hypothesis_to_cross_dimensional_link(
-                hyp, corpus, current_model
+                hyp, corpus, pair_weights, current_model
             )
             if trial_link is None:
                 continue  # couldn't count supporting observations
@@ -135,7 +136,7 @@ def _cross_dimensional_discovery(
                     entries=trial_entries
                 ),
             )
-            trial_cost = _total_corpus_cost(corpus, trial_model)
+            trial_cost = _total_corpus_cost(corpus, pair_weights, trial_model)
             reduction = baseline_cost - trial_cost
             # ΔBIC = -2 * (log_L_trial - log_L_baseline) + k * ln(N)
             # where k is the number of new parameters. A single-
@@ -240,6 +241,7 @@ def _dedup_dual_framings(
 
 def _total_corpus_cost(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
 ) -> float:
     """Return the sum of per-pair alignment costs for the whole
@@ -250,33 +252,39 @@ def _total_corpus_cost(
     rule is present in the model, its effect is captured.
     """
     total = 0.0
-    for src_form, tgt_form in corpus:
+    for (src_form, tgt_form), pair_weight in zip(corpus, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         alignment = align_forms(src_form, tgt_form, model=model)
-        total += alignment_cost(alignment, model=model)
+        total += pair_weight * alignment_cost(alignment, model=model)
     return total
 
 
 def _count_1to1_observations(
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
-) -> int:
+) -> float:
     """Return the total number of 1-to-1 link observations across
     the corpus under ``model``.
 
     Used as the ``N`` in the cross-dimensional BIC formula ``ln(N)``.
     """
-    count = 0
-    for src_form, tgt_form in corpus:
+    count = 0.0
+    for (src_form, tgt_form), pair_weight in zip(corpus, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         alignment = align_forms(src_form, tgt_form, model=model)
         for link in alignment.links:
             if len(link.source_chunk) == 1 and len(link.target_chunk) == 1:
-                count += 1
+                count += pair_weight
     return count
 
 
 def _hypothesis_to_cross_dimensional_link(
     hypothesis,  # PatternHypothesis — annotation deferred to avoid circular import
     corpus: Sequence[tuple[Form, Form]],
+    pair_weights: Sequence[float],
     model: LearnedModel,
 ) -> CrossDimensionalLink | None:
     """Build a :class:`CrossDimensionalLink` from a
@@ -343,9 +351,11 @@ def _hypothesis_to_cross_dimensional_link(
             return False
         return features is not None and name in features
 
-    src_count = 0
-    count = 0
-    for src_form, tgt_form in corpus:
+    src_count = 0.0
+    count = 0.0
+    for (src_form, tgt_form), pair_weight in zip(corpus, pair_weights, strict=True):
+        if pair_weight <= 0.0:
+            continue
         alignment = align_forms(src_form, tgt_form, model=model)
         link_src_pos = 0
         link_tgt_pos = 0
@@ -367,7 +377,7 @@ def _hypothesis_to_cross_dimensional_link(
                         src_value_2,
                     )
                 if holds:
-                    src_count += 1
+                    src_count += pair_weight
                     tgt_idx = link_tgt_pos + tgt_offset
                     if 0 <= tgt_idx < len(tgt_form.segments):
                         tgt_seg = tgt_form.segments[tgt_idx]
@@ -380,7 +390,7 @@ def _hypothesis_to_cross_dimensional_link(
                         else:
                             actual = None
                         if actual == tgt_value:
-                            count += 1
+                            count += pair_weight
             link_src_pos += src_len
             link_tgt_pos += tgt_len
 
