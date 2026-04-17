@@ -15,6 +15,7 @@ from regulae.types import (
     Alignment,
     Context,
     Form,
+    LectId,
     Segment,
 )
 
@@ -273,8 +274,8 @@ def _compositional_chunk_cost_raw(
     # Temporary model without chunks to prevent recursion into the
     # phrase table during the sub-alignment.
     no_chunks_model = replace(model, chunk_table=ChunkPhraseTable())
-    sub_src = Form(lect_id="_sub_src", segments=src_chunk)
-    sub_tgt = Form(lect_id="_sub_tgt", segments=tgt_chunk)
+    sub_src = Form(lect_id=LectId("_sub_src"), segments=src_chunk)
+    sub_tgt = Form(lect_id=LectId("_sub_tgt"), segments=tgt_chunk)
     sub = align_forms(sub_src, sub_tgt, model=no_chunks_model, max_chunk_size=1)
 
     # Compute the raw (unoffset) cost by summing over the sub-alignment's

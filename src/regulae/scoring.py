@@ -49,6 +49,8 @@ from regulae.types import (
     Context,
     FeatureConstraint,
     FeatureDisplacement,
+    FeatureName,
+    FeatureValue,
     Form,
     Link,
     Segment,
@@ -494,6 +496,7 @@ def _apply_rule_to_link(
         return 0.0
     tgt_seg = tgt_form.segments[tgt_segment_idx]
 
+    actual: str | None
     if rule.tgt_dimension == "tone":
         actual = tgt_seg.tone
     elif rule.tgt_dimension == "length":
@@ -536,7 +539,7 @@ def _source_predicate_holds(
         return False
     seg = src_form.segments[idx]
     if feature_constraint.feature == "tone":
-        return seg.tone == feature_constraint.value
+        return seg.tone is not None and str(seg.tone) == str(feature_constraint.value)
     if not seg.grapheme:
         return False
     try:
@@ -742,10 +745,18 @@ def compute_displacement(
 
     # Features present in source but not target: lost.
     for feat in sorted(src_features - tgt_features):
-        displacements.append(FeatureDisplacement(feat, "present", "absent"))
+        displacements.append(
+            FeatureDisplacement(
+                FeatureName(feat), FeatureValue("present"), FeatureValue("absent")
+            )
+        )
 
     # Features present in target but not source: gained.
     for feat in sorted(tgt_features - src_features):
-        displacements.append(FeatureDisplacement(feat, "absent", "present"))
+        displacements.append(
+            FeatureDisplacement(
+                FeatureName(feat), FeatureValue("absent"), FeatureValue("present")
+            )
+        )
 
     return tuple(displacements)

@@ -48,7 +48,7 @@ def format_segments(segments: tuple[Segment, ...]) -> str:
         return EMPTY_CHUNK_SYMBOL
     parts: list[str] = []
     for seg in segments:
-        piece = seg.grapheme
+        piece: str = seg.grapheme
         annotations: list[str] = []
         if seg.tone is not None:
             annotations.append(f"T={seg.tone}")

@@ -47,6 +47,7 @@ from regulae.search import DEFAULT_MAX_CHUNK_SIZE, align_forms
 from regulae.types import (
     Alignment,
     Form,
+    LectId,
 )
 
 from regulae._em import (
@@ -392,7 +393,7 @@ def cognate_sets_from_pairs(
     resulting ``CognateSet.forms`` mapping and in the
     ``Form.lect_id`` of each form (both are rewritten to match).
     """
-    src_lect, tgt_lect = lect_ids
+    src_lect, tgt_lect = LectId(lect_ids[0]), LectId(lect_ids[1])
     out: list[CognateSet] = []
     for i, (src, tgt) in enumerate(pairs):
         src_form = Form(

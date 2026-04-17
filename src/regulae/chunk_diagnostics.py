@@ -19,7 +19,14 @@ import merkmal
 from regulae.model import ChunkPhraseTable, LearnedModel
 from regulae.scoring import compute_displacement
 from regulae.search import align_forms
-from regulae.types import Alignment, Context, FeatureDisplacement, Form, Segment
+from regulae.types import (
+    Alignment,
+    Context,
+    FeatureDisplacement,
+    Form,
+    LectId,
+    Segment,
+)
 
 CHUNK_PROCESS_PROFILES = (
     "compact_fusion",
@@ -441,7 +448,7 @@ def describe_chunk_process_subtypes(model: LearnedModel) -> str:
 
 
 def _pseudo_form(lect_id: str, segments: tuple[Segment, ...]) -> Form:
-    return Form(lect_id=lect_id, segments=segments)
+    return Form(lect_id=LectId(lect_id), segments=segments)
 
 
 def _chunk_string(chunk: tuple[Segment, ...]) -> str:

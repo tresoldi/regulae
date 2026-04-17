@@ -20,6 +20,8 @@ from regulae.search import align_forms, alignment_cost
 from regulae.uncertainty import wilson_interval
 from regulae.types import (
     FeatureConstraint,
+    FeatureName,
+    FeatureValue,
     Form,
 )
 
@@ -409,6 +411,7 @@ def _hypothesis_to_cross_dimensional_link(
                     tgt_idx = link_tgt_pos + tgt_offset
                     if 0 <= tgt_idx < len(tgt_form.segments):
                         tgt_seg = tgt_form.segments[tgt_idx]
+                        actual: str | None
                         if tgt_dimension == "tone":
                             actual = tgt_seg.tone
                         elif tgt_dimension == "length":
@@ -439,11 +442,13 @@ def _hypothesis_to_cross_dimensional_link(
     base_position_2: str | None = None
     if is_joint and feature_name_2 is not None and src_value_2 is not None:
         base_feature_2 = FeatureConstraint(
-            feature=feature_name_2, value=src_value_2
+            feature=FeatureName(feature_name_2), value=FeatureValue(src_value_2)
         )
         base_position_2 = hypothesis.src_position_spec_2
     return CrossDimensionalLink(
-        src_feature=FeatureConstraint(feature=feature_name, value=src_value),
+        src_feature=FeatureConstraint(
+            feature=FeatureName(feature_name), value=FeatureValue(src_value)
+        ),
         src_position=hypothesis.src_position_spec,
         tgt_dimension=tgt_dimension,
         tgt_value=tgt_value,

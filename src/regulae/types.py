@@ -35,6 +35,24 @@ Design notes:
 """
 
 from dataclasses import dataclass, field
+from typing import NewType
+
+
+# ----- domain NewTypes ---------------------------------------------------
+#
+# Transparent at runtime (each is just ``str`` under the hood) but carry a
+# distinct static type so mypy catches e.g. passing a grapheme where a lect
+# id is expected. Coercion happens at loader boundaries — see
+# :mod:`regulae.loaders`. Internal code that must build one of these from a
+# bare string must call the corresponding constructor explicitly.
+
+LectId = NewType("LectId", str)
+CognateId = NewType("CognateId", str)
+Grapheme = NewType("Grapheme", str)
+FeatureName = NewType("FeatureName", str)
+FeatureValue = NewType("FeatureValue", str)
+Tone = NewType("Tone", str)
+SlotName = NewType("SlotName", str)
 
 
 @dataclass(frozen=True)
@@ -51,8 +69,8 @@ class Segment:
     correspondence discovery).
     """
 
-    grapheme: str
-    tone: str | None = None
+    grapheme: Grapheme
+    tone: Tone | None = None
     length: str | None = None
     stress: str | None = None
 
@@ -74,7 +92,7 @@ class Form:
       artifacts, not phonological correspondences.
     """
 
-    lect_id: str
+    lect_id: LectId
     segments: tuple[Segment, ...]
     syllable_breaks: tuple[int, ...] = ()
     morpheme_breaks: tuple[int, ...] = ()
@@ -89,7 +107,7 @@ class Lect:
     (contrast graph, alternations, paradigms) lives in higher layers.
     """
 
-    lect_id: str
+    lect_id: LectId
     feature_system: str = "descriptive"
 
 
@@ -103,8 +121,8 @@ class FeatureConstraint:
     may be ``"present"`` or ``"absent"``.
     """
 
-    feature: str
-    value: str
+    feature: FeatureName
+    value: FeatureValue
 
 
 @dataclass(frozen=True)
@@ -152,10 +170,10 @@ class Context:
     ``position`` or ``morphological`` likewise means unconstrained.
     """
 
-    position: str | None = None
+    position: SlotName | None = None
     preceding: tuple[FeatureConstraint, ...] = ()
     following: tuple[FeatureConstraint, ...] = ()
-    morphological: str | None = None
+    morphological: SlotName | None = None
     preceding_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
     following_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
     somewhere_preceding: tuple[FeatureConstraint, ...] = ()
@@ -255,9 +273,9 @@ class FeatureDisplacement:
     all share ``{stop → fricative}``).
     """
 
-    feature: str
-    from_value: str
-    to_value: str
+    feature: FeatureName
+    from_value: FeatureValue
+    to_value: FeatureValue
 
 
 @dataclass(frozen=True)

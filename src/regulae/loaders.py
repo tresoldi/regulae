@@ -12,7 +12,7 @@ from collections.abc import Collection
 from pathlib import Path
 
 from regulae.model import CognateSet
-from regulae.types import Form, Segment
+from regulae.types import CognateId, Form, Grapheme, LectId, Segment
 
 
 def _parse_segments(raw: str) -> tuple[Segment, ...]:
@@ -22,7 +22,7 @@ def _parse_segments(raw: str) -> tuple[Segment, ...]:
     are dropped. Dashes ``-`` are treated as gap markers and are NOT
     returned as segments — a form is the sequence of non-gap segments.
     """
-    return tuple(Segment(tok) for tok in raw.split() if tok and tok != "-")
+    return tuple(Segment(Grapheme(tok)) for tok in raw.split() if tok and tok != "-")
 
 
 def _parse_alignment(raw: str) -> tuple[Segment | None, ...]:
@@ -37,7 +37,7 @@ def _parse_alignment(raw: str) -> tuple[Segment | None, ...]:
         if tok == "-":
             out.append(None)
         else:
-            out.append(Segment(tok))
+            out.append(Segment(Grapheme(tok)))
     return tuple(out)
 
 
@@ -112,7 +112,7 @@ def load_cognates_from_tsv(
                     f"TSV {path}: cognate {cog_id!r} has duplicate row for "
                     f"lect {lect_id!r}"
                 )
-            forms_by_id[cog_id][lect_id] = Form(lect_id=lect_id, segments=segs)
+            forms_by_id[cog_id][lect_id] = Form(lect_id=LectId(lect_id), segments=segs)
 
             if alignment_col is not None:
                 raw_align = row.get(alignment_col, "") or ""
@@ -145,7 +145,7 @@ def load_cognates_from_tsv(
         confidence = conf_by_id.get(cog_id, 1.0)
         out.append(
             CognateSet(
-                cognate_id=cog_id,
+                cognate_id=CognateId(cog_id),
                 forms=forms,
                 alignments=aligns,
                 confidence=confidence,
@@ -228,7 +228,7 @@ def load_gled(
                 # a language has multiple reflexes of the same proto-
                 # form. Keep the first one; drop subsequent ones.
                 continue
-            forms_by_id[cog_id][lect_id] = Form(lect_id=lect_id, segments=segs)
+            forms_by_id[cog_id][lect_id] = Form(lect_id=LectId(lect_id), segments=segs)
             raw_align = row.get("ALIGNMENT", "") or ""
             if raw_align:
                 aligns_by_id[cog_id][lect_id] = _parse_alignment(raw_align)
@@ -244,7 +244,7 @@ def load_gled(
             lens = {len(v) for v in aligns.values()}
             if len(lens) > 1:
                 aligns = None  # silently discard malformed alignment hint
-        out.append(CognateSet(cognate_id=cog_id, forms=forms, alignments=aligns))
+        out.append(CognateSet(cognate_id=CognateId(cog_id), forms=forms, alignments=aligns))
     return out
 
 
@@ -277,7 +277,7 @@ def _parse_arcaverborum_segments(
             continue
         if tok == "-":
             continue
-        segments.append(Segment(tok))
+        segments.append(Segment(Grapheme(tok)))
     return tuple(segments), tuple(boundaries)
 
 
@@ -370,7 +370,7 @@ def load_arcaverborum(
                 boundaries_by_id[cog_id] = {}
             if lect_id in forms_by_id[cog_id]:
                 continue  # keep first reflex per (lect, cognate)
-            forms_by_id[cog_id][lect_id] = Form(lect_id=lect_id, segments=segs)
+            forms_by_id[cog_id][lect_id] = Form(lect_id=LectId(lect_id), segments=segs)
             if morph_bounds:
                 boundaries_by_id[cog_id][lect_id] = morph_bounds
             raw_align = row.get("Alignment") or ""
@@ -390,7 +390,7 @@ def load_arcaverborum(
         bounds = boundaries_by_id[cog_id] or None
         out.append(
             CognateSet(
-                cognate_id=cog_id,
+                cognate_id=CognateId(cog_id),
                 forms=forms,
                 alignments=aligns,
                 morpheme_boundaries=bounds,

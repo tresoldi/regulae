@@ -37,6 +37,7 @@ from regulae.uncertainty import wilson_interval
 from regulae.types import (
     Context,
     Form,
+    LectId,
 )
 from regulae._discovery import (
     DELTA_BIC_THRESHOLD,
@@ -218,8 +219,8 @@ def _pair_alignment_edges(
                 no_chunks_model = replace(
                     pair_model, chunk_table=ChunkPhraseTable()
                 )
-            sub_src = Form(lect_id=lect_a, segments=link.source_chunk)
-            sub_tgt = Form(lect_id=lect_b, segments=link.target_chunk)
+            sub_src = Form(lect_id=LectId(lect_a), segments=link.source_chunk)
+            sub_tgt = Form(lect_id=LectId(lect_b), segments=link.target_chunk)
             sub = align_forms(
                 sub_src, sub_tgt, model=no_chunks_model, max_chunk_size=1
             )
@@ -302,7 +303,7 @@ def _reconcile_cognate_set(
             continue
         if len(by_lect) < 2:
             continue
-        segments = {
+        segments: dict[str, str] = {
             lect_id: cs.forms[lect_id].segments[pos].grapheme
             for lect_id, pos in by_lect.items()
         }

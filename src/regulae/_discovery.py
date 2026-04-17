@@ -16,7 +16,11 @@ from regulae.search import align_forms
 from regulae.types import (
     Context,
     FeatureConstraint,
+    FeatureName,
+    FeatureValue,
     Form,
+    LectId,
+    SlotName,
 )
 from regulae.uncertainty import UncertaintyEstimate, wilson_interval
 
@@ -187,8 +191,8 @@ def _context_discovery(
             if not sc or not tc:
                 continue  # pure gap — no segment-level observation
             # Multi-segment link: decompose via sub-alignment.
-            sub_src = Form(lect_id="_sub", segments=sc)
-            sub_tgt = Form(lect_id="_sub", segments=tc)
+            sub_src = Form(lect_id=LectId("_sub"), segments=sc)
+            sub_tgt = Form(lect_id=LectId("_sub"), segments=tc)
             sub = align_forms(
                 sub_src, sub_tgt, model=no_chunks_model, max_chunk_size=1
             )
@@ -620,7 +624,7 @@ def _apply_predicate(
     import dataclasses
 
     slot, feature, value = predicate
-    fc = FeatureConstraint(feature, value or "+")
+    fc = FeatureConstraint(FeatureName(feature), FeatureValue(value or "+"))
     if slot == "following":
         return dataclasses.replace(
             base_context, following=base_context.following + (fc,)
@@ -630,7 +634,7 @@ def _apply_predicate(
             base_context, preceding=base_context.preceding + (fc,)
         )
     if slot == "position":
-        return dataclasses.replace(base_context, position=feature)
+        return dataclasses.replace(base_context, position=SlotName(feature))
     if slot.startswith("preceding@"):
         d = int(slot.split("@", 1)[1])
         return dataclasses.replace(

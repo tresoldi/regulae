@@ -45,9 +45,12 @@ from regulae.types import (
     Context,
     FeatureConstraint,
     FeatureDisplacement,
+    FeatureName,
+    FeatureValue,
     Form,
     Link,
     Segment,
+    SlotName,
 )
 
 # Small, hand-picked inventory of features used when computing a link's
@@ -238,11 +241,11 @@ def align_forms(
                             if src_end < n else ()
                         )
                         if src_start == 0:
-                            position: str | None = "initial"
+                            position: SlotName | None = SlotName("initial")
                         elif src_end == n:
-                            position = "final"
+                            position = SlotName("final")
                         else:
-                            position = "medial"
+                            position = SlotName("medial")
                         # Long-range fields. Distance offsets {2, 3}
                         # only (offset 1 is the immediate `preceding`/
                         # `following` slots above). Existential and
@@ -287,15 +290,27 @@ def align_forms(
                         if k == 1 and l == 1:
                             own = source.segments[src_start].stress
                             if own is not None:
-                                self_stress = (FeatureConstraint("stress", own),)
+                                self_stress = (
+                                    FeatureConstraint(
+                                        FeatureName("stress"), FeatureValue(own)
+                                    ),
+                                )
                             if src_start > 0:
                                 pre_s = source.segments[src_start - 1].stress
                                 if pre_s is not None:
-                                    preceding_stress = (FeatureConstraint("stress", pre_s),)
+                                    preceding_stress = (
+                                        FeatureConstraint(
+                                            FeatureName("stress"), FeatureValue(pre_s)
+                                        ),
+                                    )
                             if src_end < n:
                                 fol_s = source.segments[src_end].stress
                                 if fol_s is not None:
-                                    following_stress = (FeatureConstraint("stress", fol_s),)
+                                    following_stress = (
+                                        FeatureConstraint(
+                                            FeatureName("stress"), FeatureValue(fol_s)
+                                        ),
+                                    )
                         link_context = Context(
                             position=position,
                             preceding=preceding,
@@ -380,11 +395,11 @@ def _compute_link_context(
     preceding = _features_for_neighbor(source_form, src_start - 1, feature_system)
     following = _features_for_neighbor(source_form, src_end, feature_system)
     if src_start == 0:
-        position: str | None = "initial"
+        position: SlotName | None = SlotName("initial")
     elif src_end == n:
-        position = "final"
+        position = SlotName("final")
     else:
-        position = "medial"
+        position = SlotName("medial")
     source_features = [
         _features_for_neighbor(source_form, idx, feature_system)
         for idx in range(n)
@@ -427,15 +442,21 @@ def _compute_link_context(
     if (src_end - src_start) == 1:
         own = source_form.segments[src_start].stress
         if own is not None:
-            self_stress = (FeatureConstraint("stress", own),)
+            self_stress = (
+                FeatureConstraint(FeatureName("stress"), FeatureValue(own)),
+            )
         if src_start > 0:
             pre_s = source_form.segments[src_start - 1].stress
             if pre_s is not None:
-                preceding_stress = (FeatureConstraint("stress", pre_s),)
+                preceding_stress = (
+                    FeatureConstraint(FeatureName("stress"), FeatureValue(pre_s)),
+                )
         if src_end < n:
             fol_s = source_form.segments[src_end].stress
             if fol_s is not None:
-                following_stress = (FeatureConstraint("stress", fol_s),)
+                following_stress = (
+                    FeatureConstraint(FeatureName("stress"), FeatureValue(fol_s)),
+                )
     return Context(
         position=position,
         preceding=preceding,
@@ -573,7 +594,10 @@ def _features_for_neighbor(
         result: tuple[FeatureConstraint, ...] = ()
     else:
         relevant = sorted(f for f in feats if f in _CONTEXT_FEATURES)
-        result = tuple(FeatureConstraint(feature=f, value="+") for f in relevant)
+        result = tuple(
+            FeatureConstraint(feature=FeatureName(f), value=FeatureValue("+"))
+            for f in relevant
+        )
     _NEIGHBOR_FEATURE_CACHE[cache_key] = result
     return result
 
