@@ -39,6 +39,7 @@ from regulae.types import (
     FeatureDisplacement,
     Form,
     Segment,
+    TargetDimension,
 )
 from regulae.uncertainty import UncertaintyEstimate
 
@@ -182,7 +183,7 @@ class CrossDimensionalLink:
 
     src_feature: FeatureConstraint
     src_position: str
-    tgt_dimension: str
+    tgt_dimension: TargetDimension
     tgt_value: str
     tgt_position_offset: int
     count: float = 0.0
@@ -247,7 +248,7 @@ class MultiLectCrossDimensionalLink:
     tgt_lect: str
     src_feature: FeatureConstraint
     src_position: str
-    tgt_dimension: str
+    tgt_dimension: TargetDimension
     tgt_value: str
     tgt_position_offset: int
     count: float = 0.0

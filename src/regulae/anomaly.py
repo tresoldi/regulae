@@ -21,7 +21,7 @@ import merkmal
 
 from regulae.model import LearnedModel
 from regulae.search import _CONTEXT_FEATURES, align_forms
-from regulae.types import Form, Segment
+from regulae.types import Form, HypothesisKind, Segment, TargetDimension
 
 
 #: Hypothesis kinds reported by :func:`find_residual_patterns`.
@@ -34,7 +34,7 @@ from regulae.types import Form, Segment
 #: than the anomaly-detection diagnostic, so the diagnostic
 #: pipeline is the canonical path only for cross-dimensional
 #: patterns.
-HYPOTHESIS_KINDS: tuple[str, ...] = (
+HYPOTHESIS_KINDS: tuple[HypothesisKind, ...] = (
     "cross_dimensional_tonogenesis",
 )
 
@@ -82,11 +82,11 @@ class PatternHypothesis:
       observations contributed to the MI calculation.
     """
 
-    kind: str
+    kind: HypothesisKind
     src_feature: str
     src_position_spec: str
     tgt_feature_or_value: str
-    tgt_dimension: str
+    tgt_dimension: TargetDimension
     tgt_position_offset: int | None
     residual_mi: float
     null_percentile: float
@@ -124,7 +124,7 @@ def find_residual_patterns(
     null_percentile_threshold: float = 0.95,
     feature_system: str | None = None,
     random_seed: int = 0,
-    kinds: Collection[str] | None = None,
+    kinds: Collection[HypothesisKind] | None = None,
 ) -> list[PatternHypothesis]:
     """Rank suspicious feature-pair combinations by residual MI.
 

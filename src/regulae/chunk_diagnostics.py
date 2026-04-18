@@ -25,6 +25,7 @@ from regulae.types import (
     FeatureDisplacement,
     Form,
     LectId,
+    ProcessProfile,
     Segment,
 )
 
@@ -68,7 +69,7 @@ class ChunkTransparencyReport:
     deletion_count: int
     insertion_count: int
     overlap_count: int
-    process_profile: str
+    process_profile: ProcessProfile
     process_subtype: str
     process_confidence: float
     process_evidence: tuple[str, ...]
@@ -84,7 +85,7 @@ class ChunkProcessFamilyReport:
     backed by repeated evidence rather than isolated chunk proposals.
     """
 
-    process_profile: str
+    process_profile: ProcessProfile
     chunk_count: int
     weighted_support: float
     average_transparency: float
@@ -97,7 +98,7 @@ class ChunkProcessFamilyReport:
 class ChunkProcessSubtypeReport:
     """Corpus-level summary of one inferred chunk process subtype."""
 
-    process_profile: str
+    process_profile: ProcessProfile
     process_subtype: str
     chunk_count: int
     weighted_support: float
@@ -239,7 +240,7 @@ def summarize_chunk_process_families(
     classified chunks.
     """
     reports = analyze_promoted_chunks(model)
-    by_profile: dict[str, list[ChunkTransparencyReport]] = {}
+    by_profile: dict[ProcessProfile, list[ChunkTransparencyReport]] = {}
     for report in reports:
         by_profile.setdefault(report.process_profile, []).append(report)
 
@@ -361,7 +362,7 @@ def summarize_chunk_process_subtypes(
 ) -> tuple[ChunkProcessSubtypeReport, ...]:
     """Aggregate promoted chunks into narrower process subtype groups."""
     reports = analyze_promoted_chunks(model)
-    by_subtype: dict[tuple[str, str], list[ChunkTransparencyReport]] = {}
+    by_subtype: dict[tuple[ProcessProfile, str], list[ChunkTransparencyReport]] = {}
     for report in reports:
         key = (report.process_profile, report.process_subtype)
         by_subtype.setdefault(key, []).append(report)
@@ -469,7 +470,7 @@ def _transparency_score(
     deletion_count: int,
     insertion_count: int,
     overlap_count: int,
-    process_profile: str,
+    process_profile: ProcessProfile,
 ) -> float:
     total_len = len(src_chunk) + len(tgt_chunk)
     score = 1.0
@@ -532,7 +533,7 @@ def _chunk_notes(
     insertion_count: int,
     overlap_count: int,
     transparency_score: float,
-    process_profile: str,
+    process_profile: ProcessProfile,
 ) -> tuple[str, ...]:
     notes: list[str] = []
     total_len = len(src_chunk) + len(tgt_chunk)
@@ -606,7 +607,7 @@ def _classify_chunk_process(
     *,
     sub_alignment: Alignment,
     feature_system: str,
-) -> tuple[str, float, tuple[str, ...]]:
+) -> tuple[ProcessProfile, float, tuple[str, ...]]:
     changed_matches: list[tuple[Segment, Segment]] = []
     identity_matches: list[tuple[Segment, Segment]] = []
     deletions: list[Segment] = []
@@ -671,7 +672,7 @@ def _classify_chunk_process(
 def _classify_chunk_subtype(
     *,
     sub_alignment: Alignment,
-    process_profile: str,
+    process_profile: ProcessProfile,
     process_evidence: tuple[str, ...],
     feature_system: str,
 ) -> str:

@@ -35,7 +35,26 @@ Design notes:
 """
 
 from dataclasses import dataclass, field
-from typing import NewType
+from typing import Literal, NewType
+
+
+# ----- domain Literals ---------------------------------------------------
+#
+# Closed string vocabularies. Use these in dataclass fields and function
+# signatures that accept / return one of the enumerated values so mypy
+# rejects typos and unexpected values.
+
+TargetDimension = Literal["grapheme", "tone", "length", "stress"]
+HypothesisKind = Literal["cross_dimensional_tonogenesis"]
+ProcessProfile = Literal[
+    "nasal_fusion",
+    "glide_or_vocalization_fusion",
+    "compact_fusion",
+    "residual_reduction",
+    "balanced_restructuring",
+    "bundled_reduction",
+    "mixed_or_unclear",
+]
 
 
 # ----- domain NewTypes ---------------------------------------------------
