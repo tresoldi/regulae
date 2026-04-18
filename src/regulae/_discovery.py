@@ -1,7 +1,7 @@
 import math
 from collections import defaultdict
 from collections.abc import Sequence
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from regulae.config import BICConfig
 from regulae.model import (
@@ -23,6 +23,30 @@ from regulae.types import (
     SlotName,
 )
 from regulae.uncertainty import UncertaintyEstimate, wilson_interval
+
+
+@dataclass(frozen=True)
+class SplitPredicate:
+    """A candidate conditioning predicate for context-split discovery.
+
+    Three fields:
+
+    * ``slot`` — which :class:`Context` field the constraint applies to.
+      Values are the literal strings recognised by
+      :func:`_predicate_holds` / :func:`_apply_predicate` (e.g.
+      ``"preceding"``, ``"following"``, ``"position"``,
+      ``"preceding@2"``, ``"somewhere_preceding"``, ``"self_stress"``,
+      etc.).
+    * ``feature`` — for feature-based slots, the feature name. For
+      the ``"position"`` slot, the position name (e.g. ``"initial"``).
+    * ``value`` — the expected value. ``None`` for the ``"position"``
+      slot (the position name is in ``feature``). For binary features
+      it is typically ``"+"``.
+    """
+
+    slot: str
+    feature: str
+    value: str | None
 
 
 # Minimum observation count for a split branch to be considered.
@@ -344,7 +368,7 @@ def _commit_splits_for_source(
         and _observation_weight(remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
-        best_predicate: tuple[str, str, str | None] | None = None
+        best_predicate: SplitPredicate | None = None
         best_partitions: tuple[
             list[tuple[str, Context, float]],
             list[tuple[str, Context, float]],
@@ -418,7 +442,7 @@ def _refine_split(
     if depth >= max_depth or _observation_weight(observations) < min_obs:
         return
     baseline_cost = _group_cost(observations)
-    best_predicate: tuple[str, str, str | None] | None = None
+    best_predicate: SplitPredicate | None = None
     best_partitions: tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]] | None = None
     best_delta = delta_threshold
     for predicate in _candidate_predicates(base_context, observed_stress_values):
@@ -494,7 +518,7 @@ def _group_cost(observations: list[tuple[str, Context, float]]) -> float:
 def _candidate_predicates(
     base_context: Context,
     observed_stress_values: frozenset[str] | None = None,
-) -> list[tuple[str, str, str | None]]:
+) -> list[SplitPredicate]:
     """Return candidate split predicates not already in ``base_context``.
 
     Each predicate is a tuple:
@@ -513,7 +537,7 @@ def _candidate_predicates(
     enumeration entirely; passing ``frozenset()`` disables it in the
     same way.
     """
-    candidates: list[tuple[str, str, str | None]] = []
+    candidates: list[SplitPredicate] = []
     existing_following = {c.feature for c in base_context.following}
     existing_preceding = {c.feature for c in base_context.preceding}
     for slot, feature, value in _SPLIT_FEATURE_INVENTORY:
@@ -521,11 +545,11 @@ def _candidate_predicates(
             continue
         if slot == "preceding" and feature in existing_preceding:
             continue
-        candidates.append((slot, feature, value))
+        candidates.append(SplitPredicate(slot, feature, value))
     # Position splits: only if the base context has no position set.
     if base_context.position is None:
         for pos in _SPLIT_POSITIONS:
-            candidates.append(("position", pos, None))
+            candidates.append(SplitPredicate("position", pos, None))
     # Stress splits: one candidate per observed value per slot.
     if observed_stress_values:
         for slot, base_slot in (
@@ -537,23 +561,22 @@ def _candidate_predicates(
             for value in sorted(observed_stress_values):
                 if value in existing_values:
                     continue
-                candidates.append((slot, "stress", value))
+                candidates.append(SplitPredicate(slot, "stress", value))
     return candidates
 
 
 def _partition(
     observations: list[tuple[str, Context, float]],
-    predicate: tuple[str, str, str | None],
+    predicate: SplitPredicate,
 ) -> tuple[list[tuple[str, Context, float]], list[tuple[str, Context, float]]]:
     """Split the observations by whether the predicate is satisfied."""
-    slot, feature, value = predicate
     yes_obs: list[tuple[str, Context, float]] = []
     no_obs: list[tuple[str, Context, float]] = []
     for obs in observations:
         t = obs[0]
         ctx = obs[1]
         weight = _obs_weight(obs)
-        if _predicate_holds(ctx, slot, feature, value):
+        if _predicate_holds(ctx, predicate.slot, predicate.feature, predicate.value):
             yes_obs.append((t, ctx, weight))
         else:
             no_obs.append((t, ctx, weight))
@@ -613,7 +636,7 @@ def _predicate_holds(
 
 def _apply_predicate(
     base_context: Context,
-    predicate: tuple[str, str, str | None],
+    predicate: SplitPredicate,
 ) -> Context:
     """Return a new context with the predicate's constraint added.
 
@@ -623,7 +646,7 @@ def _apply_predicate(
     """
     import dataclasses
 
-    slot, feature, value = predicate
+    slot, feature, value = predicate.slot, predicate.feature, predicate.value
     fc = FeatureConstraint(FeatureName(feature), FeatureValue(value or "+"))
     if slot == "following":
         return dataclasses.replace(
@@ -762,21 +785,21 @@ def _tonal_aggregation(
 
 def _long_range_candidate_predicates(
     base_context: Context,
-) -> list[tuple[str, str, str | None]]:
+) -> list[SplitPredicate]:
     """Return candidate long-range split predicates.
 
     Only emits predicates that aren't already satisfied by
     ``base_context`` so a refinement step doesn't re-add a
     constraint that's already committed.
     """
-    candidates: list[tuple[str, str, str | None]] = []
+    candidates: list[SplitPredicate] = []
     for slot in (
         _LONG_RANGE_STRUCTURAL_SLOTS
         + _LONG_RANGE_DISTANCE_SLOTS
         + _LONG_RANGE_EXISTENTIAL_SLOTS
     ):
         for feat in _LONG_RANGE_FEATURES:
-            predicate = (slot, feat, "+")
+            predicate = SplitPredicate(slot, feat, "+")
             # Skip if already in base_context.
             if _predicate_holds(base_context, slot, feat, "+"):
                 continue
@@ -895,7 +918,7 @@ def _commit_long_range_splits_for_source(
         and _observation_weight(remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
-        best_predicate: tuple[str, str, str | None] | None = None
+        best_predicate: SplitPredicate | None = None
         best_partitions: tuple[
             list[tuple[str, Context, float]],
             list[tuple[str, Context, float]],

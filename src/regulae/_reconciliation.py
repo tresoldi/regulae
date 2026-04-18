@@ -46,6 +46,7 @@ from regulae._discovery import (
     _LONG_RANGE_DELTA_BIC_THRESHOLD,
     _LONG_RANGE_MIN_DOMINANT_FRACTION,
     _LONG_RANGE_MIN_SPLIT_OBS,
+    SplitPredicate,
     _apply_predicate,
     _candidate_predicates,
     _group_cost,
@@ -673,7 +674,7 @@ def _commit_multi_lect_splits_for_pivot(
         and sum(_obs_weight(obs) for obs in remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
-        best_predicate: tuple[str, str, str | None] | None = None
+        best_predicate: SplitPredicate | None = None
         best_partitions: tuple[
             list[tuple[str, Context, float]],
             list[tuple[str, Context, float]],
@@ -771,7 +772,7 @@ def _commit_multi_lect_long_range_splits_for_pivot(
         and sum(_obs_weight(obs) for obs in remaining) >= min_obs
     ):
         baseline_cost = _group_cost(remaining)
-        best_predicate: tuple[str, str, str | None] | None = None
+        best_predicate: SplitPredicate | None = None
         best_partitions: tuple[
             list[tuple[str, Context, float]],
             list[tuple[str, Context, float]],
