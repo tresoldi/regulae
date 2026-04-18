@@ -22,7 +22,6 @@ but marginal in the data: they will have low lower bounds.
 from __future__ import annotations
 
 import random
-from collections.abc import Mapping, Sequence
 from dataclasses import replace as dc_replace
 from typing import TYPE_CHECKING, Any
 
@@ -42,12 +41,12 @@ from regulae.model import (
     TonalCorrespondence,
     TonalCorrespondenceTable,
 )
-from regulae.types import FeatureDisplacement, Form, Segment
 from regulae.uncertainty import UncertaintyEstimate, bootstrap_rate_interval
 
 if TYPE_CHECKING:
-    pass
+    from collections.abc import Mapping, Sequence
 
+    from regulae.types import Context, FeatureDisplacement, Form, Segment
 
 CrossDimKey = tuple[Any, ...]
 CondClassKey = tuple[Any, ...]
@@ -64,7 +63,7 @@ def bootstrap_pairwise_uncertainty(
     corpus: Sequence[tuple[Form, Form]],
     bootstrap_n: int,
     bootstrap_seed: int,
-    **train_kwargs: Any,
+    **train_kwargs: Any,  # noqa: ANN401
 ) -> LearnedModel:
     """Run ``bootstrap_n`` resampled trainings on a pair corpus and
     replace the base model's Wilson intervals with percentile
@@ -246,7 +245,7 @@ def bootstrap_multi_lect_uncertainty(
     corpus: Sequence[CognateSet],
     bootstrap_n: int,
     bootstrap_seed: int,
-    **train_kwargs: Any,
+    **train_kwargs: Any,  # noqa: ANN401
 ) -> MultiLectModel:
     """Resample the cognate-set corpus and replace intervals on the
     base :class:`MultiLectModel` with bootstrap percentile intervals.
@@ -404,7 +403,7 @@ def _cond_class_key(c: MultiLectCorrespondenceClass) -> CondClassKey:
     )
 
 
-def _context_signature(ctx: Any) -> ContextSignature:
+def _context_signature(ctx: Context) -> ContextSignature:
     """Hashable signature for a Context (for bootstrap key matching)."""
     return (
         ctx.position,
