@@ -82,7 +82,7 @@ carrying:
 ```sh
 pip install -e .
 # merkmal must be installed (sibling directory):
-pip install -e ../merkmal
+pip install -e ../merkmal/python
 ```
 
 ## Run tests
