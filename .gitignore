@@ -9,5 +9,3 @@ build/
 *.egg
 .venv/
 docs/html/
-
-
