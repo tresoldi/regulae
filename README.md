@@ -1,7 +1,7 @@
 # regulae
 
 Pairwise and multi-lect phonological alignment for the new
-historical linguistics framework.
+historical linguistics framework — a Go implementation.
 
 ## What this package does
 
@@ -48,159 +48,106 @@ carrying:
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy
-  BIC-driven search over a feature vocabulary. Refinements
-  are allowed within committed splits.
+  BIC-driven search over a feature vocabulary.
 - **Long-range conditioning.** A second split loop looks for
-  conditioning environments that sit beyond the immediate
-  neighbours — distance-bounded (*n* positions away),
-  existential (*somewhere preceding / following*), and
-  syllable-structural (*same / next / previous syllable*).
-  Captures umlaut, harmony, and related phenomena.
-- **Tonal correspondences.** Source → target tone mappings
-  aggregated across 1-to-1 links.
-- **Cross-dimensional rules.** Segmental features predicting
-  suprasegmental values (or vice versa), committed via a
-  BIC-gated search with support and confidence floors. Joint
-  predictors (conjunctions of two source features) are
-  supported with a non-interaction guard that prevents
-  "passenger" commits.
+  conditioning environments beyond the immediate neighbours —
+  distance-bounded, existential (*somewhere preceding /
+  following*), and syllable-structural. Captures umlaut,
+  harmony, and related phenomena.
+- **Tonal correspondences** and **cross-dimensional rules**
+  (segmental features predicting suprasegmental values, with a
+  BIC-gated search, joint-predictor support, and a
+  non-interaction guard).
 - **Multi-lect reconciliation.** Union-find over pairwise
   alignment positions, yielding multi-lect classes that bind
-  N lects in one row rather than forcing you to read five
-  pairwise reflexes separately.
-- **Non-cognate outlier diagnostics.** A post-hoc
-  `find_cognate_outliers` helper ranks cognate sets by
-  alignment-cost z-score under the trained model. The
-  framework never silently drops suspect cognates; the
-  diagnostic is a tool for the user to audit their own
-  corpus.
-- **Determinism.** Same input, same output, bitwise, across
-  runs and across processes.
+  N lects in one row.
+- **Non-cognate outlier diagnostics** via `FindCognateOutliers`.
+- **Determinism.** Same input, same output across runs and
+  processes.
 
-## Install
+## Dependencies
 
-```sh
-pip install -e .
-# merkmal must be installed (sibling directory):
-pip install -e ../merkmal/python
-```
+`regulae` is built on the Go port of
+[merkmal](../merkmal/go) for phonological feature lookups and
+segment distances; the dependency is wired via a `replace`
+directive in `go.mod`.
 
-## Run tests
+## Build and test
 
 ```sh
-python -m pytest -q
+go build ./...
+go test ./...
+go vet ./...
 ```
-
-Current test count: **427 passing, 2 xfailed** (pre-existing).
 
 ## Run experiments
 
-Each experiment is a standalone script under `experiments/`
-that trains a model on a specific corpus and prints a
-human-readable report:
+Each experiment is a standalone `package main` under
+`experiments/` that trains a model on a specific corpus and
+prints a human-readable report:
 
 ```sh
-# Pair experiments:
-python experiments/latin_spanish/run_experiment.py
-python experiments/latin_french/run_experiment.py
-python experiments/latin_italian/run_experiment.py
-python experiments/oe_english/run_experiment.py
-python experiments/ppn_hawaiian/run_experiment.py
-
-# Multi-lect experiments:
-python experiments/gled_romance/run_experiment.py
-python experiments/gled_polynesian/run_experiment.py
-python experiments/arcaverborum_polynesian/run_experiment.py
-
-# Tonal and cross-dimensional fixtures:
-python experiments/tone_synthetic/run_experiment.py
-python experiments/tone_yoruba_like/run_experiment.py
-python experiments/tone_vietnamese_like/run_experiment.py
-python experiments/tone_chinese_like/run_experiment.py
-python experiments/tone_chinese_like_clean/run_experiment.py
-python experiments/tone_3way_synthetic/run_experiment.py
-
-# Long-range context fixtures:
-python experiments/umlaut_synthetic/run_experiment.py
-python experiments/harmony_synthetic/run_experiment.py
+cd experiments/latin_spanish && go run .
+cd experiments/oe_english   && go run .
+cd experiments/ppn_hawaiian && go run .
+# tonal / cross-dimensional fixtures:
+cd experiments/tone_chinese_like_clean && go run .
+# long-range context fixtures:
+cd experiments/umlaut_synthetic  && go run .
+cd experiments/harmony_synthetic && go run .
 ```
 
 Each experiment directory carries a `findings.md` with the
-interpretation of its output and notes on what the framework
-recovered versus what it missed.
+interpretation of its output. The `gled_*` and
+`arcaverborum_polynesian` experiments read external corpora
+and expect a data-file path (`go run . /path/to/data`).
 
 ## Quick API tour
 
-```python
-from regulae import (
-    CognateSet,
-    Form,
-    Segment,
-    train_model,
-    cognate_sets_from_pairs,
-    find_cognate_outliers,
-    format_multi_lect_model,
-    load_gled,
-    load_arcaverborum,
-)
+```go
+import regulae "github.com/tresoldi/regulae"
 
-# Multi-lect training from a loader:
-corpus = load_gled(
-    "/path/to/gled.tsv",
-    family="Indo-European",
-    doculects={"LATIN", "SPANISH", "FRENCH_2"},
-)
-model = train_model(corpus)
-print(format_multi_lect_model(model, top_conditioned=20))
+// Build a corpus of cognate sets (or use a loader).
+corpus := regulae.CognateSetsFromPairs(pairs, [2]string{"latin", "spanish"}, "ls")
 
-# Post-hoc outlier check:
-for report in find_cognate_outliers(corpus, model, top_k=10):
-    print(f"  z={report.z_score:+.2f}  {report.cognate_id}")
+// Multi-lect training (the canonical entry point):
+model, err := regulae.TrainModel(corpus, regulae.DefaultTrainOptions())
+if err != nil { /* e.g. *regulae.UnknownGraphemeError */ }
+fmt.Println(regulae.FormatMultiLectModel(model, 20, 20))
 
-# Drill into one lect's behaviour:
-from regulae import describe_multi_lect_class
-print(describe_multi_lect_class(model, "LATIN", "w"))
+// Drill into one pair's learned model:
+if pm, ok := model.PairwiseModel("latin", "spanish"); ok {
+    fmt.Println(regulae.FormatModel(pm, regulae.DefaultFormatModelOptions()))
+}
+
+// Post-hoc outlier check:
+reports, _ := regulae.FindCognateOutliers(corpus, model, 10, 0)
+for _, r := range reports {
+    fmt.Printf("  z=%+.2f  %s\n", r.ZScore, r.CognateID)
+}
+
+// Drill into one lect's behaviour:
+fmt.Println(regulae.DescribeMultiLectClass(model, "latin", "w"))
 ```
 
-The pair-based input form is still accepted as a convenience
-for two-lect corpora, with a deprecation warning:
-
-```python
-# Pair input (emits DeprecationWarning):
-pairs = [(latin_form, spanish_form), ...]
-legacy_model = train_model(pairs)  # returns LearnedModel
-
-# Recommended form:
-cogs = cognate_sets_from_pairs(pairs, ("latin", "spanish"))
-multi = train_model(cogs)
-legacy_model = multi.pairwise_models[frozenset({"latin", "spanish"})]
-```
+Loaders are provided for generic TSV, GLED, and arcaverborum
+data: `LoadCognatesFromTSV`, `LoadGLED`, `LoadArcaverborum`.
 
 ## Documentation
 
-- **Tutorials** at `docs/tutorials/` — a five-part series for
-  historical linguists. Read these first if you are new to
-  the package.
-- **Consumer guide** at `docs/consumer_guide.md` — the
-  authoritative external contract for downstream consumers of
-  a trained model.
 - **Design documents** at `docs/training_pipeline.md`,
   `docs/correspondence_discovery.md`, and
   `docs/alignment_details.md` — rationale for the staged
-  training pipeline, discovery mechanisms, and data types.
-- **Framework-level context** in the `framework/` sibling
-  repository — lect theory, asymmetry, historical inference
-  design. Read when making cross-package design decisions.
+  training pipeline, discovery mechanisms, and data types
+  (language-agnostic; written against the original design).
+- **Consumer guide** at `docs/consumer_guide.md`.
+- The original Python implementation is archived under
+  `python/` for reference.
 
 ## What is not in this package
 
 - Cognate detection. Cognate sets are user input.
-- Historical inference. Reconstruction, phylogeny, dating,
-  relatedness-as-posterior all belong to a separate
-  downstream package.
-- Morphological segmentation. A reserved slot exists on
-  `CognateSet` for future morph-aware alignment, but the
-  current pipeline is purely phonological.
-- Directionality. The alignment search is symmetric. Who
-  inherited from whom, who borrowed from whom, is not a
-  question `regulae` answers.
+- Historical inference. Reconstruction, phylogeny, dating.
+- Morphological segmentation (a reserved slot exists on
+  `CognateSet` but the pipeline is purely phonological).
+- Directionality. The alignment search is symmetric.
