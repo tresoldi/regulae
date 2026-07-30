@@ -39,6 +39,7 @@ endif()
 add_library(regulae
     src/context.c
     src/memory.c
+    src/model.c
     src/options.c
     src/scoring.c
     src/search.c
@@ -52,6 +53,9 @@ target_include_directories(regulae PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(regulae PUBLIC merkmal::merkmal)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(regulae PUBLIC m)
+endif()
 set_target_properties(regulae PROPERTIES C_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
 target_compile_definitions(regulae PRIVATE REGULAE_BUILDING_LIBRARY)
 if(BUILD_SHARED_LIBS)
@@ -108,6 +112,15 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_align tests/c/test_align.c)
     target_link_libraries(test_align PRIVATE regulae::regulae)
     add_test(NAME align COMMAND test_align)
+
+    add_executable(test_pairwise_model tests/c/test_pairwise_model.c)
+    target_link_libraries(test_pairwise_model PRIVATE regulae::regulae)
+    add_test(NAME pairwise_model COMMAND test_pairwise_model)
+
+    add_executable(test_real_fixtures tests/c/test_real_fixtures.c)
+    target_compile_definitions(test_real_fixtures PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_real_fixtures PRIVATE regulae::regulae)
+    add_test(NAME real_fixtures COMMAND test_real_fixtures)
 
     if(REGULAE_BUILD_CLI)
         add_test(NAME cli_version COMMAND regulae_cli version)

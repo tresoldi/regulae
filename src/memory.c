@@ -70,6 +70,204 @@ rg_status rg_segment_copy_internal(const rg_segment *src, rg_segment *out) {
     return RG_OK;
 }
 
+static void feature_constraint_clear(rg_feature_constraint *constraint) {
+    if (constraint == 0) {
+        return;
+    }
+    free((char *)constraint->feature);
+    free((char *)constraint->value);
+    constraint->feature = 0;
+    constraint->value = 0;
+}
+
+rg_status rg_feature_constraint_copy_internal(
+    const rg_feature_constraint *src,
+    rg_feature_constraint *out
+) {
+    if (src == 0 || out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    out->feature = 0;
+    out->value = 0;
+    if (src->feature != 0) {
+        out->feature = rg_strdup_internal(src->feature);
+        if (out->feature == 0) {
+            return RG_ERR_OOM;
+        }
+    }
+    if (src->value != 0) {
+        out->value = rg_strdup_internal(src->value);
+        if (out->value == 0) {
+            feature_constraint_clear(out);
+            return RG_ERR_OOM;
+        }
+    }
+    return RG_OK;
+}
+
+rg_status rg_feature_constraint_array_copy_internal(
+    const rg_feature_constraint *src,
+    size_t count,
+    const rg_feature_constraint **out
+) {
+    rg_feature_constraint *copy;
+    size_t i;
+    rg_status status;
+    if (out == 0 || (count > 0 && src == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    if (count == 0) {
+        return RG_OK;
+    }
+    copy = (rg_feature_constraint *)calloc(count, sizeof(*copy));
+    if (copy == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < count; i++) {
+        status = rg_feature_constraint_copy_internal(&src[i], &copy[i]);
+        if (status != RG_OK) {
+            while (i > 0) {
+                i--;
+                feature_constraint_clear(&copy[i]);
+            }
+            free(copy);
+            return status;
+        }
+    }
+    *out = copy;
+    return RG_OK;
+}
+
+void rg_feature_constraint_array_clear_internal(const rg_feature_constraint *items, size_t count) {
+    size_t i;
+    if (items == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        feature_constraint_clear((rg_feature_constraint *)&items[i]);
+    }
+    free((rg_feature_constraint *)items);
+}
+
+static void distance_constraint_array_clear(const rg_distance_constraint *items, size_t count) {
+    size_t i;
+    if (items == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        feature_constraint_clear((rg_feature_constraint *)&items[i].constraint);
+    }
+    free((rg_distance_constraint *)items);
+}
+
+static rg_status distance_constraint_array_copy(
+    const rg_distance_constraint *src,
+    size_t count,
+    const rg_distance_constraint **out
+) {
+    rg_distance_constraint *copy;
+    size_t i;
+    rg_status status;
+    if (out == 0 || (count > 0 && src == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    if (count == 0) {
+        return RG_OK;
+    }
+    copy = (rg_distance_constraint *)calloc(count, sizeof(*copy));
+    if (copy == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < count; i++) {
+        copy[i].offset = src[i].offset;
+        status = rg_feature_constraint_copy_internal(&src[i].constraint, &copy[i].constraint);
+        if (status != RG_OK) {
+            while (i > 0) {
+                i--;
+                free((char *)copy[i].constraint.feature);
+                free((char *)copy[i].constraint.value);
+            }
+            free(copy);
+            return status;
+        }
+    }
+    *out = copy;
+    return RG_OK;
+}
+
+rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_spec *out) {
+    rg_status status;
+    if (src == 0 || out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    rg_context_spec_init_empty(out);
+    if (src->position != 0) {
+        out->position = rg_strdup_internal(src->position);
+        if (out->position == 0) {
+            return RG_ERR_OOM;
+        }
+    }
+    if (src->morphological != 0) {
+        out->morphological = rg_strdup_internal(src->morphological);
+        if (out->morphological == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+    }
+#define COPY_FC_FIELD(name) \
+    status = rg_feature_constraint_array_copy_internal(src->name, src->name##_count, &out->name); \
+    if (status != RG_OK) { \
+        rg_context_spec_clear_internal(out); \
+        return status; \
+    } \
+    out->name##_count = src->name##_count
+#define COPY_DC_FIELD(name) \
+    status = distance_constraint_array_copy(src->name, src->name##_count, &out->name); \
+    if (status != RG_OK) { \
+        rg_context_spec_clear_internal(out); \
+        return status; \
+    } \
+    out->name##_count = src->name##_count
+    COPY_FC_FIELD(preceding);
+    COPY_FC_FIELD(following);
+    COPY_DC_FIELD(preceding_at_distance);
+    COPY_DC_FIELD(following_at_distance);
+    COPY_FC_FIELD(somewhere_preceding);
+    COPY_FC_FIELD(somewhere_following);
+    COPY_FC_FIELD(same_syllable);
+    COPY_FC_FIELD(next_syllable);
+    COPY_FC_FIELD(previous_syllable);
+    COPY_FC_FIELD(self_stress);
+    COPY_FC_FIELD(preceding_stress);
+    COPY_FC_FIELD(following_stress);
+#undef COPY_FC_FIELD
+#undef COPY_DC_FIELD
+    return RG_OK;
+}
+
+void rg_context_spec_clear_internal(rg_context_spec *context) {
+    if (context == 0) {
+        return;
+    }
+    free((char *)context->position);
+    rg_feature_constraint_array_clear_internal(context->preceding, context->preceding_count);
+    rg_feature_constraint_array_clear_internal(context->following, context->following_count);
+    free((char *)context->morphological);
+    distance_constraint_array_clear(context->preceding_at_distance, context->preceding_at_distance_count);
+    distance_constraint_array_clear(context->following_at_distance, context->following_at_distance_count);
+    rg_feature_constraint_array_clear_internal(context->somewhere_preceding, context->somewhere_preceding_count);
+    rg_feature_constraint_array_clear_internal(context->somewhere_following, context->somewhere_following_count);
+    rg_feature_constraint_array_clear_internal(context->same_syllable, context->same_syllable_count);
+    rg_feature_constraint_array_clear_internal(context->next_syllable, context->next_syllable_count);
+    rg_feature_constraint_array_clear_internal(context->previous_syllable, context->previous_syllable_count);
+    rg_feature_constraint_array_clear_internal(context->self_stress, context->self_stress_count);
+    rg_feature_constraint_array_clear_internal(context->preceding_stress, context->preceding_stress_count);
+    rg_feature_constraint_array_clear_internal(context->following_stress, context->following_stress_count);
+    rg_context_spec_init_empty(context);
+}
+
 void rg_link_clear_internal(rg_link *link) {
     size_t i;
     if (link == 0) {
@@ -83,6 +281,7 @@ void rg_link_clear_internal(rg_link *link) {
     }
     free((rg_segment *)link->source);
     free((rg_segment *)link->target);
+    rg_context_spec_clear_internal(&link->context);
     rg_feature_displacement_free((rg_feature_displacement *)link->feature_displacement, link->feature_displacement_count);
     link->source = 0;
     link->source_count = 0;

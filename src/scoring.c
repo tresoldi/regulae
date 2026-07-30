@@ -1,5 +1,6 @@
 #include "internal.h"
 
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -215,5 +216,338 @@ rg_status rg_score_link(
         asymmetry = -asymmetry;
     }
     *out = pair_cost + RG_DEFAULT_GAP_COST * (double)asymmetry + RG_DEFAULT_CHUNK_PENALTY * (double)asymmetry;
+    return RG_OK;
+}
+
+static double option_or_default(double value, double fallback) {
+    return value == 0.0 ? fallback : value;
+}
+
+static int scoring_segment_equal(const rg_segment *a, const rg_segment *b) {
+    return strcmp(a->grapheme == 0 ? "" : a->grapheme, b->grapheme == 0 ? "" : b->grapheme) == 0 &&
+        strcmp(a->tone == 0 ? "" : a->tone, b->tone == 0 ? "" : b->tone) == 0 &&
+        strcmp(a->length == 0 ? "" : a->length, b->length == 0 ? "" : b->length) == 0 &&
+        strcmp(a->stress == 0 ? "" : a->stress, b->stress == 0 ? "" : b->stress) == 0;
+}
+
+static int scoring_segment_array_equal(const rg_segment *a, size_t a_count, const rg_segment *b, size_t b_count) {
+    size_t i;
+    if (a_count != b_count) {
+        return 0;
+    }
+    for (i = 0; i < a_count; i++) {
+        if (!scoring_segment_equal(&a[i], &b[i])) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static const rg_chunk_row *find_chunk_row(
+    const rg_pairwise_model *model,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count
+) {
+    size_t i;
+    if (model == 0 || source_count == 0 || target_count == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->chunk_count; i++) {
+        if (scoring_segment_array_equal(model->chunks[i].source, model->chunks[i].source_count, source, source_count) &&
+            scoring_segment_array_equal(model->chunks[i].target, model->chunks[i].target_count, target, target_count)) {
+            return &model->chunks[i];
+        }
+    }
+    return 0;
+}
+
+static const rg_segment_count_row *find_segment_count(
+    const rg_pairwise_model *model,
+    const char *source,
+    const char *target
+) {
+    size_t i;
+    if (model == 0 || source == 0 || target == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->segment_count_count; i++) {
+        if (strcmp(model->segment_counts[i].source, source) == 0 &&
+            strcmp(model->segment_counts[i].target, target) == 0) {
+            return &model->segment_counts[i];
+        }
+    }
+    return 0;
+}
+
+static const rg_conditioned_segment_count_row *find_conditioned_segment_count(
+    const rg_pairwise_model *model,
+    const char *source,
+    const char *target,
+    const rg_context_spec *link_context
+) {
+    size_t i;
+    const rg_conditioned_segment_count_row *best = 0;
+    size_t best_specificity = 0;
+    if (model == 0 || source == 0 || target == 0 || link_context == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->conditioned_segment_count_count; i++) {
+        int subset = 0;
+        const rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[i];
+        size_t specificity;
+        if (strcmp(row->source, source) != 0 || strcmp(row->target, target) != 0) {
+            continue;
+        }
+        if (rg_context_spec_is_subset(&row->context, link_context, &subset) != RG_OK || !subset) {
+            continue;
+        }
+        specificity = rg_context_spec_constraint_count(&row->context);
+        if (best == 0 || specificity > best_specificity) {
+            best = row;
+            best_specificity = specificity;
+        }
+    }
+    return best;
+}
+
+static size_t segment_targets_for_source(const rg_pairwise_model *model, const char *source) {
+    size_t i;
+    size_t count = 0;
+    if (model == 0 || source == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->segment_count_count; i++) {
+        if (strcmp(model->segment_counts[i].source, source) == 0) {
+            count++;
+        }
+    }
+    return count;
+}
+
+static size_t conditioned_segment_targets_for_source(
+    const rg_pairwise_model *model,
+    const char *source,
+    const rg_context_spec *link_context,
+    size_t specificity
+) {
+    size_t i;
+    size_t count = 0;
+    if (model == 0 || source == 0 || link_context == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->conditioned_segment_count_count; i++) {
+        int subset = 0;
+        const rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[i];
+        if (strcmp(row->source, source) != 0) {
+            continue;
+        }
+        if (rg_context_spec_constraint_count(&row->context) != specificity) {
+            continue;
+        }
+        if (rg_context_spec_is_subset(&row->context, link_context, &subset) != RG_OK || !subset) {
+            continue;
+        }
+        count++;
+    }
+    return count;
+}
+
+static rg_status displacement_model_cost(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    rg_segment source,
+    rg_segment target,
+    double *out
+) {
+    rg_feature_displacement *disp = 0;
+    size_t disp_count = 0;
+    size_t i;
+    size_t j;
+    double n = 0.0;
+    double total = 0.0;
+    double alpha = 1.0;
+    double v;
+    rg_status status;
+    *out = 0.0;
+    if (model == 0 || model->displacement_count_count == 0) {
+        return RG_OK;
+    }
+    status = rg_compute_displacement(ctx, source, target, &disp, &disp_count);
+    if (status != RG_OK) {
+        return status;
+    }
+    for (i = 0; i < model->displacement_count_count; i++) {
+        total = model->displacement_counts[i].total;
+        break;
+    }
+    for (i = 0; i < disp_count; i++) {
+        for (j = 0; j < model->displacement_count_count; j++) {
+            if (strcmp(disp[i].feature, model->displacement_counts[j].feature) == 0 &&
+                strcmp(disp[i].from_value, model->displacement_counts[j].from_value) == 0 &&
+                strcmp(disp[i].to_value, model->displacement_counts[j].to_value) == 0) {
+                n += model->displacement_counts[j].count;
+                break;
+            }
+        }
+    }
+    v = (double)(model->displacement_count_count == 0 ? 1 : model->displacement_count_count);
+    if (total <= 0.0) {
+        *out = 0.0;
+    } else {
+        double p = (alpha + n) / (alpha * v + total);
+        *out = -log(p) - log(v);
+    }
+    rg_feature_displacement_free(disp, disp_count);
+    return RG_OK;
+}
+
+static double tonal_model_cost(const rg_pairwise_model *model, const char *source_tone, const char *target_tone) {
+    size_t i;
+    const char *src = source_tone == 0 ? "" : source_tone;
+    const char *tgt = target_tone == 0 ? "" : target_tone;
+    double n = 0.0;
+    double total = 0.0;
+    double alpha = 1.0;
+    double v;
+    if ((src[0] == '\0' && tgt[0] == '\0') || model == 0 || model->tonal_count_count == 0) {
+        return 0.0;
+    }
+    for (i = 0; i < model->tonal_count_count; i++) {
+        if (strcmp(model->tonal_counts[i].source_tone, src) == 0) {
+            total = model->tonal_counts[i].source_total;
+            if (strcmp(model->tonal_counts[i].target_tone, tgt) == 0) {
+                n = model->tonal_counts[i].count;
+            }
+        }
+    }
+    if (total <= 0.0) {
+        return 0.0;
+    }
+    v = (double)(model->tonal_count_count < 2 ? 2 : model->tonal_count_count);
+    return -log((alpha + n) / (alpha * v + total)) - log(v);
+}
+
+rg_status rg_score_link_with_model(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    double *out
+) {
+    return rg_score_link_with_context_model_internal(
+        ctx,
+        model,
+        options,
+        source,
+        source_count,
+        target,
+        target_count,
+        0,
+        out
+    );
+}
+
+rg_status rg_score_link_with_context_model_internal(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    const rg_context_spec *link_context,
+    double *out
+) {
+    double prior_cost = 0.0;
+    rg_status status;
+    if (ctx == 0 || out == 0 || (source_count > 0 && source == 0) || (target_count > 0 && target == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    if (model == 0) {
+        return rg_score_link(ctx, source, source_count, target, target_count, out);
+    }
+    {
+        const rg_chunk_row *chunk = find_chunk_row(model, source, source_count, target, target_count);
+        if (chunk != 0) {
+            *out = chunk->cost;
+            return RG_OK;
+        }
+    }
+    if (source_count == 0 || target_count == 0) {
+        return rg_score_link(ctx, source, source_count, target, target_count, out);
+    }
+    if (source_count != 1 || target_count != 1) {
+        size_t paired = source_count < target_count ? source_count : target_count;
+        size_t i;
+        int asymmetry = (int)source_count - (int)target_count;
+        double total = 0.0;
+        if (asymmetry < 0) {
+            asymmetry = -asymmetry;
+        }
+        for (i = 0; i < paired; i++) {
+            double pair_cost = 0.0;
+            status = rg_score_link_with_context_model_internal(
+                ctx,
+                model,
+                options,
+                &source[i],
+                1,
+                &target[i],
+                1,
+                link_context,
+                &pair_cost
+            );
+            if (status != RG_OK) {
+                return status;
+            }
+            total += pair_cost;
+        }
+        *out = total + RG_DEFAULT_GAP_COST * (double)asymmetry + RG_DEFAULT_CHUNK_PENALTY * (double)asymmetry;
+        return RG_OK;
+    }
+    status = rg_score_link(ctx, source, source_count, target, target_count, &prior_cost);
+    if (status != RG_OK) {
+        return status;
+    }
+    {
+        const rg_segment_count_row *row = find_segment_count(model, source[0].grapheme, target[0].grapheme);
+        const rg_conditioned_segment_count_row *conditioned = find_conditioned_segment_count(model, source[0].grapheme, target[0].grapheme, link_context);
+        size_t v_count = segment_targets_for_source(model, source[0].grapheme);
+        double v = (double)(v_count == 0 ? 1 : v_count);
+        double concentration = option_or_default(options == 0 ? 0.0 : options->concentration, 5.0);
+        double segment_weight = option_or_default(options == 0 ? 0.0 : options->segment_weight, 0.7);
+        double displacement_weight = option_or_default(options == 0 ? 0.0 : options->displacement_weight, 0.3);
+        double tone_weight = option_or_default(options == 0 ? 0.0 : options->tone_weight, 1.0);
+        double n = row == 0 ? 0.0 : row->count;
+        double total = row == 0 ? 0.0 : row->source_total;
+        double seg_cost;
+        double disp_cost = 0.0;
+        if (conditioned != 0) {
+            size_t specificity = rg_context_spec_constraint_count(&conditioned->context);
+            size_t conditioned_v_count = conditioned_segment_targets_for_source(model, source[0].grapheme, link_context, specificity);
+            if (conditioned_v_count > 0 && conditioned->source_total > 0.0) {
+                n = conditioned->count;
+                total = conditioned->source_total;
+                v_count = conditioned_v_count;
+                v = (double)v_count;
+            }
+        }
+        if (v_count == 0 || total <= 0.0) {
+            *out = prior_cost;
+            return RG_OK;
+        }
+        seg_cost = -log((concentration / v + n) / (concentration + total));
+        status = displacement_model_cost(ctx, model, source[0], target[0], &disp_cost);
+        if (status != RG_OK) {
+            return status;
+        }
+        *out = segment_weight * seg_cost + displacement_weight * disp_cost +
+            tone_weight * tonal_model_cost(model, source[0].tone, target[0].tone);
+    }
     return RG_OK;
 }
