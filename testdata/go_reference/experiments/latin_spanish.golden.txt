@@ -1,0 +1,133 @@
+Latin → Spanish experiment: 97 cognate pairs
+
+LearnedModel (feature_system="descriptive", τ=1, β=5, w_seg=0.7, w_disp=0.3, w_tone=1)
+Segment correspondences — unconditioned (top 15 of 59):
+  r -> r: 45
+  a -> a: 39
+  e -> e: 38
+  u -> o: 35
+  n -> n: 19
+  l -> l: 15
+  o -> o: 15
+  m -> m: 13
+  i -> e: 12
+  k -> k: 12
+  s -> s: 12
+  i -> i: 11
+  t -> t: 11
+  d -> d: 10
+  v -> b: 10
+
+Context-conditioned splits (27 entries):
+  d -> j / [vowel:+]_: 2
+  d -> d / [vowel:+]_: 1
+  d -> n / [vowel:+]_: 1
+  g -> j / _[front:+]: 1
+  g -> p / _[front:+]: 1
+  i -> e / @medial: 12
+  i -> i / @medial: 9
+  i -> x / _[vowel:+]: 3
+  i -> j / _[vowel:+]: 1
+  k -> k / _[front:+,open:+]: 4
+  k -> g / _[front:+,open:+]: 1
+  k -> p / _[front:+,open:+]: 1
+  k -> θ / _[front:+,open:+]: 1
+  k -> θ / _[front:+]: 5
+  k -> k / _[front:+]: 4
+  k -> g / _[front:+]: 1
+  k -> p / _[front:+]: 1
+  p -> b / [vowel:+]_: 4
+  t -> d / [vowel:+]_: 3
+  t -> t / [vowel:+]_: 2
+  t -> a / [vowel:+]_: 1
+  t -> n / [vowel:+]_: 1
+  u -> o / @medial: 8
+  u -> u / @medial: 4
+  u -> w / _[vowel:+]: 3
+  v -> b / _[front:+]: 10
+  v -> v / _[front:+]: 1
+Tonal correspondences (0):
+  (none yet)
+Cross-dimensional links (0):
+  (none)
+Feature displacements (top 5 of 37):
+  identity: 269
+  [close: P->A, close-mid: A->P]: 47
+  [fricative: P->A, labio-dental: P->A, bilabial: A->P, stop: A->P]: 10
+  [voiceless: P->A, voiced: A->P]: 9
+  [back: P->A, rounded: P->A, front: A->P, unrounded: A->P]: 8
+Promoted chunks (33):
+  (lia, xa): cost=-7.993
+  (kte, tʃe): cost=-7.982
+  (okt, otʃ): cost=-7.963
+  (ire, ir): cost=-7.962
+  (are, ar): cost=-7.953
+  (tem, te): cost=-7.915
+  (fil, i): cost=-7.914
+  (llu, ʎo): cost=-7.879
+  (ere, er): cost=-7.581
+  (ate, ad): cost=-7.498
+  (ua, wa): cost=-5.368
+  (au, o): cost=-5.368
+  (kk, k): cost=-5.328
+  (tt, t): cost=-5.324
+  (ce, θ): cost=-5.316
+  (fi, i): cost=-5.313
+  (ir, ir): cost=-5.306
+  (re, r): cost=-5.071
+  (kt, tʃ): cost=-4.920
+  (ll, ʎ): cost=-4.866
+  (il, i): cost=-4.791
+  (no, nwe): cost=-4.548
+  (lu, o): cost=-4.249
+  (ok, o): cost=-4.202
+  (er, r): cost=-3.758
+  (er, re): cost=-3.470
+  (d, dj): cost=-2.682
+  (p, pj): cost=-2.648
+  (o, we): cost=-2.185
+  (m, mb): cost=-2.038
+  (n, nw): cost=-1.757
+  (m, mbr): cost=-1.750
+  (e, je): cost=-1.663
+
+Prior-only total cost:    143.37
+Learned-model total cost: -895.60
+Reduction:                1038.97
+
+Selected alignments (trained model):
+
+[father]
+latin "pater" ~ spanish "padre"  (cost=1.625)
+  p ~ p  [0.000]
+  ate ~ ad  [1.125]
+  r ~ r  [0.000]
+  ε ~ e  [0.500]
+
+[mother]
+latin "mater" ~ spanish "madre"  (cost=1.625)
+  m ~ m  [0.000]
+  ate ~ ad  [1.125]
+  r ~ r  [0.000]
+  ε ~ e  [0.500]
+
+[night]
+latin "nokte" ~ spanish "notʃe"  (cost=1.562)
+  n ~ n  [0.000]
+  okt ~ otʃ  [1.562]
+  e ~ e  [0.000]
+
+[head]
+latin "kaput" ~ spanish "kabeθa"  (cost=2.554)
+  kap ~ kab  [0.375]
+  u ~ ε  [0.500]
+  ε ~ e  [0.500]
+  ε ~ θ  [0.500]
+  t ~ a  [0.679]
+
+[tooth]
+latin "dentem" ~ spanish "djente"  (cost=1.500)
+  d ~ dj  [0.750]
+  e ~ e  [0.000]
+  n ~ n  [0.000]
+  tem ~ te  [0.750]

@@ -1,0 +1,28 @@
+Loaded 24 pairs.
+
+Without morpheme boundaries — chunks promoted:
+  (ti, tti): cost=-3.985
+  (tu, ttu): cost=-3.936
+  (to, tto): cost=-3.906
+  (ta, tta): cost=-3.523
+  (at, att): cost=-3.214
+  (i, ti): cost=-2.001
+  (t, tt): cost=-1.984
+  (a, ta): cost=-1.981
+  (u, tu): cost=-1.952
+  (o, to): cost=-1.922
+
+With morpheme boundaries — chunks promoted:
+  (at, at): cost=-3.965
+  (i, ti): cost=-2.001
+  (a, ta): cost=-1.981
+  (u, tu): cost=-1.952
+  (o, to): cost=-1.922
+
+Boundary-rejected chunks (6):
+  (at, att)
+  (t, tt)
+  (ta, tta)
+  (ti, tti)
+  (to, tto)
+  (tu, ttu)

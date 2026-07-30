@@ -1,0 +1,39 @@
+Loaded 80 synthetic clean Mandarin/Cantonese-like pairs.
+
+NOTE: rule-explicit synthetic fixture. Designed to validate
+cross-dimensional discovery commit loop on clean signal.
+
+LearnedModel (feature_system="descriptive", τ=1, β=5, w_seg=0.7, w_disp=0.3, w_tone=1)
+Segment correspondences — unconditioned (top 9 of 9):
+  b -> b: 20
+  d -> d: 20
+  p -> p: 20
+  t -> t: 20
+  a -> a: 16
+  e -> e: 16
+  i -> i: 16
+  o -> o: 16
+  u -> u: 16
+Tonal correspondences (8):
+  4 -> 1: 10
+  1 -> 4: 10
+  2 -> 4: 10
+  3 -> 4: 10
+  4 -> 4: 10
+  1 -> 1: 10
+  3 -> 1: 10
+  2 -> 1: 10
+Cross-dimensional links (2):
+  voiced=+@relative_-1 -> tone=4@+0  count=40/40 conf=1.00
+  voiceless=+@relative_-1 -> tone=1@+0  count=40/40 conf=1.00
+Feature displacements (top 1 of 1):
+  identity: 160
+Promoted chunks (0):
+  (none promoted)
+
+Cross-dimensional rules in detail:
+#0: src[voiced@relative_-1] → tgt[tone=4@+0]  count=40  conf=1.00
+#1: src[voiceless@relative_-1] → tgt[tone=1@+0]  count=40  conf=1.00
+
+Prior-only total cost:  0.00
+Learned-model total cost: -308.58

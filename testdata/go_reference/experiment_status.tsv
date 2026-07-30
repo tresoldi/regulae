@@ -1,0 +1,28 @@
+experiment	status	golden
+arabic_hebrew	pass	
+arcaverborum_polynesian	skipped_external_data	
+contaminated_cognates_synthetic	pass	experiments/contaminated_cognates_synthetic.golden.txt
+finnish_estonian	pass	
+georgian_svan	pass	
+gled_polynesian	skipped_external_data	
+gled_romance	skipped_external_data	
+harmony_synthetic	pass	
+latin_french	pass	
+latin_italian	pass	
+latin_spanish	pass	experiments/latin_spanish.golden.txt
+length_conditioned_synthetic	pass	
+mandarin_historical	pass	
+morph_boundary_synthetic	pass	experiments/morph_boundary_synthetic.golden.txt
+navajo_chipewyan	pass	
+oe_english	pass	
+ppn_hawaiian	pass	experiments/ppn_hawaiian.golden.txt
+stress_conditioned_synthetic	pass	
+swahili_zulu	pass	
+tone_3way_synthetic	pass	
+tone_chinese_like	pass	
+tone_chinese_like_clean	pass	experiments/tone_chinese_like_clean.golden.txt
+tone_synthetic	pass	
+tone_vietnamese_like	pass	
+tone_yoruba_like	pass	
+turkish_azerbaijani	pass	
+umlaut_synthetic	pass	experiments/umlaut_synthetic.golden.txt

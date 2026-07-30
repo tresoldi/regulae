@@ -1,0 +1,12 @@
+Loaded 25 cognates (5 contaminated at confidence=0).
+
+=== With confidence weighting (bad pairs at 0.0) ===
+Segment table (p source):
+  p -> f: count=20.0
+
+=== Control: all pairs at confidence=1.0 ===
+Segment table (p source):
+  p -> f: count=20.0
+  p -> k: count=1.0
+  p -> q: count=1.0
+  p -> x: count=1.0

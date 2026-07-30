@@ -1,0 +1,37 @@
+Loaded 40 synthetic umlaut pairs.
+
+Rule: a → æ when next syllable's vowel is front (i, e).
+      Context discovery cannot capture this (the intervening C
+      doesn't encode the triggering V2 feature).
+
+LearnedModel (feature_system="descriptive", τ=1, β=5, w_seg=0.7, w_disp=0.3, w_tone=1)
+Segment correspondences — unconditioned (top 14 of 14):
+  i -> i: 23
+  u -> u: 23
+  k -> k: 14
+  d -> d: 13
+  t -> t: 13
+  b -> b: 12
+  p -> p: 12
+  a -> a: 11
+  a -> æ: 10
+  g -> g: 9
+  o -> o: 8
+  e -> e: 5
+  m -> m: 5
+  n -> n: 2
+
+Context-conditioned splits (1 entries):
+  a -> æ / next_syl=[front:+]: 10
+Tonal correspondences (0):
+  (none yet)
+Cross-dimensional links (0):
+  (none)
+Feature displacements (top 2 of 2):
+  identity: 150
+  [open: P->A, near-open: A->P]: 10
+Promoted chunks (0):
+  (none promoted)
+
+Long-range conditioned entries in detail:
+  a -> æ: 10  [next_syl=front:+]
