@@ -29,6 +29,7 @@ extern "C" {
 
 typedef struct rg_context rg_context;
 typedef struct rg_feature_set rg_feature_set;
+typedef struct rg_alignment rg_alignment;
 
 typedef enum rg_status {
     RG_OK = 0,
@@ -128,6 +129,23 @@ typedef struct rg_context_spec {
     size_t following_stress_count;
 } rg_context_spec;
 
+typedef struct rg_feature_displacement {
+    const char *feature;
+    const char *from_value;
+    const char *to_value;
+} rg_feature_displacement;
+
+typedef struct rg_link {
+    const rg_segment *source;
+    size_t source_count;
+    const rg_segment *target;
+    size_t target_count;
+    rg_context_spec context;
+    const rg_feature_displacement *feature_displacement;
+    size_t feature_displacement_count;
+    double confidence;
+} rg_link;
+
 RG_API const char *rg_version_string(void);
 RG_API int rg_version_major(void);
 RG_API int rg_version_minor(void);
@@ -167,6 +185,35 @@ RG_API rg_status rg_context_spec_is_subset(
     const rg_context_spec *other,
     int *out
 );
+
+RG_API rg_status rg_score_link(
+    const rg_context *ctx,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    double *out
+);
+RG_API rg_status rg_compute_displacement(
+    const rg_context *ctx,
+    rg_segment source,
+    rg_segment target,
+    rg_feature_displacement **out,
+    size_t *out_count
+);
+RG_API void rg_feature_displacement_free(rg_feature_displacement *items, size_t count);
+
+RG_API rg_status rg_align_forms(
+    const rg_context *ctx,
+    const rg_form *source,
+    const rg_form *target,
+    int max_chunk_size,
+    rg_alignment **out
+);
+RG_API void rg_alignment_free(rg_alignment *alignment);
+RG_API size_t rg_alignment_link_count(const rg_alignment *alignment);
+RG_API const rg_link *rg_alignment_link_at(const rg_alignment *alignment, size_t index);
+RG_API rg_status rg_alignment_cost(const rg_context *ctx, const rg_alignment *alignment, double *out);
 
 #ifdef __cplusplus
 }

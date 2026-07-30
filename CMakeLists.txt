@@ -38,7 +38,10 @@ endif()
 
 add_library(regulae
     src/context.c
+    src/memory.c
     src/options.c
+    src/scoring.c
+    src/search.c
     src/types.c
     src/version.c
 )
@@ -97,6 +100,14 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_merkmal_bridge tests/c/test_merkmal_bridge.c)
     target_link_libraries(test_merkmal_bridge PRIVATE regulae::regulae)
     add_test(NAME merkmal_bridge COMMAND test_merkmal_bridge)
+
+    add_executable(test_scoring tests/c/test_scoring.c)
+    target_link_libraries(test_scoring PRIVATE regulae::regulae)
+    add_test(NAME scoring COMMAND test_scoring)
+
+    add_executable(test_align tests/c/test_align.c)
+    target_link_libraries(test_align PRIVATE regulae::regulae)
+    add_test(NAME align COMMAND test_align)
 
     if(REGULAE_BUILD_CLI)
         add_test(NAME cli_version COMMAND regulae_cli version)
