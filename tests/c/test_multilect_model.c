@@ -1,0 +1,301 @@
+#include "regulae.h"
+
+#include <assert.h>
+#include <math.h>
+#include <stdlib.h>
+#include <string.h>
+
+static rg_segment seg(const char *g) {
+    rg_segment s = {g, 0, 0, 0};
+    return s;
+}
+
+static rg_form form(const char *lect, const rg_segment *segments, size_t count) {
+    rg_form f;
+    f.lect_id = lect;
+    f.segments = segments;
+    f.segment_count = count;
+    f.syllable_breaks = 0;
+    f.syllable_break_count = 0;
+    f.morpheme_breaks = 0;
+    f.morpheme_break_count = 0;
+    return f;
+}
+
+static char *dup_string(const char *value) {
+    size_t len = strlen(value);
+    char *out = (char *)malloc(len + 1);
+    assert(out != 0);
+    memcpy(out, value, len + 1);
+    return out;
+}
+
+static rg_segment *segments_from_ascii(const char *word, size_t *count) {
+    size_t i;
+    size_t n = strlen(word);
+    rg_segment *segments = (rg_segment *)calloc(n, sizeof(*segments));
+    assert(segments != 0);
+    for (i = 0; i < n; i++) {
+        char g[2];
+        g[0] = word[i];
+        g[1] = '\0';
+        segments[i].grapheme = dup_string(g);
+    }
+    *count = n;
+    return segments;
+}
+
+static void segments_free(rg_segment *segments, size_t count) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        free((char *)segments[i].grapheme);
+    }
+    free(segments);
+}
+
+static int class_has(const rg_multi_class_row *row, const char *lect, const char *grapheme) {
+    size_t i;
+    for (i = 0; i < row->segment_count; i++) {
+        if (strcmp(row->lect_ids[i], lect) == 0 && strcmp(row->graphemes[i], grapheme) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int model_has_class(
+    const rg_multi_model *model,
+    const char *lect_a,
+    const char *graph_a,
+    const char *lect_b,
+    const char *graph_b,
+    const char *lect_c,
+    const char *graph_c,
+    double count
+) {
+    size_t i;
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        if (row->segment_count == 3 &&
+            fabs(row->count - count) < 1e-12 &&
+            class_has(row, lect_a, graph_a) &&
+            class_has(row, lect_b, graph_b) &&
+            class_has(row, lect_c, graph_c)) {
+            assert(row->confidence == 1.0);
+            assert(row->supporting_cognate_count == (size_t)count);
+            assert(row->supporting_cognates != 0);
+            assert(row->uncertainty.lower <= row->uncertainty.estimate + 1e-12);
+            assert(row->uncertainty.upper + 1e-12 >= row->uncertainty.estimate);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static void test_conditioned_palatalization(rg_context *ctx, const rg_train_options *options) {
+    const char *source_words[16] = {
+        "kita", "kite", "ketu", "keri", "kina", "keta", "kile", "kise",
+        "kata", "koto", "kupa", "kala", "koma", "kuma", "kota", "kapa"
+    };
+    const char *target_words[16] = {
+        "sita", "site", "setu", "seri", "sina", "seta", "sile", "sise",
+        "kata", "koto", "kupa", "kala", "koma", "kuma", "kota", "kapa"
+    };
+    rg_segment *source_segments[16];
+    rg_segment *target_segments[16];
+    size_t source_counts[16];
+    size_t target_counts[16];
+    rg_cognate_form forms[16][2];
+    rg_cognate_set cognates[16];
+    rg_multi_model *model = 0;
+    rg_train_options local_options = *options;
+    size_t i;
+    int found = 0;
+
+    local_options.max_chunk_size = 1;
+
+    for (i = 0; i < 16; i++) {
+        source_segments[i] = segments_from_ascii(source_words[i], &source_counts[i]);
+        target_segments[i] = segments_from_ascii(target_words[i], &target_counts[i]);
+        forms[i][0].lect_id = "A";
+        forms[i][0].form = form("A", source_segments[i], source_counts[i]);
+        forms[i][1].lect_id = "B";
+        forms[i][1].form = form("B", target_segments[i], target_counts[i]);
+        cognates[i].cognate_id = source_words[i];
+        cognates[i].forms = forms[i];
+        cognates[i].form_count = 2;
+        cognates[i].confidence = 1.0;
+    }
+
+    assert(rg_train_model(ctx, cognates, 16, &local_options, &model) == RG_OK);
+    assert(model != 0);
+    assert(rg_multi_model_conditioned_class_count(model) > 0);
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        assert(row != 0);
+        assert(row->contexts != 0);
+        assert(row->class_id >= (int)rg_multi_model_unconditioned_class_count(model));
+        if (row->segment_count == 2 &&
+            strcmp(row->lect_ids[0], "A") == 0 &&
+            strcmp(row->lect_ids[1], "B") == 0 &&
+            strcmp(row->graphemes[0], "k") == 0 &&
+            strcmp(row->graphemes[1], "s") == 0 &&
+            row->contexts[0].following_count > 0 &&
+            row->count >= 8.0 &&
+            fabs(row->confidence - 0.5) < 1e-9) {
+            found = 1;
+        }
+    }
+    assert(found);
+    assert(rg_multi_model_conditioned_class_at(model, 1000) == 0);
+    rg_multi_model_free(model);
+    for (i = 0; i < 16; i++) {
+        segments_free(source_segments[i], source_counts[i]);
+        segments_free(target_segments[i], target_counts[i]);
+    }
+}
+
+int main(void) {
+    rg_context *ctx = 0;
+    rg_train_options options;
+    rg_multi_model *model = 0;
+    rg_cognate_outlier_row *outliers = 0;
+    size_t outlier_count = 0;
+    rg_segment a1[] = {{"p", 0, 0, 0}, {"a", 0, 0, 0}};
+    rg_segment b1[] = {{"f", 0, 0, 0}, {"a", 0, 0, 0}};
+    rg_segment c1[] = {{"b", 0, 0, 0}, {"a", 0, 0, 0}};
+    rg_segment a2[] = {{"p", 0, 0, 0}, {"i", 0, 0, 0}};
+    rg_segment b2[] = {{"f", 0, 0, 0}, {"i", 0, 0, 0}};
+    rg_segment c2[] = {{"b", 0, 0, 0}, {"i", 0, 0, 0}};
+    rg_cognate_form forms1[3];
+    rg_cognate_form forms2[3];
+    rg_cognate_set cognates[2];
+    rg_cognate_set invalid;
+    rg_cognate_form invalid_forms[1];
+    size_t i;
+    int saw_ab = 0;
+    int saw_ac = 0;
+    int saw_bc = 0;
+
+    assert(rg_context_new_builtin(&ctx) == RG_OK);
+    rg_train_options_init_defaults(&options);
+    test_conditioned_palatalization(ctx, &options);
+
+    forms1[0].lect_id = "A";
+    forms1[0].form = form("A", a1, 2);
+    forms1[1].lect_id = "B";
+    forms1[1].form = form("B", b1, 2);
+    forms1[2].lect_id = "C";
+    forms1[2].form = form("C", c1, 2);
+    forms2[0].lect_id = "A";
+    forms2[0].form = form("A", a2, 2);
+    forms2[1].lect_id = "B";
+    forms2[1].form = form("B", b2, 2);
+    forms2[2].lect_id = "C";
+    forms2[2].form = form("C", c2, 2);
+
+    cognates[0].cognate_id = "one";
+    cognates[0].forms = forms1;
+    cognates[0].form_count = 3;
+    cognates[0].confidence = 1.0;
+    cognates[1].cognate_id = "two";
+    cognates[1].forms = forms2;
+    cognates[1].form_count = 3;
+    cognates[1].confidence = 1.0;
+
+    assert(rg_train_model(ctx, cognates, 2, &options, &model) == RG_OK);
+    assert(model != 0);
+    assert(rg_multi_model_lect_count(model) == 3);
+    assert(strcmp(rg_multi_model_lect_at(model, 0), "A") == 0);
+    assert(strcmp(rg_multi_model_lect_at(model, 1), "B") == 0);
+    assert(strcmp(rg_multi_model_lect_at(model, 2), "C") == 0);
+    assert(rg_multi_model_lect_at(model, 3) == 0);
+    assert(rg_multi_model_pair_model_count(model) == 3);
+    for (i = 0; i < rg_multi_model_pair_model_count(model); i++) {
+        const rg_multi_pair_model_row *row = rg_multi_model_pair_model_at(model, i);
+        assert(row != 0);
+        assert(row->model != 0);
+        if (strcmp(row->lect_a, "A") == 0 && strcmp(row->lect_b, "B") == 0) {
+            saw_ab = 1;
+        }
+        if (strcmp(row->lect_a, "A") == 0 && strcmp(row->lect_b, "C") == 0) {
+            saw_ac = 1;
+        }
+        if (strcmp(row->lect_a, "B") == 0 && strcmp(row->lect_b, "C") == 0) {
+            saw_bc = 1;
+        }
+    }
+    assert(saw_ab && saw_ac && saw_bc);
+    assert(rg_multi_model_pair_model_at(model, 1000) == 0);
+    assert(model_has_class(model, "A", "p", "B", "f", "C", "b", 2.0));
+    assert(model_has_class(model, "A", "a", "B", "a", "C", "a", 1.0));
+    assert(model_has_class(model, "A", "i", "B", "i", "C", "i", 1.0));
+    assert(rg_multi_model_unconditioned_class_at(model, 1000) == 0);
+    assert(rg_multi_model_cross_dimensional_row_count(model) == 0);
+    assert(rg_multi_model_cross_dimensional_row_at(model, 0) == 0);
+    assert(rg_find_cognate_outliers(ctx, cognates, 2, model, &options, 0, 0, &outliers, &outlier_count) == RG_OK);
+    assert(outlier_count == 2);
+    assert(outliers != 0);
+    assert(outliers[0].pair_count == 3);
+    assert(outliers[1].pair_count == 3);
+    assert(outliers[0].z_score >= outliers[1].z_score);
+    rg_cognate_outlier_rows_free(outliers, outlier_count);
+    outliers = 0;
+    outlier_count = 0;
+    assert(rg_find_cognate_outliers(ctx, cognates, 2, model, &options, 1, 1, &outliers, &outlier_count) == RG_OK);
+    assert(outlier_count == 1);
+    rg_cognate_outlier_rows_free(outliers, outlier_count);
+    outliers = 0;
+    outlier_count = 0;
+    rg_multi_model_free(model);
+    model = 0;
+
+    invalid_forms[0].lect_id = "A";
+    invalid_forms[0].form = form("A", a1, 2);
+    invalid.cognate_id = "bad";
+    invalid.forms = invalid_forms;
+    invalid.form_count = 1;
+    invalid.confidence = 1.0;
+    /* A one-form set is legitimate while the corpus only knows one lect: there
+     * is nothing to reconcile it against. It becomes a structural error as soon
+     * as a second lect appears, which the two-set corpus below checks. */
+    assert(rg_train_model(ctx, &invalid, 1, &options, &model) == RG_OK);
+    assert(rg_multi_model_lect_count(model) == 1);
+    assert(rg_multi_model_unconditioned_class_count(model) == 0);
+    rg_multi_model_free(model);
+    model = 0;
+    {
+        rg_cognate_form paired_forms[2];
+        rg_cognate_set mixed[2];
+        paired_forms[0].lect_id = "A";
+        paired_forms[0].form = form("A", a1, 2);
+        paired_forms[1].lect_id = "B";
+        paired_forms[1].form = form("B", a1, 2);
+        mixed[0].cognate_id = "ok";
+        mixed[0].forms = paired_forms;
+        mixed[0].form_count = 2;
+        mixed[0].confidence = 1.0;
+        mixed[1] = invalid;
+        assert(rg_train_model(ctx, mixed, 2, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    }
+    invalid.form_count = 2;
+    invalid.forms = 0;
+    assert(rg_train_model(ctx, &invalid, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    invalid.forms = invalid_forms;
+    invalid.form_count = 1;
+    invalid.confidence = 1.5;
+    assert(rg_train_model(ctx, &invalid, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_train_model(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_train_model(0, cognates, 2, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_multi_model_lect_count(0) == 0);
+    assert(rg_multi_model_pair_model_count(0) == 0);
+    assert(rg_multi_model_unconditioned_class_count(0) == 0);
+    assert(rg_multi_model_conditioned_class_count(0) == 0);
+    assert(rg_multi_model_cross_dimensional_row_count(0) == 0);
+    assert(rg_find_cognate_outliers(ctx, cognates, 2, 0, &options, 0, 0, &outliers, &outlier_count) == RG_ERR_INVALID_ARGUMENT);
+    rg_cognate_outlier_rows_free(0, 0);
+    rg_multi_model_free(0);
+
+    rg_context_free(ctx);
+    return 0;
+}

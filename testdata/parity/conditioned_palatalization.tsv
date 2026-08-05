@@ -1,0 +1,25 @@
+cognate_id	lect_id	segments	confidence
+p1	old	k i t a	1.0
+p1	new	s i t a	1.0
+p2	old	k e t a	1.0
+p2	new	s e t a	1.0
+p3	old	k i m a	1.0
+p3	new	s i m a	1.0
+p4	old	k e m a	1.0
+p4	new	s e m a	1.0
+p5	old	k a t a	1.0
+p5	new	k a t a	1.0
+p6	old	k o t a	1.0
+p6	new	k o t a	1.0
+p7	old	k a m a	1.0
+p7	new	k a m a	1.0
+p8	old	k u m a	1.0
+p8	new	k u m a	1.0
+p9	old	k i n a	1.0
+p9	new	s i n a	1.0
+p10	old	k a n a	1.0
+p10	new	k a n a	1.0
+p11	old	k e n a	1.0
+p11	new	s e n a	1.0
+p12	old	k o n a	1.0
+p12	new	k o n a	1.0

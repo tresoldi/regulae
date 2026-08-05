@@ -1,0 +1,193 @@
+cognate_id	lect_id	segments	confidence
+one-000	ppn	t a h i	1.0
+one-000	hawaiian	k a h i	1.0
+two-001	ppn	r u a	1.0
+two-001	hawaiian	l u a	1.0
+three-002	ppn	t o r u	1.0
+three-002	hawaiian	k o l u	1.0
+four-003	ppn	f a a	1.0
+four-003	hawaiian	h a a	1.0
+five-004	ppn	l i m a	1.0
+five-004	hawaiian	l i m a	1.0
+six-005	ppn	o n o	1.0
+six-005	hawaiian	o n o	1.0
+seven-006	ppn	f i t u	1.0
+seven-006	hawaiian	h i k u	1.0
+eight-007	ppn	w a l u	1.0
+eight-007	hawaiian	w a l u	1.0
+nine-008	ppn	i w a	1.0
+nine-008	hawaiian	i w a	1.0
+ten-009	ppn	f u l u	1.0
+ten-009	hawaiian	h u l u	1.0
+hundred-010	ppn	l a u	1.0
+hundred-010	hawaiian	l a u	1.0
+person-011	ppn	t a ŋ a t a	1.0
+person-011	hawaiian	k a n a k a	1.0
+man-012	ppn	t a a n e	1.0
+man-012	hawaiian	k a a n e	1.0
+woman-013	ppn	f a f i n e	1.0
+woman-013	hawaiian	w a h i n e	1.0
+child-014	ppn	t a m a	1.0
+child-014	hawaiian	k a m a	1.0
+chief-015	ppn	a r i k i	1.0
+chief-015	hawaiian	a l i ʔ i	1.0
+eye-016	ppn	m a t a	1.0
+eye-016	hawaiian	m a k a	1.0
+ear-017	ppn	t a l i n g a	1.0
+ear-017	hawaiian	k a l i n a	1.0
+nose-018	ppn	i h u	1.0
+nose-018	hawaiian	i h u	1.0
+mouth-019	ppn	ŋ u t u	1.0
+mouth-019	hawaiian	n u k u	1.0
+tongue-020	ppn	a l e l o	1.0
+tongue-020	hawaiian	a l e l o	1.0
+tooth-021	ppn	n i f o	1.0
+tooth-021	hawaiian	n i h o	1.0
+hand-022	ppn	r i m a	1.0
+hand-022	hawaiian	l i m a	1.0
+foot-023	ppn	w a ʔ e	1.0
+foot-023	hawaiian	w a ʔ e	1.0
+heart-024	ppn	l o t o	1.0
+heart-024	hawaiian	l o k o	1.0
+blood-025	ppn	t o t o	1.0
+blood-025	hawaiian	k o k o	1.0
+bone-026	ppn	i w i	1.0
+bone-026	hawaiian	i w i	1.0
+skin-027	ppn	k i l i	1.0
+skin-027	hawaiian	ʔ i l i	1.0
+hair-028	ppn	f u l u u	1.0
+hair-028	hawaiian	h u l u	1.0
+name-029	ppn	i ŋ o a	1.0
+name-029	hawaiian	i n o a	1.0
+water-030	ppn	w a i	1.0
+water-030	hawaiian	w a i	1.0
+sea-031	ppn	t a i	1.0
+sea-031	hawaiian	k a i	1.0
+sky-032	ppn	l a ŋ i	1.0
+sky-032	hawaiian	l a n i	1.0
+cloud-033	ppn	a o	1.0
+cloud-033	hawaiian	a o	1.0
+sun-034	ppn	l a ʔ a a	1.0
+sun-034	hawaiian	l a a	1.0
+moon-035	ppn	m a a r a m a	1.0
+moon-035	hawaiian	m a l a m a	1.0
+star-036	ppn	f e t u ʔ u	1.0
+star-036	hawaiian	h o k u u	1.0
+fire-037	ppn	a f i	1.0
+fire-037	hawaiian	a h i	1.0
+stone-038	ppn	f a t u	1.0
+stone-038	hawaiian	h a k u	1.0
+earth-039	ppn	f a n u a	1.0
+earth-039	hawaiian	h o n u a	1.0
+road-040	ppn	a l a	1.0
+road-040	hawaiian	a l a	1.0
+house-041	ppn	f a r e	1.0
+house-041	hawaiian	h a l e	1.0
+canoe-042	ppn	w a k a	1.0
+canoe-042	hawaiian	w a ʔ a	1.0
+reef-043	ppn	a k a u	1.0
+reef-043	hawaiian	a ʔ a u	1.0
+taro-044	ppn	t a l o	1.0
+taro-044	hawaiian	k a l o	1.0
+coconut-045	ppn	n i u	1.0
+coconut-045	hawaiian	n i u	1.0
+bird-046	ppn	m a n u	1.0
+bird-046	hawaiian	m a n u	1.0
+chicken-047	ppn	m o a	1.0
+chicken-047	hawaiian	m o a	1.0
+fish-048	ppn	i k a	1.0
+fish-048	hawaiian	i ʔ a	1.0
+dog-049	ppn	k u l i i	1.0
+dog-049	hawaiian	ʔ i l i ʔ	1.0
+pig-050	ppn	p u a k a	1.0
+pig-050	hawaiian	p u a ʔ a	1.0
+rat-051	ppn	k i o r e	1.0
+rat-051	hawaiian	ʔ i o l e	1.0
+snake-052	ppn	ŋ a t a	1.0
+snake-052	hawaiian	n a k a	1.0
+tree-053	ppn	l a k a u	1.0
+tree-053	hawaiian	l a a u	1.0
+leaf-054	ppn	l a u	1.0
+leaf-054	hawaiian	l a u	1.0
+root-055	ppn	a k a	1.0
+root-055	hawaiian	a ʔ a	1.0
+fruit-056	ppn	f u a	1.0
+fruit-056	hawaiian	h u a	1.0
+flower-057	ppn	p u a	1.0
+flower-057	hawaiian	p u a	1.0
+wood-058	ppn	r a k a u	1.0
+wood-058	hawaiian	l a a u	1.0
+leaf2-059	ppn	r a u	1.0
+leaf2-059	hawaiian	l a u	1.0
+big-060	ppn	n u i	1.0
+big-060	hawaiian	n u i	1.0
+small-061	ppn	r i k i	1.0
+small-061	hawaiian	l i ʔ i	1.0
+good-062	ppn	l e l e i	1.0
+good-062	hawaiian	l e l e i	1.0
+bad-063	ppn	k i n o	1.0
+bad-063	hawaiian	ʔ i n o	1.0
+new-064	ppn	f o ʔ o u	1.0
+new-064	hawaiian	h o ʔ u	1.0
+old-065	ppn	m a t u ʔ a	1.0
+old-065	hawaiian	m a k u ʔ a	1.0
+long-066	ppn	l o a	1.0
+long-066	hawaiian	l o a	1.0
+cold-067	ppn	m a k a r i r i	1.0
+cold-067	hawaiian	m a k a n i a n i	1.0
+hot-068	ppn	w e r a	1.0
+hot-068	hawaiian	w e l a	1.0
+red-069	ppn	k u r a	1.0
+red-069	hawaiian	ʔ u l a	1.0
+white-070	ppn	t e a	1.0
+white-070	hawaiian	k e a	1.0
+black-071	ppn	ʔ u l i	1.0
+black-071	hawaiian	ʔ e l e ʔ e l e	1.0
+go-072	ppn	f a n o	1.0
+go-072	hawaiian	h a n a	1.0
+come-073	ppn	s a u	1.0
+come-073	hawaiian	h a u	1.0
+sleep-074	ppn	m o e	1.0
+sleep-074	hawaiian	m o e	1.0
+eat-075	ppn	k a i	1.0
+eat-075	hawaiian	ʔ a i	1.0
+drink-076	ppn	i n u	1.0
+drink-076	hawaiian	i n u	1.0
+see-077	ppn	k i t e	1.0
+see-077	hawaiian	ʔ i k e	1.0
+hear-078	ppn	f a k a r o n g o	1.0
+hear-078	hawaiian	h o ʔ o l o n o	1.0
+know-079	ppn	i l o a	1.0
+know-079	hawaiian	i k e	1.0
+say-080	ppn	t a l a	1.0
+say-080	hawaiian	k a a	1.0
+work-081	ppn	ŋ a u e	1.0
+work-081	hawaiian	h a n a	1.0
+die-082	ppn	m a t e	1.0
+die-082	hawaiian	m a k e	1.0
+live-083	ppn	m o ʔ u i	1.0
+live-083	hawaiian	m o ʔ u i	1.0
+rain-084	ppn	u a	1.0
+rain-084	hawaiian	u a	1.0
+wind-085	ppn	m a t a n g i	1.0
+wind-085	hawaiian	m a k a n i	1.0
+word-086	ppn	t a l a	1.0
+word-086	hawaiian	k a l a	1.0
+year-087	ppn	t a u	1.0
+year-087	hawaiian	m a k a h i k i	1.0
+moon-month-088	ppn	m a l a m a	1.0
+moon-month-088	hawaiian	m a l a m a	1.0
+yes-089	ppn	ʔ a e	1.0
+yes-089	hawaiian	ʔ a e	1.0
+count-090	ppn	t a t a u	1.0
+count-090	hawaiian	k a u	1.0
+fly-091	ppn	l e l e	1.0
+fly-091	hawaiian	l e l e	1.0
+sit-092	ppn	n o h o	1.0
+sit-092	hawaiian	n o h o	1.0
+stand-093	ppn	t u ʔ u	1.0
+stand-093	hawaiian	k u u	1.0
+path-094	ppn	a l a	1.0
+path-094	hawaiian	a l a	1.0
+thousand-095	ppn	m a n o	1.0
+thousand-095	hawaiian	m a n o	1.0

@@ -1,0 +1,19 @@
+cognate_id	lect_id	segments	confidence
+q1	a	p a t a	1.0
+q1	b	f a t a	1.0
+q2	a	p i t i	1.0
+q2	c	p i s i	1.0
+q3	b	f u t u	1.0
+q3	c	p u s u	1.0
+q4	a	p a k a	1.0
+q4	b	f a k a	1.0
+q4	c	p a k a	1.0
+q5	a	t a p a	0.5
+q5	b	t a f a	0.5
+q5	c	s a p a	0.5
+q6	a	k a t a	1.0
+q6	b	k a t a	1.0
+q7	a	m a t a	0.0
+q7	b	m a t a	0.0
+q8	a	n a p a	1.0
+q8	c	n a p a	1.0

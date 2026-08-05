@@ -19,22 +19,6 @@ struct rg_alignment {
     size_t link_count;
 };
 
-static const char *const context_feature_names[] = {
-    "back",
-    "close",
-    "consonant",
-    "fricative",
-    "front",
-    "long",
-    "nasal",
-    "open",
-    "sonorant",
-    "stop",
-    "voiced",
-    "voiceless",
-    "vowel"
-};
-
 static void form_clear(rg_form *form) {
     size_t i;
     if (form == 0) {
@@ -140,48 +124,20 @@ static rg_status context_features_for_segment(
     const rg_feature_constraint **out,
     size_t *out_count
 ) {
-    rg_feature_set *features = 0;
-    rg_feature_constraint constraints[sizeof(context_feature_names) / sizeof(context_feature_names[0])];
-    size_t i;
-    size_t count = 0;
-    rg_status status;
     if (ctx == 0 || segment == 0 || segment->grapheme == 0 || out == 0 || out_count == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
-    *out = 0;
-    *out_count = 0;
-    status = rg_context_grapheme_features(ctx, segment->grapheme, &features);
-    if (status != RG_OK) {
-        return status;
-    }
-    for (i = 0; i < sizeof(context_feature_names) / sizeof(context_feature_names[0]); i++) {
-        if (feature_set_contains(features, context_feature_names[i])) {
-            constraints[count].feature = context_feature_names[i];
-            constraints[count].value = "+";
-            count++;
-        }
-    }
-    rg_feature_set_free(features);
-    status = rg_feature_constraint_array_copy_internal(constraints, count, out);
-    if (status != RG_OK) {
-        return status;
-    }
-    *out_count = count;
-    return RG_OK;
+    return rg_context_constraints_internal(ctx, segment->grapheme, out, out_count);
 }
 
+/* The rows are borrowed from the context's per-grapheme cache; only the index
+ * arrays belong to the matrix. */
 static void feature_matrix_clear(
     const rg_feature_constraint **features,
     const size_t *feature_counts,
     size_t count
 ) {
-    size_t i;
-    if (features == 0) {
-        return;
-    }
-    for (i = 0; i < count; i++) {
-        rg_feature_constraint_array_clear_internal(features[i], feature_counts == 0 ? 0 : feature_counts[i]);
-    }
+    (void)count;
     free(features);
     free((size_t *)feature_counts);
 }
@@ -330,15 +286,20 @@ static int constraint_array_has(const rg_feature_constraint *items, size_t count
     return 0;
 }
 
-static rg_status context_feature_union_copy(
+/* Union of the context features over [start, end), optionally skipping one
+ * index. Feature names are emitted in the fixed alphabetical order of
+ * context_feature_names, which is what the Go reference produces by sorting. */
+static rg_status context_feature_union_copy_excluding(
     const rg_feature_constraint *const *source_features,
     const size_t *source_feature_counts,
     size_t start,
     size_t end,
+    size_t exclude,
+    int has_exclude,
     const rg_feature_constraint **out,
     size_t *out_count
 ) {
-    rg_feature_constraint constraints[sizeof(context_feature_names) / sizeof(context_feature_names[0])];
+    rg_feature_constraint constraints[rg_context_feature_name_count];
     size_t i;
     size_t f;
     size_t count = 0;
@@ -347,13 +308,16 @@ static rg_status context_feature_union_copy(
     }
     *out = 0;
     *out_count = 0;
-    for (f = 0; f < sizeof(context_feature_names) / sizeof(context_feature_names[0]); f++) {
+    for (f = 0; f < rg_context_feature_name_count; f++) {
         int found = 0;
         for (i = start; i < end && !found; i++) {
-            found = constraint_array_has(source_features[i], source_feature_counts[i], context_feature_names[f], "+");
+            if (has_exclude && i == exclude) {
+                continue;
+            }
+            found = constraint_array_has(source_features[i], source_feature_counts[i], rg_context_feature_names[f], "+");
         }
         if (found) {
-            constraints[count].feature = context_feature_names[f];
+            constraints[count].feature = rg_context_feature_names[f];
             constraints[count].value = "+";
             count++;
         }
@@ -371,10 +335,233 @@ static rg_status context_feature_union_copy(
     return RG_OK;
 }
 
+static rg_status context_feature_union_copy(
+    const rg_feature_constraint *const *source_features,
+    const size_t *source_feature_counts,
+    size_t start,
+    size_t end,
+    const rg_feature_constraint **out,
+    size_t *out_count
+) {
+    return context_feature_union_copy_excluding(
+        source_features,
+        source_feature_counts,
+        start,
+        end,
+        0,
+        0,
+        out,
+        out_count
+    );
+}
+
+/* syllable_data holds the syllable-structural arrays a form's link contexts
+ * need: which syllable each segment belongs to, the feature union of each
+ * syllable, and the feature union of each segment's own syllable excluding
+ * itself. Built once per alignment, mirroring Go's computeLongRangeData. */
+typedef struct syllable_data {
+    size_t segment_count;
+    size_t syllable_count;
+    size_t *syllable_of;
+    const rg_feature_constraint **syllable_features;
+    size_t *syllable_feature_counts;
+    const rg_feature_constraint **same_syllable_excluding;
+    size_t *same_syllable_excluding_counts;
+    /* Cumulative feature unions over [0, i) and [i, n), so the existential
+     * slots of a link context are a lookup rather than a rescan. Recomputing
+     * them per DP cell dominated training time. */
+    const rg_feature_constraint **left_cumulative;
+    size_t *left_cumulative_counts;
+    const rg_feature_constraint **right_cumulative;
+    size_t *right_cumulative_counts;
+} syllable_data;
+
+static void syllable_data_clear(syllable_data *data) {
+    size_t i;
+    if (data == 0) {
+        return;
+    }
+    if (data->syllable_features != 0) {
+        for (i = 0; i < data->syllable_count; i++) {
+            rg_feature_constraint_array_clear_internal(
+                data->syllable_features[i],
+                data->syllable_feature_counts == 0 ? 0 : data->syllable_feature_counts[i]
+            );
+        }
+    }
+    if (data->same_syllable_excluding != 0) {
+        for (i = 0; i < data->segment_count; i++) {
+            rg_feature_constraint_array_clear_internal(
+                data->same_syllable_excluding[i],
+                data->same_syllable_excluding_counts == 0 ? 0 : data->same_syllable_excluding_counts[i]
+            );
+        }
+    }
+    if (data->left_cumulative != 0) {
+        for (i = 0; i <= data->segment_count; i++) {
+            rg_feature_constraint_array_clear_internal(
+                data->left_cumulative[i],
+                data->left_cumulative_counts == 0 ? 0 : data->left_cumulative_counts[i]
+            );
+        }
+    }
+    if (data->right_cumulative != 0) {
+        for (i = 0; i <= data->segment_count; i++) {
+            rg_feature_constraint_array_clear_internal(
+                data->right_cumulative[i],
+                data->right_cumulative_counts == 0 ? 0 : data->right_cumulative_counts[i]
+            );
+        }
+    }
+    free(data->syllable_of);
+    free(data->syllable_features);
+    free(data->syllable_feature_counts);
+    free(data->same_syllable_excluding);
+    free(data->same_syllable_excluding_counts);
+    free(data->left_cumulative);
+    free(data->left_cumulative_counts);
+    free(data->right_cumulative);
+    free(data->right_cumulative_counts);
+    memset(data, 0, sizeof(*data));
+}
+
+static rg_status syllable_data_build(
+    const rg_context *ctx,
+    const rg_form *form,
+    const rg_feature_constraint *const *source_features,
+    const size_t *source_feature_counts,
+    syllable_data *out
+) {
+    size_t *breaks = 0;
+    size_t break_count = 0;
+    size_t *starts = 0;
+    size_t syllable_count;
+    size_t n;
+    size_t i;
+    size_t s;
+    rg_status status;
+
+    if (out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    memset(out, 0, sizeof(*out));
+    if (form == 0 || form->segment_count == 0) {
+        return RG_OK;
+    }
+    n = form->segment_count;
+
+    status = rg_compute_syllable_breaks_internal(ctx, form, &breaks, &break_count);
+    if (status != RG_OK) {
+        return status;
+    }
+
+    starts = (size_t *)calloc(break_count + 2, sizeof(*starts));
+    if (starts == 0) {
+        free(breaks);
+        return RG_ERR_OOM;
+    }
+    starts[0] = 0;
+    for (i = 0; i < break_count; i++) {
+        starts[i + 1] = breaks[i] > n ? n : breaks[i];
+    }
+    starts[break_count + 1] = n;
+    free(breaks);
+    syllable_count = break_count + 1;
+
+    out->segment_count = n;
+    out->syllable_count = syllable_count;
+    out->syllable_of = (size_t *)calloc(n, sizeof(*out->syllable_of));
+    out->syllable_features = (const rg_feature_constraint **)calloc(syllable_count, sizeof(*out->syllable_features));
+    out->syllable_feature_counts = (size_t *)calloc(syllable_count, sizeof(*out->syllable_feature_counts));
+    out->same_syllable_excluding = (const rg_feature_constraint **)calloc(n, sizeof(*out->same_syllable_excluding));
+    out->same_syllable_excluding_counts = (size_t *)calloc(n, sizeof(*out->same_syllable_excluding_counts));
+    if (out->syllable_of == 0 || out->syllable_features == 0 || out->syllable_feature_counts == 0 ||
+        out->same_syllable_excluding == 0 || out->same_syllable_excluding_counts == 0) {
+        free(starts);
+        syllable_data_clear(out);
+        return RG_ERR_OOM;
+    }
+
+    s = 0;
+    for (i = 0; i < n; i++) {
+        while (s + 1 < syllable_count && i >= starts[s + 1]) {
+            s++;
+        }
+        out->syllable_of[i] = s;
+    }
+
+    for (s = 0; s < syllable_count; s++) {
+        status = context_feature_union_copy(
+            source_features,
+            source_feature_counts,
+            starts[s],
+            starts[s + 1],
+            &out->syllable_features[s],
+            &out->syllable_feature_counts[s]
+        );
+        if (status != RG_OK) {
+            free(starts);
+            syllable_data_clear(out);
+            return status;
+        }
+    }
+
+    for (i = 0; i < n; i++) {
+        size_t idx = out->syllable_of[i];
+        status = context_feature_union_copy_excluding(
+            source_features,
+            source_feature_counts,
+            starts[idx],
+            starts[idx + 1],
+            i,
+            1,
+            &out->same_syllable_excluding[i],
+            &out->same_syllable_excluding_counts[i]
+        );
+        if (status != RG_OK) {
+            free(starts);
+            syllable_data_clear(out);
+            return status;
+        }
+    }
+
+    out->left_cumulative = (const rg_feature_constraint **)calloc(n + 1, sizeof(*out->left_cumulative));
+    out->left_cumulative_counts = (size_t *)calloc(n + 1, sizeof(*out->left_cumulative_counts));
+    out->right_cumulative = (const rg_feature_constraint **)calloc(n + 1, sizeof(*out->right_cumulative));
+    out->right_cumulative_counts = (size_t *)calloc(n + 1, sizeof(*out->right_cumulative_counts));
+    if (out->left_cumulative == 0 || out->left_cumulative_counts == 0 ||
+        out->right_cumulative == 0 || out->right_cumulative_counts == 0) {
+        free(starts);
+        syllable_data_clear(out);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i <= n; i++) {
+        status = context_feature_union_copy(
+            source_features, source_feature_counts, 0, i,
+            &out->left_cumulative[i], &out->left_cumulative_counts[i]
+        );
+        if (status == RG_OK) {
+            status = context_feature_union_copy(
+                source_features, source_feature_counts, i, n,
+                &out->right_cumulative[i], &out->right_cumulative_counts[i]
+            );
+        }
+        if (status != RG_OK) {
+            free(starts);
+            syllable_data_clear(out);
+            return status;
+        }
+    }
+
+    free(starts);
+    return RG_OK;
+}
+
 static rg_status build_link_context(
     const rg_form *source,
     const rg_feature_constraint *const *source_features,
     const size_t *source_feature_counts,
+    const syllable_data *syllables,
     size_t source_start,
     size_t source_count,
     size_t target_count,
@@ -473,29 +660,86 @@ static rg_status build_link_context(
             return status;
         }
     }
-    status = context_feature_union_copy(
-        source_features,
-        source_feature_counts,
-        0,
-        source_start,
-        &out->somewhere_preceding,
-        &out->somewhere_preceding_count
-    );
+    if (syllables != 0 && syllables->left_cumulative != 0 && source_start <= syllables->segment_count) {
+        status = context_copy_constraints(
+            syllables->left_cumulative[source_start],
+            syllables->left_cumulative_counts[source_start],
+            &out->somewhere_preceding,
+            &out->somewhere_preceding_count
+        );
+    } else {
+        status = context_feature_union_copy(
+            source_features,
+            source_feature_counts,
+            0,
+            source_start,
+            &out->somewhere_preceding,
+            &out->somewhere_preceding_count
+        );
+    }
     if (status != RG_OK) {
         rg_context_spec_clear_internal(out);
         return status;
     }
-    status = context_feature_union_copy(
-        source_features,
-        source_feature_counts,
-        source_end,
-        source->segment_count,
-        &out->somewhere_following,
-        &out->somewhere_following_count
-    );
+    if (syllables != 0 && syllables->right_cumulative != 0 && source_end <= syllables->segment_count) {
+        status = context_copy_constraints(
+            syllables->right_cumulative[source_end],
+            syllables->right_cumulative_counts[source_end],
+            &out->somewhere_following,
+            &out->somewhere_following_count
+        );
+    } else {
+        status = context_feature_union_copy(
+            source_features,
+            source_feature_counts,
+            source_end,
+            source->segment_count,
+            &out->somewhere_following,
+            &out->somewhere_following_count
+        );
+    }
     if (status != RG_OK) {
         rg_context_spec_clear_internal(out);
         return status;
+    }
+    /* Syllable-structural slots mirror the DP: only 1-to-1 links carry them. */
+    if (source_count == 1 && target_count == 1 && syllables != 0 && syllables->segment_count > 0 &&
+        source_start < syllables->segment_count) {
+        size_t syllable_index = syllables->syllable_of[source_start];
+        status = context_copy_constraints(
+            syllables->same_syllable_excluding[source_start],
+            syllables->same_syllable_excluding_counts[source_start],
+            &out->same_syllable,
+            &out->same_syllable_count
+        );
+        if (status != RG_OK) {
+            rg_context_spec_clear_internal(out);
+            return status;
+        }
+        if (syllable_index + 1 < syllables->syllable_count) {
+            status = context_copy_constraints(
+                syllables->syllable_features[syllable_index + 1],
+                syllables->syllable_feature_counts[syllable_index + 1],
+                &out->next_syllable,
+                &out->next_syllable_count
+            );
+            if (status != RG_OK) {
+                rg_context_spec_clear_internal(out);
+                return status;
+            }
+        }
+        if (syllable_index > 0) {
+            status = context_copy_constraints(
+                syllables->syllable_features[syllable_index - 1],
+                syllables->syllable_feature_counts[syllable_index - 1],
+                &out->previous_syllable,
+                &out->previous_syllable_count
+            );
+            if (status != RG_OK) {
+                rg_context_spec_clear_internal(out);
+                return status;
+            }
+        }
     }
     if (source_count == 1 && target_count == 1) {
         status = context_copy_stress(source->segments[source_start].stress, &out->self_stress, &out->self_stress_count);
@@ -521,6 +765,70 @@ static rg_status build_link_context(
     return RG_OK;
 }
 
+void rg_context_spec_array_free_internal(rg_context_spec *contexts, size_t count) {
+    size_t i;
+    if (contexts == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        rg_context_spec_clear_internal(&contexts[i]);
+    }
+    free(contexts);
+}
+
+rg_status rg_form_position_contexts_internal(
+    const rg_context *ctx,
+    const rg_form *form,
+    rg_context_spec **out,
+    size_t *out_count
+) {
+    const rg_feature_constraint **features = 0;
+    size_t *feature_counts = 0;
+    syllable_data syllables;
+    rg_context_spec *contexts = 0;
+    size_t i;
+    rg_status status;
+
+    if (ctx == 0 || form == 0 || out == 0 || out_count == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    *out_count = 0;
+    if (form->segment_count == 0) {
+        return RG_OK;
+    }
+    memset(&syllables, 0, sizeof(syllables));
+    status = feature_matrix_build(ctx, form, &features, &feature_counts);
+    if (status != RG_OK) {
+        return status;
+    }
+    status = syllable_data_build(ctx, form, features, feature_counts, &syllables);
+    if (status != RG_OK) {
+        feature_matrix_clear(features, feature_counts, form->segment_count);
+        return status;
+    }
+    contexts = (rg_context_spec *)calloc(form->segment_count, sizeof(*contexts));
+    if (contexts == 0) {
+        feature_matrix_clear(features, feature_counts, form->segment_count);
+        syllable_data_clear(&syllables);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < form->segment_count; i++) {
+        status = build_link_context(form, features, feature_counts, &syllables, i, 1, 1, &contexts[i]);
+        if (status != RG_OK) {
+            rg_context_spec_array_free_internal(contexts, i);
+            feature_matrix_clear(features, feature_counts, form->segment_count);
+            syllable_data_clear(&syllables);
+            return status;
+        }
+    }
+    feature_matrix_clear(features, feature_counts, form->segment_count);
+    syllable_data_clear(&syllables);
+    *out = contexts;
+    *out_count = form->segment_count;
+    return RG_OK;
+}
+
 static rg_status link_from_slice(
     const rg_context *ctx,
     const rg_form *source,
@@ -531,6 +839,7 @@ static rg_status link_from_slice(
     size_t target_count,
     const rg_feature_constraint *const *source_features,
     const size_t *source_feature_counts,
+    const syllable_data *syllables,
     rg_link *out
 ) {
     rg_status status;
@@ -550,6 +859,7 @@ static rg_status link_from_slice(
             source,
             source_features,
             source_feature_counts,
+            syllables,
             source_start,
             source_count,
             target_count,
@@ -594,6 +904,7 @@ static rg_status align_forms_internal(
     rg_link *rev_links = 0;
     const rg_feature_constraint **source_features = 0;
     size_t *source_feature_counts = 0;
+    syllable_data syllables;
     size_t rev_count = 0;
     size_t rev_cap = 0;
     rg_status status = RG_OK;
@@ -610,9 +921,16 @@ static rg_status align_forms_internal(
     }
     n = source->segment_count;
     m = target->segment_count;
+    memset(&syllables, 0, sizeof(syllables));
     if (model != 0) {
         status = feature_matrix_build(ctx, source, &source_features, &source_feature_counts);
         if (status != RG_OK) {
+            return status;
+        }
+        status = syllable_data_build(ctx, source, source_features, source_feature_counts, &syllables);
+        if (status != RG_OK) {
+            feature_matrix_clear(source_features, source_feature_counts, n);
+            syllable_data_clear(&syllables);
             return status;
         }
     }
@@ -621,6 +939,7 @@ static rg_status align_forms_internal(
     back = (rg_dp_step *)calloc((n + 1) * (m + 1), sizeof(*back));
     if (cost == 0 || back == 0) {
         feature_matrix_clear(source_features, source_feature_counts, n);
+        syllable_data_clear(&syllables);
         free(cost);
         free(back);
         return RG_ERR_OOM;
@@ -661,6 +980,7 @@ static rg_status align_forms_internal(
                             source,
                             source_features,
                             source_feature_counts,
+                            &syllables,
                             i - k,
                             k,
                             l,
@@ -701,6 +1021,7 @@ static rg_status align_forms_internal(
     }
     if (status != RG_OK) {
         feature_matrix_clear(source_features, source_feature_counts, n);
+        syllable_data_clear(&syllables);
         free(cost);
         free(back);
         return status;
@@ -710,6 +1031,7 @@ static rg_status align_forms_internal(
         free(cost);
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
+        syllable_data_clear(&syllables);
         return RG_ERR_OOM;
     }
     status = form_copy(source, &alignment->source_form);
@@ -721,6 +1043,7 @@ static rg_status align_forms_internal(
         free(cost);
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
+        syllable_data_clear(&syllables);
         return status;
     }
     i = n;
@@ -753,6 +1076,7 @@ static rg_status align_forms_internal(
             step.target_count,
             source_features,
             source_feature_counts,
+            &syllables,
             &link
         );
         if (status != RG_OK) {
@@ -783,12 +1107,14 @@ static rg_status align_forms_internal(
         free(cost);
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
+        syllable_data_clear(&syllables);
         return status;
     }
     free(rev_links);
     free(cost);
     free(back);
     feature_matrix_clear(source_features, source_feature_counts, n);
+    syllable_data_clear(&syllables);
     *out = alignment;
     return RG_OK;
 }
@@ -867,9 +1193,8 @@ static int cross_dimensional_source_holds(
 ) {
     int offset;
     int index;
-    rg_feature_set *features = 0;
+    const rg_feature_set *features = 0;
     rg_status status;
-    int found = 0;
     if (ctx == 0 || form == 0 || row == 0 || row->source_feature == 0) {
         return 0;
     }
@@ -885,13 +1210,11 @@ static int cross_dimensional_source_holds(
     if (form->segments[index].grapheme == 0) {
         return 0;
     }
-    status = rg_context_grapheme_features(ctx, form->segments[index].grapheme, &features);
+    status = rg_context_features_internal(ctx, form->segments[index].grapheme, &features);
     if (status != RG_OK) {
         return 0;
     }
-    found = feature_set_contains(features, row->source_feature);
-    rg_feature_set_free(features);
-    return found;
+    return feature_set_contains(features, row->source_feature);
 }
 
 static double cross_dimensional_adjustment_for_row(

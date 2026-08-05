@@ -89,7 +89,7 @@ int main(void) {
     rg_form_pair tone_pairs[1];
     rg_form_pair cross_dim_pairs[6];
     rg_form_pair conditioned_pairs[6];
-    rg_form_pair long_range_pairs[6];
+    rg_form_pair long_range_pairs[16];
     rg_form_pair chunk_pairs[20];
     rg_form_pair boundary_chunk_pairs[20];
     size_t i;
@@ -138,14 +138,18 @@ int main(void) {
     }
     assert(found_pf);
     assert(found_aa);
-    assert(rg_pairwise_model_displacement_count_row_count(model) > 0);
-    for (i = 0; i < rg_pairwise_model_displacement_count_row_count(model); i++) {
-        const rg_displacement_count_row *row = rg_pairwise_model_displacement_count_row_at(model, i);
+    assert(rg_pairwise_model_displacement_row_count(model) > 0);
+    for (i = 0; i < rg_pairwise_model_displacement_row_count(model); i++) {
+        const rg_displacement_row *row = rg_pairwise_model_displacement_row_at(model, i);
+        size_t d;
         assert(row != 0);
         assert(row->count > 0.0);
         assert(row->total >= row->count);
-        if (strcmp(row->from_value, "present") == 0 || strcmp(row->to_value, "present") == 0) {
-            found_disp = 1;
+        for (d = 0; d < row->item_count; d++) {
+            if (strcmp(row->items[d].from_value, "present") == 0 ||
+                strcmp(row->items[d].to_value, "present") == 0) {
+                found_disp = 1;
+            }
         }
     }
     assert(found_disp);
@@ -200,7 +204,7 @@ int main(void) {
     assert(strcmp(rg_alignment_link_at(learned_alignment, 4)->context.position, "final") == 0);
     rg_alignment_free(learned_alignment);
     learned_alignment = 0;
-    assert(rg_pairwise_model_displacement_count_row_at(model, 1000000) == 0);
+    assert(rg_pairwise_model_displacement_row_at(model, 1000000) == 0);
     assert(rg_pairwise_model_tonal_count_row_count(model) == 0);
     assert(rg_pairwise_model_tonal_count_row_at(model, 0) == 0);
     assert(rg_pairwise_model_segment_count_row_at(model, 1000000) == 0);
@@ -234,24 +238,48 @@ int main(void) {
     rg_pairwise_model_free(model);
     model = 0;
 
-    for (i = 0; i < 3; i++) {
-        long_range_pairs[i].source = form("A", atp, 3);
-        long_range_pairs[i].target = form("B", atf, 3);
-        long_range_pairs[i].weight = 1.0;
-        long_range_pairs[i + 3].source = form("A", itp, 3);
-        long_range_pairs[i + 3].target = form("B", itp, 3);
-        long_range_pairs[i + 3].weight = 1.0;
+    /* Long-range discovery is a separate pass with stricter gates than the
+     * immediate one: both sides of a split need at least
+     * LongRangeMinSplitObservations mass, the BIC delta must beat -5, and the
+     * YES side must be dominated by a single outcome. The medial consonant
+     * varies so chunk promotion cannot swallow whole words and erase the
+     * one-to-one links the pass reads. */
+    {
+        static const char *const medials[8] = {"t", "k", "n", "m", "s", "l", "r", "w"};
+        static rg_segment lr_source_a[8][3];
+        static rg_segment lr_target_a[8][3];
+        static rg_segment lr_source_i[8][3];
+        static rg_segment lr_target_i[8][3];
+        for (i = 0; i < 8; i++) {
+            lr_source_a[i][0] = seg("a");
+            lr_source_a[i][1] = seg(medials[i]);
+            lr_source_a[i][2] = seg("p");
+            lr_target_a[i][0] = seg("a");
+            lr_target_a[i][1] = seg(medials[i]);
+            lr_target_a[i][2] = seg("f");
+            lr_source_i[i][0] = seg("i");
+            lr_source_i[i][1] = seg(medials[i]);
+            lr_source_i[i][2] = seg("p");
+            lr_target_i[i][0] = seg("i");
+            lr_target_i[i][1] = seg(medials[i]);
+            lr_target_i[i][2] = seg("p");
+            long_range_pairs[i].source = form("A", lr_source_a[i], 3);
+            long_range_pairs[i].target = form("B", lr_target_a[i], 3);
+            long_range_pairs[i].weight = 1.0;
+            long_range_pairs[i + 8].source = form("A", lr_source_i[i], 3);
+            long_range_pairs[i + 8].target = form("B", lr_target_i[i], 3);
+            long_range_pairs[i + 8].weight = 1.0;
+        }
     }
-    assert(rg_train_pairwise(ctx, long_range_pairs, 6, &options, &model) == RG_OK);
+    assert(rg_train_pairwise(ctx, long_range_pairs, 16, &options, &model) == RG_OK);
     for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(model); i++) {
         const rg_conditioned_segment_count_row *row = rg_pairwise_model_conditioned_segment_count_row_at(model, i);
         if (strcmp(row->source, "p") == 0 &&
             strcmp(row->target, "p") == 0 &&
-            (has_distance_constraint(row->context.preceding_at_distance, row->context.preceding_at_distance_count, 2, "close", "+") ||
-             has_constraint(row->context.somewhere_preceding, row->context.somewhere_preceding_count, "close", "+"))) {
+            has_constraint(row->context.same_syllable, row->context.same_syllable_count, "close", "+")) {
             found_long_range = 1;
-            assert(row->count == 3.0);
-            assert(row->source_total == 6.0);
+            assert(row->count == 8.0);
+            assert(row->source_total == 16.0);
         }
     }
     assert(found_long_range);

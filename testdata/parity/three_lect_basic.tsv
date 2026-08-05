@@ -1,0 +1,19 @@
+cognate_id	lect_id	segments	confidence
+c1	alpha	p a t a	1.0
+c1	beta	f a t a	1.0
+c1	gamma	p a s a	1.0
+c2	alpha	p i t i	1.0
+c2	beta	f i t i	1.0
+c2	gamma	p i s i	1.0
+c3	alpha	p a k a	1.0
+c3	beta	f a k a	1.0
+c3	gamma	p a k a	1.0
+c4	alpha	t a p a	1.0
+c4	beta	t a f a	1.0
+c4	gamma	s a p a	1.0
+c5	alpha	k a t a	1.0
+c5	beta	k a t a	1.0
+c5	gamma	k a s a	1.0
+c6	alpha	p u t u	1.0
+c6	beta	f u t u	1.0
+c6	gamma	p u s u	1.0

@@ -1,0 +1,382 @@
+cognate_id	lect_id	segments	confidence
+bad-000	latin	m a l u	1.0
+bad-000	spanish	m a l o	1.0
+bad-000	french	m a l	1.0
+bad-000	italian	m a l o	1.0
+bear-001	latin	u r s u	1.0
+bear-001	spanish	o s o	1.0
+bear-001	french	u ʁ s	1.0
+bear-001	italian	o r s o	1.0
+big-002	latin	g r a n d e	1.0
+big-002	spanish	g r a n d e	1.0
+big-002	french	ɡ ʁ ɑ̃	1.0
+big-002	italian	ɡ r a n d e	1.0
+bird-003	latin	a v i s	1.0
+bird-003	spanish	a b e	1.0
+bird-003	french	w a z o	1.0
+bird-003	italian	u k k ɛ l l o	1.0
+black-004	latin	n i g r u	1.0
+black-004	spanish	n e g r o	1.0
+black-004	french	n w a ʁ	1.0
+black-004	italian	n e r o	1.0
+blood-005	latin	s a n g u i n e	1.0
+blood-005	spanish	s a n g r e	1.0
+blood-005	french	s ɑ̃	1.0
+blood-005	italian	s a ŋ ɡ w e	1.0
+bone-006	latin	o s s u	1.0
+bone-006	spanish	w e s o	1.0
+bone-006	french	o	1.0
+bone-006	italian	ɔ s s o	1.0
+break-007	latin	f r a n g e r e	1.0
+break-007	spanish	r o m p e r	1.0
+break-007	french	k a s e	1.0
+break-007	italian	r o m p e r e	1.0
+brother-008	latin	f r a t e r	1.0
+brother-008	spanish	e r m a n o	1.0
+brother-008	french	f ʁ ɛ ʁ	1.0
+brother-008	italian	f r a t ɛ l l o	1.0
+cat-009	latin	k a t t u	1.0
+cat-009	spanish	g a t o	1.0
+cat-009	french	ʃ a	1.0
+cat-009	italian	ɡ a t t o	1.0
+cold-010	latin	f r i g i d u	1.0
+cold-010	spanish	f r i o	1.0
+cold-010	french	f ʁ w a	1.0
+cold-010	italian	f r ɛ d d o	1.0
+come-011	latin	v e n i r e	1.0
+come-011	spanish	b e n i r	1.0
+come-011	french	v ə n i ʁ	1.0
+come-011	italian	v e n i r e	1.0
+cow-012	latin	v a k k a	1.0
+cow-012	spanish	b a k a	1.0
+cow-012	french	v a ʃ	1.0
+cow-012	italian	m u k k a	1.0
+daughter-013	latin	f i l i a	1.0
+daughter-013	spanish	i x a	1.0
+daughter-013	french	f i ʝ	1.0
+daughter-013	italian	f i ʎ a	1.0
+day-014	latin	d j e	1.0
+day-014	spanish	d i a	1.0
+day-014	french	ʒ u ʁ	1.0
+day-014	italian	d ʒ o r n o	1.0
+die-015	latin	m o r i	1.0
+die-015	spanish	m o r i r	1.0
+die-015	french	m u ʁ i ʁ	1.0
+die-015	italian	m o r i r e	1.0
+dog-016	latin	k a n e	1.0
+dog-016	spanish	p e r r o	1.0
+dog-016	french	ʃ j ɛ̃	1.0
+dog-016	italian	k a n e	1.0
+drink-017	latin	b i b e r e	1.0
+drink-017	spanish	b e b e r	1.0
+drink-017	french	b w a ʁ	1.0
+drink-017	italian	b e r e	1.0
+ear-018	latin	a u r i s	1.0
+ear-018	spanish	o r e ʎ a	1.0
+ear-018	french	ɔ ʁ ɛ j	1.0
+ear-018	italian	o r ɛ k k j o	1.0
+earth-019	latin	t e r r a	1.0
+earth-019	spanish	t j e r r a	1.0
+earth-019	french	t ɛ ʁ	1.0
+earth-019	italian	t ɛ r r a	1.0
+eat-020	latin	k o m e d e r e	1.0
+eat-020	spanish	k o m e r	1.0
+eat-020	french	m ɑ̃ ʒ e	1.0
+eat-020	italian	m a n d ʒ a r e	1.0
+eight-021	latin	o k t o	1.0
+eight-021	spanish	o t ʃ o	1.0
+eight-021	french	ɥ i t	1.0
+eight-021	italian	o t t o	1.0
+eye-022	latin	o k u l u	1.0
+eye-022	spanish	o x o	1.0
+eye-022	french	œ j	1.0
+eye-022	italian	ɔ k k j o	1.0
+father-023	latin	p a t e r	1.0
+father-023	spanish	p a d r e	1.0
+father-023	french	p ɛ ʁ	1.0
+father-023	italian	p a d r e	1.0
+fire-024	latin	f o k u s	1.0
+fire-024	spanish	f w e g o	1.0
+fire-024	french	f ø	1.0
+fire-024	italian	f w ɔ k o	1.0
+fish-025	latin	p i s c e	1.0
+fish-025	spanish	p e θ	1.0
+fish-025	french	p w a s ɔ̃	1.0
+fish-025	italian	p e ʃ e	1.0
+five-026	latin	k i n k w e	1.0
+five-026	spanish	θ i n k o	1.0
+five-026	french	s ɛ̃ k	1.0
+five-026	italian	t ʃ i ŋ k w e	1.0
+flower-027	latin	f l o r e	1.0
+flower-027	spanish	f l o r	1.0
+flower-027	french	f l œ ʁ	1.0
+flower-027	italian	f j o r e	1.0
+foot-028	latin	p e d e	1.0
+foot-028	spanish	p j e	1.0
+foot-028	french	p j e	1.0
+foot-028	italian	p j ɛ d e	1.0
+four-029	latin	q u a t t u o r	1.0
+four-029	spanish	k w a t r o	1.0
+four-029	french	k a t ʁ	1.0
+four-029	italian	k w a t t r o	1.0
+fruit-030	latin	f r u k t u	1.0
+fruit-030	spanish	f r u t o	1.0
+fruit-030	french	f ʁ ɥ i	1.0
+fruit-030	italian	f r u t t o	1.0
+give-031	latin	d a r e	1.0
+give-031	spanish	d a r	1.0
+give-031	french	d ɔ n e	1.0
+give-031	italian	d a r e	1.0
+go-032	latin	i r e	1.0
+go-032	spanish	i r	1.0
+go-032	french	a l e	1.0
+go-032	italian	a n d a r e	1.0
+good-033	latin	b o n u	1.0
+good-033	spanish	b w e n o	1.0
+good-033	french	b ɔ̃	1.0
+good-033	italian	b w ɔ n o	1.0
+green-034	latin	v i r i d e	1.0
+green-034	spanish	b e r d e	1.0
+green-034	french	v ɛ ʁ	1.0
+green-034	italian	v ɛ r d e	1.0
+hair-035	latin	k a p i l l u	1.0
+hair-035	spanish	k a b e ʎ o	1.0
+hair-035	french	ʃ ə v ø	1.0
+hair-035	italian	k a p ɛ l l o	1.0
+hand-036	latin	m a n u	1.0
+hand-036	spanish	m a n o	1.0
+hand-036	french	m ɛ̃	1.0
+hand-036	italian	m a n o	1.0
+head-037	latin	k a p u t	1.0
+head-037	spanish	k a b e θ a	1.0
+head-037	french	ʃ ɛ f	1.0
+head-037	italian	t ɛ s t a	1.0
+hear-038	latin	a u d i r e	1.0
+hear-038	spanish	o j i r	1.0
+hear-038	french	ɑ̃ t ɑ̃ d ʁ	1.0
+hear-038	italian	u d i r e	1.0
+heart-039	latin	k o r	1.0
+heart-039	spanish	k o r a θ o n	1.0
+heart-039	french	k œ ʁ	1.0
+heart-039	italian	k w ɔ r e	1.0
+horse-040	latin	k a b a l l u	1.0
+horse-040	spanish	k a b a ʎ o	1.0
+horse-040	french	ʃ ə v a l	1.0
+horse-040	italian	k a v a l l o	1.0
+hot-041	latin	k a l i d u	1.0
+hot-041	spanish	k a l j e n t e	1.0
+hot-041	french	ʃ o	1.0
+hot-041	italian	k a l d o	1.0
+king-042	latin	r e g e	1.0
+king-042	spanish	r e j	1.0
+king-042	french	ʁ w a	1.0
+king-042	italian	r e	1.0
+know-043	latin	s a p e r e	1.0
+know-043	spanish	s a b e r	1.0
+know-043	french	s a v w a ʁ	1.0
+know-043	italian	s a p e r e	1.0
+leaf-044	latin	f o l i a	1.0
+leaf-044	spanish	o x a	1.0
+leaf-044	french	f œ j	1.0
+leaf-044	italian	f ɔ ʎ a	1.0
+live-045	latin	v i v e r e	1.0
+live-045	spanish	b i b i r	1.0
+live-045	french	v i v ʁ	1.0
+live-045	italian	v i v e r e	1.0
+long-046	latin	l o n g u	1.0
+long-046	spanish	l a r g o	1.0
+long-046	french	l ɔ̃	1.0
+long-046	italian	l u ŋ ɡ o	1.0
+love-047	latin	a m a r e	1.0
+love-047	spanish	a m a r	1.0
+love-047	french	ɛ m e	1.0
+love-047	italian	a m a r e	1.0
+make-048	latin	f a k e r e	1.0
+make-048	spanish	a θ e r	1.0
+make-048	french	f ɛ ʁ	1.0
+make-048	italian	f a r e	1.0
+man-049	latin	o m o	1.0
+man-049	spanish	o m b r e	1.0
+man-049	french	ɔ m	1.0
+man-049	italian	w ɔ m o	1.0
+milk-050	latin	l a k t e	1.0
+milk-050	spanish	l e t ʃ e	1.0
+milk-050	french	l ɛ	1.0
+milk-050	italian	l a t t e	1.0
+month-051	latin	m e n s e	1.0
+month-051	spanish	m e s	1.0
+month-051	french	m w a	1.0
+month-051	italian	m e s e	1.0
+moon-052	latin	l u n a	1.0
+moon-052	spanish	l u n a	1.0
+moon-052	french	l y n	1.0
+moon-052	italian	l u n a	1.0
+mother-053	latin	m a t e r	1.0
+mother-053	spanish	m a d r e	1.0
+mother-053	french	m ɛ ʁ	1.0
+mother-053	italian	m a d r e	1.0
+mouse-054	latin	m u r e	1.0
+mouse-054	spanish	r a t o n	1.0
+mouse-054	french	s u ʁ i	1.0
+mouth-055	latin	b u k k a	1.0
+mouth-055	spanish	b o k a	1.0
+mouth-055	french	b u ʃ	1.0
+mouth-055	italian	b o k k a	1.0
+name-056	latin	n o m e n	1.0
+name-056	spanish	n o m b r e	1.0
+name-056	french	n ɔ m	1.0
+name-056	italian	n o m e	1.0
+neck-057	latin	k o l l u	1.0
+neck-057	spanish	k w e ʎ o	1.0
+neck-057	french	k u	1.0
+neck-057	italian	k ɔ l l o	1.0
+new-058	latin	n o v u	1.0
+new-058	spanish	n w e β o	1.0
+new-058	french	n œ f	1.0
+new-058	italian	n w ɔ v o	1.0
+night-059	latin	n o k t e	1.0
+night-059	spanish	n o t ʃ e	1.0
+night-059	french	n ɥ i	1.0
+night-059	italian	n ɔ t t e	1.0
+nine-060	latin	n o v e m	1.0
+nine-060	spanish	n w e v e	1.0
+nine-060	french	n œ f	1.0
+nine-060	italian	n ɔ v e	1.0
+nose-061	latin	n a s u	1.0
+nose-061	spanish	n a s o	1.0
+nose-061	french	n e	1.0
+nose-061	italian	n a s o	1.0
+old-062	latin	v e t u l u	1.0
+old-062	spanish	b j e x o	1.0
+old-062	french	v j ø	1.0
+old-062	italian	v ɛ k k j o	1.0
+rain-063	latin	p l u v i a	1.0
+rain-063	spanish	ʎ u b j a	1.0
+rain-063	french	p l ɥ i	1.0
+rain-063	italian	p j ɔ d ʒ a	1.0
+red-064	latin	r u b j u	1.0
+red-064	spanish	r o x o	1.0
+red-064	french	ʁ u ʒ	1.0
+red-064	italian	r o s s o	1.0
+say-065	latin	d i k e r e	1.0
+say-065	spanish	d e θ i r	1.0
+say-065	french	d i ʁ	1.0
+say-065	italian	d i r e	1.0
+see-066	latin	v i d e r e	1.0
+see-066	spanish	b e r	1.0
+see-066	french	v w a ʁ	1.0
+see-066	italian	v e d e r e	1.0
+seed-067	latin	s e m e n	1.0
+seed-067	spanish	s e m i ʎ a	1.0
+seed-067	french	ɡ ʁ ɛ n	1.0
+seed-067	italian	s e m e	1.0
+seven-068	latin	s e p t e m	1.0
+seven-068	spanish	s j e t e	1.0
+seven-068	french	s ɛ t	1.0
+seven-068	italian	s ɛ t t e	1.0
+short-069	latin	k u r t u	1.0
+short-069	spanish	k o r t o	1.0
+short-069	french	k u ʁ	1.0
+short-069	italian	k o r t o	1.0
+sister-070	latin	s o r o r	1.0
+sister-070	spanish	e r m a n a	1.0
+sister-070	french	s œ ʁ	1.0
+sister-070	italian	s o r ɛ l l a	1.0
+skin-071	latin	p e l l e	1.0
+skin-071	spanish	p j e l	1.0
+skin-071	french	p o	1.0
+skin-071	italian	p ɛ l l e	1.0
+sky-072	latin	k a e l u	1.0
+sky-072	spanish	θ j e l o	1.0
+sky-072	french	s j ɛ l	1.0
+sky-072	italian	t ʃ ɛ l o	1.0
+sleep-073	latin	d o r m i r e	1.0
+sleep-073	spanish	d o r m i r	1.0
+sleep-073	french	d ɔ ʁ m i ʁ	1.0
+sleep-073	italian	d o r m i r e	1.0
+small-074	latin	p a r v u	1.0
+small-074	spanish	p e q w e ɲ o	1.0
+small-074	french	p ə t i	1.0
+small-074	italian	p i k k o l o	1.0
+snake-075	latin	s e r p e n t e	1.0
+snake-075	spanish	s e r p j e n t e	1.0
+snake-075	french	s ɛ ʁ p ɑ̃	1.0
+snake-075	italian	s ɛ r p ɛ n t e	1.0
+son-076	latin	f i l i u	1.0
+son-076	spanish	i x o	1.0
+son-076	french	f i s	1.0
+son-076	italian	f i ʎ o	1.0
+speak-077	latin	l o q u i	1.0
+speak-077	spanish	a b l a r	1.0
+speak-077	french	p a ʁ l e	1.0
+speak-077	italian	p a r l a r e	1.0
+star-078	latin	s t e l l a	1.0
+star-078	spanish	e s t r e ʎ a	1.0
+star-078	french	e t w a l	1.0
+star-078	italian	s t e l l a	1.0
+stone-079	latin	p e t r a	1.0
+stone-079	spanish	p j e d r a	1.0
+stone-079	french	p j ɛ ʁ	1.0
+stone-079	italian	p j ɛ t r a	1.0
+sun-080	latin	s o l e	1.0
+sun-080	spanish	s o l	1.0
+sun-080	french	s ɔ l ɛ j	1.0
+sun-080	italian	s o l e	1.0
+sweet-081	latin	d u l k e	1.0
+sweet-081	spanish	d u l θ e	1.0
+take-082	latin	p r e n d e r e	1.0
+take-082	spanish	p r e n d e r	1.0
+take-082	french	p ʁ ɑ̃ d ʁ	1.0
+take-082	italian	p r ɛ n d e r e	1.0
+ten-083	latin	d e c e m	1.0
+ten-083	spanish	d j e θ	1.0
+ten-083	french	d i s	1.0
+ten-083	italian	d j ɛ t ʃ i	1.0
+three-084	latin	t r e s	1.0
+three-084	spanish	t r e s	1.0
+three-084	french	t ʁ w a	1.0
+three-084	italian	t r e	1.0
+tongue-085	latin	l i n g u a	1.0
+tongue-085	spanish	l e n g w a	1.0
+tongue-085	french	l ɑ̃ ɡ	1.0
+tongue-085	italian	l i ŋ ɡ w a	1.0
+tooth-086	latin	d e n t e m	1.0
+tooth-086	spanish	d j e n t e	1.0
+tooth-086	french	d ɑ̃	1.0
+tooth-086	italian	d ɛ n t e	1.0
+tree-087	latin	a r b o r	1.0
+tree-087	spanish	a r b o l	1.0
+tree-087	french	a ʁ b ʁ	1.0
+tree-087	italian	a l b e r o	1.0
+walk-088	latin	a m b u l a r e	1.0
+walk-088	spanish	a n d a r	1.0
+walk-088	french	m a ʁ ʃ e	1.0
+walk-088	italian	k a m m i n a r e	1.0
+water-089	latin	a q u a	1.0
+water-089	spanish	a g w a	1.0
+water-089	french	o	1.0
+water-089	italian	a k k w a	1.0
+white-090	latin	b l a n k u	1.0
+white-090	spanish	b l a n k o	1.0
+white-090	french	b l ɑ̃	1.0
+white-090	italian	b j a ŋ k o	1.0
+wind-091	latin	v e n t u	1.0
+wind-091	spanish	b j e n t o	1.0
+wind-091	french	v ɑ̃	1.0
+wind-091	italian	v ɛ n t o	1.0
+wolf-092	latin	l u p u	1.0
+wolf-092	spanish	l o b o	1.0
+wolf-092	french	l u	1.0
+wolf-092	italian	l u p o	1.0
+woman-093	latin	f e m i n a	1.0
+woman-093	spanish	e m b e r	1.0
+woman-093	french	f a m	1.0
+woman-093	italian	f ɛ m m i n a	1.0
+wood-094	latin	l i g n u	1.0
+wood-094	spanish	l e ɲ o	1.0
+wood-094	french	b w a	1.0
+wood-094	italian	l e ɲ o	1.0
+year-095	latin	a n n u	1.0
+year-095	spanish	a ɲ o	1.0
+year-095	french	ɑ̃	1.0
+year-095	italian	a n n o	1.0

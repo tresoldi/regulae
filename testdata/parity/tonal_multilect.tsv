@@ -1,0 +1,13 @@
+cognate_id	lect_id	segments	confidence
+t1	hi	m a	1.0
+t1	lo	m a	1.0
+t2	hi	t a	1.0
+t2	lo	t a	1.0
+t3	hi	k a	1.0
+t3	lo	k a	1.0
+t4	hi	p a	1.0
+t4	lo	p a	1.0
+t5	hi	s a	1.0
+t5	lo	s a	1.0
+t6	hi	n a	1.0
+t6	lo	n a	1.0

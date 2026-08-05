@@ -150,7 +150,7 @@ void rg_feature_constraint_array_clear_internal(const rg_feature_constraint *ite
     free((rg_feature_constraint *)items);
 }
 
-static void distance_constraint_array_clear(const rg_distance_constraint *items, size_t count) {
+void rg_distance_constraint_array_clear_internal(const rg_distance_constraint *items, size_t count) {
     size_t i;
     if (items == 0) {
         return;
@@ -255,8 +255,8 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
     rg_feature_constraint_array_clear_internal(context->preceding, context->preceding_count);
     rg_feature_constraint_array_clear_internal(context->following, context->following_count);
     free((char *)context->morphological);
-    distance_constraint_array_clear(context->preceding_at_distance, context->preceding_at_distance_count);
-    distance_constraint_array_clear(context->following_at_distance, context->following_at_distance_count);
+    rg_distance_constraint_array_clear_internal(context->preceding_at_distance, context->preceding_at_distance_count);
+    rg_distance_constraint_array_clear_internal(context->following_at_distance, context->following_at_distance_count);
     rg_feature_constraint_array_clear_internal(context->somewhere_preceding, context->somewhere_preceding_count);
     rg_feature_constraint_array_clear_internal(context->somewhere_following, context->somewhere_following_count);
     rg_feature_constraint_array_clear_internal(context->same_syllable, context->same_syllable_count);

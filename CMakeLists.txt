@@ -39,10 +39,14 @@ endif()
 add_library(regulae
     src/context.c
     src/memory.c
+    src/format.c
+    src/loaders.c
     src/model.c
+    src/multilect.c
     src/options.c
     src/scoring.c
     src/search.c
+    src/syllabification.c
     src/types.c
     src/version.c
 )
@@ -105,6 +109,19 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_merkmal_bridge PRIVATE regulae::regulae)
     add_test(NAME merkmal_bridge COMMAND test_merkmal_bridge)
 
+    add_executable(test_syllabification tests/c/test_syllabification.c)
+    target_link_libraries(test_syllabification PRIVATE regulae::regulae)
+    add_test(NAME syllabification COMMAND test_syllabification)
+
+    add_executable(test_format tests/c/test_format.c)
+    target_link_libraries(test_format PRIVATE regulae::regulae)
+    add_test(NAME format COMMAND test_format)
+
+    add_executable(test_loaders tests/c/test_loaders.c)
+    target_compile_definitions(test_loaders PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_loaders PRIVATE regulae::regulae)
+    add_test(NAME loaders COMMAND test_loaders)
+
     add_executable(test_scoring tests/c/test_scoring.c)
     target_link_libraries(test_scoring PRIVATE regulae::regulae)
     add_test(NAME scoring COMMAND test_scoring)
@@ -117,6 +134,10 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_pairwise_model PRIVATE regulae::regulae)
     add_test(NAME pairwise_model COMMAND test_pairwise_model)
 
+    add_executable(test_multilect_model tests/c/test_multilect_model.c)
+    target_link_libraries(test_multilect_model PRIVATE regulae::regulae)
+    add_test(NAME multilect_model COMMAND test_multilect_model)
+
     add_executable(test_real_fixtures tests/c/test_real_fixtures.c)
     target_compile_definitions(test_real_fixtures PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_real_fixtures PRIVATE regulae::regulae)
@@ -127,5 +148,30 @@ if(REGULAE_BUILD_TESTS)
         set_tests_properties(cli_version PROPERTIES PASS_REGULAR_EXPRESSION "regulae 0.1.0")
         add_test(NAME cli_help COMMAND regulae_cli help)
         set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: regulae")
+
+        add_test(NAME cli_train_summary
+            COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/conditioned_multilect.tsv")
+        set_tests_properties(cli_train_summary PROPERTIES
+            PASS_REGULAR_EXPRESSION "LECTS	alpha beta gamma")
+
+        add_test(NAME cli_train_human
+            COMMAND regulae_cli train --human "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/conditioned_multilect.tsv")
+        set_tests_properties(cli_train_human PROPERTIES
+            PASS_REGULAR_EXPRESSION "MultiLectModel")
+
+        add_test(NAME cli_align
+            COMMAND regulae_cli align "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/three_lect_basic.tsv")
+        set_tests_properties(cli_align PROPERTIES PASS_REGULAR_EXPRESSION "^ALIGN	c1")
+
+        add_test(NAME cli_outliers
+            COMMAND regulae_cli outliers --top-k 3 "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/real_contaminated.tsv")
+        set_tests_properties(cli_outliers PROPERTIES PASS_REGULAR_EXPRESSION "^OUTLIER	")
+
+        add_test(NAME cli_arcaverborum
+            COMMAND regulae_cli train --format arcaverborum "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/morph_boundary.csv")
+        set_tests_properties(cli_arcaverborum PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	one two")
+
+        add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
+        set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
     endif()
 endif()

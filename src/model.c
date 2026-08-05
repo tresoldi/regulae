@@ -4,6 +4,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void string_array_free(char **items, size_t count) {
+    size_t i;
+    if (items == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        free(items[i]);
+    }
+    free(items);
+}
+
 static rg_uncertainty_estimate wilson_interval(double count, double total) {
     double z = 1.959963984540054;
     rg_uncertainty_estimate out;
@@ -132,6 +143,20 @@ static void cross_dimensional_row_clear(rg_cross_dimensional_row *row) {
     row->uncertainty = wilson_interval(0.0, 0.0);
 }
 
+static void displacement_row_clear(rg_displacement_row *row) {
+    size_t i;
+    if (row == 0) {
+        return;
+    }
+    for (i = 0; i < row->item_count; i++) {
+        free((char *)row->items[i].feature);
+        free((char *)row->items[i].from_value);
+        free((char *)row->items[i].to_value);
+    }
+    free((rg_feature_displacement *)row->items);
+    memset(row, 0, sizeof(*row));
+}
+
 void rg_pairwise_model_free(rg_pairwise_model *model) {
     size_t i;
     if (model == 0) {
@@ -153,17 +178,24 @@ void rg_pairwise_model_free(rg_pairwise_model *model) {
         cross_dimensional_row_clear(&model->cross_dimensional_rows[i]);
     }
     free(model->cross_dimensional_rows);
-    for (i = 0; i < model->displacement_count_count; i++) {
-        free((char *)model->displacement_counts[i].feature);
-        free((char *)model->displacement_counts[i].from_value);
-        free((char *)model->displacement_counts[i].to_value);
+    for (i = 0; i < model->displacement_row_count; i++) {
+        displacement_row_clear(&model->displacement_rows[i]);
     }
-    free(model->displacement_counts);
+    free(model->displacement_rows);
     for (i = 0; i < model->tonal_count_count; i++) {
         free((char *)model->tonal_counts[i].source_tone);
         free((char *)model->tonal_counts[i].target_tone);
     }
     free(model->tonal_counts);
+    for (i = 0; i < model->segment_prior_count; i++) {
+        free(model->segment_priors[i].source);
+        free(model->segment_priors[i].target);
+    }
+    free(model->segment_priors);
+    for (i = 0; i < model->log_normalizer_count; i++) {
+        free(model->log_normalizers[i].source);
+    }
+    free(model->log_normalizers);
     free(model);
 }
 
@@ -375,59 +407,102 @@ static rg_status add_conditioned_segment_count(
     return RG_OK;
 }
 
-static int displacement_row_cmp(const void *a, const void *b) {
-    const rg_displacement_count_row *ra = (const rg_displacement_count_row *)a;
-    const rg_displacement_count_row *rb = (const rg_displacement_count_row *)b;
-    int c = strcmp(ra->feature, rb->feature);
-    if (c != 0) {
-        return c;
+
+static int displacement_vector_equal(
+    const rg_feature_displacement *a,
+    size_t a_count,
+    const rg_feature_displacement *b,
+    size_t b_count
+) {
+    size_t i;
+    if (a_count != b_count) {
+        return 0;
     }
-    c = strcmp(ra->from_value, rb->from_value);
-    if (c != 0) {
-        return c;
+    for (i = 0; i < a_count; i++) {
+        if (strcmp(a[i].feature, b[i].feature) != 0 ||
+            strcmp(a[i].from_value, b[i].from_value) != 0 ||
+            strcmp(a[i].to_value, b[i].to_value) != 0) {
+            return 0;
+        }
     }
-    return strcmp(ra->to_value, rb->to_value);
+    return 1;
 }
 
-static rg_status add_displacement_count(
-    rg_displacement_count_row **rows,
+static int displacement_row_cmp(const void *a, const void *b) {
+    const rg_displacement_row *ra = (const rg_displacement_row *)a;
+    const rg_displacement_row *rb = (const rg_displacement_row *)b;
+    size_t i;
+    for (i = 0; i < ra->item_count && i < rb->item_count; i++) {
+        int c = strcmp(ra->items[i].feature, rb->items[i].feature);
+        if (c != 0) {
+            return c;
+        }
+        c = strcmp(ra->items[i].from_value, rb->items[i].from_value);
+        if (c != 0) {
+            return c;
+        }
+        c = strcmp(ra->items[i].to_value, rb->items[i].to_value);
+        if (c != 0) {
+            return c;
+        }
+    }
+    if (ra->item_count != rb->item_count) {
+        return ra->item_count < rb->item_count ? -1 : 1;
+    }
+    return 0;
+}
+
+/* Counts one whole displacement vector. The vector, not the individual feature
+ * changes, is the unit of observation: "voiced lost and fricative gained" is a
+ * different event from either change alone. */
+static rg_status add_displacement_vector(
+    rg_displacement_row **rows,
     size_t *count,
     size_t *cap,
-    const char *feature,
-    const char *from_value,
-    const char *to_value,
+    const rg_feature_displacement *items,
+    size_t item_count,
     double weight
 ) {
     size_t i;
-    rg_displacement_count_row *next;
+    rg_feature_displacement *copy;
     for (i = 0; i < *count; i++) {
-        if (strcmp((*rows)[i].feature, feature) == 0 &&
-            strcmp((*rows)[i].from_value, from_value) == 0 &&
-            strcmp((*rows)[i].to_value, to_value) == 0) {
+        if (displacement_vector_equal((*rows)[i].items, (*rows)[i].item_count, items, item_count)) {
             (*rows)[i].count += weight;
             return RG_OK;
         }
     }
     if (*count == *cap) {
-        size_t next_cap = *cap == 0 ? 16 : *cap * 2;
-        next = (rg_displacement_count_row *)realloc(*rows, next_cap * sizeof(**rows));
+        size_t next_cap = *cap == 0 ? 8 : *cap * 2;
+        rg_displacement_row *next = (rg_displacement_row *)realloc(*rows, next_cap * sizeof(**rows));
         if (next == 0) {
             return RG_ERR_OOM;
         }
         *rows = next;
         *cap = next_cap;
     }
-    (*rows)[*count].feature = rg_strdup_internal(feature);
-    (*rows)[*count].from_value = rg_strdup_internal(from_value);
-    (*rows)[*count].to_value = rg_strdup_internal(to_value);
-    (*rows)[*count].count = weight;
-    (*rows)[*count].total = 0.0;
-    if ((*rows)[*count].feature == 0 || (*rows)[*count].from_value == 0 || (*rows)[*count].to_value == 0) {
-        free((char *)(*rows)[*count].feature);
-        free((char *)(*rows)[*count].from_value);
-        free((char *)(*rows)[*count].to_value);
+    memset(&(*rows)[*count], 0, sizeof((*rows)[*count]));
+    copy = (rg_feature_displacement *)calloc(item_count == 0 ? 1 : item_count, sizeof(*copy));
+    if (copy == 0) {
         return RG_ERR_OOM;
     }
+    for (i = 0; i < item_count; i++) {
+        copy[i].feature = rg_strdup_internal(items[i].feature);
+        copy[i].from_value = rg_strdup_internal(items[i].from_value);
+        copy[i].to_value = rg_strdup_internal(items[i].to_value);
+        if (copy[i].feature == 0 || copy[i].from_value == 0 || copy[i].to_value == 0) {
+            size_t j;
+            for (j = 0; j <= i; j++) {
+                free((char *)copy[j].feature);
+                free((char *)copy[j].from_value);
+                free((char *)copy[j].to_value);
+            }
+            free(copy);
+            return RG_ERR_OOM;
+        }
+    }
+    (*rows)[*count].items = copy;
+    (*rows)[*count].item_count = item_count;
+    (*rows)[*count].count = weight;
     (*count)++;
     return RG_OK;
 }
@@ -500,9 +575,9 @@ static void fill_source_totals(rg_segment_count_row *rows, size_t count) {
     }
 }
 
-static void fill_displacement_total(rg_displacement_count_row *rows, size_t count) {
-    size_t i;
+static void fill_displacement_total(rg_displacement_row *rows, size_t count) {
     double total = 0.0;
+    size_t i;
     for (i = 0; i < count; i++) {
         total += rows[i].count;
     }
@@ -534,72 +609,7 @@ typedef struct context_observation {
     double weight;
 } context_observation;
 
-typedef struct split_candidate {
-    const char *slot;
-    const char *feature;
-    const char *value;
-} split_candidate;
-
-static const split_candidate immediate_split_candidates[] = {
-    {"following", "vowel", "+"},
-    {"following", "front", "+"},
-    {"following", "back", "+"},
-    {"following", "close", "+"},
-    {"following", "open", "+"},
-    {"following", "long", "+"},
-    {"preceding", "vowel", "+"},
-    {"preceding", "front", "+"},
-    {"preceding", "back", "+"},
-    {"preceding", "voiced", "+"},
-    {"preceding", "voiceless", "+"},
-    {"preceding", "consonant", "+"},
-    {"preceding", "long", "+"},
-    {"position", "initial", "+"},
-    {"position", "medial", "+"},
-    {"position", "final", "+"},
-    {"preceding@2", "front", "+"},
-    {"preceding@2", "back", "+"},
-    {"preceding@2", "close", "+"},
-    {"preceding@2", "open", "+"},
-    {"preceding@2", "voiced", "+"},
-    {"preceding@2", "voiceless", "+"},
-    {"preceding@2", "long", "+"},
-    {"preceding@3", "front", "+"},
-    {"preceding@3", "back", "+"},
-    {"preceding@3", "close", "+"},
-    {"preceding@3", "open", "+"},
-    {"preceding@3", "voiced", "+"},
-    {"preceding@3", "voiceless", "+"},
-    {"preceding@3", "long", "+"},
-    {"following@2", "front", "+"},
-    {"following@2", "back", "+"},
-    {"following@2", "close", "+"},
-    {"following@2", "open", "+"},
-    {"following@2", "voiced", "+"},
-    {"following@2", "voiceless", "+"},
-    {"following@2", "long", "+"},
-    {"following@3", "front", "+"},
-    {"following@3", "back", "+"},
-    {"following@3", "close", "+"},
-    {"following@3", "open", "+"},
-    {"following@3", "voiced", "+"},
-    {"following@3", "voiceless", "+"},
-    {"following@3", "long", "+"},
-    {"somewhere_preceding", "front", "+"},
-    {"somewhere_preceding", "back", "+"},
-    {"somewhere_preceding", "close", "+"},
-    {"somewhere_preceding", "open", "+"},
-    {"somewhere_preceding", "voiced", "+"},
-    {"somewhere_preceding", "voiceless", "+"},
-    {"somewhere_preceding", "long", "+"},
-    {"somewhere_following", "front", "+"},
-    {"somewhere_following", "back", "+"},
-    {"somewhere_following", "close", "+"},
-    {"somewhere_following", "open", "+"},
-    {"somewhere_following", "voiced", "+"},
-    {"somewhere_following", "voiceless", "+"},
-    {"somewhere_following", "long", "+"}
-};
+typedef rg_split_candidate split_candidate;
 
 static const char *const cross_dimensional_feature_names[] = {
     "back",
@@ -686,7 +696,7 @@ static int context_has_distance_constraint(const rg_distance_constraint *items, 
     return 0;
 }
 
-static int predicate_holds(const rg_context_spec *context, const split_candidate *candidate) {
+int rg_predicate_holds_internal(const rg_context_spec *context, const rg_split_candidate *candidate) {
     if (strcmp(candidate->slot, "following") == 0) {
         return context_has_constraint(context->following, context->following_count, candidate->feature, candidate->value);
     }
@@ -714,10 +724,28 @@ static int predicate_holds(const rg_context_spec *context, const split_candidate
     if (strcmp(candidate->slot, "somewhere_following") == 0) {
         return context_has_constraint(context->somewhere_following, context->somewhere_following_count, candidate->feature, candidate->value);
     }
+    if (strcmp(candidate->slot, "same_syllable") == 0) {
+        return context_has_constraint(context->same_syllable, context->same_syllable_count, candidate->feature, candidate->value);
+    }
+    if (strcmp(candidate->slot, "next_syllable") == 0) {
+        return context_has_constraint(context->next_syllable, context->next_syllable_count, candidate->feature, candidate->value);
+    }
+    if (strcmp(candidate->slot, "previous_syllable") == 0) {
+        return context_has_constraint(context->previous_syllable, context->previous_syllable_count, candidate->feature, candidate->value);
+    }
+    if (strcmp(candidate->slot, "self_stress") == 0) {
+        return context_has_constraint(context->self_stress, context->self_stress_count, candidate->feature, candidate->value);
+    }
+    if (strcmp(candidate->slot, "preceding_stress") == 0) {
+        return context_has_constraint(context->preceding_stress, context->preceding_stress_count, candidate->feature, candidate->value);
+    }
+    if (strcmp(candidate->slot, "following_stress") == 0) {
+        return context_has_constraint(context->following_stress, context->following_stress_count, candidate->feature, candidate->value);
+    }
     return 0;
 }
 
-static rg_status context_from_candidate(const split_candidate *candidate, rg_context_spec *out) {
+rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate, rg_context_spec *out) {
     rg_feature_constraint constraint;
     rg_distance_constraint distance;
     rg_status status;
@@ -753,6 +781,48 @@ static rg_status context_from_candidate(const split_candidate *candidate, rg_con
         status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->somewhere_following);
         if (status == RG_OK) {
             out->somewhere_following_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "same_syllable") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->same_syllable);
+        if (status == RG_OK) {
+            out->same_syllable_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "next_syllable") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->next_syllable);
+        if (status == RG_OK) {
+            out->next_syllable_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "previous_syllable") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->previous_syllable);
+        if (status == RG_OK) {
+            out->previous_syllable_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "self_stress") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->self_stress);
+        if (status == RG_OK) {
+            out->self_stress_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "preceding_stress") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->preceding_stress);
+        if (status == RG_OK) {
+            out->preceding_stress_count = 1;
+        }
+        return status;
+    }
+    if (strcmp(candidate->slot, "following_stress") == 0) {
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->following_stress);
+        if (status == RG_OK) {
+            out->following_stress_count = 1;
         }
         return status;
     }
@@ -826,89 +896,6 @@ static rg_status add_target_mass(target_mass **items, size_t *count, size_t *cap
     return RG_OK;
 }
 
-static double group_cost_for_candidate(
-    const context_observation *observations,
-    size_t observation_count,
-    const char *source,
-    const split_candidate *candidate,
-    int want_yes,
-    double *mass_out,
-    size_t *target_count_out
-) {
-    target_mass *targets = 0;
-    size_t target_count = 0;
-    size_t target_cap = 0;
-    size_t i;
-    double total = 0.0;
-    double cost = 0.0;
-    for (i = 0; i < observation_count; i++) {
-        int yes;
-        if (strcmp(observations[i].source, source) != 0) {
-            continue;
-        }
-        yes = predicate_holds(&observations[i].context, candidate);
-        if (yes != want_yes) {
-            continue;
-        }
-        if (add_target_mass(&targets, &target_count, &target_cap, observations[i].target, observations[i].weight) != RG_OK) {
-            free(targets);
-            *mass_out = 0.0;
-            *target_count_out = 0;
-            return INFINITY;
-        }
-        total += observations[i].weight;
-    }
-    for (i = 0; i < target_count; i++) {
-        double p = total <= 0.0 ? 0.0 : targets[i].mass / total;
-        if (p > 0.0) {
-            cost += -targets[i].mass * log(p);
-        }
-    }
-    free(targets);
-    *mass_out = total;
-    *target_count_out = target_count;
-    return cost;
-}
-
-static double baseline_group_cost(
-    const context_observation *observations,
-    size_t observation_count,
-    const char *source,
-    double *mass_out,
-    size_t *target_count_out
-) {
-    split_candidate all = {"position", "", "+"};
-    target_mass *targets = 0;
-    size_t target_count = 0;
-    size_t target_cap = 0;
-    size_t i;
-    double total = 0.0;
-    double cost = 0.0;
-    (void)all;
-    for (i = 0; i < observation_count; i++) {
-        if (strcmp(observations[i].source, source) != 0) {
-            continue;
-        }
-        if (add_target_mass(&targets, &target_count, &target_cap, observations[i].target, observations[i].weight) != RG_OK) {
-            free(targets);
-            *mass_out = 0.0;
-            *target_count_out = 0;
-            return INFINITY;
-        }
-        total += observations[i].weight;
-    }
-    for (i = 0; i < target_count; i++) {
-        double p = total <= 0.0 ? 0.0 : targets[i].mass / total;
-        if (p > 0.0) {
-            cost += -targets[i].mass * log(p);
-        }
-    }
-    free(targets);
-    *mass_out = total;
-    *target_count_out = target_count;
-    return cost;
-}
-
 static int string_ptr_cmp(const void *a, const void *b) {
     const char *const *sa = (const char *const *)a;
     const char *const *sb = (const char *const *)b;
@@ -936,85 +923,761 @@ static rg_status append_unique_source(const char ***items, size_t *count, size_t
     return RG_OK;
 }
 
-static rg_status commit_candidate_yes_counts(
-    rg_pairwise_model *model,
-    const context_observation *observations,
-    size_t observation_count,
-    const char *source,
-    const split_candidate *candidate
+/* ---- pairwise context discovery ---------------------------------------- */
+
+/* Immediate-neighbour conditioning axes, searched by discover_context_counts.
+ * Long-range axes live in a separate inventory and a separate pass, because
+ * they carry different thresholds and a dominance filter. Table order is
+ * load-bearing: equal-BIC candidates are resolved by taking the first. */
+static const split_candidate immediate_feature_inventory[] = {
+    {"following", "vowel", "+"},
+    {"following", "front", "+"},
+    {"following", "back", "+"},
+    {"following", "close", "+"},
+    {"following", "open", "+"},
+    {"following", "long", "+"},
+    {"preceding", "vowel", "+"},
+    {"preceding", "front", "+"},
+    {"preceding", "back", "+"},
+    {"preceding", "voiced", "+"},
+    {"preceding", "voiceless", "+"},
+    {"preceding", "consonant", "+"},
+    {"preceding", "long", "+"}
+};
+
+static const char *const split_positions[] = {"initial", "medial", "final"};
+
+static const char *const stress_slot_names[] = {"self_stress", "preceding_stress", "following_stress"};
+
+/* Long-range axes omit "vowel"/"consonant", which are tautological on syllable
+ * slots. */
+static const char *const long_range_feature_names[] = {
+    "front", "back", "close", "open", "voiced", "voiceless", "long"
+};
+
+static const char *const long_range_slot_names[] = {
+    "same_syllable",
+    "next_syllable",
+    "previous_syllable",
+    "preceding@2",
+    "preceding@3",
+    "following@2",
+    "following@3",
+    "somewhere_preceding",
+    "somewhere_following"
+};
+
+typedef struct stress_inventory {
+    char **values;
+    size_t count;
+    size_t cap;
+} stress_inventory;
+
+static void stress_inventory_clear(stress_inventory *inventory) {
+    size_t i;
+    for (i = 0; i < inventory->count; i++) {
+        free(inventory->values[i]);
+    }
+    free(inventory->values);
+    memset(inventory, 0, sizeof(*inventory));
+}
+
+static rg_status stress_inventory_add(stress_inventory *inventory, const char *value) {
+    size_t i;
+    size_t insert_at;
+    for (i = 0; i < inventory->count; i++) {
+        if (strcmp(inventory->values[i], value) == 0) {
+            return RG_OK;
+        }
+    }
+    if (inventory->count == inventory->cap) {
+        size_t next_cap = inventory->cap == 0 ? 4 : inventory->cap * 2;
+        char **next = (char **)realloc(inventory->values, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        inventory->values = next;
+        inventory->cap = next_cap;
+    }
+    insert_at = inventory->count;
+    while (insert_at > 0 && strcmp(inventory->values[insert_at - 1], value) > 0) {
+        insert_at--;
+    }
+    if (insert_at < inventory->count) {
+        memmove(&inventory->values[insert_at + 1], &inventory->values[insert_at],
+                (inventory->count - insert_at) * sizeof(*inventory->values));
+    }
+    inventory->values[insert_at] = rg_strdup_internal(value);
+    if (inventory->values[insert_at] == 0) {
+        return RG_ERR_OOM;
+    }
+    inventory->count++;
+    return RG_OK;
+}
+
+static rg_status collect_observed_stress(stress_inventory *inventory, const rg_context_spec *context) {
+    const rg_feature_constraint *slots[3];
+    size_t counts[3];
+    size_t s;
+    slots[0] = context->self_stress;
+    counts[0] = context->self_stress_count;
+    slots[1] = context->preceding_stress;
+    counts[1] = context->preceding_stress_count;
+    slots[2] = context->following_stress;
+    counts[2] = context->following_stress_count;
+    for (s = 0; s < 3; s++) {
+        size_t i;
+        for (i = 0; i < counts[s]; i++) {
+            if (slots[s][i].feature != 0 && strcmp(slots[s][i].feature, "stress") == 0 && slots[s][i].value != 0) {
+                rg_status status = stress_inventory_add(inventory, slots[s][i].value);
+                if (status != RG_OK) {
+                    return status;
+                }
+            }
+        }
+    }
+    return RG_OK;
+}
+
+/* Candidate axes not already constrained by base_context. A feature is dropped
+ * from the preceding/following slots once that slot constrains it, the position
+ * axis disappears once a position is fixed, and a stress value disappears once
+ * that slot already carries it. */
+static size_t immediate_candidates_for(
+    const rg_context_spec *base_context,
+    const stress_inventory *stress,
+    split_candidate *out,
+    size_t capacity
 ) {
-    rg_context_spec context;
+    size_t count = 0;
+    size_t i;
+    size_t s;
+    for (i = 0; i < sizeof(immediate_feature_inventory) / sizeof(immediate_feature_inventory[0]); i++) {
+        const split_candidate *candidate = &immediate_feature_inventory[i];
+        int skip = 0;
+        if (strcmp(candidate->slot, "following") == 0) {
+            size_t j;
+            for (j = 0; j < base_context->following_count; j++) {
+                if (strcmp(base_context->following[j].feature, candidate->feature) == 0) {
+                    skip = 1;
+                    break;
+                }
+            }
+        } else if (strcmp(candidate->slot, "preceding") == 0) {
+            size_t j;
+            for (j = 0; j < base_context->preceding_count; j++) {
+                if (strcmp(base_context->preceding[j].feature, candidate->feature) == 0) {
+                    skip = 1;
+                    break;
+                }
+            }
+        }
+        if (!skip && count < capacity) {
+            out[count++] = *candidate;
+        }
+    }
+    if (base_context->position == 0 || base_context->position[0] == '\0') {
+        for (i = 0; i < sizeof(split_positions) / sizeof(split_positions[0]); i++) {
+            if (count < capacity) {
+                out[count].slot = "position";
+                out[count].feature = split_positions[i];
+                out[count].value = "+";
+                count++;
+            }
+        }
+    }
+    for (s = 0; s < sizeof(stress_slot_names) / sizeof(stress_slot_names[0]); s++) {
+        const rg_feature_constraint *existing = 0;
+        size_t existing_count = 0;
+        if (s == 0) {
+            existing = base_context->self_stress;
+            existing_count = base_context->self_stress_count;
+        } else if (s == 1) {
+            existing = base_context->preceding_stress;
+            existing_count = base_context->preceding_stress_count;
+        } else {
+            existing = base_context->following_stress;
+            existing_count = base_context->following_stress_count;
+        }
+        for (i = 0; i < stress->count; i++) {
+            int skip = 0;
+            size_t j;
+            for (j = 0; j < existing_count; j++) {
+                if (existing[j].feature != 0 && strcmp(existing[j].feature, "stress") == 0 &&
+                    strcmp(existing[j].value, stress->values[i]) == 0) {
+                    skip = 1;
+                    break;
+                }
+            }
+            if (!skip && count < capacity) {
+                out[count].slot = stress_slot_names[s];
+                out[count].feature = "stress";
+                out[count].value = stress->values[i];
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+static size_t long_range_candidates(split_candidate *out, size_t capacity) {
+    size_t count = 0;
+    size_t s;
+    size_t f;
+    for (s = 0; s < sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]); s++) {
+        for (f = 0; f < sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]); f++) {
+            if (count < capacity) {
+                out[count].slot = long_range_slot_names[s];
+                out[count].feature = long_range_feature_names[f];
+                out[count].value = "+";
+                count++;
+            }
+        }
+    }
+    return count;
+}
+
+/* base_context extended with one more constraint. Contexts are immutable by
+ * convention, so this always allocates a fresh value. */
+static rg_status context_extend(
+    const rg_context_spec *base_context,
+    const split_candidate *candidate,
+    rg_context_spec *out
+) {
+    rg_feature_constraint *merged = 0;
+    const rg_feature_constraint **slot = 0;
+    size_t *slot_count = 0;
+    const rg_feature_constraint *existing = 0;
+    size_t existing_count = 0;
+    rg_feature_constraint addition;
+    rg_status status;
+
+    status = rg_context_spec_copy_internal(base_context, out);
+    if (status != RG_OK) {
+        return status;
+    }
+    if (strcmp(candidate->slot, "position") == 0) {
+        free((char *)out->position);
+        out->position = rg_strdup_internal(candidate->feature);
+        if (out->position == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        return RG_OK;
+    }
+    addition.feature = candidate->feature;
+    addition.value = candidate->value;
+
+#define PICK(name, field)                                     \
+    if (strcmp(candidate->slot, name) == 0) {                 \
+        slot = &out->field;                                   \
+        slot_count = &out->field##_count;                     \
+        existing = out->field;                                \
+        existing_count = out->field##_count;                  \
+    }
+
+    PICK("preceding", preceding)
+    PICK("following", following)
+    PICK("somewhere_preceding", somewhere_preceding)
+    PICK("somewhere_following", somewhere_following)
+    PICK("same_syllable", same_syllable)
+    PICK("next_syllable", next_syllable)
+    PICK("previous_syllable", previous_syllable)
+    PICK("self_stress", self_stress)
+    PICK("preceding_stress", preceding_stress)
+    PICK("following_stress", following_stress)
+
+#undef PICK
+
+    if (slot == 0) {
+        rg_distance_constraint *items;
+        int offset;
+        size_t base_count;
+        const rg_distance_constraint *base_items;
+        size_t i;
+        int preceding;
+        if (strncmp(candidate->slot, "preceding@", 10) == 0) {
+            preceding = 1;
+            offset = atoi(candidate->slot + 10);
+            base_items = out->preceding_at_distance;
+            base_count = out->preceding_at_distance_count;
+        } else if (strncmp(candidate->slot, "following@", 10) == 0) {
+            preceding = 0;
+            offset = atoi(candidate->slot + 10);
+            base_items = out->following_at_distance;
+            base_count = out->following_at_distance_count;
+        } else {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_INVALID_ARGUMENT;
+        }
+        items = (rg_distance_constraint *)calloc(base_count + 1, sizeof(*items));
+        if (items == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        for (i = 0; i < base_count; i++) {
+            items[i].offset = base_items[i].offset;
+            if (rg_feature_constraint_copy_internal(&base_items[i].constraint, &items[i].constraint) != RG_OK) {
+                rg_distance_constraint_array_clear_internal(items, i);
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
+            }
+        }
+        items[base_count].offset = offset;
+        if (rg_feature_constraint_copy_internal(&addition, &items[base_count].constraint) != RG_OK) {
+            rg_distance_constraint_array_clear_internal(items, base_count);
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        if (preceding) {
+            rg_distance_constraint_array_clear_internal((rg_distance_constraint *)out->preceding_at_distance, out->preceding_at_distance_count);
+            out->preceding_at_distance = items;
+            out->preceding_at_distance_count = base_count + 1;
+        } else {
+            rg_distance_constraint_array_clear_internal((rg_distance_constraint *)out->following_at_distance, out->following_at_distance_count);
+            out->following_at_distance = items;
+            out->following_at_distance_count = base_count + 1;
+        }
+        return RG_OK;
+    }
+
+    merged = (rg_feature_constraint *)calloc(existing_count + 1, sizeof(*merged));
+    if (merged == 0) {
+        rg_context_spec_clear_internal(out);
+        return RG_ERR_OOM;
+    }
+    {
+        size_t i;
+        for (i = 0; i < existing_count; i++) {
+            if (rg_feature_constraint_copy_internal(&existing[i], &merged[i]) != RG_OK) {
+                rg_feature_constraint_array_clear_internal(merged, i);
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
+            }
+        }
+        if (rg_feature_constraint_copy_internal(&addition, &merged[existing_count]) != RG_OK) {
+            rg_feature_constraint_array_clear_internal(merged, existing_count);
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+    }
+    rg_feature_constraint_array_clear_internal(existing, existing_count);
+    *slot = merged;
+    *slot_count = existing_count + 1;
+    return RG_OK;
+}
+
+/* Negative log-likelihood of a group under a single unconditioned
+ * correspondence. Target keys are summed in sorted order so repeated runs
+ * produce bit-identical results. */
+static double observation_group_cost(const context_observation *const *rows, size_t count) {
+    target_mass *targets = 0;
+    size_t target_count = 0;
+    size_t target_cap = 0;
+    double total = 0.0;
+    double cost = 0.0;
+    size_t i;
+    size_t j;
+
+    for (i = 0; i < count; i++) {
+        if (add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight) != RG_OK) {
+            free(targets);
+            return 0.0;
+        }
+        total += rows[i]->weight;
+    }
+    if (total <= 0.0) {
+        free(targets);
+        return 0.0;
+    }
+    /* add_target_mass appends in first-seen order; sort by target for a
+     * deterministic summation order. */
+    for (i = 1; i < target_count; i++) {
+        target_mass key = targets[i];
+        j = i;
+        while (j > 0 && strcmp(targets[j - 1].target, key.target) > 0) {
+            targets[j] = targets[j - 1];
+            j--;
+        }
+        targets[j] = key;
+    }
+    for (i = 0; i < target_count; i++) {
+        double p = targets[i].mass / total;
+        if (p > 0.0) {
+            cost += -targets[i].mass * log(p);
+        }
+    }
+    free(targets);
+    return cost;
+}
+
+static double observation_total_weight(const context_observation *const *rows, size_t count) {
+    double total = 0.0;
+    size_t i;
+    for (i = 0; i < count; i++) {
+        total += rows[i]->weight;
+    }
+    return total;
+}
+
+static double observation_dominant_fraction(const context_observation *const *rows, size_t count) {
+    target_mass *targets = 0;
+    size_t target_count = 0;
+    size_t target_cap = 0;
+    double total = 0.0;
+    double mode = 0.0;
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight) != RG_OK) {
+            free(targets);
+            return 0.0;
+        }
+        total += rows[i]->weight;
+    }
+    for (i = 0; i < target_count; i++) {
+        if (targets[i].mass > mode) {
+            mode = targets[i].mass;
+        }
+    }
+    free(targets);
+    return total > 0.0 ? mode / total : 0.0;
+}
+
+/* Writes one conditioned entry per observed target in this group. Repeating a
+ * (source, target, context) key replaces the previous count rather than adding
+ * to it, because each commit states the mass of that group outright. */
+static rg_status commit_observation_group(
+    rg_pairwise_model *model,
+    const char *source,
+    const context_observation *const *rows,
+    size_t count,
+    const rg_context_spec *context
+) {
     target_mass *targets = 0;
     size_t target_count = 0;
     size_t target_cap = 0;
     size_t conditioned_cap = model->conditioned_segment_count_count;
-    size_t i;
     double source_total = source_total_for_rows(model->segment_counts, model->segment_count_count, source);
-    rg_status status;
-    status = context_from_candidate(candidate, &context);
-    if (status != RG_OK) {
-        return status;
-    }
-    for (i = 0; i < observation_count; i++) {
-        if (strcmp(observations[i].source, source) == 0 && predicate_holds(&observations[i].context, candidate)) {
-            status = add_target_mass(&targets, &target_count, &target_cap, observations[i].target, observations[i].weight);
-            if (status != RG_OK) {
-                rg_context_spec_clear_internal(&context);
-                free(targets);
-                return status;
-            }
+    size_t i;
+    rg_status status = RG_OK;
+
+    for (i = 0; i < count; i++) {
+        status = add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight);
+        if (status != RG_OK) {
+            free(targets);
+            return status;
         }
     }
-    for (i = 0; i < target_count; i++) {
+    for (i = 0; i < target_count && status == RG_OK; i++) {
+        size_t existing;
+        int replaced = 0;
+        for (existing = 0; existing < model->conditioned_segment_count_count; existing++) {
+            rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[existing];
+            int a_subset_b = 0;
+            int b_subset_a = 0;
+            if (strcmp(row->source, source) != 0 || strcmp(row->target, targets[i].target) != 0) {
+                continue;
+            }
+            if (rg_context_spec_is_subset(&row->context, context, &a_subset_b) == RG_OK &&
+                rg_context_spec_is_subset(context, &row->context, &b_subset_a) == RG_OK &&
+                a_subset_b && b_subset_a) {
+                row->count = targets[i].mass;
+                row->source_total = source_total;
+                row->uncertainty = wilson_interval(row->count, source_total);
+                replaced = 1;
+                break;
+            }
+        }
+        if (replaced) {
+            continue;
+        }
         status = add_conditioned_segment_count(
             &model->conditioned_segment_counts,
             &model->conditioned_segment_count_count,
             &conditioned_cap,
             source,
             targets[i].target,
-            &context,
+            context,
             targets[i].mass,
             source_total
         );
-        if (status != RG_OK) {
-            break;
-        }
     }
-    rg_context_spec_clear_internal(&context);
     free(targets);
     return status;
 }
 
-static rg_status discover_immediate_context_counts(
+typedef struct split_search {
+    const context_observation **yes;
+    const context_observation **no;
+    const context_observation **best_yes;
+    const context_observation **best_no;
+    split_candidate *candidates;
+    size_t capacity;
+} split_search;
+
+static void split_search_clear(split_search *search) {
+    free(search->yes);
+    free(search->no);
+    free(search->best_yes);
+    free(search->best_no);
+    free(search->candidates);
+    memset(search, 0, sizeof(*search));
+}
+
+static rg_status split_search_init(split_search *search, size_t observation_capacity, size_t candidate_capacity) {
+    memset(search, 0, sizeof(*search));
+    search->capacity = candidate_capacity;
+    search->yes = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->yes));
+    search->no = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->no));
+    search->best_yes = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->best_yes));
+    search->best_no = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->best_no));
+    search->candidates = (split_candidate *)calloc(candidate_capacity == 0 ? 1 : candidate_capacity, sizeof(*search->candidates));
+    if (search->yes == 0 || search->no == 0 || search->best_yes == 0 || search->best_no == 0 || search->candidates == 0) {
+        split_search_clear(search);
+        return RG_ERR_OOM;
+    }
+    return RG_OK;
+}
+
+/* Finds the BIC-best split of rows over the given candidates. Returns 1 when a
+ * split beats the threshold, filling best_yes/best_no and best_candidate. */
+static int find_best_split(
+    split_search *search,
+    const context_observation *const *rows,
+    size_t count,
+    const split_candidate *candidates,
+    size_t candidate_count,
+    double min_obs,
+    double delta_threshold,
+    double penalty,
+    double min_dominant_fraction,
+    split_candidate *best_candidate,
+    size_t *best_yes_count,
+    size_t *best_no_count
+) {
+    double baseline = observation_group_cost(rows, count);
+    double best_delta = delta_threshold;
+    int found = 0;
+    size_t ci;
+
+    for (ci = 0; ci < candidate_count; ci++) {
+        size_t yes_count = 0;
+        size_t no_count = 0;
+        size_t i;
+        double split_cost;
+        double delta_bic;
+        for (i = 0; i < count; i++) {
+            if (rg_predicate_holds_internal(&rows[i]->context, &candidates[ci])) {
+                search->yes[yes_count++] = rows[i];
+            } else {
+                search->no[no_count++] = rows[i];
+            }
+        }
+        if (observation_total_weight(search->yes, yes_count) < min_obs ||
+            observation_total_weight(search->no, no_count) < min_obs) {
+            continue;
+        }
+        if (min_dominant_fraction > 0.0 &&
+            observation_dominant_fraction(search->yes, yes_count) < min_dominant_fraction) {
+            continue;
+        }
+        split_cost = observation_group_cost(search->yes, yes_count) + observation_group_cost(search->no, no_count);
+        delta_bic = -2.0 * (baseline - split_cost) + penalty;
+        if (delta_bic < best_delta) {
+            best_delta = delta_bic;
+            *best_candidate = candidates[ci];
+            memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
+            memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
+            *best_yes_count = yes_count;
+            *best_no_count = no_count;
+            found = 1;
+        }
+    }
+    return found;
+}
+
+/* Recursively refines an already-committed conditioned entry, looking for one
+ * further conditioning axis that improves BIC. */
+static rg_status refine_split(
+    rg_pairwise_model *model,
+    const char *source,
+    const context_observation *const *rows,
+    size_t count,
+    const rg_context_spec *base_context,
+    int depth,
+    int max_depth,
+    double min_obs,
+    double delta_threshold,
+    double penalty,
+    const stress_inventory *stress,
+    size_t observation_capacity
+) {
+    split_search search;
+    split_candidate best;
+    size_t yes_count = 0;
+    size_t no_count = 0;
+    size_t candidate_count;
+    rg_context_spec yes_context;
+    rg_status status;
+
+    if (depth >= max_depth || observation_total_weight(rows, count) < min_obs) {
+        return RG_OK;
+    }
+    status = split_search_init(&search, observation_capacity, 64 + 3 * stress->count);
+    if (status != RG_OK) {
+        return status;
+    }
+    candidate_count = immediate_candidates_for(base_context, stress, search.candidates, search.capacity);
+    if (!find_best_split(&search, rows, count, search.candidates, candidate_count,
+                         min_obs, delta_threshold, penalty, 0.0, &best, &yes_count, &no_count)) {
+        split_search_clear(&search);
+        return RG_OK;
+    }
+    status = context_extend(base_context, &best, &yes_context);
+    if (status == RG_OK) {
+        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
+        if (status == RG_OK) {
+            status = refine_split(
+                model,
+                source,
+                search.best_yes,
+                yes_count,
+                &yes_context,
+                depth + 1,
+                max_depth,
+                min_obs,
+                delta_threshold,
+                penalty,
+                stress,
+                observation_capacity
+            );
+        }
+        rg_context_spec_clear_internal(&yes_context);
+    }
+    split_search_clear(&search);
+    return status;
+}
+
+/* Sequential greedy splitting for one source grapheme: repeatedly take the best
+ * BIC-improving split of the remaining observations, commit it (plus a
+ * refinement of its YES side when immediate axes are in play), and continue on
+ * the NO side. */
+static rg_status commit_splits_for_source(
+    rg_pairwise_model *model,
+    const char *source,
+    const context_observation *const *rows,
+    size_t count,
+    const split_candidate *fixed_candidates,
+    size_t fixed_candidate_count,
+    const stress_inventory *stress,
+    int use_refinement,
+    int max_depth,
+    double min_obs,
+    double delta_threshold,
+    double penalty,
+    double min_dominant_fraction
+) {
+    split_search search;
+    const context_observation **remaining;
+    size_t remaining_count = count;
+    int committed = 0;
+    rg_status status;
+
+    status = split_search_init(&search, count, 64 + 3 * stress->count);
+    if (status != RG_OK) {
+        return status;
+    }
+    remaining = (const context_observation **)calloc(count == 0 ? 1 : count, sizeof(*remaining));
+    if (remaining == 0) {
+        split_search_clear(&search);
+        return RG_ERR_OOM;
+    }
+    memcpy(remaining, rows, count * sizeof(*remaining));
+
+    while (committed < max_depth * 4 && observation_total_weight(remaining, remaining_count) >= min_obs) {
+        split_candidate best;
+        size_t yes_count = 0;
+        size_t no_count = 0;
+        const split_candidate *candidates = fixed_candidates;
+        size_t candidate_count = fixed_candidate_count;
+        rg_context_spec yes_context;
+        rg_context_spec empty;
+
+        if (candidates == 0) {
+            rg_context_spec_init_empty(&empty);
+            candidate_count = immediate_candidates_for(&empty, stress, search.candidates, search.capacity);
+            candidates = search.candidates;
+            rg_context_spec_clear_internal(&empty);
+        }
+        if (!find_best_split(&search, remaining, remaining_count, candidates, candidate_count,
+                             min_obs, delta_threshold, penalty, min_dominant_fraction,
+                             &best, &yes_count, &no_count)) {
+            break;
+        }
+        rg_context_spec_init_empty(&empty);
+        status = context_extend(&empty, &best, &yes_context);
+        rg_context_spec_clear_internal(&empty);
+        if (status != RG_OK) {
+            break;
+        }
+        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
+        if (status == RG_OK && use_refinement) {
+            status = refine_split(
+                model,
+                source,
+                search.best_yes,
+                yes_count,
+                &yes_context,
+                1,
+                max_depth,
+                min_obs,
+                delta_threshold,
+                penalty,
+                stress,
+                count
+            );
+        }
+        rg_context_spec_clear_internal(&yes_context);
+        if (status != RG_OK) {
+            break;
+        }
+        memcpy(remaining, search.best_no, no_count * sizeof(*remaining));
+        remaining_count = no_count;
+        committed++;
+    }
+    free(remaining);
+    split_search_clear(&search);
+    return status;
+}
+
+/* Flattens the corpus alignments into (source, target, context, weight) rows.
+ * When decompose_chunks is set, multi-segment links are broken down through a
+ * one-segment sub-alignment and each resulting 1-to-1 pair inherits the outer
+ * link's context, matching the Go reference. */
+static rg_status flatten_context_observations(
     const rg_context *ctx,
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
-    rg_pairwise_model *model
+    rg_pairwise_model *model,
+    int decompose_chunks,
+    context_observation **out,
+    size_t *out_count,
+    double *out_total
 ) {
     context_observation *observations = 0;
     size_t observation_count = 0;
     size_t observation_cap = 0;
-    const char **sources = 0;
-    size_t source_count = 0;
-    size_t source_cap = 0;
+    double n_total = 0.0;
+    int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
     size_t i;
     rg_status status = RG_OK;
-    int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
-    double n_total = 0.0;
-    double min_obs = 2.0;
-    double threshold = 0.0;
-    if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
-    if (options != 0) {
-        if (options->max_chunk_size > 0) {
-            max_chunk_size = options->max_chunk_size;
-        }
-        if (options->bic.min_split_observations > 0) {
-            min_obs = (double)options->bic.min_split_observations;
-        }
-        threshold = options->bic.delta_bic_threshold;
+
+    *out = 0;
+    *out_count = 0;
+    *out_total = 0.0;
+    if (options != 0 && options->max_chunk_size > 0) {
+        max_chunk_size = options->max_chunk_size;
     }
     for (i = 0; i < pair_count && status == RG_OK; i++) {
         rg_alignment *alignment = 0;
@@ -1027,71 +1690,240 @@ static rg_status discover_immediate_context_counts(
         if (status != RG_OK) {
             break;
         }
-        for (j = 0; j < rg_alignment_link_count(alignment); j++) {
+        for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
             const rg_link *link = rg_alignment_link_at(alignment, j);
             if (link->source_count == 1 && link->target_count == 1) {
                 status = append_context_observation(&observations, &observation_count, &observation_cap, link, weight);
-                if (status != RG_OK) {
-                    break;
-                }
-                status = append_unique_source(&sources, &source_count, &source_cap, observations[observation_count - 1].source);
-                if (status != RG_OK) {
-                    break;
-                }
                 n_total += weight;
+                continue;
+            }
+            if (!decompose_chunks || link->source_count == 0 || link->target_count == 0) {
+                continue;
+            }
+            {
+                rg_form sub_source;
+                rg_form sub_target;
+                rg_alignment *sub = 0;
+                size_t k;
+                memset(&sub_source, 0, sizeof(sub_source));
+                memset(&sub_target, 0, sizeof(sub_target));
+                sub_source.lect_id = "_sub";
+                sub_source.segments = link->source;
+                sub_source.segment_count = link->source_count;
+                sub_target.lect_id = "_sub";
+                sub_target.segments = link->target;
+                sub_target.segment_count = link->target_count;
+                status = rg_align_forms_with_model(ctx, model, options, &sub_source, &sub_target, 1, &sub);
+                if (status != RG_OK) {
+                    break;
+                }
+                for (k = 0; k < rg_alignment_link_count(sub) && status == RG_OK; k++) {
+                    const rg_link *sub_link = rg_alignment_link_at(sub, k);
+                    rg_link merged;
+                    if (sub_link->source_count != 1 || sub_link->target_count != 1) {
+                        continue;
+                    }
+                    /* The outer link's context is what conditions this pair. */
+                    merged = *sub_link;
+                    merged.context = link->context;
+                    status = append_context_observation(&observations, &observation_count, &observation_cap, &merged, weight);
+                    n_total += weight;
+                }
+                rg_alignment_free(sub);
             }
         }
         rg_alignment_free(alignment);
     }
-    if (status == RG_OK && observation_count > 0) {
-        qsort(sources, source_count, sizeof(*sources), string_ptr_cmp);
-        for (i = 0; i < source_count && status == RG_OK; i++) {
-            size_t target_count = 0;
-            size_t c;
-            double mass = 0.0;
-            double baseline = baseline_group_cost(observations, observation_count, sources[i], &mass, &target_count);
-            const split_candidate *best = 0;
-            double best_delta = threshold;
-            if (target_count < 2 || mass < min_obs || n_total <= 0.0 || isinf(baseline)) {
-                continue;
+    if (status != RG_OK) {
+        for (i = 0; i < observation_count; i++) {
+            context_observation_clear(&observations[i]);
+        }
+        free(observations);
+        return status;
+    }
+    *out = observations;
+    *out_count = observation_count;
+    *out_total = n_total;
+    return RG_OK;
+}
+
+/* Shared driver for the two context-discovery passes. */
+static rg_status discover_context_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model,
+    int long_range
+) {
+    context_observation *observations = 0;
+    size_t observation_count = 0;
+    double n_total = 0.0;
+    const char **sources = 0;
+    size_t source_count = 0;
+    size_t source_cap = 0;
+    stress_inventory stress;
+    split_candidate *long_range_list = 0;
+    size_t long_range_count = 0;
+    const context_observation **rows = 0;
+    size_t i;
+    rg_status status;
+    double min_obs;
+    double delta_threshold;
+    double dominant_fraction = 0.0;
+    int max_depth = 3;
+
+    if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    memset(&stress, 0, sizeof(stress));
+    if (long_range) {
+        min_obs = 5.0;
+        delta_threshold = -5.0;
+        dominant_fraction = 0.6;
+    } else {
+        min_obs = 2.0;
+        delta_threshold = -1.0;
+    }
+    if (options != 0) {
+        max_depth = options->bic.max_split_depth > 0 ? options->bic.max_split_depth : 3;
+        if (long_range) {
+            if (options->bic.long_range_min_split_observations > 0) {
+                min_obs = (double)options->bic.long_range_min_split_observations;
             }
-            for (c = 0; c < sizeof(immediate_split_candidates) / sizeof(immediate_split_candidates[0]); c++) {
-                double yes_mass = 0.0;
-                double no_mass = 0.0;
-                size_t yes_targets = 0;
-                size_t no_targets = 0;
-                double yes_cost = group_cost_for_candidate(observations, observation_count, sources[i], &immediate_split_candidates[c], 1, &yes_mass, &yes_targets);
-                double no_cost = group_cost_for_candidate(observations, observation_count, sources[i], &immediate_split_candidates[c], 0, &no_mass, &no_targets);
-                double reduction;
-                double delta_bic;
-                (void)yes_targets;
-                (void)no_targets;
-                if (yes_mass < min_obs || no_mass < min_obs || isinf(yes_cost) || isinf(no_cost)) {
-                    continue;
-                }
-                reduction = baseline - (yes_cost + no_cost);
-                delta_bic = -2.0 * reduction + log(n_total);
-                if (delta_bic < best_delta) {
-                    best_delta = delta_bic;
-                    best = &immediate_split_candidates[c];
-                }
+            delta_threshold = options->bic.long_range_delta_bic_threshold;
+            dominant_fraction = options->bic.long_range_min_dominant_fraction;
+        } else {
+            if (options->bic.min_split_observations > 0) {
+                min_obs = (double)options->bic.min_split_observations;
             }
-            if (best != 0) {
-                status = commit_candidate_yes_counts(model, observations, observation_count, sources[i], best);
-            }
+            delta_threshold = options->bic.delta_bic_threshold;
         }
     }
+
+    status = flatten_context_observations(
+        ctx, pairs, pair_count, options, model, long_range ? 0 : 1,
+        &observations, &observation_count, &n_total
+    );
+    if (status != RG_OK) {
+        return status;
+    }
+    if (observation_count == 0 || n_total <= 0.0) {
+        free(observations);
+        return RG_OK;
+    }
+
+    for (i = 0; i < observation_count && status == RG_OK; i++) {
+        status = append_unique_source(&sources, &source_count, &source_cap, observations[i].source);
+        if (status == RG_OK && !long_range) {
+            status = collect_observed_stress(&stress, &observations[i].context);
+        }
+    }
+    if (long_range && status == RG_OK) {
+        long_range_list = (split_candidate *)calloc(
+            sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
+                sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]),
+            sizeof(*long_range_list)
+        );
+        if (long_range_list == 0) {
+            status = RG_ERR_OOM;
+        } else {
+            long_range_count = long_range_candidates(
+                long_range_list,
+                sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
+                    sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0])
+            );
+        }
+    }
+    rows = (const context_observation **)calloc(observation_count, sizeof(*rows));
+    if (rows == 0) {
+        status = RG_ERR_OOM;
+    }
+    if (status == RG_OK) {
+        qsort(sources, source_count, sizeof(*sources), string_ptr_cmp);
+    }
+
+    for (i = 0; i < source_count && status == RG_OK; i++) {
+        size_t row_count = 0;
+        size_t j;
+        size_t distinct_targets = 0;
+        double mass;
+
+        for (j = 0; j < observation_count; j++) {
+            if (strcmp(observations[j].source, sources[i]) == 0) {
+                rows[row_count++] = &observations[j];
+            }
+        }
+        for (j = 0; j < row_count; j++) {
+            size_t k;
+            int seen = 0;
+            for (k = 0; k < j; k++) {
+                if (strcmp(rows[k]->target, rows[j]->target) == 0) {
+                    seen = 1;
+                    break;
+                }
+            }
+            if (!seen) {
+                distinct_targets++;
+            }
+        }
+        mass = observation_total_weight(rows, row_count);
+        if (distinct_targets < 2 || mass < 4.0) {
+            continue;
+        }
+        status = commit_splits_for_source(
+            model,
+            sources[i],
+            rows,
+            row_count,
+            long_range ? long_range_list : 0,
+            long_range_count,
+            &stress,
+            long_range ? 0 : 1,
+            max_depth,
+            min_obs,
+            delta_threshold,
+            log(n_total),
+            dominant_fraction
+        );
+    }
+
     for (i = 0; i < observation_count; i++) {
         context_observation_clear(&observations[i]);
     }
     free(observations);
     free(sources);
+    free(rows);
+    free(long_range_list);
+    stress_inventory_clear(&stress);
     if (status == RG_OK && model->conditioned_segment_count_count > 1) {
-        qsort(model->conditioned_segment_counts, model->conditioned_segment_count_count, sizeof(*model->conditioned_segment_counts), conditioned_count_row_cmp);
+        qsort(model->conditioned_segment_counts, model->conditioned_segment_count_count,
+              sizeof(*model->conditioned_segment_counts), conditioned_count_row_cmp);
     }
     return status;
 }
 
+static rg_status discover_immediate_context_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    return discover_context_counts(ctx, pairs, pair_count, options, model, 0);
+}
+
+/* Long-range discovery runs after cross-dimensional discovery and adds more
+ * specific overlays alongside the immediate-neighbour entries. */
+static rg_status discover_long_range_context_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    return discover_context_counts(ctx, pairs, pair_count, options, model, 1);
+}
 typedef struct chunk_candidate {
     const rg_segment *source;
     size_t source_count;
@@ -1228,19 +2060,100 @@ static double chunk_source_total(const chunk_candidate *items, size_t count, con
     return total;
 }
 
-static rg_status model_link_cost(
+/* Raw compositional cost of a chunk: the negative log probability of producing
+ * it from independent segment-level draws under the best one-segment
+ * decomposition. No log-Z offset, so it is directly comparable with the
+ * promoted cost below. */
+static rg_status compositional_chunk_cost_raw(
     const rg_context *ctx,
     const rg_train_options *options,
     const rg_pairwise_model *model,
-    const rg_segment *source,
-    size_t source_count,
-    const rg_segment *target,
-    size_t target_count,
+    const chunk_candidate *candidate,
     double *out
 ) {
-    return rg_score_link_with_context_model_internal(ctx, model, options, source, source_count, target, target_count, 0, out);
+    rg_form sub_source;
+    rg_form sub_target;
+    rg_alignment *sub = 0;
+    size_t vocab_size;
+    double gap_cost_per_segment;
+    double cost = 0.0;
+    size_t i;
+    rg_status status;
+    rg_pairwise_model no_chunks;
+
+    *out = INFINITY;
+    memset(&sub_source, 0, sizeof(sub_source));
+    memset(&sub_target, 0, sizeof(sub_target));
+    sub_source.lect_id = "_sub_src";
+    sub_source.segments = candidate->source;
+    sub_source.segment_count = candidate->source_count;
+    sub_target.lect_id = "_sub_tgt";
+    sub_target.segments = candidate->target;
+    sub_target.segment_count = candidate->target_count;
+
+    /* A borrowed shallow view with the chunk table emptied: the decomposition
+     * must not reuse chunks that are themselves under evaluation. */
+    no_chunks = *model;
+    no_chunks.chunks = 0;
+    no_chunks.chunk_count = 0;
+
+    status = rg_align_forms_with_model(ctx, &no_chunks, options, &sub_source, &sub_target, 1, &sub);
+    if (status != RG_OK) {
+        return status;
+    }
+    vocab_size = rg_segment_vocab_size_internal(model);
+    if (vocab_size < 1) {
+        vocab_size = 1;
+    }
+    gap_cost_per_segment = vocab_size > 1 ? log((double)vocab_size) : 1.0;
+
+    for (i = 0; i < rg_alignment_link_count(sub); i++) {
+        const rg_link *link = rg_alignment_link_at(sub, i);
+        if (link->source_count == 1 && link->target_count == 1) {
+            rg_context_spec empty;
+            double posterior = 0.0;
+            rg_context_spec_init_empty(&empty);
+            if (!rg_segment_posterior_internal(model, link->source[0].grapheme, link->target[0].grapheme, &empty, &posterior) ||
+                posterior <= 0.0) {
+                rg_context_spec_clear_internal(&empty);
+                rg_alignment_free(sub);
+                return RG_OK;
+            }
+            rg_context_spec_clear_internal(&empty);
+            cost += -log(posterior);
+        } else {
+            size_t span = link->source_count > link->target_count ? link->source_count : link->target_count;
+            cost += gap_cost_per_segment * (double)span;
+        }
+    }
+    rg_alignment_free(sub);
+    *out = cost;
+    return RG_OK;
 }
 
+/* Laplace-smoothed MLE cost of the chunk under the candidate counts. */
+static double promoted_chunk_cost(
+    const chunk_candidate *items,
+    size_t count,
+    const chunk_candidate *candidate,
+    double alpha
+) {
+    size_t variants = 0;
+    double source_total = chunk_source_total(items, count, candidate, &variants);
+    double probability;
+    if (variants == 0) {
+        return INFINITY;
+    }
+    probability = (candidate->count + alpha) / (source_total + alpha * (double)variants);
+    if (probability <= 0.0) {
+        return INFINITY;
+    }
+    return -log(probability);
+}
+
+/* Enumerates contiguous sub-alignments as candidate chunks and promotes the
+ * ones whose BIC improves. Each candidate is judged independently against the
+ * unchanged segment table, so promotion order cannot matter. */
 static rg_status promote_chunk_rows(
     const rg_context *ctx,
     const rg_form_pair *pairs,
@@ -1251,33 +2164,39 @@ static rg_status promote_chunk_rows(
     chunk_candidate *candidates = 0;
     size_t candidate_count = 0;
     size_t candidate_cap = 0;
-    size_t i;
-    size_t promoted_cap = 0;
-    rg_status status = RG_OK;
-    int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
-    double min_obs = 2.0;
+    rg_chunk_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
     double n_observations = 0.0;
-    if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
+    double min_chunk_obs = 2.0;
+    size_t i;
+    int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_status status = RG_OK;
+
     if (options != 0) {
         if (options->max_chunk_size > 0) {
             max_chunk_size = options->max_chunk_size;
         }
         if (options->bic.min_chunk_observations > 0) {
-            min_obs = (double)options->bic.min_chunk_observations;
+            min_chunk_obs = (double)options->bic.min_chunk_observations;
+        }
+        if (options->chunk_min_transparency > 0.0) {
+            /* The transparency screen needs the chunk-diagnostics analyzer,
+             * which is not ported yet; refusing beats silently skipping it. */
+            return RG_ERR_UNSUPPORTED_OPTION;
         }
     }
+
     for (i = 0; i < pair_count && status == RG_OK; i++) {
         rg_alignment *alignment = 0;
         size_t link_count;
-        size_t *src_starts = 0;
-        size_t *src_ends = 0;
-        size_t *tgt_starts = 0;
-        size_t *tgt_ends = 0;
-        size_t j;
-        size_t s_pos = 0;
-        size_t t_pos = 0;
+        size_t *source_starts = 0;
+        size_t *source_ends = 0;
+        size_t *target_starts = 0;
+        size_t *target_ends = 0;
+        size_t a;
+        size_t source_pos = 0;
+        size_t target_pos = 0;
         double weight = pairs[i].weight == 0.0 ? 1.0 : pairs[i].weight;
         if (weight <= 0.0) {
             continue;
@@ -1287,127 +2206,165 @@ static rg_status promote_chunk_rows(
             break;
         }
         link_count = rg_alignment_link_count(alignment);
-        src_starts = (size_t *)calloc(link_count, sizeof(*src_starts));
-        src_ends = (size_t *)calloc(link_count, sizeof(*src_ends));
-        tgt_starts = (size_t *)calloc(link_count, sizeof(*tgt_starts));
-        tgt_ends = (size_t *)calloc(link_count, sizeof(*tgt_ends));
-        if ((src_starts == 0 || src_ends == 0 || tgt_starts == 0 || tgt_ends == 0) && link_count > 0) {
-            status = RG_ERR_OOM;
-        }
-        for (j = 0; j < link_count && status == RG_OK; j++) {
-            const rg_link *link = rg_alignment_link_at(alignment, j);
-            src_starts[j] = s_pos;
-            tgt_starts[j] = t_pos;
-            s_pos += link->source_count;
-            t_pos += link->target_count;
-            src_ends[j] = s_pos;
-            tgt_ends[j] = t_pos;
+        for (a = 0; a < link_count; a++) {
+            const rg_link *link = rg_alignment_link_at(alignment, a);
             if (link->source_count == 1 && link->target_count == 1) {
                 n_observations += weight;
             }
         }
-        for (j = 0; j < link_count && status == RG_OK; j++) {
-            size_t k;
-            for (k = j; k < link_count; k++) {
+        if (link_count == 0) {
+            rg_alignment_free(alignment);
+            continue;
+        }
+        source_starts = (size_t *)calloc(link_count, sizeof(*source_starts));
+        source_ends = (size_t *)calloc(link_count, sizeof(*source_ends));
+        target_starts = (size_t *)calloc(link_count, sizeof(*target_starts));
+        target_ends = (size_t *)calloc(link_count, sizeof(*target_ends));
+        if (source_starts == 0 || source_ends == 0 || target_starts == 0 || target_ends == 0) {
+            free(source_starts);
+            free(source_ends);
+            free(target_starts);
+            free(target_ends);
+            rg_alignment_free(alignment);
+            status = RG_ERR_OOM;
+            break;
+        }
+        for (a = 0; a < link_count; a++) {
+            const rg_link *link = rg_alignment_link_at(alignment, a);
+            source_starts[a] = source_pos;
+            target_starts[a] = target_pos;
+            source_pos += link->source_count;
+            target_pos += link->target_count;
+            source_ends[a] = source_pos;
+            target_ends[a] = target_pos;
+        }
+        for (a = 0; a < link_count && status == RG_OK; a++) {
+            size_t b;
+            for (b = a; b < link_count && status == RG_OK; b++) {
                 const rg_segment *source_chunk = 0;
                 const rg_segment *target_chunk = 0;
-                size_t source_count = src_ends[k] - src_starts[j];
-                size_t target_count = tgt_ends[k] - tgt_starts[j];
-                if (source_count > (size_t)max_chunk_size || target_count > (size_t)max_chunk_size) {
-                    break;
-                }
-                if (source_count == 0 || target_count == 0 || source_count + target_count < 3) {
-                    continue;
-                }
-                if (spans_break(src_starts[j], src_ends[k], pairs[i].source.morpheme_breaks, pairs[i].source.morpheme_break_count) ||
-                    spans_break(tgt_starts[j], tgt_ends[k], pairs[i].target.morpheme_breaks, pairs[i].target.morpheme_break_count)) {
-                    continue;
-                }
-                status = append_segments_from_link_span(alignment, j, k, 1, &source_chunk, &source_count);
-                if (status == RG_OK) {
-                    status = append_segments_from_link_span(alignment, j, k, 0, &target_chunk, &target_count);
-                }
-                if (status == RG_OK) {
-                    status = add_chunk_candidate(&candidates, &candidate_count, &candidate_cap, source_chunk, source_count, target_chunk, target_count, weight);
-                }
-                segment_array_clear(source_chunk, source_count);
-                segment_array_clear(target_chunk, target_count);
+                size_t source_chunk_count = 0;
+                size_t target_chunk_count = 0;
+                status = append_segments_from_link_span(alignment, a, b, 1, &source_chunk, &source_chunk_count);
                 if (status != RG_OK) {
                     break;
                 }
+                status = append_segments_from_link_span(alignment, a, b, 0, &target_chunk, &target_chunk_count);
+                if (status != RG_OK) {
+                    segment_array_clear(source_chunk, source_chunk_count);
+                    break;
+                }
+                if (source_chunk_count > (size_t)max_chunk_size || target_chunk_count > (size_t)max_chunk_size) {
+                    segment_array_clear(source_chunk, source_chunk_count);
+                    segment_array_clear(target_chunk, target_chunk_count);
+                    break;
+                }
+                if (source_chunk_count == 0 || target_chunk_count == 0 ||
+                    source_chunk_count + target_chunk_count < 3 ||
+                    spans_break(source_starts[a], source_ends[b], pairs[i].source.morpheme_breaks, pairs[i].source.morpheme_break_count) ||
+                    spans_break(target_starts[a], target_ends[b], pairs[i].target.morpheme_breaks, pairs[i].target.morpheme_break_count)) {
+                    segment_array_clear(source_chunk, source_chunk_count);
+                    segment_array_clear(target_chunk, target_chunk_count);
+                    continue;
+                }
+                status = add_chunk_candidate(
+                    &candidates, &candidate_count, &candidate_cap,
+                    source_chunk, source_chunk_count, target_chunk, target_chunk_count, weight
+                );
+                segment_array_clear(source_chunk, source_chunk_count);
+                segment_array_clear(target_chunk, target_chunk_count);
             }
         }
-        free(src_starts);
-        free(src_ends);
-        free(tgt_starts);
-        free(tgt_ends);
+        free(source_starts);
+        free(source_ends);
+        free(target_starts);
+        free(target_ends);
         rg_alignment_free(alignment);
     }
+
     if (n_observations <= 0.0) {
         n_observations = 1.0;
     }
+
     for (i = 0; i < candidate_count && status == RG_OK; i++) {
-        size_t variants = 0;
-        double source_total = chunk_source_total(candidates, candidate_count, &candidates[i], &variants);
-        double comp_cost = 0.0;
-        double promoted_prob;
-        double promoted_cost;
+        double compositional = 0.0;
+        double promoted;
         double reduction;
-        double k_params;
         double delta_bic;
-        rg_chunk_row *next;
-        if (candidates[i].count < min_obs || source_total <= 0.0 || variants == 0) {
+        double log_z_sum = 0.0;
+        size_t k_params;
+        size_t j;
+        if (candidates[i].count < min_chunk_obs) {
             continue;
         }
-        status = model_link_cost(ctx, options, model, candidates[i].source, candidates[i].source_count, candidates[i].target, candidates[i].target_count, &comp_cost);
+        status = compositional_chunk_cost_raw(ctx, options, model, &candidates[i], &compositional);
         if (status != RG_OK) {
             break;
         }
-        promoted_prob = (candidates[i].count + 1.0) / (source_total + (double)variants);
-        if (promoted_prob <= 0.0) {
+        promoted = promoted_chunk_cost(candidates, candidate_count, &candidates[i], 1.0);
+        if (isinf(compositional) || isinf(promoted)) {
             continue;
         }
-        promoted_cost = -log(promoted_prob);
-        reduction = candidates[i].count * (comp_cost - promoted_cost);
-        k_params = candidates[i].source_count > candidates[i].target_count ? (double)candidates[i].source_count : (double)candidates[i].target_count;
-        delta_bic = -2.0 * reduction + k_params * log(n_observations);
+        reduction = candidates[i].count * (compositional - promoted);
+        k_params = candidates[i].source_count > candidates[i].target_count
+            ? candidates[i].source_count
+            : candidates[i].target_count;
+        delta_bic = -2.0 * reduction + (double)k_params * log(n_observations);
         if (delta_bic >= 0.0) {
             continue;
         }
-        if (model->chunk_count == promoted_cap) {
-            size_t next_cap = promoted_cap == 0 ? 8 : promoted_cap * 2;
-            next = (rg_chunk_row *)realloc(model->chunks, next_cap * sizeof(*model->chunks));
+        for (j = 0; j < candidates[i].source_count; j++) {
+            log_z_sum += rg_segment_log_normalizer_internal(model, candidates[i].source[j].grapheme);
+        }
+        if (row_count == row_cap) {
+            size_t next_cap = row_cap == 0 ? 8 : row_cap * 2;
+            rg_chunk_row *next = (rg_chunk_row *)realloc(rows, next_cap * sizeof(*next));
             if (next == 0) {
                 status = RG_ERR_OOM;
                 break;
             }
-            model->chunks = next;
-            promoted_cap = next_cap;
+            rows = next;
+            row_cap = next_cap;
         }
-        memset(&model->chunks[model->chunk_count], 0, sizeof(model->chunks[model->chunk_count]));
-        status = segment_array_copy(candidates[i].source, candidates[i].source_count, &model->chunks[model->chunk_count].source);
-        if (status == RG_OK) {
-            status = segment_array_copy(candidates[i].target, candidates[i].target_count, &model->chunks[model->chunk_count].target);
-        }
+        memset(&rows[row_count], 0, sizeof(rows[row_count]));
+        status = segment_array_copy(candidates[i].source, candidates[i].source_count, &rows[row_count].source);
         if (status != RG_OK) {
-            chunk_row_clear(&model->chunks[model->chunk_count]);
             break;
         }
-        model->chunks[model->chunk_count].source_count = candidates[i].source_count;
-        model->chunks[model->chunk_count].target_count = candidates[i].target_count;
-        model->chunks[model->chunk_count].cost = promoted_cost;
-        model->chunks[model->chunk_count].count = candidates[i].count;
-        model->chunks[model->chunk_count].uncertainty = wilson_interval(candidates[i].count, n_observations);
-        model->chunk_count++;
+        status = segment_array_copy(candidates[i].target, candidates[i].target_count, &rows[row_count].target);
+        if (status != RG_OK) {
+            chunk_row_clear(&rows[row_count]);
+            break;
+        }
+        rows[row_count].source_count = candidates[i].source_count;
+        rows[row_count].target_count = candidates[i].target_count;
+        rows[row_count].cost = promoted - log_z_sum;
+        rows[row_count].count = candidates[i].count;
+        rows[row_count].uncertainty = wilson_interval(candidates[i].count, n_observations);
+        row_count++;
     }
+
     for (i = 0; i < candidate_count; i++) {
         chunk_candidate_clear(&candidates[i]);
     }
     free(candidates);
-    if (status == RG_OK && model->chunk_count > 1) {
-        qsort(model->chunks, model->chunk_count, sizeof(*model->chunks), chunk_row_cmp);
+    if (status != RG_OK) {
+        for (i = 0; i < row_count; i++) {
+            chunk_row_clear(&rows[i]);
+        }
+        free(rows);
+        return status;
     }
-    return status;
+    if (row_count > 1) {
+        qsort(rows, row_count, sizeof(*rows), chunk_row_cmp);
+    }
+    for (i = 0; i < model->chunk_count; i++) {
+        chunk_row_clear(&model->chunks[i]);
+    }
+    free(model->chunks);
+    model->chunks = rows;
+    model->chunk_count = row_count;
+    return RG_OK;
 }
 
 static const char *relative_position_name(int offset) {
@@ -1424,7 +2381,7 @@ static const char *relative_position_name(int offset) {
 }
 
 static int segment_has_context_feature(const rg_context *ctx, const rg_form *form, int index, const char *feature) {
-    rg_feature_set *features = 0;
+    const rg_feature_set *features = 0;
     rg_status status;
     int found = 0;
     if (ctx == 0 || form == 0 || feature == 0 || index < 0 || (size_t)index >= form->segment_count) {
@@ -1433,7 +2390,7 @@ static int segment_has_context_feature(const rg_context *ctx, const rg_form *for
     if (form->segments[index].grapheme == 0) {
         return 0;
     }
-    status = rg_context_grapheme_features(ctx, form->segments[index].grapheme, &features);
+    status = rg_context_features_internal(ctx, form->segments[index].grapheme, &features);
     if (status != RG_OK) {
         return 0;
     }
@@ -1447,7 +2404,6 @@ static int segment_has_context_feature(const rg_context *ctx, const rg_form *for
             }
         }
     }
-    rg_feature_set_free(features);
     return found;
 }
 
@@ -1652,35 +2608,220 @@ static rg_status discover_cross_dimensional_rows(
     return RG_OK;
 }
 
-static rg_status collect_pairwise_counts(
+/* ---- initial prior model ------------------------------------------------ */
+
+static rg_status append_vocab(char ***vocab, size_t *count, size_t *cap, const char *grapheme) {
+    size_t i;
+    size_t insert_at;
+    if (grapheme == 0) {
+        return RG_OK;
+    }
+    for (i = 0; i < *count; i++) {
+        if (strcmp((*vocab)[i], grapheme) == 0) {
+            return RG_OK;
+        }
+    }
+    if (*count == *cap) {
+        size_t next_cap = *cap == 0 ? 32 : *cap * 2;
+        char **next = (char **)realloc(*vocab, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        *vocab = next;
+        *cap = next_cap;
+    }
+    insert_at = *count;
+    while (insert_at > 0 && strcmp((*vocab)[insert_at - 1], grapheme) > 0) {
+        insert_at--;
+    }
+    if (insert_at < *count) {
+        memmove(&(*vocab)[insert_at + 1], &(*vocab)[insert_at], (*count - insert_at) * sizeof(**vocab));
+    }
+    (*vocab)[insert_at] = rg_strdup_internal(grapheme);
+    if ((*vocab)[insert_at] == 0) {
+        return RG_ERR_OOM;
+    }
+    (*count)++;
+    return RG_OK;
+}
+
+static int grapheme_is_known(const rg_context *ctx, const char *grapheme) {
+    const rg_feature_set *features = 0;
+    return rg_context_features_internal(ctx, grapheme, &features) == RG_OK;
+}
+
+/* Builds the starting model: no counts, a merkmal-derived Dirichlet prior over
+ * the corpus grapheme inventory, and empty displacement, chunk and tonal
+ * tables. The vocabulary is sorted so the softmax sums in a fixed order;
+ * floating-point non-associativity would otherwise make iteration order
+ * visible in the prior values. */
+static rg_status build_initial_prior_model(
     const rg_context *ctx,
-    const rg_pairwise_model *scoring_model,
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
     rg_pairwise_model **out
 ) {
     rg_pairwise_model *model;
-    rg_segment_count_row *rows = 0;
-    rg_displacement_count_row *disp_rows = 0;
-    rg_tonal_count_row *tonal_rows = 0;
-    size_t row_count = 0;
-    size_t row_cap = 0;
-    size_t disp_count = 0;
-    size_t disp_cap = 0;
-    size_t tonal_count = 0;
-    size_t tonal_cap = 0;
+    char **vocab = 0;
+    size_t vocab_count = 0;
+    size_t vocab_cap = 0;
+    double *logits = 0;
+    double *exps = 0;
+    size_t *targets = 0;
+    size_t prior_cap = 0;
+    size_t normalizer_cap = 0;
     size_t i;
     rg_status status = RG_OK;
-    int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
+    double temperature = options->temperature == 0.0 ? 1.0 : options->temperature;
+    double concentration = options->concentration;
 
-    if (ctx == 0 || out == 0 || (pair_count > 0 && pairs == 0)) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
     *out = 0;
-    if (options != 0 && options->max_chunk_size > 0) {
-        max_chunk_size = options->max_chunk_size;
+    for (i = 0; i < pair_count && status == RG_OK; i++) {
+        size_t j;
+        double weight = pairs[i].weight == 0.0 ? 1.0 : pairs[i].weight;
+        if (weight <= 0.0) {
+            continue;
+        }
+        for (j = 0; j < pairs[i].source.segment_count && status == RG_OK; j++) {
+            status = append_vocab(&vocab, &vocab_count, &vocab_cap, pairs[i].source.segments[j].grapheme);
+        }
+        for (j = 0; j < pairs[i].target.segment_count && status == RG_OK; j++) {
+            status = append_vocab(&vocab, &vocab_count, &vocab_cap, pairs[i].target.segments[j].grapheme);
+        }
     }
+    model = (rg_pairwise_model *)calloc(1, sizeof(*model));
+    if (model == 0 || status != RG_OK) {
+        string_array_free(vocab, vocab_count);
+        free(model);
+        return status == RG_OK ? RG_ERR_OOM : status;
+    }
+    model->concentration = concentration;
+    model->segment_weight = options->segment_weight;
+    model->displacement_weight = options->displacement_weight;
+    model->tone_weight = options->tone_weight;
+
+    logits = (double *)calloc(vocab_count == 0 ? 1 : vocab_count, sizeof(*logits));
+    exps = (double *)calloc(vocab_count == 0 ? 1 : vocab_count, sizeof(*exps));
+    targets = (size_t *)calloc(vocab_count == 0 ? 1 : vocab_count, sizeof(*targets));
+    if (logits == 0 || exps == 0 || targets == 0) {
+        free(logits);
+        free(exps);
+        free(targets);
+        string_array_free(vocab, vocab_count);
+        rg_pairwise_model_free(model);
+        return RG_ERR_OOM;
+    }
+
+    for (i = 0; i < vocab_count && status == RG_OK; i++) {
+        size_t j;
+        size_t logit_count = 0;
+        double max_logit = 0.0;
+        double total = 0.0;
+        if (!grapheme_is_known(ctx, vocab[i])) {
+            continue;
+        }
+        for (j = 0; j < vocab_count; j++) {
+            double distance = 0.0;
+            if (!grapheme_is_known(ctx, vocab[j])) {
+                continue;
+            }
+            if (rg_context_segment_distance(ctx, vocab[i], vocab[j], &distance) != RG_OK) {
+                continue;
+            }
+            logits[logit_count] = -temperature * distance;
+            targets[logit_count] = j;
+            logit_count++;
+        }
+        if (logit_count == 0) {
+            continue;
+        }
+        max_logit = logits[0];
+        for (j = 1; j < logit_count; j++) {
+            if (logits[j] > max_logit) {
+                max_logit = logits[j];
+            }
+        }
+        for (j = 0; j < logit_count; j++) {
+            exps[j] = exp(logits[j] - max_logit);
+            total += exps[j];
+        }
+        if (total <= 0.0) {
+            continue;
+        }
+        if (model->log_normalizer_count == normalizer_cap) {
+            size_t next_cap = normalizer_cap == 0 ? 32 : normalizer_cap * 2;
+            rg_log_normalizer_row *next = (rg_log_normalizer_row *)realloc(model->log_normalizers, next_cap * sizeof(*next));
+            if (next == 0) {
+                status = RG_ERR_OOM;
+                break;
+            }
+            model->log_normalizers = next;
+            normalizer_cap = next_cap;
+        }
+        model->log_normalizers[model->log_normalizer_count].source = rg_strdup_internal(vocab[i]);
+        if (model->log_normalizers[model->log_normalizer_count].source == 0) {
+            status = RG_ERR_OOM;
+            break;
+        }
+        model->log_normalizers[model->log_normalizer_count].value = max_logit + log(total);
+        model->log_normalizer_count++;
+
+        for (j = 0; j < logit_count && status == RG_OK; j++) {
+            if (model->segment_prior_count == prior_cap) {
+                size_t next_cap = prior_cap == 0 ? 64 : prior_cap * 2;
+                rg_segment_prior_row *next = (rg_segment_prior_row *)realloc(model->segment_priors, next_cap * sizeof(*next));
+                if (next == 0) {
+                    status = RG_ERR_OOM;
+                    break;
+                }
+                model->segment_priors = next;
+                prior_cap = next_cap;
+            }
+            model->segment_priors[model->segment_prior_count].source = rg_strdup_internal(vocab[i]);
+            model->segment_priors[model->segment_prior_count].target = rg_strdup_internal(vocab[targets[j]]);
+            if (model->segment_priors[model->segment_prior_count].source == 0 ||
+                model->segment_priors[model->segment_prior_count].target == 0) {
+                free(model->segment_priors[model->segment_prior_count].source);
+                free(model->segment_priors[model->segment_prior_count].target);
+                status = RG_ERR_OOM;
+                break;
+            }
+            model->segment_priors[model->segment_prior_count].alpha = concentration * (exps[j] / total);
+            model->segment_prior_count++;
+        }
+    }
+
+    free(logits);
+    free(exps);
+    free(targets);
+    string_array_free(vocab, vocab_count);
+    if (status != RG_OK) {
+        rg_pairwise_model_free(model);
+        return status;
+    }
+    *out = model;
+    return RG_OK;
+}
+
+/* Rebuilds the segment counts from the 1-to-1 links of the current alignments,
+ * leaving the prior, the normalizers, and every other table untouched. This is
+ * the M-step; the displacement, chunk and tonal tables stay empty until their
+ * own stages run. */
+static rg_status update_segment_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    rg_segment_count_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
+    size_t i;
+    int max_chunk_size = options->max_chunk_size > 0 ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_status status = RG_OK;
+
     for (i = 0; i < pair_count && status == RG_OK; i++) {
         rg_alignment *alignment = 0;
         size_t j;
@@ -1688,43 +2829,15 @@ static rg_status collect_pairwise_counts(
         if (weight <= 0.0) {
             continue;
         }
-        if (scoring_model != 0) {
-            status = rg_align_forms_with_model(ctx, scoring_model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
-        } else {
-            status = rg_align_forms(ctx, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
-        }
+        status = rg_align_forms_with_model(ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
         if (status != RG_OK) {
             break;
         }
-        for (j = 0; j < rg_alignment_link_count(alignment); j++) {
+        for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
             const rg_link *link = rg_alignment_link_at(alignment, j);
             if (link->source_count == 1 && link->target_count == 1) {
-                size_t d;
-                status = add_segment_count(&rows, &row_count, &row_cap, link->source[0].grapheme, link->target[0].grapheme, weight);
-                if (status != RG_OK) {
-                    break;
-                }
-                for (d = 0; d < link->feature_displacement_count; d++) {
-                    status = add_displacement_count(
-                        &disp_rows,
-                        &disp_count,
-                        &disp_cap,
-                        link->feature_displacement[d].feature,
-                        link->feature_displacement[d].from_value,
-                        link->feature_displacement[d].to_value,
-                        weight
-                    );
-                    if (status != RG_OK) {
-                        break;
-                    }
-                }
-                if (status != RG_OK) {
-                    break;
-                }
-                status = add_tonal_count(&tonal_rows, &tonal_count, &tonal_cap, link->source[0].tone, link->target[0].tone, weight);
-                if (status != RG_OK) {
-                    break;
-                }
+                status = add_segment_count(&rows, &row_count, &row_cap,
+                                           link->source[0].grapheme, link->target[0].grapheme, weight);
             }
         }
         rg_alignment_free(alignment);
@@ -1734,51 +2847,142 @@ static rg_status collect_pairwise_counts(
             segment_count_row_clear(&rows[i]);
         }
         free(rows);
-        for (i = 0; i < disp_count; i++) {
-            free((char *)disp_rows[i].feature);
-            free((char *)disp_rows[i].from_value);
-            free((char *)disp_rows[i].to_value);
-        }
-        free(disp_rows);
-        for (i = 0; i < tonal_count; i++) {
-            free((char *)tonal_rows[i].source_tone);
-            free((char *)tonal_rows[i].target_tone);
-        }
-        free(tonal_rows);
         return status;
     }
     fill_source_totals(rows, row_count);
-    fill_displacement_total(disp_rows, disp_count);
-    fill_tonal_source_totals(tonal_rows, tonal_count);
     qsort(rows, row_count, sizeof(*rows), count_row_cmp);
-    qsort(disp_rows, disp_count, sizeof(*disp_rows), displacement_row_cmp);
-    qsort(tonal_rows, tonal_count, sizeof(*tonal_rows), tonal_row_cmp);
-    model = (rg_pairwise_model *)calloc(1, sizeof(*model));
-    if (model == 0) {
-        for (i = 0; i < row_count; i++) {
-            segment_count_row_clear(&rows[i]);
-        }
-        free(rows);
-        for (i = 0; i < disp_count; i++) {
-            free((char *)disp_rows[i].feature);
-            free((char *)disp_rows[i].from_value);
-            free((char *)disp_rows[i].to_value);
-        }
-        free(disp_rows);
-        for (i = 0; i < tonal_count; i++) {
-            free((char *)tonal_rows[i].source_tone);
-            free((char *)tonal_rows[i].target_tone);
-        }
-        free(tonal_rows);
-        return RG_ERR_OOM;
+    for (i = 0; i < model->segment_count_count; i++) {
+        segment_count_row_clear(&model->segment_counts[i]);
     }
+    free(model->segment_counts);
     model->segment_counts = rows;
     model->segment_count_count = row_count;
-    model->displacement_counts = disp_rows;
-    model->displacement_count_count = disp_count;
-    model->tonal_counts = tonal_rows;
-    model->tonal_count_count = tonal_count;
-    *out = model;
+    return RG_OK;
+}
+
+/* Re-aligns under the post-EM model and builds the feature displacement
+ * distribution from every 1-to-1 link. */
+static rg_status aggregate_displacement_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    rg_displacement_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
+    size_t i;
+    int max_chunk_size = options->max_chunk_size > 0 ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_status status = RG_OK;
+
+    for (i = 0; i < pair_count && status == RG_OK; i++) {
+        rg_alignment *alignment = 0;
+        size_t j;
+        double weight = pairs[i].weight == 0.0 ? 1.0 : pairs[i].weight;
+        if (weight <= 0.0) {
+            continue;
+        }
+        status = rg_align_forms_with_model(ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
+        if (status != RG_OK) {
+            break;
+        }
+        for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
+            const rg_link *link = rg_alignment_link_at(alignment, j);
+            if (link->source_count != 1 || link->target_count != 1) {
+                continue;
+            }
+            status = add_displacement_vector(
+                &rows,
+                &row_count,
+                &row_cap,
+                link->feature_displacement,
+                link->feature_displacement_count,
+                weight
+            );
+        }
+        rg_alignment_free(alignment);
+    }
+    if (status != RG_OK) {
+        for (i = 0; i < row_count; i++) {
+            displacement_row_clear(&rows[i]);
+        }
+        free(rows);
+        return status;
+    }
+    fill_displacement_total(rows, row_count);
+    qsort(rows, row_count, sizeof(*rows), displacement_row_cmp);
+    for (i = 0; i < model->displacement_row_count; i++) {
+        displacement_row_clear(&model->displacement_rows[i]);
+    }
+    free(model->displacement_rows);
+    model->displacement_rows = rows;
+    model->displacement_row_count = row_count;
+    return RG_OK;
+}
+
+/* Re-aligns under the post-chunk-promotion model and counts each 1-to-1 link's
+ * tonal correspondence. The table stays empty for non-tonal corpora. */
+static rg_status aggregate_tonal_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    rg_tonal_count_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
+    size_t i;
+    int any_toned = 0;
+    int max_chunk_size = options->max_chunk_size > 0 ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_status status = RG_OK;
+
+    for (i = 0; i < pair_count && status == RG_OK; i++) {
+        rg_alignment *alignment = 0;
+        size_t j;
+        double weight = pairs[i].weight == 0.0 ? 1.0 : pairs[i].weight;
+        if (weight <= 0.0) {
+            continue;
+        }
+        status = rg_align_forms_with_model(ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
+        if (status != RG_OK) {
+            break;
+        }
+        for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
+            const rg_link *link = rg_alignment_link_at(alignment, j);
+            const char *source_tone;
+            const char *target_tone;
+            if (link->source_count != 1 || link->target_count != 1) {
+                continue;
+            }
+            source_tone = link->source[0].tone == 0 ? "" : link->source[0].tone;
+            target_tone = link->target[0].tone == 0 ? "" : link->target[0].tone;
+            if (source_tone[0] == '\0' && target_tone[0] == '\0') {
+                continue;
+            }
+            any_toned = 1;
+            status = add_tonal_count(&rows, &row_count, &row_cap, source_tone, target_tone, weight);
+        }
+        rg_alignment_free(alignment);
+    }
+    if (status != RG_OK || !any_toned) {
+        for (i = 0; i < row_count; i++) {
+            free((char *)rows[i].source_tone);
+            free((char *)rows[i].target_tone);
+        }
+        free(rows);
+        return status;
+    }
+    fill_tonal_source_totals(rows, row_count);
+    qsort(rows, row_count, sizeof(*rows), tonal_row_cmp);
+    for (i = 0; i < model->tonal_count_count; i++) {
+        free((char *)model->tonal_counts[i].source_tone);
+        free((char *)model->tonal_counts[i].target_tone);
+    }
+    free(model->tonal_counts);
+    model->tonal_counts = rows;
+    model->tonal_count_count = row_count;
     return RG_OK;
 }
 
@@ -1830,7 +3034,6 @@ rg_status rg_train_pairwise_segment_counts(
     rg_pairwise_model **out
 ) {
     rg_pairwise_model *model = 0;
-    rg_pairwise_model *next = 0;
     rg_train_options defaults;
     const rg_train_options *opts = options;
     int max_iter;
@@ -1850,7 +3053,13 @@ rg_status rg_train_pairwise_segment_counts(
     max_iter = opts->max_iter <= 0 ? 1 : opts->max_iter;
     eps = opts->convergence_eps <= 0.0 ? 1e-4 : opts->convergence_eps;
 
-    status = collect_pairwise_counts(ctx, 0, pairs, pair_count, opts, &model);
+    /* Stage order is load-bearing and mirrors the Go pipeline: initial prior,
+     * segment EM, displacement aggregation, immediate context discovery, chunk
+     * promotion, tonal aggregation, cross-dimensional discovery, long-range
+     * context discovery. Context splits need stable segment correspondences,
+     * chunk promotion would otherwise steal observations, and cross-dimensional
+     * rules should explain what the segmental and tonal baselines leave over. */
+    status = build_initial_prior_model(ctx, pairs, pair_count, opts, &model);
     if (status != RG_OK) {
         return status;
     }
@@ -1868,30 +3077,31 @@ rg_status rg_train_pairwise_segment_counts(
             }
         }
         prev_cost = cost;
-        status = collect_pairwise_counts(ctx, model, pairs, pair_count, opts, &next);
+        status = update_segment_counts(ctx, pairs, pair_count, opts, model);
         if (status != RG_OK) {
             rg_pairwise_model_free(model);
             return status;
         }
-        rg_pairwise_model_free(model);
-        model = next;
-        next = 0;
     }
-    status = discover_immediate_context_counts(ctx, pairs, pair_count, opts, model);
-    if (status != RG_OK) {
-        rg_pairwise_model_free(model);
-        return status;
-    }
-    status = promote_chunk_rows(ctx, pairs, pair_count, opts, model);
-    if (status != RG_OK) {
-        rg_pairwise_model_free(model);
-        return status;
-    }
-    status = discover_cross_dimensional_rows(ctx, pairs, pair_count, opts, model);
-    if (status != RG_OK) {
-        rg_pairwise_model_free(model);
-        return status;
-    }
+
+#define RUN_STAGE(call)                        \
+    do {                                       \
+        status = (call);                       \
+        if (status != RG_OK) {                 \
+            rg_pairwise_model_free(model);     \
+            return status;                     \
+        }                                      \
+    } while (0)
+
+    RUN_STAGE(aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE(discover_immediate_context_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE(promote_chunk_rows(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE(aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE(discover_cross_dimensional_rows(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE(discover_long_range_context_counts(ctx, pairs, pair_count, opts, model));
+
+#undef RUN_STAGE
+
     *out = model;
     return RG_OK;
 }
@@ -1906,21 +3116,21 @@ rg_status rg_train_pairwise(
     return rg_train_pairwise_segment_counts(ctx, pairs, pair_count, options, out);
 }
 
-size_t rg_pairwise_model_displacement_count_row_count(const rg_pairwise_model *model) {
+size_t rg_pairwise_model_displacement_row_count(const rg_pairwise_model *model) {
     if (model == 0) {
         return 0;
     }
-    return model->displacement_count_count;
+    return model->displacement_row_count;
 }
 
-const rg_displacement_count_row *rg_pairwise_model_displacement_count_row_at(
+const rg_displacement_row *rg_pairwise_model_displacement_row_at(
     const rg_pairwise_model *model,
     size_t index
 ) {
-    if (model == 0 || index >= model->displacement_count_count) {
+    if (model == 0 || index >= model->displacement_row_count) {
         return 0;
     }
-    return &model->displacement_counts[index];
+    return &model->displacement_rows[index];
 }
 
 size_t rg_pairwise_model_tonal_count_row_count(const rg_pairwise_model *model) {

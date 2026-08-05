@@ -1,0 +1,13 @@
+Language_ID,Segments,Cognacy
+one,p a + t a,b1
+two,f a + t a,b1
+one,p a + k a,b2
+two,f a + k a,b2
+one,p a + n a,b3
+two,f a + n a,b3
+one,k a + t a,b4
+two,k a + t a,b4
+one,k a + n a,b5
+two,k a + n a,b5
+one,p a + s a,b6
+two,f a + s a,b6
