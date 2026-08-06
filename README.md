@@ -1,7 +1,14 @@
 # regulae
 
 Pairwise and multi-lect phonological alignment for the new
-historical linguistics framework — a Go implementation.
+historical linguistics framework.
+
+The implementation is a C99 core library with a C ABI. A Go
+implementation is kept alongside it as a frozen executable
+reference the C port is diffed against, and is removed once the
+Python wrapper, WebAssembly path and migration tests are in
+place; the original Python is archived under `python/`. See
+`docs/c_conversion_roadmap.md` for the conversion state.
 
 ## What this package does
 
@@ -14,7 +21,7 @@ build phylogenies, or assign dates to changes: those are jobs
 for a downstream historical-inference package that consumes
 this one's output.
 
-What you get back from a training run is a `MultiLectModel`
+What you get back from a training run is a multi-lect model
 carrying:
 
 - **Per-pair learned models** for every directed pair of lects
@@ -61,30 +68,56 @@ carrying:
 - **Multi-lect reconciliation.** Union-find over pairwise
   alignment positions, yielding multi-lect classes that bind
   N lects in one row.
-- **Non-cognate outlier diagnostics** via `FindCognateOutliers`.
+- **Non-cognate outlier diagnostics** via
+  `rg_find_cognate_outliers`.
 - **Determinism.** Same input, same output across runs and
   processes.
 
 ## Dependencies
 
-`regulae` is built on the Go port of
-[merkmal](../merkmal/go) for phonological feature lookups and
-segment distances; the dependency is wired via a `replace`
-directive in `go.mod`.
+`regulae` is built on [merkmal](../merkmal) for phonological
+feature lookups and segment distances, used through its public
+C API only. CMake finds an installed `merkmal::merkmal`, or
+falls back to a sibling checkout at `../merkmal`
+(override with `-DREGULAE_MERKMAL_SOURCE_DIR=...`).
 
 ## Build and test
 
 ```sh
-go build ./...
-go test ./...
-go vet ./...
+cmake -S . -B build/c && cmake --build build/c
+ctest --test-dir build/c --output-on-failure
 ```
+
+Sanitizer builds use `-DREGULAE_ENABLE_SANITIZER=address` (or
+`undefined`). `scripts/parity.sh` diffs the C build against the
+frozen Go reference over the corpora in `testdata/parity/`; it
+needs the Go reference, which needs `../merkmal/go` restored as
+described in `docs/c_conversion_handoff.md`.
+
+## Command line
+
+```sh
+regulae train <corpus.tsv>              # machine-readable model summary
+regulae train --human <corpus.tsv>      # readable report
+regulae train --pairwise <corpus.tsv>   # per-pair learned tables
+regulae align <corpus.tsv>              # alignments, prior-only
+regulae align --model <corpus.tsv>      # alignments under the trained model
+regulae outliers --top-k 10 <corpus.tsv>
+```
+
+`--format tsv|gled|arcaverborum` selects the input format
+(default `tsv`). The generic TSV reader expects `cognate_id`,
+`lect_id` and `segments` columns, with an optional
+`confidence`; a cognate set takes the lowest confidence any of
+its rows reports.
 
 ## Run experiments
 
 Each experiment is a standalone `package main` under
 `experiments/` that trains a model on a specific corpus and
-prints a human-readable report:
+prints a human-readable report. These still run against the Go
+reference; the same corpora are exercised through the C build
+by `scripts/parity.sh` and `testdata/parity/real_*.tsv`.
 
 ```sh
 cd experiments/latin_spanish && go run .
@@ -104,37 +137,56 @@ and expect a data-file path (`go run . /path/to/data`).
 
 ## Quick API tour
 
-```go
-import regulae "github.com/tresoldi/regulae"
+```c
+#include "regulae.h"
 
-// Build a corpus of cognate sets (or use a loader).
-corpus := regulae.CognateSetsFromPairs(pairs, [2]string{"latin", "spanish"}, "ls")
+rg_context *ctx = NULL;
+rg_corpus *corpus = NULL;
+rg_multi_model *model = NULL;
+rg_train_options options;
 
-// Multi-lect training (the canonical entry point):
-model, err := regulae.TrainModel(corpus, regulae.DefaultTrainOptions())
-if err != nil { /* e.g. *regulae.UnknownGraphemeError */ }
-fmt.Println(regulae.FormatMultiLectModel(model, 20, 20))
+rg_context_new_builtin(&ctx);                 /* owns the merkmal bridge */
+rg_corpus_load_tsv("cognates.tsv", NULL, &corpus);
+rg_train_options_init_defaults(&options);
 
-// Drill into one pair's learned model:
-if pm, ok := model.PairwiseModel("latin", "spanish"); ok {
-    fmt.Println(regulae.FormatModel(pm, regulae.DefaultFormatModelOptions()))
+/* Multi-lect training: the canonical entry point. */
+rg_train_model(ctx, rg_corpus_cognates(corpus),
+               rg_corpus_cognate_count(corpus), &options, &model);
+
+/* Read the reconciled classes. Rows are borrowed from the model. */
+for (size_t i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+    const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+    for (size_t j = 0; j < row->segment_count; j++) {
+        printf("%s%s:%s", j ? " ~ " : "", row->lect_ids[j], row->graphemes[j]);
+    }
+    printf("  count=%.0f\n", row->count);
 }
 
-// Post-hoc outlier check:
-reports, _ := regulae.FindCognateOutliers(corpus, model, 10, 0)
-for _, r := range reports {
-    fmt.Printf("  z=%+.2f  %s\n", r.ZScore, r.CognateID)
-}
+char *text = rg_format_multi_model(model, NULL);   /* caller-owned */
+puts(text);
+rg_string_free(text);
 
-// Drill into one lect's behaviour:
-fmt.Println(regulae.DescribeMultiLectClass(model, "latin", "w"))
+rg_multi_model_free(model);
+rg_corpus_free(corpus);
+rg_context_free(ctx);
 ```
 
-Loaders are provided for generic TSV, GLED, and arcaverborum
-data: `LoadCognatesFromTSV`, `LoadGLED`, `LoadArcaverborum`.
+Every call that can fail returns `rg_status`; output pointers
+become caller-owned only on `RG_OK`. Accessors return borrowed
+pointers valid while the owning handle lives. Loaders are
+provided for generic TSV, GLED and arcaverborum data
+(`rg_corpus_load_tsv`, `rg_corpus_load_gled`,
+`rg_corpus_load_arcaverborum`), and `rg_corpus_from_pairs`
+lifts a directed pairwise corpus into cognate sets.
+
+`include/regulae.h` is the API contract; `RG_ABI_VERSION`
+moves on any layout, signature or ownership change.
 
 ## Documentation
 
+- **Conversion state** at `docs/c_conversion_roadmap.md`
+  (milestones, parity results, intentional deviations) and
+  `docs/c_conversion_handoff.md`.
 - **Design documents** at `docs/training_pipeline.md`,
   `docs/correspondence_discovery.md`, and
   `docs/alignment_details.md` — rationale for the staged

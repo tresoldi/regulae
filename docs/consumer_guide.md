@@ -1,9 +1,20 @@
 # The regulae package: a consumer's guide
 
 **Status: DOCUMENTATION.** This document describes the public
-API of `src/regulae/` from the perspective of a downstream
-package that wants to *consume* its output — historical
-inference, visualization, cross-family comparison, whatever.
+API from the perspective of a downstream package that wants to
+*consume* its output — historical inference, visualization,
+cross-family comparison, whatever.
+
+**On names.** The contract below is written in the original
+Python spelling (`train_model`, `MultiLectModel`,
+`snake_case` fields). The implementation is now a C99 core, so
+the authoritative spelling of any name is `include/regulae.h`:
+`train_model` is `rg_train_model`, `MultiLectModel` is the
+opaque `rg_multi_model` read through `rg_multi_model_*`
+accessors, `find_cognate_outliers` is
+`rg_find_cognate_outliers`, and the loaders are
+`rg_corpus_load_*`. What each field *means*, and what it does
+not mean, is unchanged and is the point of this document.
 
 The target reader is someone building a separate package (not
 modifying `regulae` itself) who needs to know:
