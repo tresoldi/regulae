@@ -41,6 +41,7 @@ add_library(regulae
     src/context.c
     src/memory.c
     src/format.c
+    src/json.c
     src/loaders.c
     src/model.c
     src/multilect.c
@@ -129,6 +130,12 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_format PRIVATE regulae::regulae)
     add_test(NAME format COMMAND test_format)
 
+    add_executable(test_json tests/c/test_json.c)
+    target_compile_definitions(test_json PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_include_directories(test_json PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test_json PRIVATE regulae::regulae)
+    add_test(NAME json COMMAND test_json)
+
     add_executable(test_loaders tests/c/test_loaders.c)
     target_compile_definitions(test_loaders PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_loaders PRIVATE regulae::regulae)
@@ -178,6 +185,11 @@ if(REGULAE_BUILD_TESTS)
         add_test(NAME cli_outliers
             COMMAND regulae_cli outliers --top-k 3 "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/real_contaminated.tsv")
         set_tests_properties(cli_outliers PROPERTIES PASS_REGULAR_EXPRESSION "^OUTLIER	")
+
+        add_test(NAME cli_train_json
+            COMMAND regulae_cli train --json "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/three_lect_basic.tsv")
+        set_tests_properties(cli_train_json PROPERTIES
+            PASS_REGULAR_EXPRESSION "\"export_kind\":\"debug_map_snapshot\"")
 
         add_test(NAME cli_wide
             COMMAND regulae_cli train --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/latin_spanish/cognates.tsv")

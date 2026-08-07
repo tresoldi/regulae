@@ -151,6 +151,26 @@ rg_status rg_context_constraints_internal(
     size_t *out_count
 );
 
+/* JSON transport for the CLI's --json output and the WebAssembly adapter. Not
+ * the interchange schema: that is M8's job, and a single MAP correspondence
+ * system is explicitly not claim-capable data. */
+char *rg_json_from_multi_model_internal(
+    const rg_context *ctx,
+    const rg_multi_model *model,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    int include_alignments,
+    int include_outliers
+);
+char *rg_json_error_internal(rg_status status, const char *detail);
+rg_status rg_json_read_train_options_internal(
+    const char *text,
+    rg_train_options *out,
+    char *error_detail,
+    size_t error_detail_size
+);
+
 rg_status rg_context_features_internal(
     const rg_context *ctx,
     const char *grapheme,

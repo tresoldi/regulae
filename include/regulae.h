@@ -554,6 +554,20 @@ RG_API char *rg_describe_multi_class(
     const char *grapheme
 );
 
+/* Renders a trained model as JSON. Caller owns the string (rg_string_free).
+ * This is a debug/inspection snapshot, labelled as such in the payload; it is
+ * not the interchange format, which carries ensembles rather than a single
+ * maximum-a-posteriori system. */
+RG_API char *rg_model_to_json(
+    const rg_context *ctx,
+    const rg_multi_model *model,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    int include_alignments,
+    int include_outliers
+);
+
 RG_API rg_status rg_train_model(
     const rg_context *ctx,
     const rg_cognate_set *cognates,

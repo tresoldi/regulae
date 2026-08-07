@@ -30,6 +30,8 @@ static int usage(void) {
     printf("  --model                            align under the trained model\n");
     printf("  --pairwise                         dump per-pair learned tables\n");
     printf("  --human                            human-readable model summary\n");
+    printf("  --json                             machine-readable model, with\n");
+    printf("                                     alignments and outliers\n");
     return 0;
 }
 
@@ -292,7 +294,7 @@ static int fail(const char *what, rg_status status) {
     return 1;
 }
 
-static int command_train(const char *path, const char *format, int pairwise, int human) {
+static int command_train(const char *path, const char *format, int pairwise, int human, int json) {
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -315,7 +317,19 @@ static int command_train(const char *path, const char *format, int pairwise, int
         rg_context_free(ctx);
         return fail("training", status);
     }
-    if (human) {
+    if (json) {
+        char *text = rg_model_to_json(ctx, model,
+                                      rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                                      &options, 1, 1);
+        if (text == 0) {
+            rg_multi_model_free(model);
+            rg_corpus_free(corpus);
+            rg_context_free(ctx);
+            return fail("rendering json", RG_ERR_OOM);
+        }
+        puts(text);
+        rg_string_free(text);
+    } else if (human) {
         char *text = rg_format_multi_model(model, 0);
         if (text != 0) {
             fputs(text, stdout);
@@ -548,6 +562,7 @@ int main(int argc, char **argv) {
     int use_model = 0;
     int pairwise = 0;
     int human = 0;
+    int json = 0;
     int i;
 
     if (argc < 2 || strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -562,6 +577,8 @@ int main(int argc, char **argv) {
             format = argv[++i];
         } else if (strcmp(argv[i], "--top-k") == 0 && i + 1 < argc) {
             top_k = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--json") == 0) {
+            json = 1;
         } else if (strcmp(argv[i], "--human") == 0) {
             human = 1;
         } else if (strcmp(argv[i], "--pairwise") == 0) {
@@ -584,7 +601,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (strcmp(argv[1], "train") == 0) {
-        return command_train(path, format, pairwise, human);
+        return command_train(path, format, pairwise, human, json);
     }
     if (strcmp(argv[1], "outliers") == 0) {
         return command_outliers(path, format, top_k);
