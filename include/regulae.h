@@ -302,6 +302,17 @@ RG_API void rg_context_free(rg_context *ctx);
 RG_API rg_status rg_context_use_system(rg_context *ctx, const char *system_name);
 RG_API rg_status rg_context_system_name(const rg_context *ctx, const char **out);
 RG_API rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int *out);
+/* Names the grapheme behind the most recent RG_ERR_UNKNOWN_GRAPHEME, and the
+ * feature system that rejected it. Both are borrowed and valid until the next
+ * failure or until the context is freed; grapheme is null if none has failed.
+ * "unknown grapheme" without saying which one is unactionable on a corpus of
+ * any size. */
+RG_API void rg_context_last_error(
+    const rg_context *ctx,
+    const char **grapheme,
+    const char **feature_system
+);
+
 RG_API rg_status rg_context_segment_distance(
     const rg_context *ctx,
     const char *a,

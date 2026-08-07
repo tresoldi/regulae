@@ -289,8 +289,26 @@ static rg_status load_corpus(const char *path, const char *format, rg_corpus **o
     return RG_ERR_UNSUPPORTED_OPTION;
 }
 
+/* Names the grapheme when one is to blame, matching what the Go reference puts
+ * in its error value. */
+static void report_failure(const rg_context *ctx, const char *what, rg_status status) {
+    const char *grapheme = 0;
+    const char *system = 0;
+    if (status == RG_ERR_UNKNOWN_GRAPHEME && ctx != 0) {
+        rg_context_last_error(ctx, &grapheme, &system);
+    }
+    if (grapheme != 0) {
+        fprintf(stderr,
+                "regulae: %s: unknown grapheme \"%s\" in feature system \"%s\". "
+                "Either the grapheme is a typo, or the feature system does not cover it.\n",
+                what, grapheme, system == 0 ? "" : system);
+    } else {
+        fprintf(stderr, "regulae: %s: %s\n", what, rg_status_string(status));
+    }
+}
+
 static int fail(const char *what, rg_status status) {
-    fprintf(stderr, "regulae: %s: %s\n", what, rg_status_string(status));
+    report_failure(0, what, status);
     return 1;
 }
 
@@ -307,15 +325,17 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
+        report_failure(ctx, "loading corpus", status);
         rg_context_free(ctx);
-        return fail("loading corpus", status);
+        return 1;
     }
     rg_train_options_init_defaults(&options);
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
+        report_failure(ctx, "training", status);
         rg_corpus_free(corpus);
         rg_context_free(ctx);
-        return fail("training", status);
+        return 1;
     }
     if (json) {
         char *text = rg_model_to_json(ctx, model,
@@ -362,15 +382,17 @@ static int command_outliers(const char *path, const char *format, int top_k) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
+        report_failure(ctx, "loading corpus", status);
         rg_context_free(ctx);
-        return fail("loading corpus", status);
+        return 1;
     }
     rg_train_options_init_defaults(&options);
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
+        report_failure(ctx, "training", status);
         rg_corpus_free(corpus);
         rg_context_free(ctx);
-        return fail("training", status);
+        return 1;
     }
     status = rg_find_cognate_outliers(
         ctx,
@@ -384,10 +406,11 @@ static int command_outliers(const char *path, const char *format, int top_k) {
         &row_count
     );
     if (status != RG_OK) {
+        report_failure(ctx, "finding outliers", status);
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
         rg_context_free(ctx);
-        return fail("finding outliers", status);
+        return 1;
     }
     for (i = 0; i < row_count; i++) {
         printf("OUTLIER\t%s\t%d\t%.6f\t%.6f\n",
@@ -416,15 +439,17 @@ static int command_align_with_model(const char *path, const char *format) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
+        report_failure(ctx, "loading corpus", status);
         rg_context_free(ctx);
-        return fail("loading corpus", status);
+        return 1;
     }
     rg_train_options_init_defaults(&options);
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
+        report_failure(ctx, "training", status);
         rg_corpus_free(corpus);
         rg_context_free(ctx);
-        return fail("training", status);
+        return 1;
     }
     for (c = 0; c < rg_corpus_cognate_count(corpus); c++) {
         const rg_cognate_set *cognate = rg_corpus_cognate_at(corpus, c);
@@ -467,10 +492,11 @@ static int command_align_with_model(const char *path, const char *format) {
                     ctx, pair_model, &options,
                     &cognate->forms[order[i]].form, &cognate->forms[order[j]].form, 3, &alignment);
                 if (status != RG_OK) {
+                    report_failure(ctx, "aligning", status);
                     rg_multi_model_free(model);
                     rg_corpus_free(corpus);
                     rg_context_free(ctx);
-                    return fail("aligning", status);
+                    return 1;
                 }
                 {
                     double mcost = 0.0;
@@ -512,8 +538,9 @@ static int command_align(const char *path, const char *format) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
+        report_failure(ctx, "loading corpus", status);
         rg_context_free(ctx);
-        return fail("loading corpus", status);
+        return 1;
     }
     for (c = 0; c < rg_corpus_cognate_count(corpus); c++) {
         const rg_cognate_set *cognate = rg_corpus_cognate_at(corpus, c);
@@ -526,9 +553,10 @@ static int command_align(const char *path, const char *format) {
                 double cost = 0.0;
                 status = rg_align_forms(ctx, &cognate->forms[i].form, &cognate->forms[j].form, 0, &alignment);
                 if (status != RG_OK) {
+                    report_failure(ctx, "aligning", status);
                     rg_corpus_free(corpus);
                     rg_context_free(ctx);
-                    return fail("aligning", status);
+                    return 1;
                 }
                 rg_alignment_cost(ctx, alignment, &cost);
                 printf("ALIGN\t%s\t%s>%s\t%.6f\t", cognate->cognate_id,

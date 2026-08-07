@@ -158,6 +158,7 @@ static rg_status segment_distance_checked(
         return status;
     }
     if (!is_segment) {
+        rg_context_note_unknown_grapheme_internal(ctx, source.grapheme);
         return RG_ERR_UNKNOWN_GRAPHEME;
     }
     status = rg_context_is_segment(ctx, target.grapheme, &is_segment);
@@ -165,6 +166,7 @@ static rg_status segment_distance_checked(
         return status;
     }
     if (!is_segment) {
+        rg_context_note_unknown_grapheme_internal(ctx, target.grapheme);
         return RG_ERR_UNKNOWN_GRAPHEME;
     }
     return rg_context_segment_distance(ctx, source.grapheme, target.grapheme, out);

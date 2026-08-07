@@ -130,6 +130,10 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_format PRIVATE regulae::regulae)
     add_test(NAME format COMMAND test_format)
 
+    add_executable(test_last_error tests/c/test_last_error.c)
+    target_link_libraries(test_last_error PRIVATE regulae::regulae)
+    add_test(NAME last_error COMMAND test_last_error)
+
     add_executable(test_progress tests/c/test_progress.c)
     target_compile_definitions(test_progress PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_progress PRIVATE regulae::regulae)

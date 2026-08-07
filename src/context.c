@@ -56,6 +56,10 @@ typedef struct distance_cache_entry {
 struct rg_context {
     mk_registry *registry;
     const mk_system *system;
+    /* The grapheme that last failed to resolve. The Go reference carries this
+     * on its error value; a C status code cannot, and "unknown grapheme" with
+     * no indication of which one is unactionable on a corpus of any size. */
+    char *unknown_grapheme;
     feature_cache_entry *features;
     size_t feature_count;
     size_t feature_cap;
@@ -206,6 +210,7 @@ void rg_context_free(rg_context *ctx) {
     if (ctx == 0) {
         return;
     }
+    free(ctx->unknown_grapheme);
     context_caches_clear(ctx);
     mk_registry_free(ctx->registry);
     free(ctx);
@@ -222,6 +227,8 @@ rg_status rg_context_use_system(rg_context *ctx, const char *system_name) {
         return map_merkmal_status(status);
     }
     ctx->system = system;
+    free(ctx->unknown_grapheme);
+    ctx->unknown_grapheme = 0;
     context_caches_clear(ctx);
     return RG_OK;
 }
@@ -331,6 +338,28 @@ rg_status rg_context_segment_distance(
     return RG_OK;
 }
 
+void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char *grapheme) {
+    rg_context *mutable_ctx = (rg_context *)ctx;
+    if (ctx == 0 || grapheme == 0) {
+        return;
+    }
+    free(mutable_ctx->unknown_grapheme);
+    mutable_ctx->unknown_grapheme = rg_strdup_internal(grapheme);
+}
+
+void rg_context_last_error(const rg_context *ctx, const char **grapheme, const char **feature_system) {
+    if (grapheme != 0) {
+        *grapheme = ctx == 0 ? 0 : ctx->unknown_grapheme;
+    }
+    if (feature_system != 0) {
+        const char *name = 0;
+        *feature_system = 0;
+        if (ctx != 0 && mk_system_name(ctx->system, &name) == MK_OK) {
+            *feature_system = name;
+        }
+    }
+}
+
 /* Borrowed feature bundle for a grapheme, valid while the context lives and
  * its feature system is unchanged. Returns RG_ERR_UNKNOWN_GRAPHEME, and
  * remembers that verdict, for graphemes the system does not cover. */
@@ -358,6 +387,7 @@ rg_status rg_context_features_internal(
     while (mutable_ctx->features[slot].grapheme != 0) {
         if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
             if (mutable_ctx->features[slot].features_state < 0) {
+                rg_context_note_unknown_grapheme_internal(ctx, grapheme);
                 return RG_ERR_UNKNOWN_GRAPHEME;
             }
             if (mutable_ctx->features[slot].features_state > 0) {
@@ -379,6 +409,9 @@ rg_status rg_context_features_internal(
     }
     if (status != RG_OK) {
         mutable_ctx->features[slot].features_state = -1;
+        if (status == RG_ERR_UNKNOWN_GRAPHEME) {
+            rg_context_note_unknown_grapheme_internal(ctx, grapheme);
+        }
         return status;
     }
     mutable_ctx->features[slot].features_state = 1;

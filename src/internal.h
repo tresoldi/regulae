@@ -202,6 +202,8 @@ rg_status rg_json_read_train_options_internal(
     size_t error_detail_size
 );
 
+void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char *grapheme);
+
 rg_status rg_context_features_internal(
     const rg_context *ctx,
     const char *grapheme,

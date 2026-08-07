@@ -1,5 +1,6 @@
 #include "regulae.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -112,6 +113,18 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
         return error_payload(RG_ERR_UNSUPPORTED_OPTION, "unknown corpus format");
     }
     if (status != RG_OK) {
+        char detail_buffer[256];
+        const char *grapheme = 0;
+        const char *system = 0;
+        if (status == RG_ERR_UNKNOWN_GRAPHEME) {
+            rg_context_last_error(ctx, &grapheme, &system);
+        }
+        if (grapheme != 0) {
+            snprintf(detail_buffer, sizeof(detail_buffer),
+                     "grapheme \"%s\" is not in the \"%s\" feature system",
+                     grapheme, system == 0 ? "" : system);
+            return error_payload(status, detail_buffer);
+        }
         return error_payload(status, "the corpus could not be read");
     }
     if (rg_corpus_cognate_count(corpus) == 0) {
@@ -122,10 +135,21 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
                             &options, &model);
     if (status != RG_OK) {
+        char detail_buffer[256];
+        const char *detail = 0;
+        if (status == RG_ERR_UNKNOWN_GRAPHEME) {
+            const char *grapheme = 0;
+            const char *system = 0;
+            rg_context_last_error(ctx, &grapheme, &system);
+            if (grapheme != 0) {
+                snprintf(detail_buffer, sizeof(detail_buffer),
+                         "grapheme \"%s\" is not in the \"%s\" feature system",
+                         grapheme, system == 0 ? "" : system);
+                detail = detail_buffer;
+            }
+        }
         rg_corpus_free(corpus);
-        return error_payload(status, status == RG_ERR_UNKNOWN_GRAPHEME
-            ? "a grapheme is not in the feature system; check the transcription"
-            : 0);
+        return error_payload(status, detail);
     }
 
     text = rg_model_to_json(ctx, model, rg_corpus_cognates(corpus),
@@ -151,6 +175,16 @@ char *regulae_segment_json(const char *word) {
         return error_payload(RG_ERR_OOM, "could not create the feature context");
     }
     if (rg_context_segment_word(ctx, word == 0 ? "" : word, &segments, &count) != RG_OK) {
+        const char *grapheme = 0;
+        const char *system = 0;
+        char detail_buffer[256];
+        rg_context_last_error(ctx, &grapheme, &system);
+        if (grapheme != 0) {
+            snprintf(detail_buffer, sizeof(detail_buffer),
+                     "grapheme \"%s\" is not in the \"%s\" feature system",
+                     grapheme, system == 0 ? "" : system);
+            return error_payload(RG_ERR_UNKNOWN_GRAPHEME, detail_buffer);
+        }
         return error_payload(RG_ERR_UNKNOWN_GRAPHEME, "the word could not be segmented");
     }
     text = rg_segments_to_json(segments, count);
