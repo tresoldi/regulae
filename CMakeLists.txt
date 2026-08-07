@@ -37,6 +37,7 @@ if(NOT TARGET merkmal::merkmal)
 endif()
 
 add_library(regulae
+    third_party/cjson/cJSON.c
     src/context.c
     src/memory.c
     src/format.c
@@ -56,6 +57,7 @@ target_include_directories(regulae PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
+target_include_directories(regulae PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/third_party/cjson)
 target_link_libraries(regulae PUBLIC merkmal::merkmal)
 if(UNIX AND NOT APPLE)
     target_link_libraries(regulae PUBLIC m)
@@ -70,6 +72,16 @@ if(MSVC)
     target_compile_options(regulae PRIVATE /W4)
 else()
     target_compile_options(regulae PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+endif()
+
+# Vendored third-party source is not held to regulae's warning settings; doing
+# so would mean carrying local patches. Symbols stay hidden so linking regulae
+# does not put cJSON_* into a consumer's namespace.
+target_compile_definitions(regulae PRIVATE CJSON_HIDE_SYMBOLS)
+if(MSVC)
+    set_source_files_properties(third_party/cjson/cJSON.c PROPERTIES COMPILE_OPTIONS /w)
+else()
+    set_source_files_properties(third_party/cjson/cJSON.c PROPERTIES COMPILE_OPTIONS -w)
 endif()
 
 if(REGULAE_ENABLE_SANITIZER)
