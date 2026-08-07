@@ -516,6 +516,7 @@ typedef struct pivot_obs {
     size_t sister_index;
     const rg_context_spec *context;
     double weight;
+    size_t observation_index;
 } pivot_obs;
 
 typedef struct pivot_bucket {
@@ -533,9 +534,16 @@ typedef struct committed_split {
     size_t sister_index;
     double count;
     double bucket_size;
+    /* The observations that justified this split, so the class it merges into
+     * can name its own evidence. */
+    size_t *observation_indices;
+    size_t observation_count;
 } committed_split;
 
 typedef struct merged_class {
+    size_t *observation_indices;
+    size_t observation_count;
+    size_t observation_cap;
     char *key;
     char **lects;
     char **graphemes;
@@ -586,6 +594,7 @@ static void discovery_state_clear(discovery_state *state) {
     for (i = 0; i < state->committed_count; i++) {
         free(state->committed[i].pivot_lect);
         free(state->committed[i].pivot_grapheme);
+        free(state->committed[i].observation_indices);
         rg_context_spec_clear_internal(&state->committed[i].context);
     }
     free(state->committed);
@@ -723,7 +732,7 @@ static rg_status pivot_index_for(discovery_state *state, const char *lect, const
     return RG_OK;
 }
 
-static rg_status pivot_bucket_append(pivot_bucket *bucket, size_t sister_index, const rg_context_spec *context, double weight) {
+static rg_status pivot_bucket_append(pivot_bucket *bucket, size_t sister_index, const rg_context_spec *context, double weight, size_t observation_index) {
     if (bucket->obs_count == bucket->obs_cap) {
         size_t next_cap = bucket->obs_cap == 0 ? 8 : bucket->obs_cap * 2;
         pivot_obs *next = (pivot_obs *)realloc(bucket->obs, next_cap * sizeof(*next));
@@ -736,6 +745,7 @@ static rg_status pivot_bucket_append(pivot_bucket *bucket, size_t sister_index, 
     bucket->obs[bucket->obs_count].sister_index = sister_index;
     bucket->obs[bucket->obs_count].context = context;
     bucket->obs[bucket->obs_count].weight = weight;
+    bucket->obs[bucket->obs_count].observation_index = observation_index;
     bucket->obs_count++;
     return RG_OK;
 }
@@ -945,7 +955,9 @@ static rg_status append_committed_split(
     const rg_context_spec *context,
     size_t sister_index,
     double count,
-    double bucket_size
+    double bucket_size,
+    const size_t *observation_indices,
+    size_t observation_count
 ) {
     committed_split *slot;
     rg_status status;
@@ -978,6 +990,18 @@ static rg_status append_committed_split(
     slot->sister_index = sister_index;
     slot->count = count;
     slot->bucket_size = bucket_size;
+    if (observation_count > 0) {
+        slot->observation_indices = (size_t *)calloc(observation_count, sizeof(size_t));
+        if (slot->observation_indices == 0) {
+            free(slot->pivot_lect);
+            free(slot->pivot_grapheme);
+            rg_context_spec_clear_internal(&slot->context);
+            memset(slot, 0, sizeof(*slot));
+            return RG_ERR_OOM;
+        }
+        memcpy(slot->observation_indices, observation_indices, observation_count * sizeof(size_t));
+        slot->observation_count = observation_count;
+    }
     state->committed_count++;
     return RG_OK;
 }
@@ -1023,8 +1047,21 @@ static rg_status emit_sister_classes(
         masses[yes_obs[i].sister_index] += yes_obs[i].weight;
     }
     for (i = 0; i < used && status == RG_OK; i++) {
+        size_t *evidence;
+        size_t evidence_count = 0;
+        size_t j;
         if (masses[order[i]] < min_commit) {
             continue;
+        }
+        evidence = (size_t *)calloc(yes_count == 0 ? 1 : yes_count, sizeof(*evidence));
+        if (evidence == 0) {
+            status = RG_ERR_OOM;
+            break;
+        }
+        for (j = 0; j < yes_count; j++) {
+            if (yes_obs[j].sister_index == order[i]) {
+                evidence[evidence_count++] = yes_obs[j].observation_index;
+            }
         }
         status = append_committed_split(
             state,
@@ -1033,8 +1070,11 @@ static rg_status emit_sister_classes(
             yes_context,
             order[i],
             masses[order[i]],
-            n_total
+            n_total,
+            evidence,
+            evidence_count
         );
+        free(evidence);
     }
     free(masses);
     free(order);
@@ -1194,6 +1234,7 @@ static void merged_classes_free(merged_class *items, size_t count) {
     }
     for (i = 0; i < count; i++) {
         free(items[i].key);
+        free(items[i].observation_indices);
         string_array_clear(items[i].lects, items[i].segment_count);
         string_array_clear(items[i].graphemes, items[i].segment_count);
         if (items[i].contexts != 0) {
@@ -1261,6 +1302,38 @@ static rg_status committed_split_segments(
     return RG_OK;
 }
 
+static rg_status merged_class_add_evidence(
+    merged_class *entry,
+    const size_t *indices,
+    size_t count
+) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        size_t j;
+        int seen = 0;
+        for (j = 0; j < entry->observation_count; j++) {
+            if (entry->observation_indices[j] == indices[i]) {
+                seen = 1;
+                break;
+            }
+        }
+        if (seen) {
+            continue;
+        }
+        if (entry->observation_count == entry->observation_cap) {
+            size_t next_cap = entry->observation_cap == 0 ? 8 : entry->observation_cap * 2;
+            size_t *next = (size_t *)realloc(entry->observation_indices, next_cap * sizeof(*next));
+            if (next == 0) {
+                return RG_ERR_OOM;
+            }
+            entry->observation_indices = next;
+            entry->observation_cap = next_cap;
+        }
+        entry->observation_indices[entry->observation_count++] = indices[i];
+    }
+    return RG_OK;
+}
+
 static rg_status merge_committed_splits(
     const discovery_state *state,
     merged_class **out,
@@ -1309,6 +1382,11 @@ static rg_status merge_committed_splits(
             string_array_clear(lects, segment_count);
             string_array_clear(graphemes, segment_count);
             free(key);
+            if (merged_class_add_evidence(entry, split->observation_indices,
+                                          split->observation_count) != RG_OK) {
+                merged_classes_free(merged, count);
+                return RG_ERR_OOM;
+            }
             if (split->count > entry->count) {
                 entry->count = split->count;
             }
@@ -1357,6 +1435,11 @@ static rg_status merge_committed_splits(
         merged[count].confidence = coverage;
         merged[count].bucket_size = split->bucket_size;
         merged[count].winning_count = split->count;
+        if (merged_class_add_evidence(&merged[count], split->observation_indices,
+                                      split->observation_count) != RG_OK) {
+            merged_classes_free(merged, count + 1);
+            return RG_ERR_OOM;
+        }
         merged[count].contexts = (rg_context_spec *)calloc(segment_count, sizeof(*merged[count].contexts));
         if (merged[count].contexts == 0) {
             merged[count].contexts = 0;
@@ -1474,7 +1557,8 @@ static rg_status multi_lect_context_discovery(
                 &state.pivots[pivot_index],
                 sister_index,
                 &form_contexts[cache_index][obs->positions[p]],
-                obs->weight
+                obs->weight,
+                i
             );
             if (status == RG_OK) {
                 status = collect_stress_values(&state, &form_contexts[cache_index][obs->positions[p]]);
@@ -1610,49 +1694,19 @@ static rg_status multi_lect_context_discovery(
         }
     }
 
-    /* Tag each reconciled position with the conditioned classes it realises.
-     * Matching on graphemes alone cannot do this: a conditioned class and the
-     * unconditioned one over the same segments look identical that way, and
-     * the environment is the whole point. The context test below is the same
-     * subset check scoring uses. */
+    /* Tag each reconciled position with the conditioned classes it realises,
+     * taken from the observations that justified each committed split. This is
+     * not re-derivable afterwards: a class merged from two pivots carries a
+     * context from each, and no single observation need satisfy both at once,
+     * so testing the published contexts as a conjunction can match nothing. */
     if (status == RG_OK) {
-        for (i = 0; i < observation_count && status == RG_OK; i++) {
-            const reconciled_observation *obs = &observations[i];
-            size_t k;
-            if (i >= model->class_position_count) {
-                break;
-            }
-            for (k = 0; k < model->conditioned_class_count && status == RG_OK; k++) {
-                const rg_multi_class_row *row = &model->conditioned_classes[k].view;
-                size_t j;
-                int matches = obs->segment_count == row->segment_count;
-                for (j = 0; matches && j < row->segment_count; j++) {
-                    if (strcmp(obs->lects[j], row->lect_ids[j]) != 0 ||
-                        strcmp(obs->graphemes[j], row->graphemes[j]) != 0) {
-                        matches = 0;
-                    }
-                }
-                for (j = 0; matches && j < row->segment_count; j++) {
-                    size_t cache_index;
-                    int subset = 0;
-                    if (row->contexts == 0 ||
-                        rg_context_spec_constraint_count(&row->contexts[j]) == 0) {
-                        continue;
-                    }
-                    cache_index = obs->cognate_index * model->lect_count + obs->lect_indices[j];
-                    if (cache_index >= cache_size || form_contexts[cache_index] == 0 ||
-                        obs->positions[j] >= form_context_counts[cache_index]) {
-                        matches = 0;
-                        break;
-                    }
-                    if (rg_context_spec_is_subset(&row->contexts[j],
-                                                  &form_contexts[cache_index][obs->positions[j]],
-                                                  &subset) != RG_OK || !subset) {
-                        matches = 0;
-                    }
-                }
-                if (matches) {
-                    status = class_position_add_id(&model->class_positions[i], row->class_id);
+        for (i = 0; i < merged_count && status == RG_OK; i++) {
+            size_t j;
+            for (j = 0; j < merged[i].observation_count && status == RG_OK; j++) {
+                size_t index = merged[i].observation_indices[j];
+                if (index < model->class_position_count) {
+                    status = class_position_add_id(&model->class_positions[index],
+                                                   (int)(model->unconditioned_class_count + i));
                 }
             }
         }

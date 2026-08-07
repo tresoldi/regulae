@@ -120,6 +120,15 @@ check('a conditioned class maps to fewer links than its unconditioned twin', () 
   // post-consonantal, while the split still separates it from latin:i ~
   // spanish:i. So the invariant is that it never covers more, and that the
   // narrowing is real somewhere.
+  // Every conditioned class must be able to show its evidence. A class with no
+  // links means the mapping lost track of what justified it, which is how the
+  // first attempt at this failed: it re-derived the link set by testing the
+  // published contexts, and a class merged from two pivots carries a context
+  // from each that no single position satisfies together.
+  for (const c of model.classes.conditioned) {
+    assert.ok(countLinks(c.id) > 0, `conditioned class ${c.id} has no evidence`);
+  }
+
   let narrowedSomewhere = false;
   for (const [conditioned, plain] of pairs) {
     const narrow = countLinks(conditioned);
