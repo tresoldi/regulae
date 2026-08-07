@@ -594,7 +594,6 @@ rg_status rg_score_link_with_context_model_internal(
     const rg_context_spec *link_context,
     double *out
 ) {
-    double prior_cost = 0.0;
     rg_status status;
     if (ctx == 0 || out == 0 || (source_count > 0 && source == 0) || (target_count > 0 && target == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
@@ -641,10 +640,6 @@ rg_status rg_score_link_with_context_model_internal(
         *out = total + RG_DEFAULT_GAP_COST * (double)asymmetry + RG_DEFAULT_CHUNK_PENALTY * (double)asymmetry;
         return RG_OK;
     }
-    status = rg_score_link(ctx, source, source_count, target, target_count, &prior_cost);
-    if (status != RG_OK) {
-        return status;
-    }
     {
         /* Posterior over the most specific matching correspondence, shifted by
          * the prior's log partition function so costs remain comparable across
@@ -657,15 +652,16 @@ rg_status rg_score_link_with_context_model_internal(
         double disp_cost = 0.0;
 
         if (!rg_segment_posterior_internal(model, src, tgt, link_context, &posterior)) {
-            *out = prior_cost;
-            return RG_OK;
+            /* The prior never saw this pair, so fall back to the bare merkmal
+             * distance. Computed here rather than up front: the model path is
+             * the common case and does not need it. */
+            return rg_score_link(ctx, source, source_count, target, target_count, out);
         }
         seg_cost = (posterior <= 0.0 ? INFINITY : -log(posterior)) - segment_log_normalizer(model, src);
         if (model->displacement_row_count > 0) {
             status = displacement_model_cost(ctx, model, source[0], target[0], &disp_cost);
             if (status == RG_ERR_UNKNOWN_GRAPHEME) {
-                *out = prior_cost;
-                return RG_OK;
+                return rg_score_link(ctx, source, source_count, target, target_count, out);
             }
             if (status != RG_OK) {
                 return status;

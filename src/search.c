@@ -374,6 +374,17 @@ typedef struct syllable_data {
     size_t *left_cumulative_counts;
     const rg_feature_constraint **right_cumulative;
     size_t *right_cumulative_counts;
+    /* Distance-bounded slots at offsets 2 and 3, indexed by span start and
+     * span end, and the one-element stress constraint of each position. With
+     * these every slot of a link context is a precomputed array, which is what
+     * lets the DP score against a borrowed context instead of building an
+     * owned one per cell. */
+    const rg_distance_constraint **preceding_at_distance;
+    size_t *preceding_at_distance_counts;
+    const rg_distance_constraint **following_at_distance;
+    size_t *following_at_distance_counts;
+    const rg_feature_constraint **stress;
+    size_t *stress_counts;
 } syllable_data;
 
 static void syllable_data_clear(syllable_data *data) {
@@ -418,10 +429,40 @@ static void syllable_data_clear(syllable_data *data) {
     free(data->syllable_feature_counts);
     free(data->same_syllable_excluding);
     free(data->same_syllable_excluding_counts);
+    if (data->preceding_at_distance != 0) {
+        for (i = 0; i <= data->segment_count; i++) {
+            rg_distance_constraint_array_clear_internal(
+                data->preceding_at_distance[i],
+                data->preceding_at_distance_counts == 0 ? 0 : data->preceding_at_distance_counts[i]
+            );
+        }
+    }
+    if (data->following_at_distance != 0) {
+        for (i = 0; i <= data->segment_count; i++) {
+            rg_distance_constraint_array_clear_internal(
+                data->following_at_distance[i],
+                data->following_at_distance_counts == 0 ? 0 : data->following_at_distance_counts[i]
+            );
+        }
+    }
+    if (data->stress != 0) {
+        for (i = 0; i < data->segment_count; i++) {
+            rg_feature_constraint_array_clear_internal(
+                data->stress[i],
+                data->stress_counts == 0 ? 0 : data->stress_counts[i]
+            );
+        }
+    }
     free(data->left_cumulative);
     free(data->left_cumulative_counts);
     free(data->right_cumulative);
     free(data->right_cumulative_counts);
+    free(data->preceding_at_distance);
+    free(data->preceding_at_distance_counts);
+    free(data->following_at_distance);
+    free(data->following_at_distance_counts);
+    free(data->stress);
+    free(data->stress_counts);
     memset(data, 0, sizeof(*data));
 }
 
@@ -553,8 +594,146 @@ static rg_status syllable_data_build(
         }
     }
 
+    out->preceding_at_distance = (const rg_distance_constraint **)calloc(n + 1, sizeof(*out->preceding_at_distance));
+    out->preceding_at_distance_counts = (size_t *)calloc(n + 1, sizeof(*out->preceding_at_distance_counts));
+    out->following_at_distance = (const rg_distance_constraint **)calloc(n + 1, sizeof(*out->following_at_distance));
+    out->following_at_distance_counts = (size_t *)calloc(n + 1, sizeof(*out->following_at_distance_counts));
+    out->stress = (const rg_feature_constraint **)calloc(n, sizeof(*out->stress));
+    out->stress_counts = (size_t *)calloc(n, sizeof(*out->stress_counts));
+    if (out->preceding_at_distance == 0 || out->preceding_at_distance_counts == 0 ||
+        out->following_at_distance == 0 || out->following_at_distance_counts == 0 ||
+        out->stress == 0 || out->stress_counts == 0) {
+        free(starts);
+        syllable_data_clear(out);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i <= n; i++) {
+        const rg_feature_constraint *pre2 = 0;
+        const rg_feature_constraint *pre3 = 0;
+        const rg_feature_constraint *fol2 = 0;
+        const rg_feature_constraint *fol3 = 0;
+        size_t pre2_count = 0;
+        size_t pre3_count = 0;
+        size_t fol2_count = 0;
+        size_t fol3_count = 0;
+        if (i >= 2) {
+            pre2 = source_features[i - 2];
+            pre2_count = source_feature_counts[i - 2];
+        }
+        if (i >= 3) {
+            pre3 = source_features[i - 3];
+            pre3_count = source_feature_counts[i - 3];
+        }
+        if (i + 1 < n) {
+            fol2 = source_features[i + 1];
+            fol2_count = source_feature_counts[i + 1];
+        }
+        if (i + 2 < n) {
+            fol3 = source_features[i + 2];
+            fol3_count = source_feature_counts[i + 2];
+        }
+        status = distance_context_copy_two(
+            pre2, pre2_count, 2, pre3, pre3_count, 3,
+            &out->preceding_at_distance[i], &out->preceding_at_distance_counts[i]
+        );
+        if (status == RG_OK) {
+            status = distance_context_copy_two(
+                fol2, fol2_count, 2, fol3, fol3_count, 3,
+                &out->following_at_distance[i], &out->following_at_distance_counts[i]
+            );
+        }
+        if (status != RG_OK) {
+            free(starts);
+            syllable_data_clear(out);
+            return status;
+        }
+    }
+    for (i = 0; i < n; i++) {
+        status = context_copy_stress(form->segments[i].stress, &out->stress[i], &out->stress_counts[i]);
+        if (status != RG_OK) {
+            free(starts);
+            syllable_data_clear(out);
+            return status;
+        }
+    }
+
     free(starts);
     return RG_OK;
+}
+
+/* Fills a context whose every slot points into the form's precomputed arrays.
+ * Nothing is allocated and nothing must be cleared: the result is valid only
+ * while the syllable_data and the feature matrix live, and only for reading.
+ * The DP scores millions of these, so building an owned copy per cell was the
+ * single largest cost in training. */
+static void build_link_context_borrowed(
+    const rg_form *source,
+    const rg_feature_constraint *const *source_features,
+    const size_t *source_feature_counts,
+    const syllable_data *syllables,
+    size_t source_start,
+    size_t source_count,
+    size_t target_count,
+    rg_context_spec *out
+) {
+    size_t source_end = source_start + source_count;
+    size_t n = source->segment_count;
+
+    rg_context_spec_init_empty(out);
+    if (source_start == 0) {
+        out->position = "initial";
+    } else if (source_end == n) {
+        out->position = "final";
+    } else {
+        out->position = "medial";
+    }
+    if (source_start > 0) {
+        out->preceding = source_features[source_start - 1];
+        out->preceding_count = source_feature_counts[source_start - 1];
+    }
+    if (source_end < n) {
+        out->following = source_features[source_end];
+        out->following_count = source_feature_counts[source_end];
+    }
+    if (syllables == 0 || syllables->segment_count == 0) {
+        return;
+    }
+    out->preceding_at_distance = syllables->preceding_at_distance[source_start];
+    out->preceding_at_distance_count = syllables->preceding_at_distance_counts[source_start];
+    out->following_at_distance = syllables->following_at_distance[source_end];
+    out->following_at_distance_count = syllables->following_at_distance_counts[source_end];
+    out->somewhere_preceding = syllables->left_cumulative[source_start];
+    out->somewhere_preceding_count = syllables->left_cumulative_counts[source_start];
+    out->somewhere_following = syllables->right_cumulative[source_end];
+    out->somewhere_following_count = syllables->right_cumulative_counts[source_end];
+
+    /* Syllable and stress slots mirror the DP: only 1-to-1 links carry them. */
+    if (source_count != 1 || target_count != 1 || source_start >= n) {
+        return;
+    }
+    {
+        size_t syllable_index = syllables->syllable_of[source_start];
+        out->same_syllable = syllables->same_syllable_excluding[source_start];
+        out->same_syllable_count = syllables->same_syllable_excluding_counts[source_start];
+        if (syllable_index + 1 < syllables->syllable_count) {
+            out->next_syllable = syllables->syllable_features[syllable_index + 1];
+            out->next_syllable_count = syllables->syllable_feature_counts[syllable_index + 1];
+        }
+        if (syllable_index > 0) {
+            out->previous_syllable = syllables->syllable_features[syllable_index - 1];
+            out->previous_syllable_count = syllables->syllable_feature_counts[syllable_index - 1];
+        }
+    }
+    out->self_stress = syllables->stress[source_start];
+    out->self_stress_count = syllables->stress_counts[source_start];
+    if (source_start > 0) {
+        out->preceding_stress = syllables->stress[source_start - 1];
+        out->preceding_stress_count = syllables->stress_counts[source_start - 1];
+    }
+    if (source_end < n) {
+        out->following_stress = syllables->stress[source_end];
+        out->following_stress_count = syllables->stress_counts[source_end];
+    }
 }
 
 static rg_status build_link_context(
@@ -974,9 +1153,10 @@ static rg_status align_forms_internal(
                         continue;
                     }
                     if (model != 0) {
+                        /* Borrowed: read-only, points into the precomputed
+                         * per-form arrays, and must not be cleared. */
                         rg_context_spec link_context;
-                        rg_context_spec_init_empty(&link_context);
-                        status = build_link_context(
+                        build_link_context_borrowed(
                             source,
                             source_features,
                             source_feature_counts,
@@ -986,20 +1166,17 @@ static rg_status align_forms_internal(
                             l,
                             &link_context
                         );
-                        if (status == RG_OK) {
-                            status = rg_score_link_with_context_model_internal(
-                                ctx,
-                                model,
-                                options,
-                                source->segments + (i - k),
-                                k,
-                                target->segments + (j - l),
-                                l,
-                                &link_context,
-                                &link_cost
-                            );
-                        }
-                        rg_context_spec_clear_internal(&link_context);
+                        status = rg_score_link_with_context_model_internal(
+                            ctx,
+                            model,
+                            options,
+                            source->segments + (i - k),
+                            k,
+                            target->segments + (j - l),
+                            l,
+                            &link_context,
+                            &link_cost
+                        );
                     } else {
                         status = rg_score_link(ctx, source->segments + (i - k), k, target->segments + (j - l), l, &link_cost);
                     }

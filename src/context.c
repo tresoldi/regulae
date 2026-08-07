@@ -36,7 +36,13 @@ typedef struct feature_cache_entry {
     rg_feature_set *features;
     rg_feature_constraint *constraints;
     size_t constraint_count;
-    int known;
+    /* An entry can be created by either lookup, so each answer tracks its own
+     * state: 0 not yet asked, 1 resolved, -1 resolved as unknown. Collapsing
+     * these into one flag makes an is_segment insert look like a failed
+     * feature lookup. */
+    int features_state;
+    int is_segment_state;
+    int is_segment;
 } feature_cache_entry;
 
 typedef struct distance_cache_entry {
@@ -218,14 +224,48 @@ rg_status rg_context_system_name(const rg_context *ctx, const char **out) {
     return map_merkmal_status(status);
 }
 
+/* Memoised: the scoring path asks this for both graphemes of every link it
+ * considers, and resolving a grapheme in merkmal is not cheap. */
 rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int *out) {
+    rg_context *mutable_ctx = (rg_context *)ctx;
     mk_status status;
+    size_t slot;
+
     if (ctx == 0 || grapheme == 0 || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
+    if (mutable_ctx->feature_cap == 0 || (mutable_ctx->feature_count + 1) * 10 >= mutable_ctx->feature_cap * 7) {
+        if (feature_cache_grow(mutable_ctx) != RG_OK) {
+            status = mk_system_is_segment(ctx->system, grapheme, out);
+            return map_merkmal_status(status);
+        }
+    }
+    slot = hash_string(grapheme, 1469598103934665603u) & (mutable_ctx->feature_cap - 1);
+    while (mutable_ctx->features[slot].grapheme != 0) {
+        if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
+            if (mutable_ctx->features[slot].is_segment_state != 0) {
+                *out = mutable_ctx->features[slot].is_segment;
+                return RG_OK;
+            }
+            break;
+        }
+        slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
+    }
     status = mk_system_is_segment(ctx->system, grapheme, out);
-    return map_merkmal_status(status);
+    if (status != MK_OK) {
+        return map_merkmal_status(status);
+    }
+    if (mutable_ctx->features[slot].grapheme == 0) {
+        mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
+        if (mutable_ctx->features[slot].grapheme == 0) {
+            return RG_OK;
+        }
+        mutable_ctx->feature_count++;
+    }
+    mutable_ctx->features[slot].is_segment = *out;
+    mutable_ctx->features[slot].is_segment_state = 1;
+    return RG_OK;
 }
 
 rg_status rg_context_segment_distance(
@@ -305,26 +345,31 @@ rg_status rg_context_features_internal(
     slot = hash_string(grapheme, 1469598103934665603u) & (mutable_ctx->feature_cap - 1);
     while (mutable_ctx->features[slot].grapheme != 0) {
         if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
-            if (!mutable_ctx->features[slot].known) {
+            if (mutable_ctx->features[slot].features_state < 0) {
                 return RG_ERR_UNKNOWN_GRAPHEME;
             }
-            *out = mutable_ctx->features[slot].features;
-            return RG_OK;
+            if (mutable_ctx->features[slot].features_state > 0) {
+                *out = mutable_ctx->features[slot].features;
+                return RG_OK;
+            }
+            break;
         }
         slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
     }
     status = rg_context_grapheme_features(ctx, grapheme, &features);
-    mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
     if (mutable_ctx->features[slot].grapheme == 0) {
-        rg_feature_set_free(features);
-        return status == RG_OK ? RG_ERR_OOM : status;
+        mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
+        if (mutable_ctx->features[slot].grapheme == 0) {
+            rg_feature_set_free(features);
+            return status == RG_OK ? RG_ERR_OOM : status;
+        }
+        mutable_ctx->feature_count++;
     }
-    mutable_ctx->feature_count++;
     if (status != RG_OK) {
-        mutable_ctx->features[slot].known = 0;
+        mutable_ctx->features[slot].features_state = -1;
         return status;
     }
-    mutable_ctx->features[slot].known = 1;
+    mutable_ctx->features[slot].features_state = 1;
     mutable_ctx->features[slot].features = features;
     *out = features;
     return RG_OK;
@@ -361,6 +406,9 @@ rg_status rg_context_constraints_internal(
     while (mutable_ctx->features[slot].grapheme != 0 &&
            strcmp(mutable_ctx->features[slot].grapheme, grapheme) != 0) {
         slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
+    }
+    if (mutable_ctx->features[slot].grapheme == 0) {
+        return RG_ERR_MERKMAL;
     }
     if (mutable_ctx->features[slot].constraints != 0) {
         *out = mutable_ctx->features[slot].constraints;
