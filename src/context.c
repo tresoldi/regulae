@@ -465,6 +465,70 @@ rg_status rg_context_grapheme_features(
     return RG_OK;
 }
 
+/* Splits a written word into segments through merkmal, merging trailing tone
+ * digits into the segment they belong to. This is the only correct way to get
+ * from "pater" to p/a/t/e/r: a naive character split breaks multi-codepoint
+ * graphemes such as affricates, digraphs and combining diacritics. */
+rg_status rg_context_segment_word(
+    const rg_context *ctx,
+    const char *word,
+    rg_segment **out,
+    size_t *out_count
+) {
+    mk_string_list *list = 0;
+    rg_segment *segments;
+    size_t count;
+    size_t i;
+    mk_status status;
+
+    if (ctx == 0 || word == 0 || out == 0 || out_count == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    *out_count = 0;
+    status = mk_segment_ipa_merged(word, &list);
+    if (status != MK_OK) {
+        return map_merkmal_status(status);
+    }
+    count = mk_string_list_size(list);
+    if (count == 0) {
+        mk_string_list_free(list);
+        return RG_OK;
+    }
+    segments = (rg_segment *)calloc(count, sizeof(*segments));
+    if (segments == 0) {
+        mk_string_list_free(list);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < count; i++) {
+        const char *item = mk_string_list_get(list, i);
+        segments[i].grapheme = rg_strdup_internal(item == 0 ? "" : item);
+        if (segments[i].grapheme == 0) {
+            rg_segments_free(segments, i + 1);
+            mk_string_list_free(list);
+            return RG_ERR_OOM;
+        }
+    }
+    mk_string_list_free(list);
+    *out = segments;
+    *out_count = count;
+    return RG_OK;
+}
+
+void rg_segments_free(rg_segment *segments, size_t count) {
+    size_t i;
+    if (segments == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        free((char *)segments[i].grapheme);
+        free((char *)segments[i].tone);
+        free((char *)segments[i].length);
+        free((char *)segments[i].stress);
+    }
+    free(segments);
+}
+
 size_t rg_feature_set_size(const rg_feature_set *features) {
     if (features == 0) {
         return 0;

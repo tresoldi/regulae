@@ -167,6 +167,10 @@ if(REGULAE_BUILD_TESTS)
             COMMAND regulae_cli outliers --top-k 3 "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/real_contaminated.tsv")
         set_tests_properties(cli_outliers PROPERTIES PASS_REGULAR_EXPRESSION "^OUTLIER	")
 
+        add_test(NAME cli_wide
+            COMMAND regulae_cli train --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/latin_spanish/cognates.tsv")
+        set_tests_properties(cli_wide PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	latin spanish")
+
         add_test(NAME cli_arcaverborum
             COMMAND regulae_cli train --format arcaverborum "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/morph_boundary.csv")
         set_tests_properties(cli_arcaverborum PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	one two")

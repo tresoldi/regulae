@@ -170,7 +170,166 @@ static void test_corpus_from_pairs(void) {
     assert(rg_corpus_from_pairs(pairs, 2, "", "B", 0, &corpus) == RG_ERR_INVALID_ARGUMENT);
 }
 
+/* The wide loader segments through merkmal; the long fixture beside it was
+ * produced by splitting the same words on characters. That fixture is
+ * parity-verified against the Go reference, so agreeing with it here checks the
+ * segmentation bridge against a known-good result rather than against my own
+ * expectations. */
+static void test_wide_matches_the_parity_verified_corpus(rg_context *ctx) {
+    rg_corpus *wide = 0;
+    rg_corpus *long_form = 0;
+    rg_tsv_load_options tsv_options;
+    size_t i;
+
+    memset(&tsv_options, 0, sizeof(tsv_options));
+    tsv_options.confidence_column = "confidence";
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &wide) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/real_latin_spanish.tsv", &tsv_options, &long_form) == RG_OK);
+    assert(rg_corpus_cognate_count(wide) == rg_corpus_cognate_count(long_form));
+    assert(rg_corpus_cognate_count(wide) > 90);
+
+    for (i = 0; i < rg_corpus_cognate_count(wide); i++) {
+        const rg_cognate_set *a = rg_corpus_cognate_at(wide, i);
+        const rg_cognate_set *b = rg_corpus_cognate_at(long_form, i);
+        size_t f;
+        assert(a->form_count == b->form_count);
+        for (f = 0; f < a->form_count; f++) {
+            size_t g;
+            assert(strcmp(a->forms[f].lect_id, b->forms[f].lect_id) == 0);
+            assert(a->forms[f].form.segment_count == b->forms[f].form.segment_count);
+            for (g = 0; g < a->forms[f].form.segment_count; g++) {
+                assert(strcmp(a->forms[f].form.segments[g].grapheme,
+                              b->forms[f].form.segments[g].grapheme) == 0);
+            }
+        }
+    }
+    rg_corpus_free(wide);
+    rg_corpus_free(long_form);
+}
+
+/* Rows glossed the same are distinct cognate sets, not one set to merge. */
+static void test_wide_repeated_gloss_is_not_merged(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    size_t i;
+    size_t die_like = 0;
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_OK);
+    for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+        const char *id = rg_corpus_cognate_at(corpus, i)->cognate_id;
+        if (strncmp(id, "die", 3) == 0) {
+            die_like++;
+        }
+    }
+    /* The corpus glosses two separate rows "die"; both must survive. */
+    assert(die_like == 2);
+    rg_corpus_free(corpus);
+}
+
+/* "<lect>_breaks" carries morpheme boundaries; "<lect>_tone" is recognised so
+ * it is not mistaken for a lect, but tone is not carried through yet. */
+static void test_wide_breaks_and_column_conventions(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    size_t i;
+    size_t with_breaks = 0;
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_OK);
+    for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        size_t f;
+        /* The "_breaks" columns must not have become lects of their own. */
+        assert(set->form_count <= 2);
+        for (f = 0; f < set->form_count; f++) {
+            assert(strcmp(set->forms[f].lect_id, "latin") == 0 ||
+                   strcmp(set->forms[f].lect_id, "spanish") == 0);
+            if (set->forms[f].form.morpheme_break_count > 0) {
+                with_breaks++;
+                assert(set->forms[f].form.morpheme_breaks[0] > 0);
+            }
+        }
+    }
+    /* The corpus carries boundaries on 18 rows; the Go experiments never read
+     * them, so this is the first consumer. */
+    assert(with_breaks > 0);
+    rg_corpus_free(corpus);
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/mandarin_historical/cognates.tsv", 0, &corpus) == RG_OK);
+    for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        size_t f;
+        for (f = 0; f < set->form_count; f++) {
+            /* mc_tone and md_tone must not be treated as lects. */
+            assert(strcmp(set->forms[f].lect_id, "middle_chinese") == 0 ||
+                   strcmp(set->forms[f].lect_id, "mandarin") == 0);
+        }
+    }
+    rg_corpus_free(corpus);
+}
+
+static void test_wide_confidence_and_bad_input(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    size_t i;
+    int saw_low = 0;
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/contaminated_cognates_synthetic/cognates.tsv", 0, &corpus) == RG_OK);
+    for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+        if (rg_corpus_cognate_at(corpus, i)->confidence < 1.0) {
+            saw_low = 1;
+        }
+    }
+    assert(saw_low);
+    rg_corpus_free(corpus);
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/no_such_file.tsv", 0, &corpus) == RG_ERR_IO);
+    assert(corpus == 0);
+    assert(rg_corpus_load_wide_tsv(0, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_ERR_INVALID_ARGUMENT);
+}
+
+/* Segmentation must respect multi-codepoint graphemes rather than splitting
+ * on characters, which is the whole reason it goes through merkmal. */
+static void test_segment_word(rg_context *ctx) {
+    rg_segment *segments = 0;
+    size_t count = 0;
+
+    assert(rg_context_segment_word(ctx, "pater", &segments, &count) == RG_OK);
+    assert(count == 5);
+    assert(strcmp(segments[0].grapheme, "p") == 0);
+    assert(strcmp(segments[4].grapheme, "r") == 0);
+    rg_segments_free(segments, count);
+
+    /* Multi-codepoint graphemes stay whole. Splitting on characters would
+     * break every one of these, which is why segmentation goes through
+     * merkmal rather than being done by the caller. */
+    assert(rg_context_segment_word(ctx, "p\xca\xb0" "a", &segments, &count) == RG_OK);
+    assert(count == 2);
+    assert(strcmp(segments[0].grapheme, "p\xca\xb0") == 0);
+    rg_segments_free(segments, count);
+
+    /* Tie-bar affricate. */
+    assert(rg_context_segment_word(ctx, "t\xcd\xa1\xca\x83" "a", &segments, &count) == RG_OK);
+    assert(count == 2);
+    rg_segments_free(segments, count);
+
+    /* A combining diacritic attaches to its base. This is exactly the case
+     * that had to be hand-corrected when the Romance parity corpus was built
+     * by splitting on characters. */
+    assert(rg_context_segment_word(ctx, "e\xcc\x83", &segments, &count) == RG_OK);
+    assert(count == 1);
+    rg_segments_free(segments, count);
+
+    assert(rg_context_segment_word(ctx, "", &segments, &count) == RG_OK);
+    assert(count == 0);
+    rg_segments_free(segments, count);
+}
+
 int main(void) {
+    rg_context *ctx = 0;
+    assert(rg_context_new_builtin(&ctx) == RG_OK);
+    test_segment_word(ctx);
+    test_wide_matches_the_parity_verified_corpus(ctx);
+    test_wide_repeated_gloss_is_not_merged(ctx);
+    test_wide_breaks_and_column_conventions(ctx);
+    test_wide_confidence_and_bad_input(ctx);
+    rg_context_free(ctx);
     test_tsv_grouping_and_order();
     test_tsv_confidence_is_the_minimum();
     test_tsv_without_confidence_column();

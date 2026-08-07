@@ -21,7 +21,10 @@ static int usage(void) {
     printf("  help              print this help\n");
     printf("\n");
     printf("Options:\n");
-    printf("  --format <tsv|gled|arcaverborum>   input format (default tsv)\n");
+    printf("  --format <tsv|wide|gled|arcaverborum>\n");
+    printf("                                     input format (default tsv);\n");
+    printf("                                     'wide' is one row per cognate,\n");
+    printf("                                     one column per lect, whole words\n");
     printf("  --summary                          machine-readable output (default)\n");
     printf("  --top-k <n>                        limit outlier rows (default all)\n");
     printf("  --model                            align under the trained model\n");
@@ -215,6 +218,8 @@ static void print_summary(const rg_multi_model *model) {
     }
 }
 
+static rg_status load_corpus(const char *path, const char *format, rg_corpus **out);
+
 /* Dumps the per-pair learned tables in the same line format as the Go
  * reference dumper, for table-level parity diffing. */
 static void print_pairwise(const rg_multi_model *model) {
@@ -254,6 +259,18 @@ static void print_pairwise(const rg_multi_model *model) {
     }
 }
 
+static rg_status load_corpus_with_context(
+    const rg_context *ctx,
+    const char *path,
+    const char *format,
+    rg_corpus **out
+) {
+    if (format != 0 && strcmp(format, "wide") == 0) {
+        return rg_corpus_load_wide_tsv(ctx, path, 0, out);
+    }
+    return load_corpus(path, format, out);
+}
+
 static rg_status load_corpus(const char *path, const char *format, rg_corpus **out) {
     if (format == 0 || strcmp(format, "tsv") == 0) {
         rg_tsv_load_options options;
@@ -286,7 +303,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus(path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
         rg_context_free(ctx);
         return fail("loading corpus", status);
@@ -329,7 +346,7 @@ static int command_outliers(const char *path, const char *format, int top_k) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus(path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
         rg_context_free(ctx);
         return fail("loading corpus", status);
@@ -383,7 +400,7 @@ static int command_align_with_model(const char *path, const char *format) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus(path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
         rg_context_free(ctx);
         return fail("loading corpus", status);
@@ -479,7 +496,7 @@ static int command_align(const char *path, const char *format) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus(path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
         rg_context_free(ctx);
         return fail("loading corpus", status);

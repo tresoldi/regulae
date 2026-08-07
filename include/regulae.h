@@ -300,6 +300,14 @@ RG_API rg_status rg_context_grapheme_features(
     rg_feature_set **out
 );
 
+RG_API rg_status rg_context_segment_word(
+    const rg_context *ctx,
+    const char *word,
+    rg_segment **out,
+    size_t *out_count
+);
+RG_API void rg_segments_free(rg_segment *segments, size_t count);
+
 RG_API size_t rg_feature_set_size(const rg_feature_set *features);
 RG_API const char *rg_feature_set_get(const rg_feature_set *features, size_t index);
 RG_API void rg_feature_set_free(rg_feature_set *features);
@@ -429,6 +437,17 @@ typedef struct rg_tsv_load_options {
     const char *confidence_column;
 } rg_tsv_load_options;
 
+/* Wide-format TSV: one row per cognate, one column per lect, cells holding
+ * whole unsegmented words. This is the shape linguistic data is actually
+ * written in; the generic long-format loader wants pre-segmented input.
+ * A "<lect>_breaks" column supplies morpheme boundary indices for that lect. */
+typedef struct rg_wide_load_options {
+    const char *cognate_id_column;
+    const char *confidence_column;
+    const char *const *lect_columns;
+    size_t lect_column_count;
+} rg_wide_load_options;
+
 typedef struct rg_gled_load_options {
     const char *family;
     const char *const *doculects;
@@ -447,6 +466,12 @@ typedef struct rg_arcaverborum_load_options {
 RG_API rg_status rg_corpus_load_tsv(
     const char *path,
     const rg_tsv_load_options *options,
+    rg_corpus **out
+);
+RG_API rg_status rg_corpus_load_wide_tsv(
+    const rg_context *ctx,
+    const char *path,
+    const rg_wide_load_options *options,
     rg_corpus **out
 );
 RG_API rg_status rg_corpus_load_gled(

@@ -105,11 +105,30 @@ regulae align --model <corpus.tsv>      # alignments under the trained model
 regulae outliers --top-k 10 <corpus.tsv>
 ```
 
-`--format tsv|gled|arcaverborum` selects the input format
+`--format tsv|wide|gled|arcaverborum` selects the input format
 (default `tsv`). The generic TSV reader expects `cognate_id`,
 `lect_id` and `segments` columns, with an optional
 `confidence`; a cognate set takes the lowest confidence any of
 its rows reports.
+
+The `wide` reader takes the shape linguistic data is usually
+written in — one row per cognate, one column per lect, holding
+whole unsegmented words:
+
+```
+gloss   latin   spanish   latin_breaks   spanish_breaks
+father  pater   padre     -              -
+woman   femina  ember     -              3
+```
+
+Words are segmented through merkmal, so multi-codepoint
+graphemes survive: `pʰ`, `t͡ʃ`, `kʷ` and a base plus combining
+diacritic each stay one segment, where splitting on characters
+would break them. A `<lect>_breaks` column supplies morpheme
+boundary indices. Columns ending in `_tone` are recognised so
+they are not mistaken for lects, but tone is not yet carried
+through the loaders; a tone digit inside a lect column is
+reported as an unknown grapheme.
 
 ## Run experiments
 

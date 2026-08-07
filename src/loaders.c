@@ -497,6 +497,50 @@ static void loader_cognate_clear(loader_cognate *cognate) {
     memset(cognate, 0, sizeof(*cognate));
 }
 
+/* Appends a new cognate set, disambiguating an id that is already taken. In
+ * wide format each row is its own cognate set and the id column is a gloss
+ * that may legitimately repeat: two rows glossed "die" are two cognate sets,
+ * not one, and merging them would silently drop data. */
+static loader_cognate *corpus_append_cognate(rg_corpus *corpus, const char *base_id) {
+    char candidate[512];
+    size_t attempt = 1;
+    size_t i;
+
+    snprintf(candidate, sizeof(candidate), "%s", base_id);
+    for (;;) {
+        int taken = 0;
+        for (i = 0; i < corpus->count; i++) {
+            if (strcmp(corpus->cognates[i].cognate_id, candidate) == 0) {
+                taken = 1;
+                break;
+            }
+        }
+        if (!taken) {
+            break;
+        }
+        attempt++;
+        snprintf(candidate, sizeof(candidate), "%s.%lu", base_id, (unsigned long)attempt);
+    }
+    if (corpus->count == corpus->cap) {
+        size_t next_cap = corpus->cap == 0 ? 64 : corpus->cap * 2;
+        loader_cognate *next = (loader_cognate *)realloc(corpus->cognates, next_cap * sizeof(*next));
+        if (next == 0) {
+            return 0;
+        }
+        corpus->cognates = next;
+        corpus->cap = next_cap;
+    }
+    memset(&corpus->cognates[corpus->count], 0, sizeof(corpus->cognates[corpus->count]));
+    corpus->cognates[corpus->count].cognate_id = rg_strdup_internal(candidate);
+    if (corpus->cognates[corpus->count].cognate_id == 0) {
+        return 0;
+    }
+    corpus->cognates[corpus->count].confidence = 1.0;
+    corpus->cognates[corpus->count].alignment_length = -1;
+    corpus->count++;
+    return &corpus->cognates[corpus->count - 1];
+}
+
 static loader_cognate *corpus_ensure_cognate(rg_corpus *corpus, const char *cognate_id) {
     size_t i;
     for (i = 0; i < corpus->count; i++) {
@@ -638,6 +682,263 @@ const rg_cognate_set *rg_corpus_cognate_at(const rg_corpus *corpus, size_t index
         return 0;
     }
     return &corpus->view[index];
+}
+
+/* ---- wide-format TSV ---------------------------------------------------- */
+
+static int has_suffix(const char *value, const char *suffix) {
+    size_t v = strlen(value);
+    size_t s = strlen(suffix);
+    return v >= s && strcmp(value + v - s, suffix) == 0;
+}
+
+/* Parses a "<lect>_breaks" cell: comma-separated morpheme boundary indices,
+ * with "-" or an empty cell meaning none. */
+static rg_status parse_break_indices(const char *raw, int **out, size_t *out_count) {
+    int *breaks = 0;
+    size_t count = 0;
+    size_t cap = 0;
+    const char *p = raw == 0 ? "" : raw;
+
+    *out = 0;
+    *out_count = 0;
+    if (p[0] == '\0' || strcmp(p, "-") == 0) {
+        return RG_OK;
+    }
+    while (*p != '\0') {
+        char *endptr = 0;
+        long value;
+        while (*p == ' ' || *p == ',' || *p == '\t') {
+            p++;
+        }
+        if (*p == '\0') {
+            break;
+        }
+        value = strtol(p, &endptr, 10);
+        if (endptr == p) {
+            free(breaks);
+            return RG_ERR_PARSE;
+        }
+        p = endptr;
+        if (value <= 0) {
+            /* A boundary at or before the first segment marks nothing. */
+            continue;
+        }
+        if (count == cap) {
+            size_t next_cap = cap == 0 ? 4 : cap * 2;
+            int *next = (int *)realloc(breaks, next_cap * sizeof(*next));
+            if (next == 0) {
+                free(breaks);
+                return RG_ERR_OOM;
+            }
+            breaks = next;
+            cap = next_cap;
+        }
+        breaks[count++] = (int)value;
+    }
+    *out = breaks;
+    *out_count = count;
+    return RG_OK;
+}
+
+rg_status rg_corpus_load_wide_tsv(
+    const rg_context *ctx,
+    const char *path,
+    const rg_wide_load_options *options,
+    rg_corpus **out
+) {
+    loader_table table;
+    rg_corpus *corpus = 0;
+    rg_wide_load_options opts;
+    long id_col = -1;
+    long confidence_col = -1;
+    long *lect_cols = 0;
+    long *break_cols = 0;
+    size_t lect_count = 0;
+    size_t c;
+    size_t r;
+    rg_status status;
+
+    if (ctx == 0 || path == 0 || out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    memset(&opts, 0, sizeof(opts));
+    if (options != 0) {
+        opts = *options;
+    }
+    status = read_table(path, '\t', &table);
+    if (status != RG_OK) {
+        return status;
+    }
+    if (table.column_count == 0) {
+        loader_table_clear(&table);
+        return RG_ERR_PARSE;
+    }
+    /* The cognate id defaults to the first column, which is how every corpus
+     * in this repository is written. */
+    id_col = opts.cognate_id_column == 0 ? 0 : column_index(&table, opts.cognate_id_column);
+    if (id_col < 0) {
+        loader_table_clear(&table);
+        return RG_ERR_PARSE;
+    }
+    confidence_col = column_index(&table, opts.confidence_column == 0 ? "confidence" : opts.confidence_column);
+
+    lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
+    break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
+    if (lect_cols == 0 || break_cols == 0) {
+        free(lect_cols);
+        free(break_cols);
+        loader_table_clear(&table);
+        return RG_ERR_OOM;
+    }
+    if (opts.lect_column_count > 0 && opts.lect_columns != 0) {
+        for (c = 0; c < opts.lect_column_count; c++) {
+            long index = column_index(&table, opts.lect_columns[c]);
+            if (index < 0) {
+                free(lect_cols);
+                free(break_cols);
+                loader_table_clear(&table);
+                return RG_ERR_PARSE;
+            }
+            lect_cols[lect_count++] = index;
+        }
+    } else {
+        /* Every column is a lect except the id, the confidence, and the
+         * companion "_breaks" and "_tone" columns. Tone columns are recognised
+         * so they are not mistaken for lects; carrying tone through the loader
+         * is a separate decision and is not done here. */
+        for (c = 0; c < table.column_count; c++) {
+            if ((long)c == id_col || (long)c == confidence_col) {
+                continue;
+            }
+            if (has_suffix(table.header[c], "_breaks") || has_suffix(table.header[c], "_tone")) {
+                continue;
+            }
+            lect_cols[lect_count++] = (long)c;
+        }
+    }
+    if (lect_count == 0) {
+        free(lect_cols);
+        free(break_cols);
+        loader_table_clear(&table);
+        return RG_ERR_PARSE;
+    }
+    for (c = 0; c < lect_count; c++) {
+        char companion[256];
+        snprintf(companion, sizeof(companion), "%s_breaks", table.header[lect_cols[c]]);
+        break_cols[c] = column_index(&table, companion);
+    }
+
+    corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
+    if (corpus == 0) {
+        free(lect_cols);
+        free(break_cols);
+        loader_table_clear(&table);
+        return RG_ERR_OOM;
+    }
+
+    for (r = 0; r < table.row_count && status == RG_OK; r++) {
+        const loader_row *row = &table.rows[r];
+        char *cognate_id = trim_copy(cell(row, id_col));
+        loader_cognate *cognate;
+
+        if (cognate_id == 0) {
+            status = RG_ERR_OOM;
+            break;
+        }
+        if (cognate_id[0] == '\0') {
+            free(cognate_id);
+            continue;
+        }
+        cognate = corpus_append_cognate(corpus, cognate_id);
+        free(cognate_id);
+        if (cognate == 0) {
+            status = RG_ERR_OOM;
+            break;
+        }
+        for (c = 0; c < lect_count && status == RG_OK; c++) {
+            const char *lect_id = table.header[lect_cols[c]];
+            char *word = trim_copy(cell(row, lect_cols[c]));
+            loader_form form;
+
+            if (word == 0) {
+                status = RG_ERR_OOM;
+                break;
+            }
+            if (word[0] == '\0' || strcmp(word, "-") == 0) {
+                free(word);
+                continue;
+            }
+            if (cognate_find_form(cognate, lect_id) != 0) {
+                free(word);
+                continue;
+            }
+            memset(&form, 0, sizeof(form));
+            status = rg_context_segment_word(ctx, word, &form.segments, &form.segment_count);
+            free(word);
+            if (status != RG_OK) {
+                break;
+            }
+            if (form.segment_count == 0) {
+                loader_form_clear(&form);
+                continue;
+            }
+            if (break_cols[c] >= 0) {
+                status = parse_break_indices(cell(row, break_cols[c]), &form.morpheme_breaks, &form.morpheme_break_count);
+                if (status != RG_OK) {
+                    loader_form_clear(&form);
+                    break;
+                }
+            }
+            form.lect_id = rg_strdup_internal(lect_id);
+            if (form.lect_id == 0) {
+                loader_form_clear(&form);
+                status = RG_ERR_OOM;
+                break;
+            }
+            status = cognate_append_form(cognate, &form);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                break;
+            }
+        }
+        if (status == RG_OK && confidence_col >= 0) {
+            char *raw = trim_copy(cell(row, confidence_col));
+            if (raw == 0) {
+                status = RG_ERR_OOM;
+                break;
+            }
+            if (raw[0] != '\0' && strcmp(raw, "-") != 0) {
+                char *endptr = 0;
+                double value = strtod(raw, &endptr);
+                if (endptr == raw || *endptr != '\0') {
+                    free(raw);
+                    status = RG_ERR_PARSE;
+                    break;
+                }
+                if (!cognate->has_confidence || value < cognate->confidence) {
+                    cognate->confidence = value;
+                    cognate->has_confidence = 1;
+                }
+            }
+            free(raw);
+        }
+    }
+
+    free(lect_cols);
+    free(break_cols);
+    loader_table_clear(&table);
+    if (status == RG_OK) {
+        /* A wide row with a single filled cell has nothing to align against. */
+        status = corpus_publish(corpus, 2);
+    }
+    if (status != RG_OK) {
+        rg_corpus_free(corpus);
+        return status;
+    }
+    *out = corpus;
+    return RG_OK;
 }
 
 /* ---- pairwise corpora --------------------------------------------------- */
