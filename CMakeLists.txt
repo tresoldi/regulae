@@ -244,6 +244,9 @@ if(REGULAE_BUILD_TESTS)
                         --check --cli $<TARGET_FILE:regulae_cli>)
         endif()
 
+        add_test(NAME wasm_worker
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/wasm/run_node_worker.sh")
+
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
         set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
     endif()
