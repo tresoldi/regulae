@@ -461,6 +461,9 @@ typedef struct rg_arcaverborum_load_options {
     const char *const *language_ids;
     size_t language_id_count;
     int min_lects;
+    /* Zero selects the delimiter from the file extension when loading a path,
+     * and comma when parsing text. */
+    char delimiter;
 } rg_arcaverborum_load_options;
 
 RG_API rg_status rg_corpus_load_tsv(
@@ -492,6 +495,31 @@ RG_API rg_status rg_corpus_from_pairs(
     const char *cognate_id_prefix,
     rg_corpus **out
 );
+/* Parse variants take the corpus as text rather than a path, so a caller that
+ * already holds the data needs no temporary file. The WebAssembly build links
+ * without a filesystem and uses these exclusively. */
+RG_API rg_status rg_corpus_parse_tsv(
+    const char *text,
+    const rg_tsv_load_options *options,
+    rg_corpus **out
+);
+RG_API rg_status rg_corpus_parse_wide_tsv(
+    const rg_context *ctx,
+    const char *text,
+    const rg_wide_load_options *options,
+    rg_corpus **out
+);
+RG_API rg_status rg_corpus_parse_gled(
+    const char *text,
+    const rg_gled_load_options *options,
+    rg_corpus **out
+);
+RG_API rg_status rg_corpus_parse_arcaverborum(
+    const char *text,
+    const rg_arcaverborum_load_options *options,
+    rg_corpus **out
+);
+
 RG_API void rg_corpus_free(rg_corpus *corpus);
 RG_API size_t rg_corpus_cognate_count(const rg_corpus *corpus);
 RG_API const rg_cognate_set *rg_corpus_cognates(const rg_corpus *corpus);

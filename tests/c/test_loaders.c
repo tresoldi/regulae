@@ -321,6 +321,103 @@ static void test_segment_word(rg_context *ctx) {
     rg_segments_free(segments, count);
 }
 
+/* The parse variants must produce exactly what the path variants do; the
+ * WebAssembly build has no filesystem and reaches the library only through
+ * them, so a divergence here would show up only in the browser. */
+static void test_parse_matches_load(rg_context *ctx) {
+    static const char *const wide_text =
+        "gloss\tlatin\tspanish\tlatin_breaks\tspanish_breaks\n"
+        "father\tpater\tpadre\t-\t-\n"
+        "woman\tfemina\tember\t-\t3\n";
+    static const char *const long_text =
+        "cognate_id\tlect_id\tsegments\tconfidence\n"
+        "c1\talpha\tp a t a\t1.0\n"
+        "c1\tbeta\tf a t a\t0.5\n";
+    rg_corpus *from_text = 0;
+    rg_corpus *from_path = 0;
+    rg_tsv_load_options tsv_options;
+    size_t i;
+
+    /* Wide: parsed text against the same file on disk. */
+    assert(rg_corpus_parse_wide_tsv(ctx, wide_text, 0, &from_text) == RG_OK);
+    assert(rg_corpus_cognate_count(from_text) == 2);
+    {
+        const rg_cognate_set *woman = rg_corpus_cognate_at(from_text, 1);
+        const rg_form *spanish = form_for(woman, "spanish");
+        assert(spanish != 0);
+        assert(spanish->morpheme_break_count == 1);
+        assert(spanish->morpheme_breaks[0] == 3);
+    }
+    rg_corpus_free(from_text);
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &from_path) == RG_OK);
+    {
+        char *text = 0;
+        long size;
+        FILE *fh = fopen(REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", "rb");
+        assert(fh != 0);
+        fseek(fh, 0, SEEK_END);
+        size = ftell(fh);
+        fseek(fh, 0, SEEK_SET);
+        text = (char *)malloc((size_t)size + 1);
+        assert(text != 0);
+        assert(fread(text, 1, (size_t)size, fh) == (size_t)size);
+        text[size] = '\0';
+        fclose(fh);
+        assert(rg_corpus_parse_wide_tsv(ctx, text, 0, &from_text) == RG_OK);
+        free(text);
+    }
+    assert(rg_corpus_cognate_count(from_text) == rg_corpus_cognate_count(from_path));
+    for (i = 0; i < rg_corpus_cognate_count(from_text); i++) {
+        const rg_cognate_set *a = rg_corpus_cognate_at(from_text, i);
+        const rg_cognate_set *b = rg_corpus_cognate_at(from_path, i);
+        size_t f;
+        assert(strcmp(a->cognate_id, b->cognate_id) == 0);
+        assert(a->form_count == b->form_count);
+        for (f = 0; f < a->form_count; f++) {
+            size_t g;
+            assert(a->forms[f].form.segment_count == b->forms[f].form.segment_count);
+            for (g = 0; g < a->forms[f].form.segment_count; g++) {
+                assert(strcmp(a->forms[f].form.segments[g].grapheme,
+                              b->forms[f].form.segments[g].grapheme) == 0);
+            }
+        }
+    }
+    rg_corpus_free(from_text);
+    rg_corpus_free(from_path);
+
+    /* Long format, including the minimum-confidence rule. */
+    memset(&tsv_options, 0, sizeof(tsv_options));
+    tsv_options.confidence_column = "confidence";
+    assert(rg_corpus_parse_tsv(long_text, &tsv_options, &from_text) == RG_OK);
+    assert(rg_corpus_cognate_count(from_text) == 1);
+    assert(rg_corpus_cognate_at(from_text, 0)->confidence == 0.5);
+    rg_corpus_free(from_text);
+
+    /* Arcaverborum text has no extension to sniff, so it defaults to comma. */
+    assert(rg_corpus_parse_arcaverborum("Language_ID,Segments,Cognacy\n"
+                                        "one,p a + t a,b1\n"
+                                        "two,f a + t a,b1\n", 0, &from_text) == RG_OK);
+    assert(rg_corpus_cognate_count(from_text) == 1);
+    assert(rg_corpus_cognate_at(from_text, 0)->forms[0].form.morpheme_break_count == 1);
+    rg_corpus_free(from_text);
+
+    {
+        rg_arcaverborum_load_options arca;
+        memset(&arca, 0, sizeof(arca));
+        arca.delimiter = '\t';
+        assert(rg_corpus_parse_arcaverborum("Language_ID\tSegments\tCognacy\n"
+                                            "one\tp a\tb1\n"
+                                            "two\tf a\tb1\n", &arca, &from_text) == RG_OK);
+        assert(rg_corpus_cognate_count(from_text) == 1);
+        rg_corpus_free(from_text);
+    }
+
+    /* Neither a path nor text is a caller error, not a crash. */
+    assert(rg_corpus_parse_tsv(0, 0, &from_text) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_corpus_parse_wide_tsv(ctx, 0, 0, &from_text) == RG_ERR_INVALID_ARGUMENT);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -329,6 +426,7 @@ int main(void) {
     test_wide_repeated_gloss_is_not_merged(ctx);
     test_wide_breaks_and_column_conventions(ctx);
     test_wide_confidence_and_bad_input(ctx);
+    test_parse_matches_load(ctx);
     rg_context_free(ctx);
     test_tsv_grouping_and_order();
     test_tsv_confidence_is_the_minimum();

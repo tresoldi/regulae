@@ -233,18 +233,18 @@ static rg_status parse_record(const char **cursor, const char *end, char delim, 
     return RG_OK;
 }
 
-static rg_status read_table(const char *path, char delim, loader_table *out) {
-    char *data = 0;
-    size_t len = 0;
+/* Parses an already-loaded buffer. Kept separate from the file wrapper so a
+ * corpus held in memory needs no temporary file, which is what the WebAssembly
+ * build requires: it links without a filesystem. */
+static rg_status read_table_from_buffer(const char *data, size_t len, char delim, loader_table *out) {
     const char *cursor;
     const char *end;
     size_t row_cap = 0;
-    rg_status status;
+    rg_status status = RG_OK;
 
     memset(out, 0, sizeof(*out));
-    status = read_whole_file(path, &data, &len);
-    if (status != RG_OK) {
-        return status;
+    if (data == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
     }
     cursor = data;
     end = data + len;
@@ -254,7 +254,6 @@ static rg_status read_table(const char *path, char delim, loader_table *out) {
         int have_row = 0;
         status = parse_record(&cursor, end, delim, &header_row, &have_row);
         if (status != RG_OK || !have_row) {
-            free(data);
             return status;
         }
         out->header = header_row.fields;
@@ -265,7 +264,6 @@ static rg_status read_table(const char *path, char delim, loader_table *out) {
         int have_row = 0;
         status = parse_record(&cursor, end, delim, &row, &have_row);
         if (status != RG_OK) {
-            free(data);
             loader_table_clear(out);
             return status;
         }
@@ -287,7 +285,6 @@ static rg_status read_table(const char *path, char delim, loader_table *out) {
                     free(row.fields[i]);
                 }
                 free(row.fields);
-                free(data);
                 loader_table_clear(out);
                 return RG_ERR_OOM;
             }
@@ -297,8 +294,30 @@ static rg_status read_table(const char *path, char delim, loader_table *out) {
         out->rows[out->row_count] = row;
         out->row_count++;
     }
-    free(data);
     return RG_OK;
+}
+
+static rg_status read_table(const char *path, char delim, loader_table *out) {
+    char *data = 0;
+    size_t len = 0;
+    rg_status status;
+
+    memset(out, 0, sizeof(*out));
+    status = read_whole_file(path, &data, &len);
+    if (status != RG_OK) {
+        return status;
+    }
+    status = read_table_from_buffer(data, len, delim, out);
+    free(data);
+    return status;
+}
+
+/* One of path or text is set; the other is null. */
+static rg_status read_table_source(const char *path, const char *text, char delim, loader_table *out) {
+    if (text != 0) {
+        return read_table_from_buffer(text, strlen(text), delim, out);
+    }
+    return read_table(path, delim, out);
 }
 
 static long column_index(const loader_table *table, const char *name) {
@@ -741,9 +760,10 @@ static rg_status parse_break_indices(const char *raw, int **out, size_t *out_cou
     return RG_OK;
 }
 
-rg_status rg_corpus_load_wide_tsv(
+static rg_status load_wide_tsv(
     const rg_context *ctx,
     const char *path,
+    const char *text,
     const rg_wide_load_options *options,
     rg_corpus **out
 ) {
@@ -759,7 +779,7 @@ rg_status rg_corpus_load_wide_tsv(
     size_t r;
     rg_status status;
 
-    if (ctx == 0 || path == 0 || out == 0) {
+    if (ctx == 0 || (path == 0 && text == 0) || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
@@ -767,7 +787,7 @@ rg_status rg_corpus_load_wide_tsv(
     if (options != 0) {
         opts = *options;
     }
-    status = read_table(path, '\t', &table);
+    status = read_table_source(path, text, '\t', &table);
     if (status != RG_OK) {
         return status;
     }
@@ -1054,7 +1074,7 @@ rg_status rg_corpus_from_pairs(
 
 /* ---- generic TSV -------------------------------------------------------- */
 
-rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *options, rg_corpus **out) {
+static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_options *options, rg_corpus **out) {
     loader_table table;
     rg_corpus *corpus = 0;
     rg_tsv_load_options opts;
@@ -1066,7 +1086,7 @@ rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *option
     size_t r;
     rg_status status;
 
-    if (path == 0 || out == 0) {
+    if ((path == 0 && text == 0) || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
@@ -1084,7 +1104,7 @@ rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *option
         opts.segments_column = "segments";
     }
 
-    status = read_table(path, '\t', &table);
+    status = read_table_source(path, text, '\t', &table);
     if (status != RG_OK) {
         return status;
     }
@@ -1213,7 +1233,7 @@ rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *option
 
 /* ---- GLED --------------------------------------------------------------- */
 
-rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *options, rg_corpus **out) {
+static rg_status load_gled(const char *path, const char *text, const rg_gled_load_options *options, rg_corpus **out) {
     loader_table table;
     rg_corpus *corpus = 0;
     long doculect_col;
@@ -1225,14 +1245,14 @@ rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *opti
     size_t r;
     rg_status status;
 
-    if (path == 0 || out == 0) {
+    if ((path == 0 && text == 0) || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
     if (options != 0 && options->min_lects != 0) {
         min_lects = options->min_lects;
     }
-    status = read_table(path, '\t', &table);
+    status = read_table_source(path, text, '\t', &table);
     if (status != RG_OK) {
         return status;
     }
@@ -1335,8 +1355,9 @@ rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *opti
 
 /* ---- arcaverborum ------------------------------------------------------- */
 
-rg_status rg_corpus_load_arcaverborum(
+static rg_status load_arcaverborum(
     const char *path,
+    const char *text,
     const rg_arcaverborum_load_options *options,
     rg_corpus **out
 ) {
@@ -1354,19 +1375,25 @@ rg_status rg_corpus_load_arcaverborum(
     size_t r;
     rg_status status;
 
-    if (path == 0 || out == 0) {
+    if ((path == 0 && text == 0) || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
     if (options != 0 && options->min_lects != 0) {
         min_lects = options->min_lects;
     }
-    path_len = strlen(path);
-    if ((path_len >= 4 && strcmp(path + path_len - 4, ".tsv") == 0) ||
-        (path_len >= 4 && strcmp(path + path_len - 4, ".txt") == 0)) {
-        delim = '\t';
+    /* The delimiter is taken from the file extension, which a string has none
+     * of; callers parsing text set it explicitly, defaulting to comma. */
+    if (options != 0 && options->delimiter != 0) {
+        delim = options->delimiter;
+    } else if (path != 0) {
+        path_len = strlen(path);
+        if ((path_len >= 4 && strcmp(path + path_len - 4, ".tsv") == 0) ||
+            (path_len >= 4 && strcmp(path + path_len - 4, ".txt") == 0)) {
+            delim = '\t';
+        }
     }
-    status = read_table(path, delim, &table);
+    status = read_table_source(path, text, delim, &table);
     if (status != RG_OK) {
         return status;
     }
@@ -1504,4 +1531,56 @@ rg_status rg_corpus_load_arcaverborum(
     }
     *out = corpus;
     return RG_OK;
+}
+
+/* ---- public entry points ------------------------------------------------ */
+
+rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *options, rg_corpus **out) {
+    return load_tsv(path, 0, options, out);
+}
+
+rg_status rg_corpus_parse_tsv(const char *text, const rg_tsv_load_options *options, rg_corpus **out) {
+    return load_tsv(0, text, options, out);
+}
+
+rg_status rg_corpus_load_wide_tsv(
+    const rg_context *ctx,
+    const char *path,
+    const rg_wide_load_options *options,
+    rg_corpus **out
+) {
+    return load_wide_tsv(ctx, path, 0, options, out);
+}
+
+rg_status rg_corpus_parse_wide_tsv(
+    const rg_context *ctx,
+    const char *text,
+    const rg_wide_load_options *options,
+    rg_corpus **out
+) {
+    return load_wide_tsv(ctx, 0, text, options, out);
+}
+
+rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *options, rg_corpus **out) {
+    return load_gled(path, 0, options, out);
+}
+
+rg_status rg_corpus_parse_gled(const char *text, const rg_gled_load_options *options, rg_corpus **out) {
+    return load_gled(0, text, options, out);
+}
+
+rg_status rg_corpus_load_arcaverborum(
+    const char *path,
+    const rg_arcaverborum_load_options *options,
+    rg_corpus **out
+) {
+    return load_arcaverborum(path, 0, options, out);
+}
+
+rg_status rg_corpus_parse_arcaverborum(
+    const char *text,
+    const rg_arcaverborum_load_options *options,
+    rg_corpus **out
+) {
+    return load_arcaverborum(0, text, options, out);
 }
