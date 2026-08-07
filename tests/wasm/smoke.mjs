@@ -95,6 +95,63 @@ check('segmentation keeps multi-codepoint graphemes whole', () => {
                    JSON.parse(call(segment, 'ẽ')).segments);
 });
 
+// The reason the class-to-link mapping is published rather than derived: a
+// conditioned class and the unconditioned one over the same segments cannot be
+// told apart by matching graphemes, and the environment is the whole point.
+check('a conditioned class maps to fewer links than its unconditioned twin', () => {
+  cancelAfter = 0;
+  const path = join(repo, 'testdata/parity/real_latin_spanish.tsv');
+  const model = JSON.parse(call(train, readFileSync(path, 'utf8'), 'tsv', null));
+  const key = (c) => c.segments.map((s) => `${s.lect}:${s.grapheme}`).join('|');
+  const unconditioned = new Map(model.classes.unconditioned.map((c) => [key(c), c.id]));
+
+  const countLinks = (id) => model.alignments
+    .flatMap((a) => a.links)
+    .filter((l) => (l.classes ?? []).includes(id))
+    .length;
+
+  const pairs = model.classes.conditioned
+    .filter((c) => unconditioned.has(key(c)))
+    .map((c) => [c.id, unconditioned.get(key(c))]);
+  assert.ok(pairs.length > 0, 'expected a conditioned class sharing segments with an unconditioned one');
+
+  // A conditioned class can legitimately cover every instance of its
+  // correspondence: latin:i ~ spanish:e holds 12 times and all 12 happen to be
+  // post-consonantal, while the split still separates it from latin:i ~
+  // spanish:i. So the invariant is that it never covers more, and that the
+  // narrowing is real somewhere.
+  let narrowedSomewhere = false;
+  for (const [conditioned, plain] of pairs) {
+    const narrow = countLinks(conditioned);
+    const broad = countLinks(plain);
+    assert.ok(narrow > 0, `conditioned class ${conditioned} matched no links`);
+    assert.ok(narrow <= broad,
+      `conditioned class ${conditioned} matched ${narrow} links, more than its unconditioned twin's ${broad}`);
+    if (narrow < broad) {
+      narrowedSomewhere = true;
+    }
+  }
+  assert.ok(narrowedSomewhere,
+    'no conditioned class narrowed its unconditioned twin; the environment is not being applied');
+});
+
+check('every class id on a link exists in the model', () => {
+  cancelAfter = 0;
+  const model = JSON.parse(call(train,
+    readFileSync(join(repo, 'testdata/parity/conditioned_multilect.tsv'), 'utf8'), 'tsv', null));
+  const known = new Set([
+    ...model.classes.unconditioned.map((c) => c.id),
+    ...model.classes.conditioned.map((c) => c.id),
+  ]);
+  for (const alignment of model.alignments) {
+    for (const link of alignment.links) {
+      for (const id of link.classes ?? []) {
+        assert.ok(known.has(id), `link references unknown class ${id}`);
+      }
+    }
+  }
+});
+
 check('repeated calls are deterministic', () => {
   const path = join(repo, 'testdata/parity/conditioned_multilect.tsv');
   const text = readFileSync(path, 'utf8');

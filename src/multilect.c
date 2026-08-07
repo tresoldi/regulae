@@ -5,6 +5,7 @@
 #include <string.h>
 
 typedef struct class_bucket {
+    size_t origin;
     char **lect_ids;
     char **graphemes;
     size_t segment_count;
@@ -36,6 +37,9 @@ typedef struct reconciled_observation {
     size_t *lect_indices;
     size_t segment_count;
     double weight;
+    /* Which unconditioned bucket this landed in, before the buckets are
+     * sorted into class order. */
+    size_t bucket_index;
 } reconciled_observation;
 
 static void reconciled_observation_clear(reconciled_observation *obs) {
@@ -47,6 +51,116 @@ static void reconciled_observation_clear(reconciled_observation *obs) {
     free(obs->positions);
     free(obs->lect_indices);
     memset(obs, 0, sizeof(*obs));
+}
+
+static rg_status class_position_add_id(rg_class_position *position, int class_id) {
+    size_t i;
+    for (i = 0; i < position->class_id_count; i++) {
+        if (position->class_ids[i] == class_id) {
+            return RG_OK;
+        }
+    }
+    if (position->class_id_count == position->class_id_cap) {
+        size_t next_cap = position->class_id_cap == 0 ? 4 : position->class_id_cap * 2;
+        int *next = (int *)realloc(position->class_ids, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        position->class_ids = next;
+        position->class_id_cap = next_cap;
+    }
+    position->class_ids[position->class_id_count++] = class_id;
+    return RG_OK;
+}
+
+/* Moves the reconciled observations onto the model as the class-position
+ * table, so a consumer can ask which classes a given aligned position
+ * realises. Only the positions and their class ids are kept; the graphemes are
+ * already on the classes. */
+static rg_status publish_class_positions(
+    rg_multi_model *model,
+    reconciled_observation *observations,
+    size_t observation_count
+) {
+    size_t i;
+    model->class_positions = (rg_class_position *)calloc(
+        observation_count == 0 ? 1 : observation_count, sizeof(*model->class_positions));
+    if (model->class_positions == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < observation_count; i++) {
+        rg_class_position *out = &model->class_positions[i];
+        size_t n = observations[i].segment_count;
+        out->cognate_index = observations[i].cognate_index;
+        out->segment_count = n;
+        out->lect_indices = (size_t *)calloc(n == 0 ? 1 : n, sizeof(*out->lect_indices));
+        out->positions = (size_t *)calloc(n == 0 ? 1 : n, sizeof(*out->positions));
+        if (out->lect_indices == 0 || out->positions == 0) {
+            return RG_ERR_OOM;
+        }
+        memcpy(out->lect_indices, observations[i].lect_indices, n * sizeof(*out->lect_indices));
+        memcpy(out->positions, observations[i].positions, n * sizeof(*out->positions));
+        if (observations[i].bucket_index < model->unconditioned_class_count) {
+            rg_status status = class_position_add_id(out, (int)observations[i].bucket_index);
+            if (status != RG_OK) {
+                return status;
+            }
+        }
+        model->class_position_count = i + 1;
+    }
+    return RG_OK;
+}
+
+size_t rg_model_classes_at_internal(
+    const rg_multi_model *model,
+    size_t cognate_index,
+    size_t lect_a,
+    size_t position_a,
+    size_t lect_b,
+    size_t position_b,
+    int *out,
+    size_t capacity
+) {
+    size_t i;
+    size_t written = 0;
+    if (model == 0 || out == 0) {
+        return 0;
+    }
+    for (i = 0; i < model->class_position_count; i++) {
+        const rg_class_position *entry = &model->class_positions[i];
+        int has_a = 0;
+        int has_b = 0;
+        size_t j;
+        size_t k;
+        if (entry->cognate_index != cognate_index) {
+            continue;
+        }
+        for (j = 0; j < entry->segment_count; j++) {
+            if (entry->lect_indices[j] == lect_a && entry->positions[j] == position_a) {
+                has_a = 1;
+            }
+            if (entry->lect_indices[j] == lect_b && entry->positions[j] == position_b) {
+                has_b = 1;
+            }
+        }
+        if (!has_a || !has_b) {
+            continue;
+        }
+        for (k = 0; k < entry->class_id_count && written < capacity; k++) {
+            size_t seen;
+            int duplicate = 0;
+            for (seen = 0; seen < written; seen++) {
+                if (out[seen] == entry->class_ids[k]) {
+                    duplicate = 1;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                out[written++] = entry->class_ids[k];
+            }
+        }
+    }
+    return written;
 }
 
 static void reconciled_observations_free(reconciled_observation *items, size_t count) {
@@ -150,6 +264,12 @@ void rg_multi_model_free(rg_multi_model *model) {
     }
     free(model->conditioned_classes);
     free(model->cross_dimensional_rows);
+    for (i = 0; i < model->class_position_count; i++) {
+        free(model->class_positions[i].lect_indices);
+        free(model->class_positions[i].positions);
+        free(model->class_positions[i].class_ids);
+    }
+    free(model->class_positions);
     free(model);
 }
 
@@ -1490,6 +1610,54 @@ static rg_status multi_lect_context_discovery(
         }
     }
 
+    /* Tag each reconciled position with the conditioned classes it realises.
+     * Matching on graphemes alone cannot do this: a conditioned class and the
+     * unconditioned one over the same segments look identical that way, and
+     * the environment is the whole point. The context test below is the same
+     * subset check scoring uses. */
+    if (status == RG_OK) {
+        for (i = 0; i < observation_count && status == RG_OK; i++) {
+            const reconciled_observation *obs = &observations[i];
+            size_t k;
+            if (i >= model->class_position_count) {
+                break;
+            }
+            for (k = 0; k < model->conditioned_class_count && status == RG_OK; k++) {
+                const rg_multi_class_row *row = &model->conditioned_classes[k].view;
+                size_t j;
+                int matches = obs->segment_count == row->segment_count;
+                for (j = 0; matches && j < row->segment_count; j++) {
+                    if (strcmp(obs->lects[j], row->lect_ids[j]) != 0 ||
+                        strcmp(obs->graphemes[j], row->graphemes[j]) != 0) {
+                        matches = 0;
+                    }
+                }
+                for (j = 0; matches && j < row->segment_count; j++) {
+                    size_t cache_index;
+                    int subset = 0;
+                    if (row->contexts == 0 ||
+                        rg_context_spec_constraint_count(&row->contexts[j]) == 0) {
+                        continue;
+                    }
+                    cache_index = obs->cognate_index * model->lect_count + obs->lect_indices[j];
+                    if (cache_index >= cache_size || form_contexts[cache_index] == 0 ||
+                        obs->positions[j] >= form_context_counts[cache_index]) {
+                        matches = 0;
+                        break;
+                    }
+                    if (rg_context_spec_is_subset(&row->contexts[j],
+                                                  &form_contexts[cache_index][obs->positions[j]],
+                                                  &subset) != RG_OK || !subset) {
+                        matches = 0;
+                    }
+                }
+                if (matches) {
+                    status = class_position_add_id(&model->class_positions[i], row->class_id);
+                }
+            }
+        }
+    }
+
     merged_classes_free(merged, merged_count);
     for (i = 0; i < cache_size; i++) {
         rg_context_spec_array_free_internal(form_contexts[i], form_context_counts[i]);
@@ -1635,7 +1803,8 @@ static rg_status add_bucket_observation(
     char **graphemes,
     size_t count,
     double weight,
-    const char *cognate_id
+    const char *cognate_id,
+    size_t *out_bucket_index
 ) {
     size_t i;
     for (i = 0; i < *bucket_count; i++) {
@@ -1646,9 +1815,11 @@ static rg_status add_bucket_observation(
             }
             string_array_clear(lects, count);
             string_array_clear(graphemes, count);
+            *out_bucket_index = i;
             return RG_OK;
         }
     }
+    *out_bucket_index = *bucket_count;
     if (*bucket_count == *bucket_cap) {
         size_t next_cap = *bucket_cap == 0 ? 16 : *bucket_cap * 2;
         class_bucket *next = (class_bucket *)realloc(*buckets, next_cap * sizeof(**buckets));
@@ -2032,7 +2203,8 @@ static rg_status aggregate_position_classes(
                     graphemes_copy,
                     item_count,
                     weight,
-                    cognates[c].cognate_id
+                    cognates[c].cognate_id,
+                    &obs.bucket_index
                 );
                 if (status != RG_OK) {
                     reconciled_observation_clear(&obs);
@@ -2064,8 +2236,34 @@ static rg_status aggregate_position_classes(
             return status;
         }
     }
-    if (bucket_count > 1) {
-        qsort(buckets, bucket_count, sizeof(*buckets), bucket_cmp);
+    /* Sorting reorders the buckets, so remember where each one went before
+     * the observations' bucket indices become meaningless. */
+    {
+        size_t *bucket_to_class = (size_t *)calloc(bucket_count == 0 ? 1 : bucket_count, sizeof(*bucket_to_class));
+        size_t i;
+        if (bucket_to_class == 0) {
+            for (c = 0; c < bucket_count; c++) {
+                class_bucket_clear(&buckets[c]);
+            }
+            free(buckets);
+            reconciled_observations_free(observations, observation_count);
+            return RG_ERR_OOM;
+        }
+        for (i = 0; i < bucket_count; i++) {
+            buckets[i].origin = i;
+        }
+        if (bucket_count > 1) {
+            qsort(buckets, bucket_count, sizeof(*buckets), bucket_cmp);
+        }
+        for (i = 0; i < bucket_count; i++) {
+            bucket_to_class[buckets[i].origin] = i;
+        }
+        for (i = 0; i < observation_count; i++) {
+            if (observations[i].bucket_index < bucket_count) {
+                observations[i].bucket_index = bucket_to_class[observations[i].bucket_index];
+            }
+        }
+        free(bucket_to_class);
     }
     model->unconditioned_classes = (rg_multi_class_owned *)calloc(bucket_count == 0 ? 1 : bucket_count, sizeof(*model->unconditioned_classes));
     if (model->unconditioned_classes == 0) {
@@ -2193,6 +2391,9 @@ rg_status rg_train_model(
     }
     if (status == RG_OK && rg_progress_step_internal(&progress, "class discovery")) {
         status = RG_ERR_CANCELLED;
+    }
+    if (status == RG_OK) {
+        status = publish_class_positions(model, observations, observation_count);
     }
     if (status == RG_OK) {
         status = multi_lect_context_discovery(

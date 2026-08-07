@@ -69,6 +69,25 @@ static void test_determinism(rg_context *ctx) {
     rg_string_free(second);
 }
 
+/* Each alignment link reports the classes it realises, taken from the
+ * reconciliation. The point of publishing it is precision: a conditioned class
+ * and the unconditioned one over the same segments are indistinguishable if a
+ * consumer matches graphemes, and the environment is what the tool is for. */
+static void test_links_carry_class_ids(rg_context *ctx) {
+    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/real_latin_spanish.tsv", 1, 1);
+    const char *cursor;
+    size_t links_with_classes = 0;
+
+    assert(text != 0);
+    assert(strstr(text, "\"classes\":[") != 0);
+
+    for (cursor = text; (cursor = strstr(cursor, "\"classes\":[")) != 0; cursor++) {
+        links_with_classes++;
+    }
+    assert(links_with_classes > 50);
+    rg_string_free(text);
+}
+
 static void test_null_model(rg_context *ctx) {
     assert(rg_model_to_json(ctx, 0, 0, 0, 0, 0, 0) == 0);
 }
@@ -149,6 +168,7 @@ int main(void) {
     test_model_json_shape(ctx);
     test_optional_sections(ctx);
     test_determinism(ctx);
+    test_links_carry_class_ids(ctx);
     test_null_model(ctx);
     test_options_reader();
     test_error_payload();

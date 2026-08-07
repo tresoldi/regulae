@@ -77,7 +77,24 @@ typedef struct rg_multi_cross_dimensional_owned {
     rg_multi_cross_dimensional_row view;
 } rg_multi_cross_dimensional_owned;
 
+/* One reconciled position tuple and the classes it realises. Reconciliation
+ * already knows which aligned positions formed each class; retaining it is what
+ * lets a consumer point at the evidence for a class rather than guess at it by
+ * matching graphemes, which cannot tell a conditioned class from the
+ * unconditioned one over the same segments. */
+typedef struct rg_class_position {
+    size_t cognate_index;
+    size_t *lect_indices;
+    size_t *positions;
+    size_t segment_count;
+    int *class_ids;
+    size_t class_id_count;
+    size_t class_id_cap;
+} rg_class_position;
+
 struct rg_multi_model {
+    rg_class_position *class_positions;
+    size_t class_position_count;
     char **lect_ids;
     size_t lect_count;
     rg_multi_pair_model_owned *pair_models;
@@ -89,6 +106,20 @@ struct rg_multi_model {
     rg_multi_cross_dimensional_owned *cross_dimensional_rows;
     size_t cross_dimensional_count;
 };
+
+/* Class ids realised at a given position pair, for a link of an alignment
+ * between two lects of one cognate set. Returns the number written to out,
+ * capped at capacity. */
+size_t rg_model_classes_at_internal(
+    const rg_multi_model *model,
+    size_t cognate_index,
+    size_t lect_a,
+    size_t position_a,
+    size_t lect_b,
+    size_t position_b,
+    int *out,
+    size_t capacity
+);
 
 char *rg_strdup_internal(const char *value);
 void rg_segment_clear_internal(rg_segment *segment);

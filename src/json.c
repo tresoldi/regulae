@@ -231,6 +231,10 @@ static rg_status json_add_alignments(
                 double cost = 0.0;
                 size_t p;
                 size_t link_i;
+                size_t source_pos;
+                size_t target_pos;
+                size_t lect_index_a = 0;
+                size_t lect_index_b = 0;
 
                 for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
                     const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, p);
@@ -242,6 +246,15 @@ static rg_status json_add_alignments(
                 }
                 if (pair_model == 0) {
                     continue;
+                }
+                for (p = 0; p < rg_multi_model_lect_count(model); p++) {
+                    const char *name = rg_multi_model_lect_at(model, p);
+                    if (strcmp(name, lect_a) == 0) {
+                        lect_index_a = p;
+                    }
+                    if (strcmp(name, lect_b) == 0) {
+                        lect_index_b = p;
+                    }
                 }
                 if (rg_align_forms_with_model(ctx, pair_model, options,
                                               &cognate->forms[order[i]].form,
@@ -269,6 +282,8 @@ static rg_status json_add_alignments(
                     free(order);
                     return RG_ERR_OOM;
                 }
+                source_pos = 0;
+                target_pos = 0;
                 for (link_i = 0; link_i < rg_alignment_link_count(alignment); link_i++) {
                     const rg_link *link = rg_alignment_link_at(alignment, link_i);
                     cJSON *link_entry = cJSON_CreateObject();
@@ -281,6 +296,44 @@ static rg_status json_add_alignments(
                     }
                     cJSON_AddItemToObject(link_entry, "source", json_segments(link->source, link->source_count));
                     cJSON_AddItemToObject(link_entry, "target", json_segments(link->target, link->target_count));
+                    /* Which classes this link realises, taken from the
+                     * reconciliation rather than re-derived by matching
+                     * graphemes, which could not tell a conditioned class from
+                     * the unconditioned one over the same segments. A
+                     * multi-segment link reports the union over the positions
+                     * it spans; a gap reports nothing. */
+                    if (link->source_count > 0 && link->target_count > 0) {
+                        int ids[64];
+                        size_t found = 0;
+                        size_t span = link->source_count < link->target_count
+                            ? link->source_count : link->target_count;
+                        size_t offset;
+                        for (offset = 0; offset < span && found < 64; offset++) {
+                            found += rg_model_classes_at_internal(
+                                model, c,
+                                lect_index_a, source_pos + offset,
+                                lect_index_b, target_pos + offset,
+                                ids + found, 64 - found);
+                        }
+                        if (found > 0) {
+                            cJSON *class_ids = cJSON_CreateArray();
+                            size_t n;
+                            if (class_ids == 0) {
+                                cJSON_Delete(link_entry);
+                                cJSON_Delete(links);
+                                cJSON_Delete(entry);
+                                rg_alignment_free(alignment);
+                                free(order);
+                                return RG_ERR_OOM;
+                            }
+                            for (n = 0; n < found; n++) {
+                                cJSON_AddItemToArray(class_ids, cJSON_CreateNumber(ids[n]));
+                            }
+                            cJSON_AddItemToObject(link_entry, "classes", class_ids);
+                        }
+                    }
+                    source_pos += link->source_count;
+                    target_pos += link->target_count;
                     cJSON_AddItemToArray(links, link_entry);
                 }
                 cJSON_AddItemToObject(entry, "links", links);
