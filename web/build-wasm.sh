@@ -6,8 +6,10 @@
 #   ./web/build-wasm.sh
 #
 # The artifacts (regulae.js, regulae.wasm) are committed, so rerun this before
-# deploying the page after any change under src/ or include/ — nothing checks
-# that the committed build matches the source.
+# deploying the page after any change under src/ or include/. This records the
+# sources it built from in web/BUILD_INFO; the 'wasm_current' test and the Pages
+# workflow both fail if that stamp falls behind, so a stale artifact cannot
+# reach the deployed page unnoticed.
 #
 # Links with -sFILESYSTEM=0: the library is reached only through the
 # parse-from-string loaders, and merkmal's built-in models are compiled in.
@@ -44,6 +46,8 @@ emcc \
     -sEXPORTED_FUNCTIONS='["_regulae_train_json","_regulae_segment_json","_regulae_version","_regulae_free","_malloc","_free"]' \
     -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString","stringToNewUTF8"]' \
     -o "$script_dir/regulae.js"
+
+"$repo_dir/scripts/wasm-provenance.sh" --write
 
 echo "built:"
 ls -lh "$script_dir/regulae.js" "$script_dir/regulae.wasm" | awk '{print "  " $9 "  " $5}'

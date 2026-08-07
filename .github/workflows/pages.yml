@@ -1,0 +1,64 @@
+name: Deploy to GitHub Pages
+
+# The page is served straight from web/: the WebAssembly engine is a committed
+# artifact, so there is nothing to compile here. That is deliberate — building
+# it would need both the Emscripten SDK and a merkmal checkout — but it means
+# the deploy has to check the artifact is not older than the sources it claims
+# to be, which is what the provenance step below does.
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'web/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fails if src/ or include/ moved on without web/build-wasm.sh being
+      # rerun, rather than quietly publishing the previous engine.
+      - name: Check the WebAssembly build is current
+        run: ./scripts/wasm-provenance.sh --check
+
+      # The page loads these by name; a rename or a missing generated file
+      # would only show up as a blank page in the browser.
+      - name: Check the page's assets are all present
+        run: |
+          missing=0
+          for asset in index.html style.css app.js worker.js \
+                       corpora.js guide-content.js regulae.js regulae.wasm; do
+              if [ ! -s "web/$asset" ]; then
+                  echo "::error::web/$asset is missing or empty"
+                  missing=1
+              fi
+          done
+          exit $missing
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

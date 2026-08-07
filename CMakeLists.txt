@@ -268,6 +268,12 @@ if(REGULAE_BUILD_TESTS)
         add_test(NAME wasm_worker
             COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/wasm/run_node_worker.sh")
 
+        # web/regulae.wasm is committed rather than built on deploy, so a source
+        # change without a rebuild would ship an old engine to the page. Needs
+        # neither emsdk nor a compiler: it compares recorded source hashes.
+        add_test(NAME wasm_current
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/scripts/wasm-provenance.sh" --check)
+
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
         set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
     endif()
