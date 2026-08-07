@@ -2,6 +2,7 @@
 
 #include "merkmal.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,11 +64,22 @@ struct rg_context {
     size_t distance_cap;
 };
 
+/* FNV-1a, with the constants chosen for the width of size_t. WebAssembly is
+ * 32-bit, where the 64-bit prime truncates to an even number and the hash
+ * degenerates. */
+#if SIZE_MAX > 0xFFFFFFFFu
+#define RG_FNV_OFFSET ((size_t)14695981039346656037ULL)
+#define RG_FNV_PRIME ((size_t)1099511628211ULL)
+#else
+#define RG_FNV_OFFSET ((size_t)2166136261u)
+#define RG_FNV_PRIME ((size_t)16777619u)
+#endif
+
 static size_t hash_string(const char *value, size_t seed) {
     size_t hash = seed;
     while (*value != 0) {
         hash ^= (size_t)(unsigned char)*value++;
-        hash *= 1099511628211u;
+        hash *= RG_FNV_PRIME;
     }
     return hash;
 }
@@ -109,7 +121,7 @@ static rg_status feature_cache_grow(rg_context *ctx) {
         if (ctx->features[i].grapheme == 0) {
             continue;
         }
-        slot = hash_string(ctx->features[i].grapheme, 1469598103934665603u) & (next_cap - 1);
+        slot = hash_string(ctx->features[i].grapheme, RG_FNV_OFFSET) & (next_cap - 1);
         while (next[slot].grapheme != 0) {
             slot = (slot + 1) & (next_cap - 1);
         }
@@ -133,7 +145,7 @@ static rg_status distance_cache_grow(rg_context *ctx) {
         if (ctx->distances[i].a == 0) {
             continue;
         }
-        slot = hash_string(ctx->distances[i].b, hash_string(ctx->distances[i].a, 1469598103934665603u)) & (next_cap - 1);
+        slot = hash_string(ctx->distances[i].b, hash_string(ctx->distances[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
         while (next[slot].a != 0) {
             slot = (slot + 1) & (next_cap - 1);
         }
@@ -241,7 +253,7 @@ rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int
             return map_merkmal_status(status);
         }
     }
-    slot = hash_string(grapheme, 1469598103934665603u) & (mutable_ctx->feature_cap - 1);
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
     while (mutable_ctx->features[slot].grapheme != 0) {
         if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
             if (mutable_ctx->features[slot].is_segment_state != 0) {
@@ -288,7 +300,7 @@ rg_status rg_context_segment_distance(
                 return map_merkmal_status(status);
             }
         }
-        slot = hash_string(b, hash_string(a, 1469598103934665603u)) & (mutable_ctx->distance_cap - 1);
+        slot = hash_string(b, hash_string(a, RG_FNV_OFFSET)) & (mutable_ctx->distance_cap - 1);
         while (mutable_ctx->distances[slot].a != 0) {
             if (strcmp(mutable_ctx->distances[slot].a, a) == 0 && strcmp(mutable_ctx->distances[slot].b, b) == 0) {
                 if (!mutable_ctx->distances[slot].resolved) {
@@ -342,7 +354,7 @@ rg_status rg_context_features_internal(
             return status;
         }
     }
-    slot = hash_string(grapheme, 1469598103934665603u) & (mutable_ctx->feature_cap - 1);
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
     while (mutable_ctx->features[slot].grapheme != 0) {
         if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
             if (mutable_ctx->features[slot].features_state < 0) {
@@ -402,7 +414,7 @@ rg_status rg_context_constraints_internal(
     if (status != RG_OK) {
         return status;
     }
-    slot = hash_string(grapheme, 1469598103934665603u) & (mutable_ctx->feature_cap - 1);
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
     while (mutable_ctx->features[slot].grapheme != 0 &&
            strcmp(mutable_ctx->features[slot].grapheme, grapheme) != 0) {
         slot = (slot + 1) & (mutable_ctx->feature_cap - 1);

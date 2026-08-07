@@ -293,6 +293,34 @@ static rg_status json_add_alignments(
     return RG_OK;
 }
 
+char *rg_error_to_json(rg_status status, const char *detail) {
+    return rg_json_error_internal(status, detail);
+}
+
+rg_status rg_train_options_from_json(
+    const char *text,
+    rg_train_options *out,
+    char *error_detail,
+    size_t error_detail_size
+) {
+    return rg_json_read_train_options_internal(text, out, error_detail, error_detail_size);
+}
+
+char *rg_segments_to_json(const rg_segment *segments, size_t count) {
+    cJSON *root = cJSON_CreateObject();
+    char *text;
+
+    if (root == 0) {
+        return 0;
+    }
+    cJSON_AddBoolToObject(root, "ok", 1);
+    cJSON_AddNumberToObject(root, "format_version", RG_JSON_FORMAT_VERSION);
+    cJSON_AddItemToObject(root, "segments", json_segments(segments, count));
+    text = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return text;
+}
+
 char *rg_model_to_json(
     const rg_context *ctx,
     const rg_multi_model *model,

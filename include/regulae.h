@@ -582,6 +582,22 @@ RG_API char *rg_model_to_json(
     int include_outliers
 );
 
+/* Renders an error as the same JSON envelope a successful call uses, so a
+ * caller has one shape to handle. Caller owns the string. */
+RG_API char *rg_error_to_json(rg_status status, const char *detail);
+
+/* Reads a flat options object. Unknown keys are rejected rather than ignored,
+ * with the offending key named in error_detail, which may be null. */
+RG_API rg_status rg_train_options_from_json(
+    const char *text,
+    rg_train_options *out,
+    char *error_detail,
+    size_t error_detail_size
+);
+
+/* Renders a segmented word, so a caller can show how input will be read. */
+RG_API char *rg_segments_to_json(const rg_segment *segments, size_t count);
+
 RG_API rg_status rg_train_model(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
