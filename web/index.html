@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>regulae — sound correspondences from cognate data</title>
+<meta name="description" content="Discover systematic sound correspondences between lects from cognate data, in the browser.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+
+  <div class="top">
+    <h1>regulae</h1>
+    <span class="version" id="version"></span>
+    <span class="spacer"></span>
+    <a href="https://github.com/tresoldi/regulae">Source</a>
+    <button id="guide-open">Guide</button>
+  </div>
+
+  <p class="tagline">Systematic sound correspondences between lects, discovered from cognate data.</p>
+
+  <p class="status-banner">
+    <strong>Early release.</strong>
+    The model this page produces is byte-identical to the reference
+    implementation across thirteen corpora, including real Latin/Spanish and
+    Proto-Polynesian/Hawaiian data. Bootstrap resampling, anomaly detection and
+    chunk-transparency screening are not implemented yet, and several input
+    conventions cannot be read — see
+    <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
+  </p>
+
+  <!-- The boundary is regulae's most misread property: a table of
+       latin:p ~ spanish:f invites exactly the historical reading the framework
+       forbids it from making, so it is stated before the tool, not after. -->
+  <div class="boundary">
+    <section>
+      <h2>What this does</h2>
+      <ul>
+        <li>Aligns cognate forms across two or more lects</li>
+        <li>Finds which segments answer to which, and how often</li>
+        <li>Discovers the environments a correspondence is conditioned by</li>
+        <li>Ranks cognate sets by how badly they fit what it learned</li>
+      </ul>
+    </section>
+    <section class="is-not">
+      <h2>What this does not do</h2>
+      <ul>
+        <li>Decide which words are cognate — that is your input</li>
+        <li>Reconstruct proto-forms</li>
+        <li>Claim a direction of change: correspondences are written
+            <code>a&nbsp;~&nbsp;b</code>, never <code>a&nbsp;→&nbsp;b</code></li>
+        <li>Build family trees or date anything</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="controls">
+    <select id="examples" aria-label="Example corpus"></select>
+    <input type="file" id="file" accept=".tsv,.csv,.txt" aria-label="Load a file">
+    <span class="spacer"></span>
+    <button id="run" class="primary" disabled>Run</button>
+    <button id="cancel" hidden>Cancel</button>
+  </div>
+
+  <p class="example-note" id="example-note"></p>
+
+  <textarea id="editor" spellcheck="false" aria-label="Corpus"></textarea>
+
+  <div class="progress" id="progress">
+    <div class="bar"><div class="fill" id="progress-fill"></div></div>
+    <div class="label" id="progress-label"></div>
+  </div>
+
+  <div id="error"></div>
+
+  <div class="results" id="results">
+    <div class="summary" id="summary"></div>
+
+    <div class="panels">
+      <div class="panel">
+        <h2>Correspondence classes</h2>
+        <p class="hint">Select one to see the alignments it rests on.</p>
+        <div class="scroll"><table class="classes" id="classes">
+          <thead><tr><th>correspondence</th><th>count</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+
+      <div class="panel">
+        <h2>Alignments</h2>
+        <p class="hint" id="alignments-hint">Select a column to see which class it belongs to.</p>
+        <div class="scroll"><div class="alignments" id="alignments"></div></div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <button id="download-json">Download JSON</button>
+      <button id="download-summary">Download summary</button>
+      <span class="spacer"></span>
+      <span class="version" id="timing"></span>
+    </div>
+    <p class="example-note">
+      The download is an inspection snapshot, not an interchange format: it
+      carries one best answer rather than the ensembles and uncertainty a
+      historical claim would need.
+    </p>
+  </div>
+
+</div>
+
+<aside class="guide" id="guide">
+  <header>
+    <h2 id="guide-title">Guide</h2>
+    <button id="guide-load" hidden>Load this example</button>
+    <button id="guide-close">Close</button>
+  </header>
+  <div class="body" id="guide-body"></div>
+  <div class="steps" id="guide-steps"></div>
+</aside>
+
+<script src="corpora.js"></script>
+<script src="guide-content.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

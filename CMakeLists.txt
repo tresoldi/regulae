@@ -244,6 +244,11 @@ if(REGULAE_BUILD_TESTS)
                         --check --cli $<TARGET_FILE:regulae_cli>)
         endif()
 
+        add_test(NAME web_page
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/web/run_node_page.sh")
+        set_tests_properties(web_page PROPERTIES
+            ENVIRONMENT "REGULAE_CLI=$<TARGET_FILE:regulae_cli>")
+
         add_test(NAME wasm_worker
             COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/wasm/run_node_worker.sh")
 
