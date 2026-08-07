@@ -221,6 +221,16 @@ if(REGULAE_BUILD_TESTS)
         set_tests_properties(wasm_smoke PROPERTIES
             ENVIRONMENT "REGULAE_CLI=$<TARGET_FILE:regulae_cli>")
 
+        # The generated capability table must match what the CLI actually does,
+        # so a corpus that starts or stops loading cannot go unrecorded.
+        find_package(Python3 COMPONENTS Interpreter QUIET)
+        if(Python3_Interpreter_FOUND)
+            add_test(NAME capabilities_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/capabilities.py"
+                        --check --cli $<TARGET_FILE:regulae_cli>)
+        endif()
+
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
         set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
     endif()

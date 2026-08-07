@@ -203,6 +203,10 @@ moves on any layout, signature or ownership change.
 
 ## Documentation
 
+- **What regulae reads** at [`docs/capabilities.md`](docs/capabilities.md) —
+  generated: which capabilities are implemented, and which corpora the loaders
+  can currently express. A corpus it cannot read says something about the input
+  path, not the engine.
 - **Conversion state** at `docs/c_conversion_roadmap.md`
   (milestones, parity results, intentional deviations) and
   `docs/c_conversion_handoff.md`.
