@@ -116,6 +116,22 @@ install(FILES third_party/cjson/LICENSE
 if(REGULAE_BUILD_TESTS)
     include(CTest)
 
+    # The tests state their expectations with assert(), and most of those wrap
+    # the library call being tested inside the assert itself. A Release build
+    # defines NDEBUG, which deletes the whole statement — call included — so the
+    # suite ran almost nothing and still reported green. Keep assertions live
+    # for the test targets whatever the build type; this comes after the flags
+    # CMake derives from CMAKE_BUILD_TYPE, so it overrides their -DNDEBUG, and
+    # it is scoped to targets declared below, leaving the library itself alone.
+    if(NOT MSVC)
+        add_compile_options(-UNDEBUG)
+    endif()
+
+    # Guards the above: without it, a change in build flags would silently
+    # return the suite to testing nothing.
+    add_executable(test_assertions_live tests/c/test_assertions_live.c)
+    add_test(NAME assertions_live COMMAND test_assertions_live)
+
     add_executable(test_options tests/c/test_options.c)
     target_link_libraries(test_options PRIVATE regulae::regulae)
     add_test(NAME options COMMAND test_options)

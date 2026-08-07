@@ -18,7 +18,18 @@ set -uo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
 
-cli="${REGULAE_CLI:-$root/build/c/regulae}"
+# build/regulae is where a plain 'cmake -B build' puts it; build/c/regulae is
+# the older layout, still accepted so existing build trees keep working.
+cli="${REGULAE_CLI:-}"
+if [ -z "$cli" ]; then
+    for candidate in "$root/build/regulae" "$root/build/c/regulae"; do
+        if [ -x "$candidate" ]; then
+            cli="$candidate"
+            break
+        fi
+    done
+    cli="${cli:-$root/build/regulae}"
+fi
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
