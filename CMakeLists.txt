@@ -204,6 +204,13 @@ if(REGULAE_BUILD_TESTS)
             COMMAND regulae_cli train --format arcaverborum "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/morph_boundary.csv")
         set_tests_properties(cli_arcaverborum PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	one two")
 
+        # Runs only when the WebAssembly artifacts and Node are present; the
+        # script skips otherwise, so a checkout without emsdk still passes.
+        add_test(NAME wasm_smoke
+            COMMAND "${CMAKE_CURRENT_SOURCE_DIR}/tests/wasm/run_node_smoke.sh")
+        set_tests_properties(wasm_smoke PROPERTIES
+            ENVIRONMENT "REGULAE_CLI=$<TARGET_FILE:regulae_cli>")
+
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
         set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
     endif()
