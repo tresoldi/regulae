@@ -215,6 +215,14 @@ moves on any layout, signature or ownership change.
 - The original Python implementation is archived under
   `python/` for reference.
 
+## Licence
+
+MIT, matching [merkmal](../merkmal), which regulae is built on. See
+[`LICENSE`](LICENSE).
+
+The vendored copy of cJSON in `third_party/cjson/` is also MIT and keeps its
+own licence file; it is regulae's only dependency other than merkmal.
+
 ## What is not in this package
 
 - Cognate detection. Cognate sets are user input.

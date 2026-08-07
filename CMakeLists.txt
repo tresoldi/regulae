@@ -3,8 +3,10 @@ cmake_minimum_required(VERSION 3.20)
 project(regulae
     VERSION 0.1.0
     DESCRIPTION "Sound-correspondence rule discovery"
+    HOMEPAGE_URL "https://github.com/tresoldi/regulae"
     LANGUAGES C
 )
+set(REGULAE_LICENSE "MIT")
 
 option(REGULAE_BUILD_TESTS "Build native C tests" ON)
 option(REGULAE_BUILD_CLI "Build the regulae CLI" ON)
@@ -106,6 +108,10 @@ if(REGULAE_BUILD_CLI)
     install(TARGETS regulae_cli RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 install(FILES include/regulae.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+install(FILES LICENSE DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/regulae)
+install(FILES third_party/cjson/LICENSE
+    DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/licenses/regulae
+    RENAME LICENSE.cjson)
 
 if(REGULAE_BUILD_TESTS)
     include(CTest)
