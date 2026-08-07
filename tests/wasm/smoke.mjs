@@ -47,6 +47,35 @@ function check(name, fn) {
   }
 }
 
+// The generated page data has to agree with itself: a guide step naming a
+// corpus that corpora.js does not carry would load an empty editor.
+check('every guide example exists in the corpus table', () => {
+  const load = (name) => {
+    const text = readFileSync(join(repo, 'web', name), 'utf8');
+    const scope = {};
+    new Function('exports', text + '\nexports.CORPORA = typeof CORPORA !== "undefined" ? CORPORA : null;'
+      + '\nexports.CORPUS_LIST = typeof CORPUS_LIST !== "undefined" ? CORPUS_LIST : null;'
+      + '\nexports.GUIDE_STEPS = typeof GUIDE_STEPS !== "undefined" ? GUIDE_STEPS : null;')(scope);
+    return scope;
+  };
+  const { CORPORA, CORPUS_LIST } = load('corpora.js');
+  const { GUIDE_STEPS } = load('guide-content.js');
+
+  assert.ok(Object.keys(CORPORA).length > 20, 'expected the corpus table to be populated');
+  for (const step of GUIDE_STEPS) {
+    if (step.example) {
+      assert.ok(CORPORA[step.example.path],
+        `guide step "${step.title}" names ${step.example.path}, absent from corpora.js`);
+    }
+  }
+  for (const entry of CORPUS_LIST) {
+    assert.ok(CORPORA[entry.path], `example list names ${entry.path}, absent from corpora.js`);
+    if (!entry.readable) {
+      assert.ok(entry.blockedBy, `${entry.path} is marked unreadable without saying what blocks it`);
+    }
+  }
+});
+
 check('version matches the library', () => {
   assert.match(version(), /^\d+\.\d+\.\d+$/);
 });

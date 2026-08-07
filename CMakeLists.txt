@@ -235,6 +235,13 @@ if(REGULAE_BUILD_TESTS)
             add_test(NAME guide_current
                 COMMAND ${Python3_EXECUTABLE}
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/guide.py" --check)
+
+            # The example list records which corpora load, so a corpus that
+            # starts or stops loading cannot silently keep its old label.
+            add_test(NAME corpora_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/corpora.py"
+                        --check --cli $<TARGET_FILE:regulae_cli>)
         endif()
 
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
