@@ -15,6 +15,13 @@
  * then smallest target span). Three orders of magnitude below the chunk
  * complexity penalty, so real tie-breaks still decide. */
 #define RG_TIE_EPSILON 1e-12
+/* Stages the pairwise pipeline reports: initial prior, segment EM, displacement
+ * aggregation, context discovery, chunk promotion, tonal aggregation,
+ * cross-dimensional discovery, long-range discovery. */
+#define RG_PAIRWISE_STAGE_COUNT 8
+/* Multi-lect stages beyond the per-pair work: reconciliation, class discovery,
+ * cross-dimensional lifting. */
+#define RG_MULTILECT_STAGE_COUNT 3
 
 /* Dirichlet prior mass alpha(t|s) over the corpus grapheme inventory, derived
  * from merkmal distances by a softmax. Held separately from the observed
@@ -154,6 +161,30 @@ rg_status rg_context_constraints_internal(
 /* JSON transport for the CLI's --json output and the WebAssembly adapter. Not
  * the interchange schema: that is M8's job, and a single MAP correspondence
  * system is explicitly not claim-capable data. */
+/* Threads one progress counter through a whole training run so a caller sees a
+ * single monotonic fraction, rather than each lect pair restarting at zero. */
+typedef struct rg_progress_state {
+    rg_progress_fn fn;
+    void *user_data;
+    size_t completed;
+    size_t total;
+    int cancelled;
+} rg_progress_state;
+
+void rg_progress_init_internal(rg_progress_state *state, const rg_train_options *options, size_t total);
+/* Reports one finished stage. Returns non-zero once the caller has asked to
+ * stop, and keeps returning it so unwinding callers all see the same answer. */
+int rg_progress_step_internal(rg_progress_state *state, const char *stage);
+
+rg_status rg_train_pairwise_internal(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_progress_state *progress,
+    rg_pairwise_model **out
+);
+
 char *rg_json_from_multi_model_internal(
     const rg_context *ctx,
     const rg_multi_model *model,

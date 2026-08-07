@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 2
+#define RG_ABI_VERSION 3
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 
 typedef struct rg_context rg_context;
@@ -42,8 +42,20 @@ typedef enum rg_status {
     RG_ERR_MERKMAL,
     RG_ERR_UNKNOWN_GRAPHEME,
     RG_ERR_UNSUPPORTED_OPTION,
-    RG_ERR_OOM
+    RG_ERR_OOM,
+    RG_ERR_CANCELLED
 } rg_status;
+
+/* Reports training progress. stage names the pipeline step just finished;
+ * completed and total count steps, so completed/total is a usable fraction.
+ * Return non-zero to abort the run, which surfaces as RG_ERR_CANCELLED.
+ * Called from the training thread, between stages, never mid-stage. */
+typedef int (*rg_progress_fn)(
+    const char *stage,
+    size_t completed,
+    size_t total,
+    void *user_data
+);
 
 typedef struct rg_bic_config {
     double delta_bic_threshold;
@@ -74,6 +86,8 @@ typedef struct rg_train_options {
     rg_bic_config bic;
     int bootstrap_n;
     int bootstrap_seed;
+    rg_progress_fn progress;
+    void *progress_user_data;
 } rg_train_options;
 
 typedef struct rg_segment {

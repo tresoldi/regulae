@@ -216,6 +216,7 @@ static rg_status train_pair_models(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
+    rg_progress_state *progress,
     rg_multi_model *model
 ) {
     size_t i;
@@ -258,7 +259,7 @@ static rg_status train_pair_models(
                 free(pairs);
                 continue;
             }
-            status = rg_train_pairwise(ctx, pairs, pair_count, options, &pair_model);
+            status = rg_train_pairwise_internal(ctx, pairs, pair_count, options, progress, &pair_model);
             free(pairs);
             if (status != RG_OK) {
                 return status;
@@ -2115,6 +2116,7 @@ rg_status rg_train_model(
     rg_multi_model **out
 ) {
     rg_multi_model *model;
+    rg_progress_state progress;
     rg_train_options resolved_options;
     reconciled_observation *observations = 0;
     size_t observation_count = 0;
@@ -2167,7 +2169,17 @@ rg_status rg_train_model(
             }
         }
     }
-    status = train_pair_models(ctx, cognates, cognate_count, options, model);
+    /* One counter spans every lect pair and the multi-lect stages, so a caller
+     * sees a single monotonic fraction rather than a bar that restarts. */
+    {
+        size_t pairs = model->lect_count < 2 ? 0 : model->lect_count * (model->lect_count - 1) / 2;
+        rg_progress_init_internal(&progress, options,
+                                  pairs * RG_PAIRWISE_STAGE_COUNT + RG_MULTILECT_STAGE_COUNT);
+    }
+    status = train_pair_models(ctx, cognates, cognate_count, options, &progress, model);
+    if (status == RG_OK && rg_progress_step_internal(&progress, "reconciliation")) {
+        status = RG_ERR_CANCELLED;
+    }
     if (status == RG_OK) {
         status = aggregate_position_classes(
             ctx,
@@ -2178,6 +2190,9 @@ rg_status rg_train_model(
             &observations,
             &observation_count
         );
+    }
+    if (status == RG_OK && rg_progress_step_internal(&progress, "class discovery")) {
+        status = RG_ERR_CANCELLED;
     }
     if (status == RG_OK) {
         status = multi_lect_context_discovery(
@@ -2192,6 +2207,9 @@ rg_status rg_train_model(
     }
     if (status == RG_OK) {
         status = lift_cross_dimensional_rows(model);
+    }
+    if (status == RG_OK && rg_progress_step_internal(&progress, "cross-dimensional lifting")) {
+        status = RG_ERR_CANCELLED;
     }
     reconciled_observations_free(observations, observation_count);
     if (status != RG_OK) {

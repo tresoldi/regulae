@@ -130,6 +130,11 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_format PRIVATE regulae::regulae)
     add_test(NAME format COMMAND test_format)
 
+    add_executable(test_progress tests/c/test_progress.c)
+    target_compile_definitions(test_progress PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_progress PRIVATE regulae::regulae)
+    add_test(NAME progress COMMAND test_progress)
+
     add_executable(test_json tests/c/test_json.c)
     target_compile_definitions(test_json PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_include_directories(test_json PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

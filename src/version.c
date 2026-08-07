@@ -38,6 +38,8 @@ const char *rg_status_string(rg_status status) {
         return "unknown grapheme";
     case RG_ERR_UNSUPPORTED_OPTION:
         return "unsupported option";
+    case RG_ERR_CANCELLED:
+        return "cancelled";
     case RG_ERR_OOM:
         return "out of memory";
     default:

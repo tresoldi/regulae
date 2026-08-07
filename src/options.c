@@ -1,4 +1,4 @@
-#include "regulae.h"
+#include "internal.h"
 
 void rg_bic_config_init_defaults(rg_bic_config *config) {
     if (config == 0) {
@@ -35,4 +35,33 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     rg_bic_config_init_defaults(&options->bic);
     options->bootstrap_n = 0;
     options->bootstrap_seed = 0;
+    options->progress = 0;
+    options->progress_user_data = 0;
+}
+
+void rg_progress_init_internal(rg_progress_state *state, const rg_train_options *options, size_t total) {
+    if (state == 0) {
+        return;
+    }
+    state->fn = options == 0 ? 0 : options->progress;
+    state->user_data = options == 0 ? 0 : options->progress_user_data;
+    state->completed = 0;
+    state->total = total == 0 ? 1 : total;
+    state->cancelled = 0;
+}
+
+int rg_progress_step_internal(rg_progress_state *state, const char *stage) {
+    if (state == 0 || state->fn == 0) {
+        return 0;
+    }
+    if (state->cancelled) {
+        return 1;
+    }
+    if (state->completed < state->total) {
+        state->completed++;
+    }
+    if (state->fn(stage, state->completed, state->total, state->user_data) != 0) {
+        state->cancelled = 1;
+    }
+    return state->cancelled;
 }

@@ -3026,11 +3026,12 @@ static rg_status corpus_cost_with_model(
     return RG_OK;
 }
 
-rg_status rg_train_pairwise_segment_counts(
+rg_status rg_train_pairwise_internal(
     const rg_context *ctx,
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
+    rg_progress_state *progress,
     rg_pairwise_model **out
 ) {
     rg_pairwise_model *model = 0;
@@ -3063,6 +3064,10 @@ rg_status rg_train_pairwise_segment_counts(
     if (status != RG_OK) {
         return status;
     }
+    if (rg_progress_step_internal(progress, "initial prior")) {
+        rg_pairwise_model_free(model);
+        return RG_ERR_CANCELLED;
+    }
     for (iter = 0; iter < max_iter; iter++) {
         double cost = 0.0;
         status = corpus_cost_with_model(ctx, pairs, pair_count, opts, model, &cost);
@@ -3083,27 +3088,49 @@ rg_status rg_train_pairwise_segment_counts(
             return status;
         }
     }
+    if (rg_progress_step_internal(progress, "segment em")) {
+        rg_pairwise_model_free(model);
+        return RG_ERR_CANCELLED;
+    }
 
-#define RUN_STAGE(call)                        \
-    do {                                       \
-        status = (call);                       \
-        if (status != RG_OK) {                 \
-            rg_pairwise_model_free(model);     \
-            return status;                     \
-        }                                      \
+    /* Cancellation is checked between stages, where the unwind path is already
+     * a plain free of the partly-built model. */
+#define RUN_STAGE(name, call)                          \
+    do {                                               \
+        status = (call);                               \
+        if (status != RG_OK) {                         \
+            rg_pairwise_model_free(model);             \
+            return status;                             \
+        }                                              \
+        if (rg_progress_step_internal(progress, name)) { \
+            rg_pairwise_model_free(model);             \
+            return RG_ERR_CANCELLED;                   \
+        }                                              \
     } while (0)
 
-    RUN_STAGE(aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE(discover_immediate_context_counts(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE(promote_chunk_rows(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE(aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE(discover_cross_dimensional_rows(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE(discover_long_range_context_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("displacement aggregation", aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("context discovery", discover_immediate_context_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("chunk promotion", promote_chunk_rows(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("tonal aggregation", aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("cross-dimensional discovery", discover_cross_dimensional_rows(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("long-range discovery", discover_long_range_context_counts(ctx, pairs, pair_count, opts, model));
 
 #undef RUN_STAGE
 
     *out = model;
     return RG_OK;
+}
+
+rg_status rg_train_pairwise_segment_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model **out
+) {
+    rg_progress_state progress;
+    rg_progress_init_internal(&progress, options, RG_PAIRWISE_STAGE_COUNT);
+    return rg_train_pairwise_internal(ctx, pairs, pair_count, options, &progress, out);
 }
 
 rg_status rg_train_pairwise(
