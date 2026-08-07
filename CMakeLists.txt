@@ -229,6 +229,12 @@ if(REGULAE_BUILD_TESTS)
                 COMMAND ${Python3_EXECUTABLE}
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/capabilities.py"
                         --check --cli $<TARGET_FILE:regulae_cli>)
+
+            # The in-page guide is generated from docs/GUIDE.md; editing one
+            # without the other is how the two copies drift apart.
+            add_test(NAME guide_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/guide.py" --check)
         endif()
 
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")

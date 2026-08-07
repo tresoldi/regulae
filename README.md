@@ -203,6 +203,9 @@ moves on any layout, signature or ownership change.
 
 ## Documentation
 
+- **Guide** at [`docs/GUIDE.md`](docs/GUIDE.md) — what the output means and
+  how to read a conditioned environment. Also the source for the in-page
+  walkthrough.
 - **What regulae reads** at [`docs/capabilities.md`](docs/capabilities.md) —
   generated: which capabilities are implemented, and which corpora the loaders
   can currently express. A corpus it cannot read says something about the input
