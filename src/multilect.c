@@ -187,34 +187,6 @@ typedef struct outlier_work_row {
     double z_score;
 } outlier_work_row;
 
-static rg_uncertainty_estimate multi_wilson_interval(double count, double total) {
-    double z = 1.959963984540054;
-    rg_uncertainty_estimate out;
-    if (total <= 0.0) {
-        out.estimate = 0.0;
-        out.lower = 0.0;
-        out.upper = 0.0;
-        return out;
-    }
-    {
-        double p = count / total;
-        double z2 = z * z;
-        double denom = 1.0 + z2 / total;
-        double center = (p + z2 / (2.0 * total)) / denom;
-        double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * total)) / total) / denom;
-        out.estimate = p;
-        out.lower = center - margin;
-        out.upper = center + margin;
-        if (out.lower < 0.0) {
-            out.lower = 0.0;
-        }
-        if (out.upper > 1.0) {
-            out.upper = 1.0;
-        }
-    }
-    return out;
-}
-
 static void class_bucket_clear(class_bucket *bucket) {
     if (bucket == 0) {
         return;
@@ -1685,7 +1657,7 @@ static rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.count = merged[i].count;
                 model->conditioned_classes[i].view.confidence = merged[i].confidence;
                 model->conditioned_classes[i].view.uncertainty =
-                    multi_wilson_interval(merged[i].winning_count, merged[i].bucket_size);
+                    rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 merged[i].lects = 0;
                 merged[i].graphemes = 0;
                 merged[i].contexts = 0;
@@ -2344,7 +2316,7 @@ static rg_status aggregate_position_classes(
         model->unconditioned_classes[c].view.confidence = 1.0;
         model->unconditioned_classes[c].view.supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
         model->unconditioned_classes[c].view.supporting_cognate_count = buckets[c].supporting_cognate_count;
-        model->unconditioned_classes[c].view.uncertainty = multi_wilson_interval(buckets[c].count, participant_total);
+        model->unconditioned_classes[c].view.uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);
         buckets[c].lect_ids = 0;
         buckets[c].graphemes = 0;
         buckets[c].supporting_cognates = 0;

@@ -52,6 +52,7 @@ add_library(regulae
     src/search.c
     src/syllabification.c
     src/types.c
+    src/uncertainty.c
     src/version.c
 )
 add_library(regulae::regulae ALIAS regulae)
@@ -155,6 +156,10 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_last_error tests/c/test_last_error.c)
     target_link_libraries(test_last_error PRIVATE regulae::regulae)
     add_test(NAME last_error COMMAND test_last_error)
+
+    add_executable(test_uncertainty tests/c/test_uncertainty.c)
+    target_link_libraries(test_uncertainty PRIVATE regulae::regulae)
+    add_test(NAME uncertainty COMMAND test_uncertainty)
 
     add_executable(test_progress tests/c/test_progress.c)
     target_compile_definitions(test_progress PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

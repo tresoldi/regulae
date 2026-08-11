@@ -15,34 +15,6 @@ static void string_array_free(char **items, size_t count) {
     free(items);
 }
 
-static rg_uncertainty_estimate wilson_interval(double count, double total) {
-    double z = 1.959963984540054;
-    rg_uncertainty_estimate out;
-    if (total <= 0.0) {
-        out.estimate = 0.0;
-        out.lower = 0.0;
-        out.upper = 0.0;
-        return out;
-    }
-    {
-        double p = count / total;
-        double z2 = z * z;
-        double denom = 1.0 + z2 / total;
-        double center = (p + z2 / (2.0 * total)) / denom;
-        double margin = z * sqrt((p * (1.0 - p) + z2 / (4.0 * total)) / total) / denom;
-        out.estimate = p;
-        out.lower = center - margin;
-        out.upper = center + margin;
-        if (out.lower < 0.0) {
-            out.lower = 0.0;
-        }
-        if (out.upper > 1.0) {
-            out.upper = 1.0;
-        }
-    }
-    return out;
-}
-
 static void segment_count_row_clear(rg_segment_count_row *row) {
     if (row == 0) {
         return;
@@ -53,7 +25,7 @@ static void segment_count_row_clear(rg_segment_count_row *row) {
     row->target = 0;
     row->count = 0.0;
     row->source_total = 0.0;
-    row->uncertainty = wilson_interval(0.0, 0.0);
+    row->uncertainty = rg_wilson_default_internal(0.0, 0.0);
 }
 
 static void conditioned_segment_count_row_clear(rg_conditioned_segment_count_row *row) {
@@ -67,7 +39,7 @@ static void conditioned_segment_count_row_clear(rg_conditioned_segment_count_row
     row->target = 0;
     row->count = 0.0;
     row->source_total = 0.0;
-    row->uncertainty = wilson_interval(0.0, 0.0);
+    row->uncertainty = rg_wilson_default_internal(0.0, 0.0);
 }
 
 static void segment_array_clear(const rg_segment *segments, size_t count) {
@@ -119,7 +91,7 @@ static void chunk_row_clear(rg_chunk_row *row) {
     row->target_count = 0;
     row->cost = 0.0;
     row->count = 0.0;
-    row->uncertainty = wilson_interval(0.0, 0.0);
+    row->uncertainty = rg_wilson_default_internal(0.0, 0.0);
 }
 
 static void cross_dimensional_row_clear(rg_cross_dimensional_row *row) {
@@ -140,7 +112,7 @@ static void cross_dimensional_row_clear(rg_cross_dimensional_row *row) {
     row->count = 0.0;
     row->source_count = 0.0;
     row->confidence = 0.0;
-    row->uncertainty = wilson_interval(0.0, 0.0);
+    row->uncertainty = rg_wilson_default_internal(0.0, 0.0);
 }
 
 static void displacement_row_clear(rg_displacement_row *row) {
@@ -376,7 +348,7 @@ static rg_status add_conditioned_segment_count(
             a_subset_b && b_subset_a) {
             (*rows)[i].count += weight;
             (*rows)[i].source_total = source_total;
-            (*rows)[i].uncertainty = wilson_interval((*rows)[i].count, source_total);
+            (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
             return RG_OK;
         }
     }
@@ -394,7 +366,7 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].target = rg_strdup_internal(target);
     (*rows)[*count].count = weight;
     (*rows)[*count].source_total = source_total;
-    (*rows)[*count].uncertainty = wilson_interval(weight, source_total);
+    (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
         conditioned_segment_count_row_clear(&(*rows)[*count]);
         return RG_ERR_OOM;
@@ -571,7 +543,7 @@ static void fill_source_totals(rg_segment_count_row *rows, size_t count) {
             }
         }
         rows[i].source_total = total;
-        rows[i].uncertainty = wilson_interval(rows[i].count, total);
+        rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, total);
     }
 }
 
@@ -583,7 +555,7 @@ static void fill_displacement_total(rg_displacement_row *rows, size_t count) {
     }
     for (i = 0; i < count; i++) {
         rows[i].total = total;
-        rows[i].uncertainty = wilson_interval(rows[i].count, total);
+        rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, total);
     }
 }
 
@@ -598,7 +570,7 @@ static void fill_tonal_source_totals(rg_tonal_count_row *rows, size_t count) {
             }
         }
         rows[i].source_total = total;
-        rows[i].uncertainty = wilson_interval(rows[i].count, total);
+        rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, total);
     }
 }
 
@@ -1383,7 +1355,7 @@ static rg_status commit_observation_group(
                 a_subset_b && b_subset_a) {
                 row->count = targets[i].mass;
                 row->source_total = source_total;
-                row->uncertainty = wilson_interval(row->count, source_total);
+                row->uncertainty = rg_wilson_default_internal(row->count, source_total);
                 replaced = 1;
                 break;
             }
@@ -2340,7 +2312,7 @@ static rg_status promote_chunk_rows(
         rows[row_count].target_count = candidates[i].target_count;
         rows[row_count].cost = promoted - log_z_sum;
         rows[row_count].count = candidates[i].count;
-        rows[row_count].uncertainty = wilson_interval(candidates[i].count, n_observations);
+        rows[row_count].uncertainty = rg_wilson_default_internal(candidates[i].count, n_observations);
         row_count++;
     }
 
@@ -2486,7 +2458,7 @@ static rg_status append_cross_dimensional_row(
     (*rows)[*count].count = rule_count;
     (*rows)[*count].source_count = source_count;
     (*rows)[*count].confidence = source_count > 0.0 ? rule_count / source_count : 0.0;
-    (*rows)[*count].uncertainty = wilson_interval(rule_count, source_count);
+    (*rows)[*count].uncertainty = rg_wilson_default_internal(rule_count, source_count);
     if ((*rows)[*count].source_feature == 0 ||
         (*rows)[*count].source_value == 0 ||
         (*rows)[*count].source_position == 0 ||

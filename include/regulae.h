@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 3
+#define RG_ABI_VERSION 4
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 
 typedef struct rg_context rg_context;
@@ -152,10 +152,28 @@ typedef struct rg_feature_displacement {
     const char *to_value;
 } rg_feature_displacement;
 
+/* How an interval was produced. A consumer cannot otherwise tell a closed-form
+ * interval from a resampled one, and the two answer different questions: the
+ * Wilson interval asks how much the count alone constrains the rate, the
+ * bootstrap asks how much the rate moves when the corpus is resampled. */
+typedef enum rg_uncertainty_method {
+    /* No observations backed the estimate, so the interval is the whole
+     * range. Not an error: an unobserved rate is unconstrained, not zero. */
+    RG_UNCERTAINTY_NONE = 0,
+    RG_UNCERTAINTY_WILSON = 1,
+    RG_UNCERTAINTY_BOOTSTRAP = 2
+} rg_uncertainty_method;
+
+/* A two-sided interval on a rate in [0, 1] — the conditional probability the
+ * count represents — plus the provenance needed to read it. n is the
+ * denominator behind the point estimate, not the number of bootstrap samples. */
 typedef struct rg_uncertainty_estimate {
     double estimate;
     double lower;
     double upper;
+    double n;
+    double alpha;
+    rg_uncertainty_method method;
 } rg_uncertainty_estimate;
 
 typedef struct rg_link {
@@ -296,6 +314,39 @@ RG_API void rg_string_free(char *value);
 
 RG_API void rg_bic_config_init_defaults(rg_bic_config *config);
 RG_API void rg_train_options_init_defaults(rg_train_options *options);
+
+/* The significance level every table in a trained model is published at.
+ * 0.05 is a 95% interval. */
+#define RG_DEFAULT_ALPHA 0.05
+
+/* Wilson score interval on the rate count/total. Accepts fractional counts,
+ * because confidence-weighted training produces them. total <= 0 yields the
+ * full [0, 1] range with method RG_UNCERTAINTY_NONE. Returns
+ * RG_ERR_UNSUPPORTED_OPTION for an alpha outside {0.10, 0.05, 0.01}. */
+RG_API rg_status rg_wilson_interval(
+    double count,
+    double total,
+    double alpha,
+    rg_uncertainty_estimate *out
+);
+
+/* Distribution-free percentile interval over samples, each a rate drawn from
+ * one resampled training run. total is the denominator behind the point
+ * estimate and is recorded, not used. Samples are clamped to [0, 1]. An empty
+ * sample set yields the full [0, 1] range with method RG_UNCERTAINTY_NONE.
+ * Returns RG_ERR_UNSUPPORTED_OPTION for an unsupported alpha. */
+RG_API rg_status rg_percentile_interval(
+    const double *samples,
+    size_t sample_count,
+    double estimate,
+    double total,
+    double alpha,
+    rg_uncertainty_estimate *out
+);
+
+/* Stable lowercase name of an interval method: "none", "wilson", "bootstrap".
+ * Borrowed and static. */
+RG_API const char *rg_uncertainty_method_string(rg_uncertainty_method method);
 
 RG_API rg_status rg_context_new_builtin(rg_context **out);
 RG_API void rg_context_free(rg_context *ctx);

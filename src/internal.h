@@ -268,4 +268,9 @@ rg_status rg_score_link_with_context_model_internal(
     double *out
 );
 
+/* The Wilson interval at RG_DEFAULT_ALPHA, which is what every published table
+ * uses. Folds away the status return, since the alpha is a compile-time
+ * constant that cannot be unsupported. */
+rg_uncertainty_estimate rg_wilson_default_internal(double count, double total);
+
 #endif
