@@ -418,6 +418,67 @@ static void test_parse_matches_load(rg_context *ctx) {
     assert(rg_corpus_parse_wide_tsv(ctx, 0, 0, &from_text) == RG_ERR_INVALID_ARGUMENT);
 }
 
+/* Tone is a suprasegmental in its own column, positionally parallel to the
+ * segments cell, because merkmal's segmenter cannot merge Chao digits back
+ * onto their vowel. Without this column the tonal table and the whole
+ * cross-dimensional stage are unreachable from a corpus file. */
+static void test_tsv_tone_column_attaches_by_position(void) {
+    static const char *const text =
+        "cognate_id\tlect_id\tsegments\ttone\n"
+        "c1\tsrc\tb a\t- 2\n"
+        "c1\ttgt\tb a\t- 4\n"
+        "c2\tsrc\tp a n\t- 1 -\n";
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+    const rg_form *form;
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_OK);
+
+    set = find_cognate(corpus, "c1");
+    assert(set != 0);
+    form = form_for(set, "src");
+    assert(form != 0 && form->segment_count == 2);
+    assert(form->segments[0].tone == 0 || form->segments[0].tone[0] == '\0');
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "2") == 0);
+    form = form_for(set, "tgt");
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "4") == 0);
+
+    set = find_cognate(corpus, "c2");
+    form = form_for(set, "src");
+    assert(form->segment_count == 3);
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "1") == 0);
+    assert(form->segments[2].tone == 0 || form->segments[2].tone[0] == '\0');
+    rg_corpus_free(corpus);
+}
+
+/* A corpus that annotates tone is doing so deliberately, so a row whose tone
+ * count disagrees with its segment count is an error rather than a truncation
+ * that would tone the wrong vowel. */
+static void test_tsv_tone_length_mismatch_is_refused(void) {
+    static const char *const text =
+        "cognate_id\tlect_id\tsegments\ttone\n"
+        "c1\tsrc\tb a\t- 2 3\n";
+    rg_corpus *corpus = 0;
+    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_ERR_PARSE);
+    assert(corpus == 0);
+}
+
+/* A corpus with no tone column keeps every segment untoned, so adding the
+ * column changes nothing for the corpora that predate it. */
+static void test_tsv_without_tone_column_is_untoned(void) {
+    static const char *const text =
+        "cognate_id\tlect_id\tsegments\n"
+        "c1\tsrc\tb a\n";
+    rg_corpus *corpus = 0;
+    const rg_form *form;
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_OK);
+    form = form_for(find_cognate(corpus, "c1"), "src");
+    assert(form->segments[0].tone == 0 || form->segments[0].tone[0] == '\0');
+    assert(form->segments[1].tone == 0 || form->segments[1].tone[0] == '\0');
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -429,6 +490,9 @@ int main(void) {
     test_parse_matches_load(ctx);
     rg_context_free(ctx);
     test_tsv_grouping_and_order();
+    test_tsv_tone_column_attaches_by_position();
+    test_tsv_tone_length_mismatch_is_refused();
+    test_tsv_without_tone_column_is_untoned();
     test_tsv_confidence_is_the_minimum();
     test_tsv_without_confidence_column();
     test_arcaverborum_morpheme_boundaries();

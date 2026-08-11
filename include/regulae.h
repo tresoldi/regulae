@@ -511,6 +511,17 @@ typedef struct rg_tsv_load_options {
     const char *segments_column;
     const char *alignment_column;
     const char *confidence_column;
+    /* Per-segment tone, whitespace-separated and positionally parallel to the
+     * segments cell: "1 0 3" tones the first, second and third segment. "-" or
+     * an empty token leaves that segment untoned, which is how a tone-bearing
+     * corpus marks its consonants. Defaults to the "tone" column when present.
+     *
+     * Tone gets its own column rather than riding inline on the grapheme
+     * because merkmal's segmenter does not merge Chao digits — "pa1" segments
+     * as p, a, 1, and the stray digit is then an unknown grapheme. A separate
+     * column also keeps the tone out of feature lookup entirely, which is
+     * where it belongs: tone is a suprasegmental, not part of the grapheme. */
+    const char *tone_column;
 } rg_tsv_load_options;
 
 /* Wide-format TSV: one row per cognate, one column per lect, cells holding

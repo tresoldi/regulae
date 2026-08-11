@@ -466,6 +466,54 @@ fail:
     return RG_ERR_OOM;
 }
 
+/* Attaches a tone cell's whitespace-separated values to already-parsed
+ * segments, by position. "-" and empty tokens leave a segment untoned, so a
+ * tone-bearing corpus can mark its consonants without inventing a tone for
+ * them. Rejects a cell whose token count disagrees with the segment count:
+ * silently truncating would tone the wrong vowels, and a corpus that annotates
+ * tone at all is annotating it deliberately. */
+static rg_status attach_tones(const char *raw, rg_segment *segments, size_t segment_count) {
+    const char *p = raw == 0 ? "" : raw;
+    size_t index = 0;
+    for (;;) {
+        const char *start;
+        size_t length;
+        while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') {
+            p++;
+        }
+        if (*p == '\0') {
+            break;
+        }
+        start = p;
+        while (*p != '\0' && *p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') {
+            p++;
+        }
+        length = (size_t)(p - start);
+        if (index >= segment_count) {
+            return RG_ERR_PARSE;
+        }
+        if (length == 1 && start[0] == '-') {
+            index++;
+            continue;
+        }
+        {
+            char *tone = (char *)malloc(length + 1);
+            if (tone == 0) {
+                return RG_ERR_OOM;
+            }
+            memcpy(tone, start, length);
+            tone[length] = '\0';
+            free((char *)segments[index].tone);
+            segments[index].tone = tone;
+        }
+        index++;
+    }
+    if (index != 0 && index != segment_count) {
+        return RG_ERR_PARSE;
+    }
+    return RG_OK;
+}
+
 /* Counts the tokens of an alignment cell, where "-" marks a gap. Only the
  * length is meaningful to the loaders, which use it to reject cognate sets
  * whose alignment hints disagree across lects. */
@@ -497,6 +545,7 @@ static void loader_form_clear(loader_form *form) {
     free(form->lect_id);
     for (i = 0; i < form->segment_count; i++) {
         free((char *)form->segments[i].grapheme);
+        free((char *)form->segments[i].tone);
     }
     free(form->segments);
     free(form->morpheme_breaks);
@@ -984,6 +1033,16 @@ static rg_status loader_form_from(const rg_form *src, const char *lect_id, loade
                 loader_form_clear(out);
                 return RG_ERR_OOM;
             }
+            /* Suprasegmentals are part of the segment's identity, and dropping
+             * them here silently untoned every corpus built from form pairs. */
+            if (src->segments[i].tone != 0 && src->segments[i].tone[0] != '\0') {
+                out->segments[i].tone = rg_strdup_internal(src->segments[i].tone);
+                if (out->segments[i].tone == 0) {
+                    out->segment_count = i + 1;
+                    loader_form_clear(out);
+                    return RG_ERR_OOM;
+                }
+            }
         }
         out->segment_count = src->segment_count;
     }
@@ -1083,6 +1142,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     long segments_col;
     long alignment_col = -1;
     long confidence_col = -1;
+    long tone_col = -1;
     size_t r;
     rg_status status;
 
@@ -1102,6 +1162,9 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     }
     if (opts.segments_column == 0) {
         opts.segments_column = "segments";
+    }
+    if (opts.tone_column == 0) {
+        opts.tone_column = "tone";
     }
 
     status = read_table_source(path, text, '\t', &table);
@@ -1125,6 +1188,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     if (opts.confidence_column != 0) {
         confidence_col = column_index(&table, opts.confidence_column);
     }
+    tone_col = column_index(&table, opts.tone_column);
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
     if (corpus == 0) {
@@ -1162,6 +1226,15 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
             free(cognate_id);
             free(lect_id);
             continue;
+        }
+        if (tone_col >= 0) {
+            status = attach_tones(cell(row, tone_col), form.segments, form.segment_count);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                free(cognate_id);
+                free(lect_id);
+                break;
+            }
         }
         cognate = corpus_ensure_cognate(corpus, cognate_id);
         free(cognate_id);

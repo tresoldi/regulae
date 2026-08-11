@@ -112,6 +112,119 @@ func contextsKey(segments map[string]string, contexts map[string]regulae.Context
 
 // loadCorpus reads the corpus path given as the second argument through the Go
 // TSV loader, so a parity run compares loader behaviour as well as training.
+// hasToneColumn reports whether a TSV declares a "tone" column, which decides
+// between the frozen loader and the local tone-aware one.
+func hasToneColumn(path string) bool {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	lines := strings.SplitN(string(data), "\n", 2)
+	if len(lines) == 0 {
+		return false
+	}
+	for _, name := range strings.Split(strings.TrimRight(lines[0], "\r"), "\t") {
+		if strings.TrimSpace(name) == "tone" {
+			return true
+		}
+	}
+	return false
+}
+
+// loadTonedTSV mirrors the C long-format loader, including its tone column:
+// per-segment tones parallel to the segments cell, with "-" leaving a segment
+// untoned. Built through regulae's public types only.
+func loadTonedTSV(path string) ([]regulae.CognateSet, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("empty corpus")
+	}
+	index := map[string]int{}
+	for i, name := range strings.Split(lines[0], "\t") {
+		index[strings.TrimSpace(name)] = i
+	}
+	cognateCol, okC := index["cognate_id"]
+	lectCol, okL := index["lect_id"]
+	segCol, okS := index["segments"]
+	if !okC || !okL || !okS {
+		return nil, fmt.Errorf("missing a required column")
+	}
+	toneCol, hasTone := index["tone"]
+	confCol, hasConf := index["confidence"]
+
+	var order []string
+	byID := map[string]*regulae.CognateSet{}
+	for _, line := range lines[1:] {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		cols := strings.Split(line, "\t")
+		get := func(i int) string {
+			if i < 0 || i >= len(cols) {
+				return ""
+			}
+			return strings.TrimSpace(cols[i])
+		}
+		id, lect := get(cognateCol), get(lectCol)
+		if id == "" || lect == "" {
+			continue
+		}
+		var segs []regulae.Segment
+		for _, tok := range strings.Fields(get(segCol)) {
+			if tok == "-" {
+				continue
+			}
+			segs = append(segs, regulae.Segment{Grapheme: tok})
+		}
+		if len(segs) == 0 {
+			continue
+		}
+		if hasTone {
+			tones := strings.Fields(get(toneCol))
+			if len(tones) > 0 && len(tones) != len(segs) {
+				return nil, fmt.Errorf("%s/%s: %d tones for %d segments", id, lect, len(tones), len(segs))
+			}
+			for i, tone := range tones {
+				if tone != "-" {
+					segs[i].Tone = tone
+				}
+			}
+		}
+		set, seen := byID[id]
+		if !seen {
+			set = &regulae.CognateSet{
+				CognateID:  id,
+				Forms:      map[string]regulae.Form{},
+				Confidence: 1.0,
+			}
+			byID[id] = set
+			order = append(order, id)
+		}
+		if _, dup := set.Forms[lect]; dup {
+			return nil, fmt.Errorf("%s: duplicate lect %s", id, lect)
+		}
+		set.Forms[lect] = regulae.Form{LectID: lect, Segments: segs}
+		set.FormsOrder = append(set.FormsOrder, lect)
+		if hasConf {
+			if raw := get(confCol); raw != "" {
+				var value float64
+				if _, err := fmt.Sscanf(raw, "%g", &value); err == nil && value < set.Confidence {
+					set.Confidence = value
+				}
+			}
+		}
+	}
+	out := make([]regulae.CognateSet, 0, len(order))
+	for _, id := range order {
+		out = append(out, *byID[id])
+	}
+	return out, nil
+}
+
 func loadCorpus() []regulae.CognateSet {
 	if len(os.Args) < 3 {
 		fmt.Fprintln(os.Stderr, "usage: goref <summary|outliers> <corpus.tsv>")
@@ -124,6 +237,13 @@ func loadCorpus() []regulae.CognateSet {
 	// come from; .tsv goes through the generic loader.
 	if strings.HasSuffix(strings.ToLower(path), ".csv") {
 		corpus, err = regulae.LoadArcaverborum(path, regulae.ArcaverborumLoadOptions{})
+	} else if hasToneColumn(path) {
+		// The frozen Go loader has no tone column, and adding one would be
+		// adding behaviour to the reference. Reading it here instead keeps the
+		// library frozen while letting a tone-bearing corpus reach the parity
+		// harness, which is the only way to exercise cross-dimensional
+		// discovery against the reference at all.
+		corpus, err = loadTonedTSV(path)
 	} else {
 		corpus, err = regulae.LoadCognatesFromTSV(path, regulae.TSVLoadOptions{ConfidenceCol: "confidence"})
 	}
@@ -211,9 +331,15 @@ func dumpModel(model *regulae.MultiLectModel) {
 			contextsKey(class.Segments, class.Contexts))
 	}
 	for _, rule := range model.CrossDimensionalTable.Entries {
-		fmt.Fprintf(w, "XDIM\t%s>%s\t%s=%s@%s\t%s=%s@%d\t%s\t%s\t%s\n",
-			rule.SrcLect, rule.TgtLect,
-			rule.SrcFeature.Feature, rule.SrcFeature.Value, rule.SrcPosition,
+		// The joint predicate is part of the rule's identity: without it a
+		// two-predicate rule prints identically to the single-predicate rule
+		// over the same first feature, and parity cannot see the difference.
+		src := fmt.Sprintf("%s=%s@%s", rule.SrcFeature.Feature, rule.SrcFeature.Value, rule.SrcPosition)
+		if rule.SrcFeature2 != nil && rule.SrcPosition2 != "" {
+			src += fmt.Sprintf("&%s=%s@%s", rule.SrcFeature2.Feature, rule.SrcFeature2.Value, rule.SrcPosition2)
+		}
+		fmt.Fprintf(w, "XDIM\t%s>%s\t%s\t%s=%s@%d\t%s\t%s\t%s\n",
+			rule.SrcLect, rule.TgtLect, src,
 			rule.TgtDimension, rule.TgtValue, rule.TgtPositionOffset,
 			num(rule.Count), num(rule.SrcCount), num(rule.Confidence))
 	}
@@ -316,6 +442,23 @@ func main() {
 				sort.Strings(toneKeys)
 				for _, key := range toneKeys {
 					fmt.Printf("TONE\t%s>%s\t%s\t%s\n", a, b, key, num(pm.TonalTable.Counts[toneOf[key]]))
+				}
+				// The per-pair cross-dimensional table is where discovery
+				// actually commits; the multi-lect table only shows what
+				// survived lifting. Joint rules are visible only here.
+				var xdimRows []string
+				for _, rule := range pm.CrossDimensionalTable.Entries {
+					src := fmt.Sprintf("%s=%s@%s", rule.SrcFeature.Feature, rule.SrcFeature.Value, rule.SrcPosition)
+					if rule.SrcFeature2 != nil && rule.SrcPosition2 != "" {
+						src += fmt.Sprintf("&%s=%s@%s", rule.SrcFeature2.Feature, rule.SrcFeature2.Value, rule.SrcPosition2)
+					}
+					xdimRows = append(xdimRows, fmt.Sprintf("XDIM\t%s>%s\t%s\t%s=%s@%d\t%s\t%s\t%s",
+						a, b, src, rule.TgtDimension, rule.TgtValue, rule.TgtPositionOffset,
+						num(rule.Count), num(rule.SrcCount), num(rule.Confidence)))
+				}
+				sort.Strings(xdimRows)
+				for _, row := range xdimRows {
+					fmt.Println(row)
 				}
 			}
 		}
