@@ -7,7 +7,7 @@
 # The Go reference needs ../merkmal/go, which current merkmal no longer ships;
 # restore it first (see docs/c_reference_freeze.md):
 #
-#   git -C ../merkmal archive d59b987^ go | tar -x -C ../merkmal
+#   git -C ../merkmal archive go-final go | tar -x -C ../merkmal
 #
 # Known intentional deviation: Go's published chunk table drops the promoted
 # observation counts and their Wilson intervals (chunks.go builds `final`
