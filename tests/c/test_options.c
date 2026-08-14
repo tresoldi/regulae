@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 4);
+    assert(rg_abi_version() == 6);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -25,12 +25,15 @@ int main(void) {
     assert(fabs(bic.long_range_min_dominant_fraction - 0.6) < 1e-12);
     assert(bic.cross_dim_max_iterations == 5);
     assert(bic.cross_dim_min_rule_count == 3);
-    assert(fabs(bic.cross_dim_min_rule_confidence - 0.5) < 1e-12);
+    /* 0.0 on purpose: a fixed fraction does not measure conditioning, so the
+     * decision belongs to the BIC gate against the complementary environment. */
+    assert(fabs(bic.cross_dim_min_rule_confidence - 0.0) < 1e-12);
+    assert(fabs(bic.cross_dim_delta_bic_threshold - -1.0) < 1e-12);
     assert(bic.multi_lect_bic_small_sample_correction == 1);
     assert(fabs(bic.multi_lect_min_commit_scale - 0.5) < 1e-12);
 
     rg_train_options_init_defaults(&options);
-    assert(strcmp(options.feature_system, "descriptive") == 0);
+    assert(strcmp(options.feature_system, RG_DEFAULT_FEATURE_SYSTEM) == 0);
     assert(options.max_chunk_size == RG_DEFAULT_MAX_CHUNK_SIZE);
     assert(fabs(options.temperature - 1.0) < 1e-12);
     assert(fabs(options.concentration - 5.0) < 1e-12);

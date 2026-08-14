@@ -417,6 +417,10 @@ static rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
             model->cross_dimensional_rows[model->cross_dimensional_count].view.count = row->count;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.source_count = row->source_count;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.confidence = row->confidence;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_count = row->contrast_count;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_source_count = row->contrast_source_count;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_confidence = row->contrast_confidence;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.delta_bic = row->delta_bic;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.uncertainty = row->uncertainty;
             model->cross_dimensional_count++;
         }

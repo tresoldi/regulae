@@ -2352,6 +2352,16 @@ static const char *relative_position_name(int offset) {
     }
 }
 
+/* Whether the position an environment names exists at all. "The preceding
+ * segment is not voiced" is a claim about a preceding segment, and word-initial
+ * position is not a voiceless onset: counting the edge as the negative side
+ * merges a positional environment into a featural one, and a rule stated over
+ * that union cannot be read as either. Positions off the end of the form are
+ * excluded from both sides of the contrast rather than assigned to one. */
+static int context_position_exists(const rg_form *form, int index) {
+    return form != 0 && index >= 0 && (size_t)index < form->segment_count;
+}
+
 static int segment_has_context_feature(const rg_context *ctx, const rg_form *form, int index, const char *feature) {
     const rg_feature_set *features = 0;
     rg_status status;
@@ -2436,7 +2446,10 @@ static rg_status append_cross_dimensional_row(
     const char *target_value,
     int target_position_offset,
     double rule_count,
-    double source_count
+    double source_count,
+    double contrast_count,
+    double contrast_source_count,
+    double delta_bic
 ) {
     rg_cross_dimensional_row *next;
     if (*count == *cap) {
@@ -2458,6 +2471,11 @@ static rg_status append_cross_dimensional_row(
     (*rows)[*count].count = rule_count;
     (*rows)[*count].source_count = source_count;
     (*rows)[*count].confidence = source_count > 0.0 ? rule_count / source_count : 0.0;
+    (*rows)[*count].contrast_count = contrast_count;
+    (*rows)[*count].contrast_source_count = contrast_source_count;
+    (*rows)[*count].contrast_confidence =
+        contrast_source_count > 0.0 ? contrast_count / contrast_source_count : 0.0;
+    (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(rule_count, source_count);
     if ((*rows)[*count].source_feature == 0 ||
         (*rows)[*count].source_value == 0 ||
@@ -2471,6 +2489,243 @@ static rg_status append_cross_dimensional_row(
     return RG_OK;
 }
 
+/* Negative log-likelihood of a tone distribution, in nats. Summed in sorted
+ * tone order so the total does not depend on which tone was seen first. */
+static double tone_group_cost(const tone_mass *items, size_t count) {
+    double total = 0.0;
+    double cost = 0.0;
+    size_t i;
+    size_t *order;
+
+    for (i = 0; i < count; i++) {
+        total += items[i].count;
+    }
+    if (total <= 0.0) {
+        return 0.0;
+    }
+    order = (size_t *)malloc(count * sizeof(*order));
+    if (order == 0) {
+        return 0.0;
+    }
+    for (i = 0; i < count; i++) {
+        order[i] = i;
+    }
+    for (i = 1; i < count; i++) {
+        size_t key = order[i];
+        size_t j = i;
+        while (j > 0 && strcmp(items[order[j - 1]].tone, items[key].tone) > 0) {
+            order[j] = order[j - 1];
+            j--;
+        }
+        order[j] = key;
+    }
+    for (i = 0; i < count; i++) {
+        double mass = items[order[i]].count;
+        if (mass > 0.0) {
+            cost += -mass * log(mass / total);
+        }
+    }
+    free(order);
+    return cost;
+}
+
+/* BIC for "this value's rate differs between the two sides", on the 2x2 table
+ * of (value, not-value) by (inside, outside). The environment passing its own
+ * test says the distribution moved; it does not say which value moved, and on
+ * a dimension with several values most of them did not. Without this, an
+ * environment that genuinely conditions one tone also publishes every other
+ * tone that drifted upward inside it. Negative means the difference is worth
+ * its parameter. */
+static double value_split_delta_bic(
+    double here_mass,
+    double here_total,
+    double there_mass,
+    double there_total
+) {
+    double total = here_total + there_total;
+    double pooled = (here_mass + there_mass) / total;
+    double gain;
+    if (total <= 0.0 || here_total <= 0.0 || there_total <= 0.0) {
+        return 0.0;
+    }
+    if (pooled <= 0.0 || pooled >= 1.0) {
+        return 0.0;
+    }
+    /* Binomial log-likelihood, one rate per side against one rate pooled.
+     * 0 * log(0) is 0, which is why each term is guarded rather than summed
+     * blind. */
+    gain = 0.0;
+    {
+        double sides[2][2];
+        size_t i;
+        sides[0][0] = here_mass;
+        sides[0][1] = here_total;
+        sides[1][0] = there_mass;
+        sides[1][1] = there_total;
+        for (i = 0; i < 2; i++) {
+            double mass = sides[i][0];
+            double side_total = sides[i][1];
+            double rate = mass / side_total;
+            if (mass > 0.0) {
+                gain += mass * (log(rate) - log(pooled));
+            }
+            if (side_total - mass > 0.0) {
+                gain += (side_total - mass) * (log(1.0 - rate) - log(1.0 - pooled));
+            }
+        }
+    }
+    return -2.0 * gain + log(total);
+}
+
+static double tone_mass_of(const tone_mass *items, size_t count, const char *tone) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (strcmp(items[i].tone, tone) == 0) {
+            return items[i].count;
+        }
+    }
+    return 0.0;
+}
+
+static double tone_total(const tone_mass *items, size_t count) {
+    double total = 0.0;
+    size_t i;
+    for (i = 0; i < count; i++) {
+        total += items[i].count;
+    }
+    return total;
+}
+
+/* One aligned link whose target segment carries tone: the evidence
+ * cross-dimensional discovery reasons over. `environments` is a bitmask over
+ * the candidate environment table, so testing membership costs a shift rather
+ * than a feature lookup, and `live` goes to zero once a committed rule
+ * accounts for this observation. */
+typedef struct xdim_observation {
+    const char *tone;
+    double weight;
+    unsigned long long environments;
+    /* Environments whose position exists for this observation. An environment
+     * the form is too short to have is neither satisfied nor contradicted. */
+    unsigned long long defined;
+    int live;
+} xdim_observation;
+
+typedef struct xdim_environment {
+    const char *feature;
+    int offset;
+} xdim_environment;
+
+typedef struct xdim_scored {
+    double delta_bic;
+    tone_mass *inside;
+    size_t inside_count;
+    tone_mass *outside;
+    size_t outside_count;
+    double inside_total;
+    double outside_total;
+    int usable;
+} xdim_scored;
+
+static void xdim_scored_clear(xdim_scored *scored) {
+    tone_masses_clear(scored->inside, scored->inside_count);
+    tone_masses_clear(scored->outside, scored->outside_count);
+    memset(scored, 0, sizeof(*scored));
+}
+
+/* Partitions the live observations on one environment and scores the split the
+ * way every other stage in this pipeline scores one: the likelihood gain from
+ * modelling the target dimension separately inside and outside, against what
+ * the extra parameters cost under BIC. */
+static rg_status xdim_score_environment(
+    const xdim_observation *observations,
+    size_t observation_count,
+    size_t env_index,
+    double min_count,
+    xdim_scored *out
+) {
+    tone_mass *pooled = 0;
+    size_t pooled_count = 0;
+    size_t pooled_cap = 0;
+    size_t inside_cap = 0;
+    size_t outside_cap = 0;
+    size_t i;
+    rg_status status = RG_OK;
+
+    memset(out, 0, sizeof(*out));
+    for (i = 0; i < observation_count && status == RG_OK; i++) {
+        const xdim_observation *observation = &observations[i];
+        if (!observation->live) {
+            continue;
+        }
+        if (!((observation->defined >> env_index) & 1ULL)) {
+            continue;
+        }
+        if ((observation->environments >> env_index) & 1ULL) {
+            status = add_tone_mass(&out->inside, &out->inside_count, &inside_cap,
+                                   observation->tone, observation->weight);
+        } else {
+            status = add_tone_mass(&out->outside, &out->outside_count, &outside_cap,
+                                   observation->tone, observation->weight);
+        }
+        if (status == RG_OK) {
+            status = add_tone_mass(&pooled, &pooled_count, &pooled_cap,
+                                   observation->tone, observation->weight);
+        }
+    }
+    if (status != RG_OK) {
+        tone_masses_clear(pooled, pooled_count);
+        xdim_scored_clear(out);
+        return status;
+    }
+    out->inside_total = tone_total(out->inside, out->inside_count);
+    out->outside_total = tone_total(out->outside, out->outside_count);
+    /* Both sides of the contrast must be attested, or there is no split to
+     * test: a predicate holding of every segment partitions nothing. */
+    if (out->inside_total >= min_count && out->outside_total >= min_count && pooled_count > 1) {
+        double pooled_total = out->inside_total + out->outside_total;
+        double baseline = tone_group_cost(pooled, pooled_count);
+        double split = tone_group_cost(out->inside, out->inside_count) +
+                       tone_group_cost(out->outside, out->outside_count);
+        out->delta_bic = -2.0 * (baseline - split) +
+                         (double)(pooled_count - 1) * log(pooled_total);
+        out->usable = 1;
+    }
+    tone_masses_clear(pooled, pooled_count);
+    return RG_OK;
+}
+
+/* Cross-dimensional discovery: does a feature on the source side condition a
+ * dimension on the target side?
+ *
+ * The claim is a conditioned split, so it is tested the way this pipeline
+ * tests one. An environment earns a rule only when
+ *
+ *   1. the complementary environment exists and is attested. A predicate that
+ *      holds of every segment partitions nothing, and "the preceding segment
+ *      is a consonant" on a corpus of CV syllables is not an environment; it
+ *      is a description of the corpus.
+ *   2. modelling the target dimension separately inside and outside beats
+ *      modelling it once by more than the extra parameters cost under BIC.
+ *      This is the criterion, and the code shape, of context discovery.
+ *
+ * and a value inside that environment is reported only when the environment
+ * raises it above its rate in the contrast. That last condition is what makes
+ * the output read as historical linguistics rather than as a frequency table:
+ * a rule says the environment *did something*, and on a two-valued dimension
+ * two rules naming one environment can no longer contradict each other.
+ *
+ * Environments are then committed one at a time, best first, against what the
+ * already-committed rules have not accounted for. Without that, every
+ * correlated framing of one fact commits separately -- on a corpus of CV
+ * syllables `consonant`, `sonorant`, `nasal` and `voiced` at the same offset
+ * are four descriptions of the same coda, and a reader has no way to tell that
+ * they are one finding. Explaining the residue is what this stage is for; it
+ * runs after the segmental and tonal baselines for the same reason.
+ *
+ * The stage previously committed on P(value | environment) >= 0.5 with no
+ * contrast at all, which reported the ambient distribution as though it were a
+ * rule, and on a two-valued dimension emitted both values at once. */
 static rg_status discover_cross_dimensional_rows(
     const rg_context *ctx,
     const rg_form_pair *pairs,
@@ -2481,11 +2736,25 @@ static rg_status discover_cross_dimensional_rows(
     rg_cross_dimensional_row *rows = 0;
     size_t row_count = 0;
     size_t row_cap = 0;
-    size_t feature_i;
     rg_status status = RG_OK;
     double min_count = 3.0;
-    double min_confidence = 0.5;
+    double min_confidence = 0.0;
+    double delta_threshold = -1.0;
+    int max_iterations = 5;
     int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
+    const size_t feature_count =
+        sizeof(cross_dimensional_feature_names) / sizeof(cross_dimensional_feature_names[0]);
+    xdim_environment environments[sizeof(cross_dimensional_feature_names) /
+                                  sizeof(cross_dimensional_feature_names[0]) * 3];
+    size_t env_count = 0;
+    xdim_observation *observations = 0;
+    size_t observation_count = 0;
+    size_t observation_cap = 0;
+    int *committed = 0;
+    size_t feature_i;
+    size_t pair_i;
+    int iteration;
+
     if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
@@ -2496,74 +2765,200 @@ static rg_status discover_cross_dimensional_rows(
         if (options->bic.cross_dim_min_rule_confidence > 0.0) {
             min_confidence = options->bic.cross_dim_min_rule_confidence;
         }
+        if (options->bic.cross_dim_delta_bic_threshold != 0.0) {
+            delta_threshold = options->bic.cross_dim_delta_bic_threshold;
+        }
+        if (options->bic.cross_dim_max_iterations > 0) {
+            max_iterations = options->bic.cross_dim_max_iterations;
+        }
         if (options->max_chunk_size > 0) {
             max_chunk_size = options->max_chunk_size;
         }
     }
-    for (feature_i = 0; feature_i < sizeof(cross_dimensional_feature_names) / sizeof(cross_dimensional_feature_names[0]) && status == RG_OK; feature_i++) {
-        const char *feature = cross_dimensional_feature_names[feature_i];
-        int src_offset;
-        for (src_offset = -1; src_offset <= 1 && status == RG_OK; src_offset++) {
-            tone_mass *tones = 0;
-            size_t tone_count = 0;
-            size_t tone_cap = 0;
-            double src_count = 0.0;
-            size_t pair_i;
-            for (pair_i = 0; pair_i < pair_count && status == RG_OK; pair_i++) {
-                rg_alignment *alignment = 0;
-                size_t link_i;
-                size_t src_pos = 0;
-                size_t tgt_pos = 0;
-                double weight = pairs[pair_i].weight == 0.0 ? 1.0 : pairs[pair_i].weight;
-                if (weight <= 0.0) {
-                    continue;
-                }
-                status = rg_align_forms_with_model(ctx, model, options, &pairs[pair_i].source, &pairs[pair_i].target, max_chunk_size, &alignment);
-                if (status != RG_OK) {
-                    break;
-                }
-                for (link_i = 0; link_i < rg_alignment_link_count(alignment) && status == RG_OK; link_i++) {
-                    const rg_link *link = rg_alignment_link_at(alignment, link_i);
-                    if (link->source_count == 1 && link->target_count == 1 &&
-                        segment_has_context_feature(ctx, &pairs[pair_i].source, (int)src_pos + src_offset, feature)) {
-                        const char *tone = pairs[pair_i].target.segments[tgt_pos].tone;
-                        if (tone != 0 && tone[0] != '\0') {
-                            src_count += weight;
-                            status = add_tone_mass(&tones, &tone_count, &tone_cap, tone, weight);
-                        }
-                    }
-                    src_pos += link->source_count;
-                    tgt_pos += link->target_count;
-                }
-                rg_alignment_free(alignment);
-            }
-            if (status == RG_OK && src_count >= min_count) {
-                size_t tone_i;
-                for (tone_i = 0; tone_i < tone_count; tone_i++) {
-                    double confidence = tones[tone_i].count / src_count;
-                    if (tones[tone_i].count >= min_count && confidence >= min_confidence) {
-                        status = append_cross_dimensional_row(
-                            &rows,
-                            &row_count,
-                            &row_cap,
-                            feature,
-                            "+",
-                            relative_position_name(src_offset),
-                            "tone",
-                            tones[tone_i].tone,
-                            0,
-                            tones[tone_i].count,
-                            src_count
-                        );
-                        if (status != RG_OK) {
-                            break;
-                        }
-                    }
-                }
-            }
-            tone_masses_clear(tones, tone_count);
+
+    /* The environment table, in a fixed order: equal-scoring candidates are
+     * resolved by taking the first, so this order is load-bearing. */
+    for (feature_i = 0; feature_i < feature_count; feature_i++) {
+        int offset;
+        for (offset = -1; offset <= 1; offset++) {
+            environments[env_count].feature = cross_dimensional_feature_names[feature_i];
+            environments[env_count].offset = offset;
+            env_count++;
         }
     }
+
+    /* One alignment pass for every environment, rather than one per
+     * environment: the membership of each link is recorded as a bitmask as the
+     * corpus is walked. */
+    for (pair_i = 0; pair_i < pair_count && status == RG_OK; pair_i++) {
+        rg_alignment *alignment = 0;
+        size_t link_i;
+        size_t src_pos = 0;
+        size_t tgt_pos = 0;
+        double weight = pairs[pair_i].weight == 0.0 ? 1.0 : pairs[pair_i].weight;
+        if (weight <= 0.0) {
+            continue;
+        }
+        status = rg_align_forms_with_model(ctx, model, options, &pairs[pair_i].source,
+                                           &pairs[pair_i].target, max_chunk_size, &alignment);
+        if (status != RG_OK) {
+            break;
+        }
+        for (link_i = 0; link_i < rg_alignment_link_count(alignment); link_i++) {
+            const rg_link *link = rg_alignment_link_at(alignment, link_i);
+            if (link->source_count == 1 && link->target_count == 1) {
+                const char *tone = pairs[pair_i].target.segments[tgt_pos].tone;
+                if (tone != 0 && tone[0] != '\0') {
+                    size_t env_i;
+                    if (observation_count == observation_cap) {
+                        size_t next_cap = observation_cap == 0 ? 64 : observation_cap * 2;
+                        xdim_observation *next = (xdim_observation *)realloc(
+                            observations, next_cap * sizeof(*next));
+                        if (next == 0) {
+                            status = RG_ERR_OOM;
+                            break;
+                        }
+                        observations = next;
+                        observation_cap = next_cap;
+                    }
+                    memset(&observations[observation_count], 0, sizeof(observations[observation_count]));
+                    observations[observation_count].tone = tone;
+                    observations[observation_count].weight = weight;
+                    observations[observation_count].live = 1;
+                    for (env_i = 0; env_i < env_count; env_i++) {
+                        int index = (int)src_pos + environments[env_i].offset;
+                        if (!context_position_exists(&pairs[pair_i].source, index)) {
+                            continue;
+                        }
+                        observations[observation_count].defined |= 1ULL << env_i;
+                        if (segment_has_context_feature(ctx, &pairs[pair_i].source, index,
+                                                        environments[env_i].feature)) {
+                            observations[observation_count].environments |= 1ULL << env_i;
+                        }
+                    }
+                    observation_count++;
+                }
+            }
+            src_pos += link->source_count;
+            tgt_pos += link->target_count;
+        }
+        rg_alignment_free(alignment);
+    }
+
+    if (status == RG_OK) {
+        committed = (int *)calloc(env_count, sizeof(*committed));
+        if (committed == 0) {
+            status = RG_ERR_OOM;
+        }
+    }
+
+    for (iteration = 0; iteration < max_iterations && status == RG_OK; iteration++) {
+        xdim_scored best;
+        size_t best_env = 0;
+        int found = 0;
+        size_t env_i;
+
+        memset(&best, 0, sizeof(best));
+        for (env_i = 0; env_i < env_count && status == RG_OK; env_i++) {
+            xdim_scored scored;
+            if (committed[env_i]) {
+                continue;
+            }
+            status = xdim_score_environment(observations, observation_count, env_i, min_count, &scored);
+            if (status != RG_OK) {
+                break;
+            }
+            if (scored.usable && scored.delta_bic < delta_threshold &&
+                (!found || scored.delta_bic < best.delta_bic)) {
+                if (found) {
+                    xdim_scored_clear(&best);
+                }
+                best = scored;
+                best_env = env_i;
+                found = 1;
+            } else {
+                xdim_scored_clear(&scored);
+            }
+        }
+        if (status != RG_OK || !found) {
+            xdim_scored_clear(&best);
+            break;
+        }
+
+        {
+            /* A split is a two-sided statement, and both sides are findings:
+             * "voiced onsets give tone 4" is half of the tonogenesis, and
+             * "voiceless onsets give tone 1" is the other half. Reporting only
+             * the side the feature holds on would describe a merger as though
+             * it were a one-way change. The complement is published under
+             * source_value "-". */
+            int side;
+            int emitted = 0;
+            for (side = 0; side < 2 && status == RG_OK; side++) {
+                const tone_mass *here = side == 0 ? best.inside : best.outside;
+                size_t here_count = side == 0 ? best.inside_count : best.outside_count;
+                const tone_mass *there = side == 0 ? best.outside : best.inside;
+                size_t there_count = side == 0 ? best.outside_count : best.inside_count;
+                double here_total = side == 0 ? best.inside_total : best.outside_total;
+                double there_total = side == 0 ? best.outside_total : best.inside_total;
+                const char *source_value = side == 0 ? "+" : "-";
+                size_t tone_i;
+                for (tone_i = 0; tone_i < here_count && status == RG_OK; tone_i++) {
+                    double here_mass = here[tone_i].count;
+                    double there_mass = tone_mass_of(there, there_count, here[tone_i].tone);
+                    double confidence = here_mass / here_total;
+                    double contrast = there_mass / there_total;
+                    if (here_mass < min_count || confidence < min_confidence) {
+                        continue;
+                    }
+                    /* This side must raise the value, not merely contain it,
+                     * and the rise must be worth stating. */
+                    if (confidence <= contrast) {
+                        continue;
+                    }
+                    if (value_split_delta_bic(here_mass, here_total, there_mass, there_total) >=
+                        delta_threshold) {
+                        continue;
+                    }
+                    status = append_cross_dimensional_row(
+                        &rows, &row_count, &row_cap,
+                        environments[best_env].feature, source_value,
+                        relative_position_name(environments[best_env].offset),
+                        "tone", here[tone_i].tone, 0,
+                        here_mass, here_total,
+                        there_mass, there_total,
+                        best.delta_bic);
+                    if (status == RG_OK) {
+                        size_t obs_i;
+                        /* Retire what this rule accounts for. What it
+                         * mispredicts stays live, so a later rule can still
+                         * explain the residue. */
+                        for (obs_i = 0; obs_i < observation_count; obs_i++) {
+                            int inside = ((observations[obs_i].environments >> best_env) & 1ULL) != 0;
+                            if (!((observations[obs_i].defined >> best_env) & 1ULL)) {
+                                continue;
+                            }
+                            if (observations[obs_i].live && inside == (side == 0) &&
+                                strcmp(observations[obs_i].tone, here[tone_i].tone) == 0) {
+                                observations[obs_i].live = 0;
+                            }
+                        }
+                        emitted = 1;
+                    }
+                }
+            }
+            committed[best_env] = 1;
+            xdim_scored_clear(&best);
+            if (!emitted) {
+                /* The split was real but named no value either side raises;
+                 * nothing was retired, so stop rather than spin. */
+                break;
+            }
+        }
+    }
+
+    free(observations);
+    free(committed);
     if (status != RG_OK) {
         size_t i;
         for (i = 0; i < row_count; i++) {
@@ -2579,6 +2974,7 @@ static rg_status discover_cross_dimensional_rows(
     model->cross_dimensional_count = row_count;
     return RG_OK;
 }
+
 
 /* ---- initial prior model ------------------------------------------------ */
 

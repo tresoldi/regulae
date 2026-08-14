@@ -480,6 +480,10 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(entry, "count", row->count);
         cJSON_AddNumberToObject(entry, "source_count", row->source_count);
         cJSON_AddNumberToObject(entry, "confidence", row->confidence);
+        cJSON_AddNumberToObject(entry, "contrast_count", row->contrast_count);
+        cJSON_AddNumberToObject(entry, "contrast_source_count", row->contrast_source_count);
+        cJSON_AddNumberToObject(entry, "contrast_confidence", row->contrast_confidence);
+        cJSON_AddNumberToObject(entry, "delta_bic", row->delta_bic);
         cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->uncertainty));
         cJSON_AddItemToArray(array, entry);
     }

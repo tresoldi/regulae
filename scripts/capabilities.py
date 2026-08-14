@@ -3,10 +3,10 @@
 can currently read.
 
 The table is keyed on capability rather than on corpus. Keying it on corpus
-would report that regulae cannot do tone, which is false: tone is supported and
-tested, and the tone corpora fail because no loader carries a tone column. A
-corpus that fails to load says something about the input path, not about the
-engine, and the tables are arranged to say which.
+would once have reported that regulae cannot do tone, which was never true: the
+tonal corpora failed because they wrote tone as an ASCII digit, not because the
+engine lacked tone. A corpus that fails to load says something about the input
+path, not about the engine, and the tables are arranged to say which.
 
 Capability rows are declared here, because "is this supported, and where is the
 evidence" is a judgement that cannot be measured. Corpus rows are measured by
@@ -34,37 +34,37 @@ CAPABILITIES = [
         "segment correspondences",
         "supported",
         "every loader",
-        "`testdata/parity/*` (13 corpora, byte-identical to the Go reference)",
+        "`testdata/corpora/*` (13 corpora)",
     ),
     (
         "conditioned environments",
         "supported",
         "every loader",
-        "`testdata/parity/conditioned_multilect.tsv`",
+        "`testdata/corpora/conditioned_multilect.tsv`",
     ),
     (
         "long-range conditioning",
         "supported",
         "every loader",
-        "`testdata/parity/long_range.tsv`",
+        "`testdata/corpora/long_range.tsv`",
     ),
     (
         "multi-lect reconciliation",
         "supported",
         "every loader",
-        "`testdata/parity/real_romance_4lect.tsv` (4 lects)",
+        "`testdata/corpora/real_romance_4lect.tsv` (4 lects)",
     ),
     (
         "confidence weighting and outliers",
         "supported",
         "TSV and wide (`confidence` column)",
-        "`testdata/parity/real_contaminated.tsv`",
+        "`testdata/corpora/real_contaminated.tsv`",
     ),
     (
         "morpheme boundaries",
         "supported",
         "arcaverborum, and wide via `<lect>_breaks`",
-        "`testdata/parity/morph_boundary.csv`",
+        "`testdata/corpora/morph_boundary.csv`",
     ),
     (
         "cross-dimensional rules",
@@ -75,8 +75,8 @@ CAPABILITIES = [
     (
         "tone",
         "supported",
-        "**none** — no loader carries tone",
-        "`tests/c/test_pairwise_model.c`",
+        "every loader, from Chao superscripts or a `_tone` column",
+        "`tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c`",
     ),
     (
         "stress conditioning",
@@ -88,27 +88,28 @@ CAPABILITIES = [
         "bootstrap uncertainty",
         "**not ported**",
         "n/a",
-        "`bootstrap.go` (`bootstrap_n` is accepted and ignored)",
+        "never ported; `bootstrap_n` is accepted and ignored",
     ),
     (
         "chunk transparency screening",
         "**not ported**",
         "n/a",
-        "`chunk_diagnostics.go` (`chunk_min_transparency > 0` is refused)",
+        "never ported; `chunk_min_transparency > 0` is refused",
     ),
     (
         "anomaly detection",
         "**not ported**",
         "n/a",
-        "`anomaly.go`",
+        "never ported",
     ),
 ]
 
 # Maps a blocking grapheme to why it blocks and which capability row it points
 # at. Anything unrecognised is reported as-is rather than guessed at.
 BLOCKERS = [
-    (re.compile(r"^[0-9]$"), "tone digit", "tone"),
+    (re.compile(r"^[0-9]$"), "ASCII digit, not Chao tone notation", "tone"),
     (re.compile(r"^\+$"), "in-word morpheme boundary", "morpheme boundaries"),
+    (re.compile(r"^[_#]$"), "CLDF boundary marker", "morpheme boundaries"),
     (re.compile(r"^-$"), "syllable separator", "stress conditioning"),
 ]
 
@@ -137,10 +138,14 @@ def run(cli, path):
             "classes": sum(1 for line in lines if line.startswith("UNCOND")),
             "conditioned": sum(1 for line in lines if line.startswith("COND")),
         }
+    # The CLI names the offending grapheme in both refusals it can report: a
+    # sound the feature system does not cover, and CLDF/CLTS markup that never
+    # transcribed one.
     match = re.search(r'unknown grapheme "([^"]*)"', result.stderr)
-    if not match:
+    markup = re.search(r'"([^"]*)" is CLDF/CLTS markup', result.stderr)
+    if not match and not markup:
         return {"status": "fails", "detail": result.stderr.strip().splitlines()[0]}
-    grapheme, = match.groups()
+    grapheme, = (match or markup).groups()
     cause, capability = classify(grapheme)
     return {
         "status": "cannot read",
@@ -175,9 +180,11 @@ def main():
     out.append("")
     out.append("What regulae implements, and which of the corpora in `experiments/` it can")
     out.append("currently read. These are different questions: a corpus that fails to load says")
-    out.append("something about the input path, not about the engine. Tone is the clearest case")
-    out.append("— it is supported and tested, and every tone corpus below is unreadable, because")
-    out.append("no loader carries a tone column.")
+    out.append("something about the input path, not about the engine. Tone made the case: the")
+    out.append("tonal corpora were unreadable for as long as they wrote tone as an ASCII digit,")
+    out.append("which no transcription standard defines, and every one of them reads now that")
+    out.append("they carry Chao superscripts on the word or a `<lect>_tone` column. Nothing in")
+    out.append("the engine changed to allow it.")
     out.append("")
     out.append("## Capabilities")
     out.append("")

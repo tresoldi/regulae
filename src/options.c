@@ -13,7 +13,8 @@ void rg_bic_config_init_defaults(rg_bic_config *config) {
     config->long_range_min_dominant_fraction = 0.6;
     config->cross_dim_max_iterations = 5;
     config->cross_dim_min_rule_count = 3;
-    config->cross_dim_min_rule_confidence = 0.5;
+    config->cross_dim_min_rule_confidence = 0.0;
+    config->cross_dim_delta_bic_threshold = -1.0;
     config->multi_lect_bic_small_sample_correction = 1;
     config->multi_lect_min_commit_scale = 0.5;
 }
@@ -22,7 +23,7 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     if (options == 0) {
         return;
     }
-    options->feature_system = "descriptive";
+    options->feature_system = RG_DEFAULT_FEATURE_SYSTEM;
     options->max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
     options->temperature = 1.0;
     options->concentration = 5.0;

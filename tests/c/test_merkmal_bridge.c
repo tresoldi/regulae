@@ -15,6 +15,61 @@ static int feature_set_contains(const rg_feature_set *features, const char *need
     return 0;
 }
 
+/* The tie bar is how a transcription says "one segment", and the default
+ * reading honours it: "t͡ʃ" is one segment where untied "tʃ" is two. Longest
+ * match against the inventory reads both as one, and on the same rule reads
+ * the geminate "kk" as one, which is why it is not the default. */
+static void test_segmentation_reads_the_tie_bar(rg_context *ctx) {
+    rg_segment *segments = 0;
+    size_t count = 0;
+
+    assert(rg_context_segmentation(ctx) == RG_SEGMENT_ORTHOGRAPHIC);
+    assert(rg_context_segment_word(ctx, "let\xcd\xa1\xca\x83""e", &segments, &count) == RG_OK);
+    assert(count == 4);
+    assert(strcmp(segments[2].grapheme, "t\xcd\xa1\xca\x83") == 0);
+    rg_segments_free(segments, count);
+
+    assert(rg_context_segment_word(ctx, "bukka", &segments, &count) == RG_OK);
+    assert(count == 5);
+    rg_segments_free(segments, count);
+
+    assert(rg_context_set_segmentation(ctx, RG_SEGMENT_SYSTEM_LONGEST_MATCH) == RG_OK);
+    assert(rg_context_segment_word(ctx, "bukka", &segments, &count) == RG_OK);
+    assert(count == 4);
+    assert(strcmp(segments[2].grapheme, "kk") == 0);
+    rg_segments_free(segments, count);
+    assert(rg_context_set_segmentation(ctx, RG_SEGMENT_ORTHOGRAPHIC) == RG_OK);
+
+    assert(rg_context_set_segmentation(0, RG_SEGMENT_ORTHOGRAPHIC) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_context_set_segmentation(ctx, (rg_segmentation)7) == RG_ERR_UNSUPPORTED_OPTION);
+}
+
+/* Tone written on the word reaches the model as the segment's own dimension,
+ * never as part of the grapheme, whether it is bound to the nucleus or spelled
+ * as a token of its own the way CLDF wordlists publish it. */
+static void test_tone_leaves_the_grapheme(rg_context *ctx) {
+    rg_segment *segments = 0;
+    size_t count = 0;
+
+    assert(rg_context_segment_word(ctx, "ma\xc2\xb3\xc2\xb3", &segments, &count) == RG_OK);
+    assert(count == 2);
+    assert(strcmp(segments[1].grapheme, "a") == 0);
+    assert(segments[1].tone != 0 && strcmp(segments[1].tone, "\xc2\xb3\xc2\xb3") == 0);
+    rg_segments_free(segments, count);
+
+    assert(rg_context_segment_word(ctx, "ma \xc2\xb3\xc2\xb3", &segments, &count) == RG_OK);
+    assert(count == 2);
+    assert(strcmp(segments[1].grapheme, "a") == 0);
+    assert(segments[1].tone != 0 && strcmp(segments[1].tone, "\xc2\xb3\xc2\xb3") == 0);
+    rg_segments_free(segments, count);
+
+    /* An untoned word carries no tone, rather than an empty one. */
+    assert(rg_context_segment_word(ctx, "ma", &segments, &count) == RG_OK);
+    assert(count == 2);
+    assert(segments[1].tone == 0);
+    rg_segments_free(segments, count);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     rg_feature_set *features = 0;
@@ -25,7 +80,7 @@ int main(void) {
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     assert(ctx != 0);
     assert(rg_context_system_name(ctx, &name) == RG_OK);
-    assert(strcmp(name, "descriptive") == 0);
+    assert(strcmp(name, RG_DEFAULT_FEATURE_SYSTEM) == 0);
 
     assert(rg_context_is_segment(ctx, "p", &is_segment) == RG_OK);
     assert(is_segment == 1);
@@ -46,6 +101,10 @@ int main(void) {
 
     assert(rg_context_grapheme_features(ctx, "not-ipa", &features) == RG_ERR_UNKNOWN_GRAPHEME);
     assert(features == 0);
+
+    test_segmentation_reads_the_tie_bar(ctx);
+    test_tone_leaves_the_grapheme(ctx);
+
     assert(rg_context_use_system(ctx, "phoible") == RG_OK);
     assert(rg_context_system_name(ctx, &name) == RG_OK);
     assert(strcmp(name, "phoible") == 0);

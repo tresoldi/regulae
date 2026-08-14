@@ -41,7 +41,7 @@ console.log('corpus'.padEnd(26), 'native'.padStart(8), 'wasm'.padStart(8), 'rati
 console.log('-'.repeat(26), '-'.repeat(8), '-'.repeat(8), '-'.repeat(8));
 
 for (const [name, format] of corpora) {
-  const path = join(repo, 'testdata/parity', name);
+  const path = join(repo, 'testdata/corpora', name);
   const text = readFileSync(path, 'utf8');
 
   const native = best(() => execFileSync(cli, ['train', '--json', path], { maxBuffer: 1 << 28 }));

@@ -27,7 +27,10 @@ if(REGULAE_ENABLE_SANITIZER)
     endif()
 endif()
 
-find_package(merkmal CONFIG QUIET)
+# 1.0 is a floor, not a preference: it removed mk_feature_set, renamed
+# mk_free_string and changed mk_system_is_segment's output type, so an older
+# merkmal does not compile against src/context.c at all.
+find_package(merkmal 1.0 CONFIG QUIET)
 if(NOT TARGET merkmal::merkmal)
     set(REGULAE_MERKMAL_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../merkmal" CACHE PATH "Merkmal C source checkout")
     if(EXISTS "${REGULAE_MERKMAL_SOURCE_DIR}/CMakeLists.txt")
@@ -205,25 +208,25 @@ if(REGULAE_BUILD_TESTS)
         set_tests_properties(cli_help PROPERTIES PASS_REGULAR_EXPRESSION "Usage: regulae")
 
         add_test(NAME cli_train_summary
-            COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/conditioned_multilect.tsv")
+            COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/conditioned_multilect.tsv")
         set_tests_properties(cli_train_summary PROPERTIES
             PASS_REGULAR_EXPRESSION "LECTS	alpha beta gamma")
 
         add_test(NAME cli_train_human
-            COMMAND regulae_cli train --human "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/conditioned_multilect.tsv")
+            COMMAND regulae_cli train --human "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/conditioned_multilect.tsv")
         set_tests_properties(cli_train_human PROPERTIES
             PASS_REGULAR_EXPRESSION "MultiLectModel")
 
         add_test(NAME cli_align
-            COMMAND regulae_cli align "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/three_lect_basic.tsv")
+            COMMAND regulae_cli align "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/three_lect_basic.tsv")
         set_tests_properties(cli_align PROPERTIES PASS_REGULAR_EXPRESSION "^ALIGN	c1")
 
         add_test(NAME cli_outliers
-            COMMAND regulae_cli outliers --top-k 3 "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/real_contaminated.tsv")
+            COMMAND regulae_cli outliers --top-k 3 "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/real_contaminated.tsv")
         set_tests_properties(cli_outliers PROPERTIES PASS_REGULAR_EXPRESSION "^OUTLIER	")
 
         add_test(NAME cli_train_json
-            COMMAND regulae_cli train --json "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/three_lect_basic.tsv")
+            COMMAND regulae_cli train --json "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/three_lect_basic.tsv")
         set_tests_properties(cli_train_json PROPERTIES
             PASS_REGULAR_EXPRESSION "\"export_kind\":\"debug_map_snapshot\"")
 
@@ -232,7 +235,7 @@ if(REGULAE_BUILD_TESTS)
         set_tests_properties(cli_wide PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	latin spanish")
 
         add_test(NAME cli_arcaverborum
-            COMMAND regulae_cli train --format arcaverborum "${CMAKE_CURRENT_SOURCE_DIR}/testdata/parity/morph_boundary.csv")
+            COMMAND regulae_cli train --format arcaverborum "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/morph_boundary.csv")
         set_tests_properties(cli_arcaverborum PROPERTIES PASS_REGULAR_EXPRESSION "LECTS	one two")
 
         # Runs only when the WebAssembly artifacts and Node are present; the

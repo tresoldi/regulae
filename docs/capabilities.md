@@ -4,50 +4,59 @@
 
 What regulae implements, and which of the corpora in `experiments/` it can
 currently read. These are different questions: a corpus that fails to load says
-something about the input path, not about the engine. Tone is the clearest case
-— it is supported and tested, and every tone corpus below is unreadable, because
-no loader carries a tone column.
+something about the input path, not about the engine. Tone made the case: the
+tonal corpora were unreadable for as long as they wrote tone as an ASCII digit,
+which no transcription standard defines, and every one of them reads now that
+they carry Chao superscripts on the word or a `<lect>_tone` column. Nothing in
+the engine changed to allow it.
 
 ## Capabilities
 
 | capability | engine | input path | evidence |
 | --- | --- | --- | --- |
-| segment correspondences | supported | every loader | `testdata/parity/*` (13 corpora, byte-identical to the Go reference) |
-| conditioned environments | supported | every loader | `testdata/parity/conditioned_multilect.tsv` |
-| long-range conditioning | supported | every loader | `testdata/parity/long_range.tsv` |
-| multi-lect reconciliation | supported | every loader | `testdata/parity/real_romance_4lect.tsv` (4 lects) |
-| confidence weighting and outliers | supported | TSV and wide (`confidence` column) | `testdata/parity/real_contaminated.tsv` |
-| morpheme boundaries | supported | arcaverborum, and wide via `<lect>_breaks` | `testdata/parity/morph_boundary.csv` |
+| segment correspondences | supported | every loader | `testdata/corpora/*` (13 corpora) |
+| conditioned environments | supported | every loader | `testdata/corpora/conditioned_multilect.tsv` |
+| long-range conditioning | supported | every loader | `testdata/corpora/long_range.tsv` |
+| multi-lect reconciliation | supported | every loader | `testdata/corpora/real_romance_4lect.tsv` (4 lects) |
+| confidence weighting and outliers | supported | TSV and wide (`confidence` column) | `testdata/corpora/real_contaminated.tsv` |
+| morpheme boundaries | supported | arcaverborum, and wide via `<lect>_breaks` | `testdata/corpora/morph_boundary.csv` |
 | cross-dimensional rules | supported | every loader | `tests/c/test_pairwise_model.c` |
-| tone | supported | **none** — no loader carries tone | `tests/c/test_pairwise_model.c` |
+| tone | supported | every loader, from Chao superscripts or a `_tone` column | `tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c` |
 | stress conditioning | supported | **none** — no loader carries stress | `src/model.c` stress split candidates |
-| bootstrap uncertainty | **not ported** | n/a | `bootstrap.go` (`bootstrap_n` is accepted and ignored) |
-| chunk transparency screening | **not ported** | n/a | `chunk_diagnostics.go` (`chunk_min_transparency > 0` is refused) |
-| anomaly detection | **not ported** | n/a | `anomaly.go` |
+| bootstrap uncertainty | **not ported** | n/a | never ported; `bootstrap_n` is accepted and ignored |
+| chunk transparency screening | **not ported** | n/a | never ported; `chunk_min_transparency > 0` is refused |
+| anomaly detection | **not ported** | n/a | never ported |
 
-## Corpora regulae reads (15 of 24)
+## Corpora regulae reads (22 of 24)
 
 Trained through the wide loader with default options.
 
 | corpus | lects | classes | conditioned |
 | --- | --- | --- | --- |
-| arabic_hebrew | arabic, hebrew | 32 | 7 |
+| arabic_hebrew | arabic, hebrew | 33 | 7 |
 | contaminated_cognates_synthetic | proto, derived | 7 | 0 |
-| finnish_estonian | finnish, estonian | 24 | 2 |
-| georgian_svan | georgian, svan | 46 | 10 |
+| finnish_estonian | finnish, estonian | 29 | 4 |
+| georgian_svan | georgian, svan | 51 | 10 |
 | harmony_synthetic | proto, derived | 13 | 0 |
-| latin_french | latin, french | 46 | 8 |
-| latin_italian | latin, italian | 35 | 11 |
-| latin_spanish | latin, spanish | 56 | 22 |
+| latin_french | latin, french | 70 | 17 |
+| latin_italian | latin, italian | 40 | 14 |
+| latin_spanish | latin, spanish | 60 | 22 |
 | length_conditioned_synthetic | proto, derived | 12 | 0 |
-| mandarin_historical | middle_chinese, mandarin | 32 | 1 |
-| oe_english | old_english, modern_english | 29 | 6 |
+| mandarin_historical | middle_chinese, mandarin | 44 | 4 |
+| navajo_chipewyan | navajo, chipewyan | 49 | 2 |
+| oe_english | old_english, modern_english | 51 | 14 |
 | ppn_hawaiian | ppn, hawaiian | 13 | 0 |
-| swahili_zulu | swahili, zulu | 37 | 8 |
-| turkish_azerbaijani | turkish, azerbaijani | 24 | 0 |
+| swahili_zulu | swahili, zulu | 41 | 7 |
+| tone_3way_synthetic | proto, daughter_a, daughter_b | 9 | 0 |
+| tone_chinese_like | mandarin, cantonese | 35 | 9 |
+| tone_chinese_like_clean | mandarin, cantonese | 9 | 0 |
+| tone_synthetic | src, tgt | 8 | 0 |
+| tone_vietnamese_like | hanoi, saigon | 19 | 0 |
+| tone_yoruba_like | standard, ekiti | 21 | 0 |
+| turkish_azerbaijani | turkish, azerbaijani | 27 | 3 |
 | umlaut_synthetic | proto, derived | 13 | 0 |
 
-## Corpora regulae cannot read yet (9 of 24)
+## Corpora regulae cannot read yet (2 of 24)
 
 Each names the grapheme that blocks it and the capability row it points at.
 None of these is an engine limitation.
@@ -55,11 +64,4 @@ None of these is an engine limitation.
 | corpus | blocked by | cause | see capability |
 | --- | --- | --- | --- |
 | morph_boundary_synthetic | `+` | in-word morpheme boundary | morpheme boundaries |
-| navajo_chipewyan | `ṍ` | not covered by the feature system | upstream (merkmal) |
 | stress_conditioned_synthetic | `-` | syllable separator | stress conditioning |
-| tone_3way_synthetic | `1` | tone digit | tone |
-| tone_chinese_like | `1` | tone digit | tone |
-| tone_chinese_like_clean | `1` | tone digit | tone |
-| tone_synthetic | `5` | tone digit | tone |
-| tone_vietnamese_like | `6` | tone digit | tone |
-| tone_yoruba_like | `3` | tone digit | tone |

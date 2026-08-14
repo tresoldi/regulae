@@ -35,11 +35,12 @@ does not work. Three concrete reasons:
    definition, the part of the target distribution that is not
    explained by segmental correspondences. Discovering it requires a
    baseline: a model that already explains everything it can segmentally
-   and tonally, so that what's left (residual mutual information
-   between a segmental predictor and a tonal outcome) is genuinely
-   unexplained variance. Running anomaly detection before the
-   segmental baseline is converged produces spurious "anomalies" that
-   are really just under-trained segment correspondences.
+   and tonally, so that what is left is genuinely unexplained. Running
+   the stage before the segmental baseline has converged produces
+   spurious rules that are really just under-trained segment
+   correspondences. The same reasoning runs inside the stage, where each
+   committed rule retires the evidence it accounts for before the next
+   environment is tested.
 
 So stages are ordered by what they consume. Each stage either
 converges on its own objective (segment EM, chunk promotion) or runs
@@ -184,34 +185,44 @@ It also makes the next stage (cross-dimensional discovery) tractable:
 tonal outcome", and that correlation can only be tested when the two
 dimensions live in separate tables.
 
-### 6. Cross-dimensional discovery — `_cross_dimensional_discovery`
+### 6. Cross-dimensional discovery — `discover_cross_dimensional_rows`
 
-**What it does.** Runs residual-MI anomaly detection to produce a
-ranked list of candidate `PatternHypothesis` objects (e.g. "voicing
-at source offset −1 predicts tone 4 at target offset 0"). For each
-candidate, builds a trial `CrossDimensionalLink`, re-scores the corpus
-under the trial model, and accepts the best candidate whose BIC delta
-beats the threshold and whose support clears explicit floors
-(`_CROSS_DIM_MIN_RULE_COUNT = 3`, `_CROSS_DIM_MIN_RULE_CONFIDENCE = 0.5`).
+**What it does.** Walks the 1-to-1 links once, recording for every toned
+target segment which of the candidate environments (source feature ×
+source offset) hold at its source position. It then commits environments
+one at a time, best first, testing each against what earlier rules have
+left unexplained, up to `_CROSS_DIM_MAX_ITERATIONS`.
 
-Iterates sequentially-greedy up to `_CROSS_DIM_MAX_ITERATIONS`, then
-runs a post-commit dual-framing dedup step that collapses rules
-differing only by link-position framing into a canonical
-representative.
+An environment is committed only if its complement is attested and the
+target distribution differs between the two by more than the extra
+parameters cost under BIC; a value inside it is reported only if the
+environment raises that value relative to the contrast and the rise
+passes its own 2×2 BIC test. Both sides of the split are published, the
+complement under `source_value = "-"`.
 
-**What it produces.** A `CrossDimensionalLinkTable` used by the
-scoring overlay (see `docs/correspondence_discovery.md` for the
-scoring-side detail).
+**What it produces.** A `CrossDimensionalLinkTable` used by the scoring
+overlay. Every row carries the contrast it was measured against, because
+a conditional probability without its baseline is not evidence of
+conditioning. See `docs/correspondence_discovery.md` for the criterion
+and for what the original Python design had that this does not.
 
-**Why anomaly detection as the discovery mechanism.** Cross-dimensional
-rules cannot be enumerated exhaustively like context splits — the
-candidate space (source feature × source offset × target dimension ×
-target value × target offset) is too large for greedy enumeration to
-be informative on realistic data. Anomaly detection solves this by
-ranking candidates by residual mutual information against a
-permutation null, giving a principled shortlist to BIC-test.
+**Why the environment is tested against its complement rather than
+scored on its own.** The stage answers "does this feature condition this
+dimension", and conditioning is a comparison. Until 2026-08-14 it was
+answered with `P(value | environment) >= 0.5` and no comparison at all,
+which committed predicates true of the whole corpus, predicates that
+partitioned the corpus without moving anything, and — on a two-valued
+dimension — both values for the same environment at once.
 
-**Why support floors in addition to BIC.** On corpora with many rare
+**Why the greedy loop tests against the residue.** Correlated framings
+of one fact would otherwise commit separately: `consonant`, `sonorant`,
+`nasal` and `voiced` at the same offset can all be true of the same
+onset, and four rows describing one finding read as four findings.
+Retiring the evidence a committed rule accounts for makes the redundant
+framings fail their own test, which is more honest than filtering them
+by name afterwards.
+
+**Why a support floor in addition to BIC.** On corpora with many rare
 tonal outcomes, BIC's Dirichlet-smoothed LLR on a 1/N-support rule
 scores slightly negative — passing BIC but committing noise. The
 floors are calibrated to reject this class of commits without

@@ -53,6 +53,12 @@ stay whole: `pʰ`, `t͡ʃ`, `kʷ` and a vowel carrying a combining diacritic are
 each one segment, where splitting on characters would break every one of them.
 You do not need to segment anything yourself.
 
+The tie bar is what marks an affricate as a single segment. `t͡ʃ` is one
+segment; untied `tʃ` is two, because that is what the transcription says. This
+matters in both directions: writing the tie bar where you mean one segment is
+the way to be understood, and leaving it off where you mean a sequence is
+equally respected.
+
 Press Run. What comes back is a list of correspondence classes, each one a
 segment from every participating lect, with how much evidence supports it and
 which cognates that evidence came from.
@@ -112,7 +118,7 @@ else.
 With three or more lects, regulae aligns each pair, then reconciles those
 pairwise alignments into classes binding every lect at once.
 
-<!-- example: testdata/parity/real_romance_4lect.tsv -->
+<!-- example: testdata/corpora/real_romance_4lect.tsv -->
 
 Reconciliation works over positions: if the Latin position 2 aligns with the
 Spanish position 2, and that Spanish position aligns with the Italian position
@@ -154,20 +160,27 @@ the most interesting thing in your data is not something a program can decide.
 Some of the corpora in the example list will not load, and the honest reason is
 worth stating plainly, because it is not what it looks like.
 
-<!-- example: experiments/tone_chinese_like_clean/cognates.tsv -->
+<!-- example: experiments/morph_boundary_synthetic/cognates.tsv -->
 
-Run this one and you get `unknown grapheme "1"`. That is not regulae failing to
-handle tone. Tone is implemented: segments carry it in a field of their own,
-there is a tonal correspondence table, and it is exercised by the test suite.
-What is missing is a way to get tone *in* — none of the loaders carries a tone
-column, so a tone digit written into a word reaches the feature system as part
-of the grapheme and is rejected.
+Run this one and regulae tells you `"+"` is CLDF/CLTS markup rather than a
+transcribed sound. It is not refusing to handle morpheme boundaries — they are
+implemented, and the arcaverborum format carries them today. The wide format
+simply has no convention yet for a `+` written inside a word, so the marker
+reaches the feature system as if it were a sound. The gap is in the input path.
 
-The same holds for the other blocked corpora. Stress conditioning is
-implemented, and `stress_conditioned_synthetic` fails on `-`, a syllable
-separator, not on the stress mark, which is read fine. Morpheme boundaries are
-implemented and work today in another format; the wide format just has no
-convention for a `+` inside a word yet.
+The other blocked corpus is the same shape: `stress_conditioned_synthetic`
+fails on `-`, a syllable separator, not on the stress mark, which is read fine.
+Stress conditioning itself is implemented.
+
+Tone used to be the example here, and it is worth saying what changed, because
+it is the same lesson. Every tonal corpus in the example list was unreadable —
+not because tone was missing, but because they wrote it as an ASCII `1`, which
+is not tone notation and is not something a reader can safely guess at. Written
+the way the field writes it, tone goes straight in: `ma³³` gives `m` and an `a`
+carrying `³³`, whether the tone is bound to its nucleus or spelled as a token
+of its own. A `<lect>_tone` column is the other way in, for corpora that record
+tone categories rather than pitch: one value per segment, `-` for a segment you
+are not annotating. Nothing in the engine changed; the corpora were rewritten.
 
 [`docs/capabilities.md`](capabilities.md) lists all of this: what is
 implemented, what the loaders can express, and which grapheme blocks each
@@ -184,8 +197,8 @@ Four readers are available, and all of them arrive at the same model.
 **Wide** is the default and the one used above: a cognate per row, a lect per
 column, whole unsegmented words. A `<lect>_breaks` column supplies morpheme
 boundary positions for that lect, and a `confidence` column weights the set.
-Columns ending in `_tone` are recognised and skipped, so they are not mistaken
-for lects.
+A `<lect>_tone` column supplies tone per segment, and is recognised so it is
+not mistaken for a lect.
 
 **Long TSV** wants `cognate_id`, `lect_id` and `segments` columns, with
 segments already space-separated, plus an optional `confidence`. Use it when

@@ -35,7 +35,7 @@ static void test_tsv_grouping_and_order(void) {
 
     memset(&options, 0, sizeof(options));
     options.confidence_column = "confidence";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/three_lect_basic.tsv", &options, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus) == RG_OK);
     assert(rg_corpus_cognate_count(corpus) == 6);
 
     /* Cognate sets keep first-appearance order, and so do the forms inside
@@ -63,7 +63,7 @@ static void test_tsv_confidence_is_the_minimum(void) {
 
     memset(&options, 0, sizeof(options));
     options.confidence_column = "confidence";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/partial_coverage.tsv", &options, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", &options, &corpus) == RG_OK);
 
     low = find_cognate(corpus, "q5");
     assert(low != 0);
@@ -81,7 +81,7 @@ static void test_tsv_without_confidence_column(void) {
     rg_corpus *corpus = 0;
     const rg_cognate_set *low;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/partial_coverage.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", 0, &corpus) == RG_OK);
     low = find_cognate(corpus, "q5");
     assert(low != 0);
     assert(low->confidence == 1.0);
@@ -93,7 +93,7 @@ static void test_arcaverborum_morpheme_boundaries(void) {
     const rg_cognate_set *set;
     const rg_form *form;
 
-    assert(rg_corpus_load_arcaverborum(REGULAE_SOURCE_DIR "/testdata/parity/morph_boundary.csv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_arcaverborum(REGULAE_SOURCE_DIR "/testdata/corpora/morph_boundary.csv", 0, &corpus) == RG_OK);
     assert(rg_corpus_cognate_count(corpus) == 6);
 
     set = find_cognate(corpus, "b1");
@@ -114,12 +114,12 @@ static void test_missing_file_and_columns(void) {
     rg_corpus *corpus = 0;
     rg_tsv_load_options options;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/does_not_exist.tsv", 0, &corpus) == RG_ERR_IO);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/does_not_exist.tsv", 0, &corpus) == RG_ERR_IO);
     assert(corpus == 0);
 
     memset(&options, 0, sizeof(options));
     options.segments_column = "not_a_column";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/three_lect_basic.tsv", &options, &corpus) == RG_ERR_PARSE);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus) == RG_ERR_PARSE);
     assert(corpus == 0);
 }
 
@@ -184,7 +184,7 @@ static void test_wide_matches_the_parity_verified_corpus(rg_context *ctx) {
     memset(&tsv_options, 0, sizeof(tsv_options));
     tsv_options.confidence_column = "confidence";
     assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &wide) == RG_OK);
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/parity/real_latin_spanish.tsv", &tsv_options, &long_form) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/real_latin_spanish.tsv", &tsv_options, &long_form) == RG_OK);
     assert(rg_corpus_cognate_count(wide) == rg_corpus_cognate_count(long_form));
     assert(rg_corpus_cognate_count(wide) > 90);
 
@@ -261,6 +261,55 @@ static void test_wide_breaks_and_column_conventions(rg_context *ctx) {
             assert(strcmp(set->forms[f].lect_id, "middle_chinese") == 0 ||
                    strcmp(set->forms[f].lect_id, "mandarin") == 0);
         }
+    }
+    rg_corpus_free(corpus);
+}
+
+/* Tone reaches a form by either route: written on the word, or annotated in a
+ * companion column when the corpus records tone categories rather than pitch.
+ * The column wins where both are present, since it is the deliberate one. */
+static void test_wide_carries_tone(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+    size_t f;
+    size_t toned = 0;
+
+    assert(rg_corpus_load_wide_tsv(
+        ctx, REGULAE_SOURCE_DIR "/experiments/tone_vietnamese_like/cognates.tsv",
+        0, &corpus) == RG_OK);
+    assert(rg_corpus_cognate_count(corpus) > 0);
+    set = rg_corpus_cognate_at(corpus, 0);
+    for (f = 0; f < set->form_count; f++) {
+        size_t g;
+        /* The "_tone" columns must not have become lects of their own. */
+        assert(strcmp(set->forms[f].lect_id, "hanoi") == 0 ||
+               strcmp(set->forms[f].lect_id, "saigon") == 0);
+        for (g = 0; g < set->forms[f].form.segment_count; g++) {
+            if (set->forms[f].form.segments[g].tone != 0) {
+                toned++;
+            }
+        }
+    }
+    assert(toned == 2);
+    rg_corpus_free(corpus);
+
+    /* The same corpus written with Chao superscripts on the word instead. */
+    assert(rg_corpus_load_wide_tsv(
+        ctx, REGULAE_SOURCE_DIR "/experiments/tone_synthetic/cognates.tsv",
+        0, &corpus) == RG_OK);
+    set = rg_corpus_cognate_at(corpus, 0);
+    for (f = 0; f < set->form_count; f++) {
+        size_t g;
+        int found = 0;
+        for (g = 0; g < set->forms[f].form.segment_count; g++) {
+            const rg_segment *segment = &set->forms[f].form.segments[g];
+            /* Tone is its own dimension: it never stays in the grapheme. */
+            assert(strstr(segment->grapheme, "\xe2\x81\xb5") == 0);
+            if (segment->tone != 0) {
+                found = 1;
+            }
+        }
+        assert(found);
     }
     rg_corpus_free(corpus);
 }
@@ -486,6 +535,7 @@ int main(void) {
     test_wide_matches_the_parity_verified_corpus(ctx);
     test_wide_repeated_gloss_is_not_merged(ctx);
     test_wide_breaks_and_column_conventions(ctx);
+    test_wide_carries_tone(ctx);
     test_wide_confidence_and_bad_input(ctx);
     test_parse_matches_load(ctx);
     rg_context_free(ctx);

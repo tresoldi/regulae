@@ -4,9 +4,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* The regulae command-line front end. `train --summary` and `outliers` emit the
- * compact, deterministic summary format that scripts/parity.sh diffs against
- * the Go reference dumper in tools/goref. */
+/* The regulae command-line front end. `train --summary` and `outliers` emit a
+ * compact, deterministic line format meant to be diffed. It was shaped for the
+ * parity harness and kept after it, because a format two implementations could
+ * be compared through is also the one a user can grep and a test can pin. */
 
 #define MAX_PARTS 64
 
@@ -212,18 +213,19 @@ static void print_summary(const rg_multi_model *model) {
     }
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        printf("XDIM\t%s>%s\t%s=%s@%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\n",
+        printf("XDIM\t%s>%s\t%s=%s@%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
                row->source_lect, row->target_lect,
                row->source_feature, row->source_value, row->source_position,
                row->target_dimension, row->target_value, row->target_position_offset,
-               row->count, row->source_count, row->confidence);
+               row->count, row->source_count, row->confidence,
+               row->contrast_count, row->contrast_source_count, row->contrast_confidence,
+               row->delta_bic);
     }
 }
 
 static rg_status load_corpus(const char *path, const char *format, rg_corpus **out);
 
-/* Dumps the per-pair learned tables in the same line format as the Go
- * reference dumper, for table-level parity diffing. */
+/* Dumps the per-pair learned tables, one row per line, for diffing. */
 static void print_pairwise(const rg_multi_model *model) {
     size_t p;
     for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
@@ -289,21 +291,39 @@ static rg_status load_corpus(const char *path, const char *format, rg_corpus **o
     return RG_ERR_UNSUPPORTED_OPTION;
 }
 
-/* Names the grapheme when one is to blame, matching what the Go reference puts
- * in its error value. */
+/* Names the grapheme when one is to blame, and the character within it that
+ * broke, which is usually the repair. */
 static void report_failure(const rg_context *ctx, const char *what, rg_status status) {
     const char *grapheme = 0;
     const char *system = 0;
-    if (status == RG_ERR_UNKNOWN_GRAPHEME && ctx != 0) {
+    rg_grapheme_diagnosis diagnosis;
+    int diagnosed = 0;
+
+    if ((status == RG_ERR_UNKNOWN_GRAPHEME || status == RG_ERR_SOURCE_MARKER ||
+         status == RG_ERR_PARSE) && ctx != 0) {
         rg_context_last_error(ctx, &grapheme, &system);
+        diagnosed = rg_context_last_diagnosis(ctx, &diagnosis);
     }
-    if (grapheme != 0) {
-        fprintf(stderr,
-                "regulae: %s: unknown grapheme \"%s\" in feature system \"%s\". "
-                "Either the grapheme is a typo, or the feature system does not cover it.\n",
-                what, grapheme, system == 0 ? "" : system);
-    } else {
+    if (grapheme == 0) {
         fprintf(stderr, "regulae: %s: %s\n", what, rg_status_string(status));
+        return;
+    }
+    if (status == RG_ERR_SOURCE_MARKER) {
+        fprintf(stderr,
+                "regulae: %s: \"%s\" is CLDF/CLTS markup, not a transcribed sound. "
+                "The gap is in the source data, not in the feature system.\n",
+                what, grapheme);
+        return;
+    }
+    fprintf(stderr,
+            "regulae: %s: unknown grapheme \"%s\" in feature system \"%s\". "
+            "Either the grapheme is a typo, or the feature system does not cover it.\n",
+            what, grapheme, system == 0 ? "" : system);
+    if (diagnosed && diagnosis.offending[0] != '\0' && diagnosis.valid_prefix_bytes > 0) {
+        fprintf(stderr,
+                "regulae: %.*s resolves; \"%s\" at byte %zu does not.\n",
+                (int)diagnosis.valid_prefix_bytes, grapheme,
+                diagnosis.offending, diagnosis.offending_offset);
     }
 }
 

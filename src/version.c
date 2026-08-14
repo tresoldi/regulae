@@ -36,6 +36,8 @@ const char *rg_status_string(rg_status status) {
         return "merkmal error";
     case RG_ERR_UNKNOWN_GRAPHEME:
         return "unknown grapheme";
+    case RG_ERR_SOURCE_MARKER:
+        return "source marker, not a sound";
     case RG_ERR_UNSUPPORTED_OPTION:
         return "unsupported option";
     case RG_ERR_CANCELLED:

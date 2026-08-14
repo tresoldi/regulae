@@ -1391,7 +1391,14 @@ static int cross_dimensional_source_holds(
     if (status != RG_OK) {
         return 0;
     }
-    return feature_set_contains(features, row->source_feature);
+    {
+        /* source_value "-" is the complementary environment, which is half of
+         * every conditioned split. Reading the feature alone and ignoring the
+         * value fires a rule about voiceless onsets on a voiced one. */
+        int holds = feature_set_contains(features, row->source_feature);
+        const char *value = row->source_value == 0 ? "+" : row->source_value;
+        return strcmp(value, "-") == 0 ? !holds : holds;
+    }
 }
 
 static double cross_dimensional_adjustment_for_row(

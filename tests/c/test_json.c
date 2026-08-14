@@ -27,7 +27,7 @@ static char *train_json(rg_context *ctx, const char *corpus_path, int alignments
 }
 
 static void test_model_json_shape(rg_context *ctx) {
-    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/conditioned_multilect.tsv", 1, 1);
+    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/corpora/conditioned_multilect.tsv", 1, 1);
     assert(text != 0);
 
     assert(strstr(text, "\"ok\":true") != 0);
@@ -50,7 +50,7 @@ static void test_model_json_shape(rg_context *ctx) {
 
 /* Alignments and outliers are opt-in; asking for neither must not emit them. */
 static void test_optional_sections(rg_context *ctx) {
-    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/three_lect_basic.tsv", 0, 0);
+    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", 0, 0);
     assert(text != 0);
     assert(strstr(text, "\"unconditioned\"") != 0);
     assert(strstr(text, "\"alignments\"") == 0);
@@ -61,8 +61,8 @@ static void test_optional_sections(rg_context *ctx) {
 /* Repeated renders of the same model must agree byte for byte, or the demo and
  * the CLI could disagree without anything changing. */
 static void test_determinism(rg_context *ctx) {
-    char *first = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/three_lect_basic.tsv", 1, 1);
-    char *second = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/three_lect_basic.tsv", 1, 1);
+    char *first = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", 1, 1);
+    char *second = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", 1, 1);
     assert(first != 0 && second != 0);
     assert(strcmp(first, second) == 0);
     rg_string_free(first);
@@ -74,7 +74,7 @@ static void test_determinism(rg_context *ctx) {
  * and the unconditioned one over the same segments are indistinguishable if a
  * consumer matches graphemes, and the environment is what the tool is for. */
 static void test_links_carry_class_ids(rg_context *ctx) {
-    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/parity/real_latin_spanish.tsv", 1, 1);
+    char *text = train_json(ctx, REGULAE_SOURCE_DIR "/testdata/corpora/real_latin_spanish.tsv", 1, 1);
     const char *cursor;
     size_t links_with_classes = 0;
 

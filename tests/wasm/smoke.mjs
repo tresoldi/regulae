@@ -91,7 +91,7 @@ for (const name of [
   'real_latin_spanish.tsv',
 ]) {
   check(`byte-identical to native: ${name}`, () => {
-    const path = join(repo, 'testdata/parity', name);
+    const path = join(repo, 'testdata/corpora', name);
     cancelAfter = 0;
     const fromWasm = call(train, readFileSync(path, 'utf8'), 'tsv', null);
     const fromNative = execFileSync(cli, ['train', '--json', path], {
@@ -129,7 +129,7 @@ check('segmentation keeps multi-codepoint graphemes whole', () => {
 // told apart by matching graphemes, and the environment is the whole point.
 check('a conditioned class maps to fewer links than its unconditioned twin', () => {
   cancelAfter = 0;
-  const path = join(repo, 'testdata/parity/real_latin_spanish.tsv');
+  const path = join(repo, 'testdata/corpora/real_latin_spanish.tsv');
   const model = JSON.parse(call(train, readFileSync(path, 'utf8'), 'tsv', null));
   const key = (c) => c.segments.map((s) => `${s.lect}:${s.grapheme}`).join('|');
   const unconditioned = new Map(model.classes.unconditioned.map((c) => [key(c), c.id]));
@@ -176,7 +176,7 @@ check('a conditioned class maps to fewer links than its unconditioned twin', () 
 check('every class id on a link exists in the model', () => {
   cancelAfter = 0;
   const model = JSON.parse(call(train,
-    readFileSync(join(repo, 'testdata/parity/conditioned_multilect.tsv'), 'utf8'), 'tsv', null));
+    readFileSync(join(repo, 'testdata/corpora/conditioned_multilect.tsv'), 'utf8'), 'tsv', null));
   const known = new Set([
     ...model.classes.unconditioned.map((c) => c.id),
     ...model.classes.conditioned.map((c) => c.id),
@@ -191,7 +191,7 @@ check('every class id on a link exists in the model', () => {
 });
 
 check('repeated calls are deterministic', () => {
-  const path = join(repo, 'testdata/parity/conditioned_multilect.tsv');
+  const path = join(repo, 'testdata/corpora/conditioned_multilect.tsv');
   const text = readFileSync(path, 'utf8');
   cancelAfter = 0;
   assert.equal(call(train, text, 'tsv', null), call(train, text, 'tsv', null));
@@ -200,7 +200,7 @@ check('repeated calls are deterministic', () => {
 check('progress is reported and monotonic', () => {
   cancelAfter = 0;
   progressCalls = [];
-  call(train, readFileSync(join(repo, 'testdata/parity/three_lect_basic.tsv'), 'utf8'), 'tsv', null);
+  call(train, readFileSync(join(repo, 'testdata/corpora/three_lect_basic.tsv'), 'utf8'), 'tsv', null);
   assert.ok(progressCalls.length > 0);
   const { total } = progressCalls[0];
   let previous = 0;
@@ -217,7 +217,7 @@ check('cancellation stops the run', () => {
   cancelAfter = 3;
   progressCalls = [];
   const parsed = JSON.parse(
-    call(train, readFileSync(join(repo, 'testdata/parity/real_ppn_hawaiian.tsv'), 'utf8'), 'tsv', null));
+    call(train, readFileSync(join(repo, 'testdata/corpora/real_ppn_hawaiian.tsv'), 'utf8'), 'tsv', null));
   assert.equal(parsed.ok, false);
   assert.equal(parsed.status, 'cancelled');
   assert.ok(progressCalls.length < 8, 'stopped early rather than running to completion');
@@ -243,7 +243,7 @@ check('errors come back as payloads, not exceptions', () => {
 check('options are honoured', () => {
   // gaps_and_length is the corpus that actually promotes chunks; on one where
   // chunking never fires, max_chunk_size correctly changes nothing.
-  const text = readFileSync(join(repo, 'testdata/parity/gaps_and_length.tsv'), 'utf8');
+  const text = readFileSync(join(repo, 'testdata/corpora/gaps_and_length.tsv'), 'utf8');
   const defaults = call(train, text, 'tsv', null);
   const narrowed = call(train, text, 'tsv', '{"max_chunk_size":1}');
   assert.notEqual(defaults, narrowed, 'max_chunk_size should change the model');

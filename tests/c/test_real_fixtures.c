@@ -51,31 +51,16 @@ static void fixture_pair_clear(fixture_pair *pair) {
     memset(pair, 0, sizeof(*pair));
 }
 
-static int is_vowel_char(char c) {
-    return c == 'a' || c == 'e' || c == 'i' || c == 'o' || c == 'u';
-}
 
-static void parse_form(const char *raw, int attach_tone, rg_segment **segments_out, size_t *count_out, int **breaks_out, size_t *break_count_out) {
+static void parse_form(const char *raw, rg_segment **segments_out, size_t *count_out, int **breaks_out, size_t *break_count_out) {
     rg_segment *segments = 0;
     size_t count = 0;
     size_t cap = 0;
     int *breaks = 0;
     size_t break_count = 0;
     size_t break_cap = 0;
-    char tone[32];
-    size_t tone_len = 0;
-    size_t raw_len = strlen(raw);
-    size_t end = raw_len;
+    size_t end = strlen(raw);
     size_t i;
-    while (end > 0 && isdigit((unsigned char)raw[end - 1])) {
-        end--;
-    }
-    if (attach_tone && end < raw_len) {
-        tone_len = raw_len - end;
-        assert(tone_len < sizeof(tone));
-        memcpy(tone, raw + end, tone_len);
-        tone[tone_len] = '\0';
-    }
     for (i = 0; i < end; i++) {
         if (raw[i] == '+') {
             if (break_count == break_cap) {
@@ -106,16 +91,6 @@ static void parse_form(const char *raw, int attach_tone, rg_segment **segments_o
             segments[count].grapheme = dup_string(grapheme);
         }
         count++;
-    }
-    if (attach_tone && tone_len > 0 && count > 0) {
-        size_t attach = count - 1;
-        for (i = count; i > 0; i--) {
-            if (is_vowel_char(segments[i - 1].grapheme[0])) {
-                attach = i - 1;
-                break;
-            }
-        }
-        segments[attach].tone = dup_string(tone);
     }
     *segments_out = segments;
     *count_out = count;
@@ -157,7 +132,7 @@ static fixture_pair *append_pair(fixture_pair **items, size_t *count, size_t *ca
     return &(*items)[(*count)++];
 }
 
-static void load_three_column_fixture(const char *path, int attach_tone, fixture_pair **items_out, size_t *count_out) {
+static void load_three_column_fixture(const char *path, fixture_pair **items_out, size_t *count_out) {
     char line[4096];
     FILE *fh = fopen(path, "r");
     fixture_pair *items = 0;
@@ -180,8 +155,8 @@ static void load_three_column_fixture(const char *path, int attach_tone, fixture
             continue;
         }
         pair = append_pair(&items, &count, &cap);
-        parse_form(cols[1], attach_tone, &pair->source_segments, &pair->source_count, &pair->source_breaks, &pair->source_break_count);
-        parse_form(cols[2], attach_tone, &pair->target_segments, &pair->target_count, &pair->target_breaks, &pair->target_break_count);
+        parse_form(cols[1], &pair->source_segments, &pair->source_count, &pair->source_breaks, &pair->source_break_count);
+        parse_form(cols[2], &pair->target_segments, &pair->target_count, &pair->target_breaks, &pair->target_break_count);
         if (col > 3 && cols[3] != 0 && cols[3][0] != '\0') {
             pair->weight = atof(cols[3]);
         }
@@ -209,34 +184,56 @@ static rg_form_pair *make_views(const fixture_pair *items, size_t count, const c
     return views;
 }
 
+/* The fixture is a wide corpus, so it goes in through the wide loader rather
+ * than a parser written for this test: tone reaches the model the same way a
+ * user's corpus would, which is the thing worth checking. */
 static void test_tone_clean_fixture(rg_context *ctx) {
-    fixture_pair *items = 0;
+    rg_corpus *corpus = 0;
     rg_form_pair *views;
     rg_pairwise_model *model = 0;
     rg_train_options options;
-    size_t count = 0;
+    size_t count;
     size_t i;
     int found_voiced = 0;
     int found_voiceless = 0;
-    load_three_column_fixture(REGULAE_SOURCE_DIR "/experiments/tone_chinese_like_clean/cognates.tsv", 1, &items, &count);
+
+    assert(rg_corpus_load_wide_tsv(
+        ctx, REGULAE_SOURCE_DIR "/experiments/tone_chinese_like_clean/cognates.tsv",
+        0, &corpus) == RG_OK);
+    count = rg_corpus_cognate_count(corpus);
     assert(count == 80);
-    views = make_views(items, count, "mandarin-like", "cantonese-like");
+    views = (rg_form_pair *)calloc(count, sizeof(*views));
+    assert(views != 0);
+    for (i = 0; i < count; i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        assert(set->form_count == 2);
+        views[i].source = set->forms[0].form;
+        views[i].target = set->forms[1].form;
+        views[i].weight = 1.0;
+    }
     rg_train_options_init_defaults(&options);
     assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
+    /* The fixture encodes one conditioned split, and both halves of it are
+     * findings: voiced onsets take one tone, voiceless onsets the other. The
+     * complementary environment is published under source_value "-". */
+    assert(rg_pairwise_model_cross_dimensional_row_count(model) == 2);
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        if (strcmp(row->source_feature, "voiced") == 0 &&
-            strcmp(row->source_position, "relative_-1") == 0 &&
-            strcmp(row->target_value, "4") == 0 &&
-            row->count == 40.0 &&
-            row->source_count == 40.0) {
+        assert(strcmp(row->source_feature, "voiced") == 0);
+        assert(strcmp(row->source_position, "relative_-1") == 0);
+        assert(row->count == 40.0 && row->source_count == 40.0);
+        assert(row->confidence == 1.0);
+        /* The environment is what makes the difference: the value never occurs
+         * outside it. */
+        assert(row->contrast_count == 0.0);
+        assert(row->contrast_confidence == 0.0);
+        assert(row->delta_bic < 0.0);
+        if (strcmp(row->source_value, "+") == 0 &&
+            strcmp(row->target_value, "\xe2\x81\xb4\xe2\x81\xb4") == 0) {
             found_voiced = 1;
         }
-        if (strcmp(row->source_feature, "voiceless") == 0 &&
-            strcmp(row->source_position, "relative_-1") == 0 &&
-            strcmp(row->target_value, "1") == 0 &&
-            row->count == 40.0 &&
-            row->source_count == 40.0) {
+        if (strcmp(row->source_value, "-") == 0 &&
+            strcmp(row->target_value, "\xc2\xb9\xc2\xb9") == 0) {
             found_voiceless = 1;
         }
     }
@@ -244,7 +241,7 @@ static void test_tone_clean_fixture(rg_context *ctx) {
     assert(found_voiceless);
     rg_pairwise_model_free(model);
     free(views);
-    fixture_pairs_free(items, count);
+    rg_corpus_free(corpus);
 }
 
 static void test_contaminated_weights_fixture(rg_context *ctx) {
@@ -255,7 +252,7 @@ static void test_contaminated_weights_fixture(rg_context *ctx) {
     size_t count = 0;
     size_t i;
     int found_pf = 0;
-    load_three_column_fixture(REGULAE_SOURCE_DIR "/experiments/contaminated_cognates_synthetic/cognates.tsv", 0, &items, &count);
+    load_three_column_fixture(REGULAE_SOURCE_DIR "/experiments/contaminated_cognates_synthetic/cognates.tsv", &items, &count);
     assert(count == 25);
     views = make_views(items, count, "proto", "derived");
     rg_train_options_init_defaults(&options);

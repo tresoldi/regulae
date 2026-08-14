@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 static rg_segment seg(const char *g) {
@@ -60,6 +61,78 @@ static void assert_uncertainty_contains(const rg_uncertainty_estimate *uncertain
     assert(uncertainty->upper + 1e-12 >= uncertainty->estimate);
     assert(uncertainty->lower >= 0.0);
     assert(uncertainty->upper <= 1.0);
+}
+
+/* A conditioning environment has to condition something. These are the two
+ * ways a rule can be committed on evidence that supports nothing, and both
+ * were committed before 2026-08-14: a predicate true of the whole corpus,
+ * which partitions nothing, and a predicate that partitions the corpus without
+ * moving the target distribution. Neither is a sound change. */
+static void test_uninformative_environments_commit_nothing(rg_context *ctx) {
+    rg_segment consonant;
+    rg_segment vowel_high;
+    rg_segment vowel_low;
+    rg_segment target_high;
+    rg_segment target_low;
+    rg_segment source[2];
+    rg_segment high_target[2];
+    rg_segment low_target[2];
+    rg_form_pair pairs[40];
+    rg_train_options options;
+    rg_pairwise_model *model = 0;
+    size_t i;
+
+    memset(&consonant, 0, sizeof(consonant));
+    memset(&vowel_high, 0, sizeof(vowel_high));
+    memset(&vowel_low, 0, sizeof(vowel_low));
+    memset(&target_high, 0, sizeof(target_high));
+    memset(&target_low, 0, sizeof(target_low));
+    consonant.grapheme = "p";
+    vowel_high.grapheme = "i";
+    vowel_low.grapheme = "a";
+    target_high.grapheme = "i";
+    target_high.tone = "H";
+    target_low.grapheme = "a";
+    target_low.tone = "H";
+    rg_train_options_init_defaults(&options);
+
+    /* Every source segment sequence is p + vowel, and every target tone is H.
+     * "the preceding segment is a consonant" holds everywhere, so it has no
+     * complement and cannot be an environment. */
+    source[0] = consonant;
+    source[1] = vowel_high;
+    high_target[0] = consonant;
+    high_target[1] = target_high;
+    for (i = 0; i < 20; i++) {
+        pairs[i].source = form("A", source, 2);
+        pairs[i].target = form("B", high_target, 2);
+        pairs[i].weight = 1.0;
+    }
+    assert(rg_train_pairwise(ctx, pairs, 20, &options, &model) == RG_OK);
+    assert(rg_pairwise_model_cross_dimensional_row_count(model) == 0);
+    rg_pairwise_model_free(model);
+    model = 0;
+
+    /* Now a predicate that does partition the corpus -- the vowel is close in
+     * half the pairs -- but the target tone is H either way, so the split
+     * explains nothing and buys no rule. */
+    low_target[0] = consonant;
+    low_target[1] = target_low;
+    for (i = 0; i < 40; i++) {
+        rg_segment *src = (rg_segment *)malloc(2 * sizeof(*src));
+        assert(src != 0);
+        src[0] = consonant;
+        src[1] = (i % 2 == 0) ? vowel_high : vowel_low;
+        pairs[i].source = form("A", src, 2);
+        pairs[i].target = form("B", (i % 2 == 0) ? high_target : low_target, 2);
+        pairs[i].weight = 1.0;
+    }
+    assert(rg_train_pairwise(ctx, pairs, 40, &options, &model) == RG_OK);
+    assert(rg_pairwise_model_cross_dimensional_row_count(model) == 0);
+    rg_pairwise_model_free(model);
+    for (i = 0; i < 40; i++) {
+        free((void *)pairs[i].source.segments);
+    }
 }
 
 int main(void) {
@@ -409,6 +482,7 @@ int main(void) {
     assert(fabs(learned_pf - prior_pf) < 1e-12);
     assert(rg_align_forms_with_model(ctx, 0, &options, &pairs[0].source, &pairs[0].target, 0, &learned_alignment) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_train_pairwise(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    test_uninformative_environments_commit_nothing(ctx);
     rg_context_free(ctx);
     return 0;
 }

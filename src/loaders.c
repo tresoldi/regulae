@@ -467,9 +467,12 @@ fail:
 }
 
 /* Attaches a tone cell's whitespace-separated values to already-parsed
- * segments, by position. "-" and empty tokens leave a segment untoned, so a
- * tone-bearing corpus can mark its consonants without inventing a tone for
- * them. Rejects a cell whose token count disagrees with the segment count:
+ * segments, by position. A value replaces whatever the word itself carried, so
+ * an explicit column wins over tone written into the transcription. "-" and
+ * empty tokens leave the segment as segmentation found it, so a tone-bearing
+ * corpus can mark its consonants without inventing a tone for them, and a
+ * corpus that annotates only some segments does not erase the rest.
+ * Rejects a cell whose token count disagrees with the segment count:
  * silently truncating would tone the wrong vowels, and a corpus that annotates
  * tone at all is annotating it deliberately. */
 static rg_status attach_tones(const char *raw, rg_segment *segments, size_t segment_count) {
@@ -823,6 +826,7 @@ static rg_status load_wide_tsv(
     long confidence_col = -1;
     long *lect_cols = 0;
     long *break_cols = 0;
+    long *tone_cols = 0;
     size_t lect_count = 0;
     size_t c;
     size_t r;
@@ -855,9 +859,11 @@ static rg_status load_wide_tsv(
 
     lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
     break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
-    if (lect_cols == 0 || break_cols == 0) {
+    tone_cols = (long *)calloc(table.column_count, sizeof(*tone_cols));
+    if (lect_cols == 0 || break_cols == 0 || tone_cols == 0) {
         free(lect_cols);
         free(break_cols);
+        free(tone_cols);
         loader_table_clear(&table);
         return RG_ERR_OOM;
     }
@@ -867,6 +873,7 @@ static rg_status load_wide_tsv(
             if (index < 0) {
                 free(lect_cols);
                 free(break_cols);
+                free(tone_cols);
                 loader_table_clear(&table);
                 return RG_ERR_PARSE;
             }
@@ -874,9 +881,7 @@ static rg_status load_wide_tsv(
         }
     } else {
         /* Every column is a lect except the id, the confidence, and the
-         * companion "_breaks" and "_tone" columns. Tone columns are recognised
-         * so they are not mistaken for lects; carrying tone through the loader
-         * is a separate decision and is not done here. */
+         * companion "_breaks" and "_tone" columns. */
         for (c = 0; c < table.column_count; c++) {
             if ((long)c == id_col || (long)c == confidence_col) {
                 continue;
@@ -890,6 +895,7 @@ static rg_status load_wide_tsv(
     if (lect_count == 0) {
         free(lect_cols);
         free(break_cols);
+        free(tone_cols);
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -897,12 +903,15 @@ static rg_status load_wide_tsv(
         char companion[256];
         snprintf(companion, sizeof(companion), "%s_breaks", table.header[lect_cols[c]]);
         break_cols[c] = column_index(&table, companion);
+        snprintf(companion, sizeof(companion), "%s_tone", table.header[lect_cols[c]]);
+        tone_cols[c] = column_index(&table, companion);
     }
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
     if (corpus == 0) {
         free(lect_cols);
         free(break_cols);
+        free(tone_cols);
         loader_table_clear(&table);
         return RG_ERR_OOM;
     }
@@ -960,6 +969,13 @@ static rg_status load_wide_tsv(
                     break;
                 }
             }
+            if (tone_cols[c] >= 0) {
+                status = attach_tones(cell(row, tone_cols[c]), form.segments, form.segment_count);
+                if (status != RG_OK) {
+                    loader_form_clear(&form);
+                    break;
+                }
+            }
             form.lect_id = rg_strdup_internal(lect_id);
             if (form.lect_id == 0) {
                 loader_form_clear(&form);
@@ -997,6 +1013,7 @@ static rg_status load_wide_tsv(
 
     free(lect_cols);
     free(break_cols);
+    free(tone_cols);
     loader_table_clear(&table);
     if (status == RG_OK) {
         /* A wide row with a single filled cell has nothing to align against. */

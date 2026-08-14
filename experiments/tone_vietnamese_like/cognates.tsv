@@ -1,75 +1,75 @@
-gloss	hanoi	saigon
-one	mot6	mot5
-two	hai1	hai1
-three	ba1	ba1
-four	bon5	bon4
-five	nam1	nam1
-six	sau5	sau4
-seven	bay3	bay2
-eight	tam2	tam1
-nine	tin5	tin4
-ten	muoi3	muoi2
-hundred	tram1	tram1
-mother	me4	me4
-father	cha1	cha1
-child	con1	con1
-person	nguoi3	nguoi2
-man	dan1	dan1
-woman	ba2	ba1
-water	nuoc5	nuoc4
-fire	lua3	lua2
-stone	da2	da1
-house	nha1	nha1
-tree	cay1	cay1
-leaf	la2	la1
-fruit	qua3	qua2
-rice	com1	com1
-book	sach5	sach4
-pen	but5	but4
-school	truong3	truong2
-road	duong1	duong1
-day	ngay3	ngay2
-night	dem1	dem1
-morning	sang5	sang4
-sun	mat5	mat4
-moon	trang1	trang1
-star	sao1	sao1
-sky	troi3	troi2
-sea	bien3	bien2
-mountain	nui5	nui4
-river	song1	song1
-dog	cho5	cho4
-cat	meo1	meo1
-bird	chim1	chim1
-fish	ca5	ca4
-cow	bo1	bo1
-pig	lon5	lon4
-head	dau2	dau1
-eye	mat5	mat4
-ear	tai1	tai1
-nose	mui3	mui2
-mouth	mieng4	mieng4
-tongue	luoi3	luoi2
-tooth	rang1	rang1
-hand	tay1	tay1
-foot	chan1	chan1
-red	do2	do1
-white	trang5	trang4
-black	den1	den1
-blue	xanh1	xanh1
-big	to1	to1
-small	nho2	nho1
-new	moi5	moi4
-old	cu2	cu1
-good	tot5	tot4
-bad	xau5	xau4
-hot	nong1	nong1
-cold	lanh4	lanh4
-go	di1	di1
-come	den5	den4
-eat	an1	an1
-drink	uong5	uong4
-sleep	ngu3	ngu2
-see	thay5	thay4
-hear	nghe1	nghe1
-speak	noi5	noi4
+gloss	hanoi	hanoi_tone	saigon	saigon_tone
+one	mot	- 6 -	mot	- 5 -
+two	hai	- - 1	hai	- - 1
+three	ba	- 1	ba	- 1
+four	bon	- 5 -	bon	- 4 -
+five	nam	- 1 -	nam	- 1 -
+six	sau	- - 5	sau	- - 4
+seven	bay	- 3 -	bay	- 2 -
+eight	tam	- 2 -	tam	- 1 -
+nine	tin	- 5 -	tin	- 4 -
+ten	muoi	- - - 3	muoi	- - - 2
+hundred	tram	- - 1 -	tram	- - 1 -
+mother	me	- 4	me	- 4
+father	cha	- - 1	cha	- - 1
+child	con	- 1 -	con	- 1 -
+person	nguoi	- - - - 3	nguoi	- - - - 2
+man	dan	- 1 -	dan	- 1 -
+woman	ba	- 2	ba	- 1
+water	nuoc	- - 5 -	nuoc	- - 4 -
+fire	lua	- - 3	lua	- - 2
+stone	da	- 2	da	- 1
+house	nha	- - 1	nha	- - 1
+tree	cay	- 1 -	cay	- 1 -
+leaf	la	- 2	la	- 1
+fruit	qua	- - 3	qua	- - 2
+rice	com	- 1 -	com	- 1 -
+book	sach	- 5 - -	sach	- 4 - -
+pen	but	- 5 -	but	- 4 -
+school	truong	- - - 3 - -	truong	- - - 2 - -
+road	duong	- - 1 - -	duong	- - 1 - -
+day	ngay	- - 3 -	ngay	- - 2 -
+night	dem	- 1 -	dem	- 1 -
+morning	sang	- 5 - -	sang	- 4 - -
+sun	mat	- 5 -	mat	- 4 -
+moon	trang	- - 1 - -	trang	- - 1 - -
+star	sao	- - 1	sao	- - 1
+sky	troi	- - - 3	troi	- - - 2
+sea	bien	- - 3 -	bien	- - 2 -
+mountain	nui	- - 5	nui	- - 4
+river	song	- 1 - -	song	- 1 - -
+dog	cho	- - 5	cho	- - 4
+cat	meo	- - 1	meo	- - 1
+bird	chim	- - 1 -	chim	- - 1 -
+fish	ca	- 5	ca	- 4
+cow	bo	- 1	bo	- 1
+pig	lon	- 5 -	lon	- 4 -
+head	dau	- - 2	dau	- - 1
+eye	mat	- 5 -	mat	- 4 -
+ear	tai	- - 1	tai	- - 1
+nose	mui	- - 3	mui	- - 2
+mouth	mieng	- - 4 - -	mieng	- - 4 - -
+tongue	luoi	- - - 3	luoi	- - - 2
+tooth	rang	- 1 - -	rang	- 1 - -
+hand	tay	- 1 -	tay	- 1 -
+foot	chan	- - 1 -	chan	- - 1 -
+red	do	- 2	do	- 1
+white	trang	- - 5 - -	trang	- - 4 - -
+black	den	- 1 -	den	- 1 -
+blue	xanh	- 1 - -	xanh	- 1 - -
+big	to	- 1	to	- 1
+small	nho	- - 2	nho	- - 1
+new	moi	- - 5	moi	- - 4
+old	cu	- 2	cu	- 1
+good	tot	- 5 -	tot	- 4 -
+bad	xau	- - 5	xau	- - 4
+hot	nong	- 1 - -	nong	- 1 - -
+cold	lanh	- 4 - -	lanh	- 4 - -
+go	di	- 1	di	- 1
+come	den	- 5 -	den	- 4 -
+eat	an	1 -	an	1 -
+drink	uong	- 5 - -	uong	- 4 - -
+sleep	ngu	- - 3	ngu	- - 2
+see	thay	- - 5 -	thay	- - 4 -
+hear	nghe	- - - 1	nghe	- - - 1
+speak	noi	- - 5	noi	- - 4

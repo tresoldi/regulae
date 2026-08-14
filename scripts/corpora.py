@@ -37,7 +37,7 @@ LADDER = [
     ("experiments/contaminated_cognates_synthetic/cognates.tsv",
      "Contaminated cognates",
      "Confidence weighting and outlier ranking on deliberately noisy data."),
-    ("testdata/parity/real_romance_4lect.tsv",
+    ("testdata/corpora/real_romance_4lect.tsv",
      "Romance, four lects",
      "Latin, Spanish, French and Italian reconciled into classes binding all four."),
 ]
@@ -76,7 +76,11 @@ def probe(cli, path):
     if result.returncode == 0:
         first = result.stdout.splitlines()[0] if result.stdout else ""
         return {"readable": True, "lects": first.split("\t")[1].split(" ") if "\t" in first else []}
-    match = re.search(r'unknown grapheme "([^"]*)"', result.stderr)
+    # Both refusals the CLI can report name the offending token: a sound the
+    # feature system does not cover, and CLDF/CLTS markup that never
+    # transcribed one.
+    match = (re.search(r'unknown grapheme "([^"]*)"', result.stderr) or
+             re.search(r'"([^"]*)" is CLDF/CLTS markup', result.stderr))
     return {"readable": False, "blockedBy": match.group(1) if match else None}
 
 

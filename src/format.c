@@ -469,7 +469,8 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                         row->source_feature, row->source_value, row->source_position,
                         row->target_dimension, row->target_value, row->target_position_offset);
         append_count(&builder, row->count);
-        builder_appendf(&builder, " conf=%.2f\n", row->confidence);
+        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere\n",
+                        row->confidence, row->contrast_confidence);
     }
     return builder_finish(&builder);
 }

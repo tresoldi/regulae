@@ -67,7 +67,7 @@ const run = (data) => {
 };
 
 check('a train request yields progress then a result', () => {
-  const corpus = readFileSync(join(repo, 'testdata/parity/three_lect_basic.tsv'), 'utf8');
+  const corpus = readFileSync(join(repo, 'testdata/corpora/three_lect_basic.tsv'), 'utf8');
   const out = run({ type: 'train', corpus, format: 'tsv' });
   const progress = out.filter((m) => m.type === 'progress');
   const result = out.find((m) => m.type === 'result');
@@ -90,7 +90,7 @@ check('a bad corpus comes back as a result, not a fatal', () => {
 });
 
 check('the deadline cancels a run', () => {
-  const corpus = readFileSync(join(repo, 'testdata/parity/real_ppn_hawaiian.tsv'), 'utf8');
+  const corpus = readFileSync(join(repo, 'testdata/corpora/real_ppn_hawaiian.tsv'), 'utf8');
   const out = run({ type: 'train', corpus, format: 'tsv', timeoutMs: 1 });
   const model = JSON.parse(out.find((m) => m.type === 'result').json);
   assert.equal(model.ok, false);
@@ -98,7 +98,7 @@ check('the deadline cancels a run', () => {
 });
 
 check('the deadline does not leak into the next run', () => {
-  const corpus = readFileSync(join(repo, 'testdata/parity/three_lect_basic.tsv'), 'utf8');
+  const corpus = readFileSync(join(repo, 'testdata/corpora/three_lect_basic.tsv'), 'utf8');
   const model = JSON.parse(run({ type: 'train', corpus, format: 'tsv' })
     .find((m) => m.type === 'result').json);
   assert.equal(model.ok, true);

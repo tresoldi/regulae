@@ -36,7 +36,7 @@ static int record(const char *stage, size_t completed, size_t total, void *user_
 static rg_corpus *load(const char *name) {
     rg_corpus *corpus = 0;
     char path[1024];
-    snprintf(path, sizeof(path), "%s/testdata/parity/%s", REGULAE_SOURCE_DIR, name);
+    snprintf(path, sizeof(path), "%s/testdata/corpora/%s", REGULAE_SOURCE_DIR, name);
     assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
     return corpus;
 }

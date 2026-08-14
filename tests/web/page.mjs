@@ -159,7 +159,7 @@ check('the guide renders and its steps are wired', () => {
 
 // The heart of it: render a real model and check the linkage.
 const model = JSON.parse(execFileSync(
-  cli, ['train', '--json', join(repo, 'testdata/parity/real_latin_spanish.tsv')],
+  cli, ['train', '--json', join(repo, 'testdata/corpora/real_latin_spanish.tsv')],
   { encoding: 'utf8', maxBuffer: 1 << 28 }));
 
 const worker = FakeWorker.instances[0];

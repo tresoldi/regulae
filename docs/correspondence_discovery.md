@@ -169,62 +169,102 @@ A `CrossDimensionalLink` encodes a rule of the form
 value V at target position q." The canonical instance is tonogenesis:
 voicing on a consonant predicts tone on the following vowel.
 
-### Discovery via anomaly detection
+### What has to be true before a rule is committed
 
-The anomaly detection engine (`regulae.anomaly`) computes residual
-mutual information between every candidate `(source_feature,
-source_offset, target_value, target_offset)` pair across the 1-to-1
-links in the training alignments. "Residual" means conditional on
-what the model already explains — so a feature pair that is already
-captured by the segment or tonal table will not surface as an anomaly.
+A cross-dimensional rule is a claim about a conditioned split, so it is tested
+the way a conditioned split has to be tested. Three things must hold, and each
+of them rejects a class of statement that looks like a rule and is not.
 
-Each candidate is tested against a permutation null (shuffle target
-assignments, recompute MI, repeat 100×). Candidates whose observed
-MI ranks above the 95th percentile of the null distribution become
-`PatternHypothesis` objects passed to the BIC commit loop.
+**The environment must have a complement.** "The preceding segment is a
+consonant" is not an environment on a corpus of CV syllables; it is a
+description of the corpus. A predicate true of every observation partitions
+nothing, and a rule conditioned on it says only what the ambient distribution
+already said. Both sides must reach `_CROSS_DIM_MIN_RULE_COUNT`.
 
-### BIC commit loop
+Positions that do not exist are excluded from both sides rather than counted as
+the complement. Word-initial position is not a voiceless onset, and a rule
+stated over the union of "after a voiceless segment" and "at the left edge"
+cannot be read as either. This is why the Middle Chinese voicing rule in
+`experiments/mandarin_historical/` is visible at all: with edges folded into the
+complement it is diluted below its own threshold.
 
-The commit loop evaluates each hypothesis by:
+**The environment must move the distribution.** The target dimension is modelled
+once over all observations, and again separately inside and outside the
+environment; the second model is accepted only when its likelihood gain beats
+what its extra parameters cost under BIC. This is the criterion, and the code
+shape, that context discovery already uses for segmental splits — the same
+question is being asked, so it gets the same test.
 
-1. Building a trial `CrossDimensionalLink` from the hypothesis.
-2. Re-scoring the entire training corpus under a trial model that
-   includes the candidate rule.
-3. Computing `ΔBIC = −2 · (trial_cost − baseline_cost) + k · ln(N)`.
-4. Accepting the best candidate whose `ΔBIC` beats the threshold.
-5. Repeating on the updated model.
+**The value must be the thing that moved.** An environment passing its own test
+says the distribution changed, not which value changed, and on a dimension with
+several values most of them did not. Each candidate value is therefore tested on
+its own 2×2 table — value against not-value, inside against outside — with its
+own BIC penalty, and a value is reported only if it is *raised* inside the
+environment relative to the contrast. Requiring a rise is what stops a
+two-valued dimension from publishing both of its values for the same
+environment, which is a frequency table pretending to be a pair of rules.
 
-This is sequential-greedy with re-ranking: the expensive permutation
-null recomputation happens at most once per iteration. In practice
-the loop terminates after 1–2 iterations on typical corpora.
+### Both halves of a split are findings
+
+A conditioned split is a two-sided statement. "Voiced onsets give tone 4" is
+half of a tonogenesis; "voiceless onsets give tone 1" is the other half, and a
+report carrying only the first describes a conditioned merger as though it were
+a one-way change. The complementary environment is published as a rule in its
+own right, under `source_value = "-"`.
+
+### Greedy commit against the residue
+
+Environments are committed one at a time, best ΔBIC first, and each committed
+rule retires the observations it accounts for. What a rule mispredicts stays
+live, so a later rule can still explain the residue — which is the whole point
+of running this stage after the segmental and tonal baselines.
+
+Without the retirement step every correlated framing of one fact commits
+separately. On a corpus of CV syllables, `consonant`, `sonorant`, `nasal` and
+`voiced` at the same offset are four descriptions of the same onset, and a
+reader given all four has no way to tell they are one finding. Retiring the
+evidence is what makes the second-best framing fail its own test, which is more
+honest than filtering it afterwards by name.
+
+`_CROSS_DIM_MAX_ITERATIONS` bounds the loop. Typical corpora exit after one or
+two rounds, when nothing left unexplained passes.
 
 ### Support floors
 
-BIC alone admits `count=1/N`-style noise rules on corpora with many
-rare tonal outcomes. Explicit floors reject these:
+- `_CROSS_DIM_MIN_RULE_COUNT = 3` — minimum absolute support, on each side of
+  the contrast and on the rule itself. BIC alone admits `count=1/N` noise on
+  corpora with many rare outcomes.
+- `_CROSS_DIM_MIN_RULE_CONFIDENCE = 0.0` — off by default, and deliberately.
+  A fixed conditional probability is not a measure of conditioning: with two
+  possible values 0.5 is chance, with ten it is overwhelming evidence, and a
+  floor that rejects a value occurring at 0.4 against a base rate of 0.05
+  discards exactly the conditioned splits this stage exists to find. It remains
+  available for suppressing weak rules in a report.
 
-- `_CROSS_DIM_MIN_RULE_COUNT = 3` — minimum absolute support.
-- `_CROSS_DIM_MIN_RULE_CONFIDENCE = 0.5` — minimum conditional
-  probability of the target value given the source predicate.
+### What the original design had and this does not
 
-### Dual-framing dedup
+The Python implementation ranked candidates by residual mutual information
+against a permutation null (shuffle the target assignments, recompute, 100×)
+before the BIC loop saw them, supported joint predictors (`src_feature_2`), and
+ran a post-commit pass to collapse dual positional framings of one rule. None
+of that is ported.
 
-The greedy commit naturally emits rules in multiple positional
-framings of the same underlying pattern (e.g.,
-`voiced@−1 → tone=4@+0` and `voiced@0 → tone=4@+1`). A post-commit
-dedup step collapses these to the canonical framing (smallest
-`src_offset`). Two rules are duals iff they share the source feature,
-target dimension, target value, and the delta between target and
-source offsets.
+The permutation null and the BIC gate answer the same question by different
+means, and the loop above keeps the cheaper one. Dual-framing dedup is
+unnecessary here: the second framing of a committed rule has no unexplained
+evidence left to justify it. Joint predictors are a real gap, tracked in
+`c_conversion_roadmap.md` — `rg_cross_dimensional_row` cannot represent a rule
+conditioned on two predicates, so a change like the full Middle Chinese
+register split, which needs voicing *and* source tone together, is out of reach.
 
-### Joint predictors
+### What a row reports
 
-An optional second predictor (`src_feature_2`, `src_position_2`)
-handles the cross-source-dimension case: voicing AND source tone
-jointly predict a target tone. Joint rules pay `k = 2` in the BIC
-formula (instead of `k = 1`) and must strictly outperform either
-component predictor alone — a non-interaction guard that rejects
-"passenger" predictors where one component does all the work.
+Every row carries the contrast it was measured against: `count`, `source_count`
+and `confidence` describe the environment, `contrast_count`,
+`contrast_source_count` and `contrast_confidence` describe everywhere else, and
+`delta_bic` scores the environment as a whole. Reading `confidence` alone will
+mislead — a rule holding at 0.9 where the contrast also holds at 0.9 is not a
+rule — which is why the human formatter prints both.
 
 ### Scoring overlay
 
@@ -370,6 +410,7 @@ Key calibration points:
 | `_LONG_RANGE_MIN_SPLIT_OBS` | 5 | long-range splits | Prevents chance partitions in large candidate space |
 | `MAX_SPLIT_DEPTH` | 3 | both context loops | Caps runaway multi-level splits |
 | `_CROSS_DIM_MIN_RULE_COUNT` | 3 | cross-dimensional commit | Rejects 1/N noise rules |
-| `_CROSS_DIM_MIN_RULE_CONFIDENCE` | 0.5 | cross-dimensional commit | Rejects low-confidence rules |
+| `_CROSS_DIM_MIN_RULE_CONFIDENCE` | 0.0 | cross-dimensional commit | Off: a fixed fraction does not measure conditioning |
 | `_CROSS_DIM_MAX_ITERATIONS` | 5 | cross-dimensional loop | Safety valve; typical corpora exit after 1–2 |
+| `_CROSS_DIM_DELTA_BIC_THRESHOLD` | −1.0 | cross-dimensional commit | The environment, and each value, must beat its parameters |
 | `MIN_CHUNK_OBSERVATIONS` | 2 | chunk promotion | Rejects singleton chunks BIC can't filter |

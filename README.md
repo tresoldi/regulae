@@ -3,12 +3,12 @@
 Pairwise and multi-lect phonological alignment for the new
 historical linguistics framework.
 
-The implementation is a C99 core library with a C ABI. A Go
-implementation is kept alongside it as a frozen executable
-reference the C port is diffed against, and is removed once the
-Python wrapper, WebAssembly path and migration tests are in
-place; the original Python is archived under `python/`. See
-`docs/c_conversion_roadmap.md` for the conversion state.
+The implementation is a C99 core library with a C ABI. It was
+ported from a Go implementation, which served as a frozen
+executable reference until merkmal 1.0 changed the feature
+system out from under it; the original Python is archived under
+`python/`. See `docs/c_conversion_roadmap.md` for the conversion
+state.
 
 ## What this package does
 
@@ -89,10 +89,7 @@ ctest --test-dir build/c --output-on-failure
 ```
 
 Sanitizer builds use `-DREGULAE_ENABLE_SANITIZER=address` (or
-`undefined`). `scripts/parity.sh` diffs the C build against the
-frozen Go reference over the corpora in `testdata/parity/`; it
-needs the Go reference, which needs `../merkmal/go` restored as
-described in `docs/c_conversion_handoff.md`.
+`undefined`).
 
 ## Command line
 
@@ -124,35 +121,35 @@ woman   femina  ember     -              3
 Words are segmented through merkmal, so multi-codepoint
 graphemes survive: `pʰ`, `t͡ʃ`, `kʷ` and a base plus combining
 diacritic each stay one segment, where splitting on characters
-would break them. A `<lect>_breaks` column supplies morpheme
-boundary indices. Columns ending in `_tone` are recognised so
-they are not mistaken for lects, but tone is not yet carried
-through the loaders; a tone digit inside a lect column is
-reported as an unknown grapheme.
+would break them. The tie bar is what marks an affricate as one
+segment: untied `tʃ` is read as two, which is what the
+transcription says. A `<lect>_breaks` column supplies morpheme
+boundary indices.
+
+Tone written on the word is carried through as the segment's own
+dimension rather than as part of the grapheme: `ma³³` gives `m`
+and `a` bearing `³³`, and a tone spelled as a separate token —
+how CLDF wordlists publish it — attaches to the segment before
+it. This reads Chao's superscript digits, which is what the
+field writes; an ASCII `1` is not tone notation and is still
+reported as an unknown grapheme. A `<lect>_tone` column can
+annotate tone per segment instead, and overrides what the word
+carries.
 
 ## Run experiments
 
-Each experiment is a standalone `package main` under
-`experiments/` that trains a model on a specific corpus and
-prints a human-readable report. These still run against the Go
-reference; the same corpora are exercised through the C build
-by `scripts/parity.sh` and `testdata/parity/real_*.tsv`.
+Each experiment under `experiments/` is a curated corpus and a
+`findings.md` interpreting what training it produced. Run one
+through the CLI:
 
 ```sh
-cd experiments/latin_spanish && go run .
-cd experiments/oe_english   && go run .
-cd experiments/ppn_hawaiian && go run .
-# tonal / cross-dimensional fixtures:
-cd experiments/tone_chinese_like_clean && go run .
-# long-range context fixtures:
-cd experiments/umlaut_synthetic  && go run .
-cd experiments/harmony_synthetic && go run .
+regulae train --human --format wide experiments/latin_spanish/cognates.tsv
+regulae train --human --format wide experiments/oe_english/cognates.tsv
+regulae train --human --format wide experiments/ppn_hawaiian/cognates.tsv
 ```
 
-Each experiment directory carries a `findings.md` with the
-interpretation of its output. The `gled_*` and
-`arcaverborum_polynesian` experiments read external corpora
-and expect a data-file path (`go run . /path/to/data`).
+The `gled_*` and `arcaverborum_polynesian` experiments read
+external corpora and need the data file supplied.
 
 ## Quick API tour
 
@@ -211,7 +208,7 @@ moves on any layout, signature or ownership change.
   can currently express. A corpus it cannot read says something about the input
   path, not the engine.
 - **Conversion state** at `docs/c_conversion_roadmap.md`
-  (milestones, parity results, intentional deviations) and
+  (milestones, intentional deviations, why parity ended) and
   `docs/c_conversion_handoff.md`.
 - **Design documents** at `docs/training_pipeline.md`,
   `docs/correspondence_discovery.md`, and

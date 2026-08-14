@@ -317,9 +317,24 @@ class CrossDimensionalLink:
     tgt_value:           str                  # e.g. "4" for tone 4
     tgt_position_offset: int                  # signed offset from link
     count:               float                # observed matches
-    src_count:           float                # observations where src feature held
+    src_count:           float                # observations in the environment
     confidence:          float                # count / src_count
+    contrast_count:      float                # matches outside the environment
+    contrast_src_count:  float                # observations outside it
+    contrast_confidence: float                # contrast_count / contrast_src_count
+    delta_bic:           float                # score for the environment
 ```
+
+`src_feature.value` is `"+"` or `"-"`. A conditioned split is a two-sided
+statement, and both halves are published: `"-"` names the complementary
+environment, and a consumer that filters to `"+"` will read a merger as a
+one-way change.
+
+**Do not read `confidence` on its own.** It is P(value | environment), and a
+rule holding at 0.9 where the contrast also holds at 0.9 is the ambient
+distribution rather than a conditioning effect. The contrast fields are what
+make the row a claim; `delta_bic` scores the environment as a whole and is
+negative for every published row.
 
 Lives on `LearnedModel.cross_dimensional_table.entries`, not on
 multi-lect classes — the cross-dimensional discovery loop
@@ -461,7 +476,10 @@ Things that belong inside regulae (and not historical inference):
 - **Feature-system changes.** The `feature_system` string on
   `LearnedModel` is fixed by the regulae training run. Historical
   inference doesn't re-project segments into a different feature
-  system; if you need one, retrain regulae.
+  system; if you need one, retrain regulae. The default is
+  merkmal's `distinctive`; every model records which system it was
+  trained under, and models trained under different systems are not
+  comparable.
 - **Cognacy filtering.** If a cognate set looks suspect after
   historical inference runs, the workflow is: flag it, re-run
   `find_cognate_outliers` on the regulae model, decide by hand

@@ -24,8 +24,13 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 4
+#define RG_ABI_VERSION 6
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
+/* merkmal's own default. It reads the same graphemes and returns the same
+ * feature labels as "descriptive", but scores through its own dimensions, and
+ * on BDPA gold alignments it is the one merkmal cannot distinguish from SCA.
+ * rg_context_use_system takes any system the registry holds. */
+#define RG_DEFAULT_FEATURE_SYSTEM "distinctive"
 
 typedef struct rg_context rg_context;
 typedef struct rg_feature_set rg_feature_set;
@@ -43,7 +48,12 @@ typedef enum rg_status {
     RG_ERR_UNKNOWN_GRAPHEME,
     RG_ERR_UNSUPPORTED_OPTION,
     RG_ERR_OOM,
-    RG_ERR_CANCELLED
+    RG_ERR_CANCELLED,
+    /* The token is CLDF/CLTS markup rather than a transcription of a sound:
+     * `<?>`, `<<...>>`, and the boundary marks `+`, `_` and `#`. This is a
+     * documented gap in the source data, not a sound the feature system fails
+     * to cover, and the two call for different responses from the user. */
+    RG_ERR_SOURCE_MARKER
 } rg_status;
 
 /* Reports training progress. stage names the pipeline step just finished;
@@ -67,7 +77,16 @@ typedef struct rg_bic_config {
     double long_range_min_dominant_fraction;
     int cross_dim_max_iterations;
     int cross_dim_min_rule_count;
+    /* A floor on P(target_value | environment). Defaults to 0.0, which is not
+     * an oversight: a fixed fraction is not a measure of conditioning. With
+     * two possible values 0.5 is chance; with ten it is overwhelming evidence,
+     * and a threshold that rejects a value occurring at 0.4 against a base
+     * rate of 0.05 throws away exactly the conditioned splits this stage
+     * exists to find. Whether an environment conditions anything is decided by
+     * cross_dim_delta_bic_threshold against the complementary environment.
+     * Set this only to suppress weak rules in a report. */
     double cross_dim_min_rule_confidence;
+    double cross_dim_delta_bic_threshold;
     int multi_lect_bic_small_sample_correction;
     double multi_lect_min_commit_scale;
 } rg_bic_config;
@@ -250,6 +269,23 @@ typedef struct rg_chunk_row {
     rg_uncertainty_estimate uncertainty;
 } rg_chunk_row;
 
+/* A claim that a source-side feature conditions a target-side dimension: in
+ * the environment (source_feature at source_position), the target dimension
+ * takes target_value.
+ *
+ * A conditioning environment is only conditioning if the complementary
+ * environment behaves differently, so every row carries the contrast it was
+ * measured against. `count`/`source_count`/`confidence` describe the
+ * environment; `contrast_count`/`contrast_source_count`/`contrast_confidence`
+ * describe everywhere else. Reading `confidence` alone will mislead: a rule
+ * holding at 0.9 where the contrast also holds at 0.9 states the ambient
+ * distribution, not a conditioned split. The row is published only when the
+ * environment raises the value above its contrast.
+ *
+ * `delta_bic` is for the environment as a whole, not for this value: the
+ * likelihood gain from modelling the target dimension separately inside and
+ * outside the environment, penalised by the parameters that costs. It is
+ * negative for every published row, and more negative is stronger. */
 typedef struct rg_cross_dimensional_row {
     const char *source_feature;
     const char *source_value;
@@ -260,6 +296,10 @@ typedef struct rg_cross_dimensional_row {
     double count;
     double source_count;
     double confidence;
+    double contrast_count;
+    double contrast_source_count;
+    double contrast_confidence;
+    double delta_bic;
     rg_uncertainty_estimate uncertainty;
 } rg_cross_dimensional_row;
 
@@ -294,6 +334,10 @@ typedef struct rg_multi_cross_dimensional_row {
     double count;
     double source_count;
     double confidence;
+    double contrast_count;
+    double contrast_source_count;
+    double contrast_confidence;
+    double delta_bic;
     rg_uncertainty_estimate uncertainty;
 } rg_multi_cross_dimensional_row;
 
@@ -348,7 +392,23 @@ RG_API rg_status rg_percentile_interval(
  * Borrowed and static. */
 RG_API const char *rg_uncertainty_method_string(rg_uncertainty_method method);
 
+/* How a written word is cut into segments.
+ *
+ * Neither reading is universally right, so the choice belongs to whoever knows
+ * the corpus. Orthographic honours the tie bar, which is how a transcription
+ * says "this is one segment": "t͡ʃ" is one and untied "tʃ" is two. Longest
+ * match instead asks the feature system what it recognises, which reads untied
+ * "tʃ" and "kp" as single segments -- and, on the same rule, "kk", "dr", "ng"
+ * and "st", which are sequences in most corpora regulae is pointed at. Latin
+ * "bukka" comes out as b/u/kk/a under it. */
+typedef enum rg_segmentation {
+    RG_SEGMENT_ORTHOGRAPHIC = 0,
+    RG_SEGMENT_SYSTEM_LONGEST_MATCH
+} rg_segmentation;
+
 RG_API rg_status rg_context_new_builtin(rg_context **out);
+RG_API rg_status rg_context_set_segmentation(rg_context *ctx, rg_segmentation mode);
+RG_API rg_segmentation rg_context_segmentation(const rg_context *ctx);
 RG_API void rg_context_free(rg_context *ctx);
 RG_API rg_status rg_context_use_system(rg_context *ctx, const char *system_name);
 RG_API rg_status rg_context_system_name(const rg_context *ctx, const char **out);
@@ -362,6 +422,39 @@ RG_API void rg_context_last_error(
     const rg_context *ctx,
     const char **grapheme,
     const char **feature_system
+);
+
+/* Why a grapheme was refused. status is what a feature lookup would return:
+ * RG_ERR_UNKNOWN_GRAPHEME for a sound the system does not cover,
+ * RG_ERR_SOURCE_MARKER for CLDF/CLTS markup, RG_ERR_PARSE for a token the
+ * system recognises and rejects, RG_OK for one that resolves.
+ *
+ * valid_prefix_bytes is the longest prefix that does resolve, which localises
+ * the problem and is usually the repair; it is 0 when nothing resolves and the
+ * whole length when nothing is wrong. offending_offset is the byte offset just
+ * past that prefix, and offending holds the character there, empty when there
+ * is none. There is deliberately no nearest-valid-grapheme suggestion: that
+ * would be a guess presented as an answer. */
+typedef struct rg_grapheme_diagnosis {
+    rg_status status;
+    size_t valid_prefix_bytes;
+    size_t offending_offset;
+    char offending[8];
+} rg_grapheme_diagnosis;
+
+/* Diagnoses one grapheme. Returns RG_OK unless the arguments are unusable: a
+ * refused grapheme is the normal case and is reported in out->status. */
+RG_API rg_status rg_context_diagnose(
+    const rg_context *ctx,
+    const char *grapheme,
+    rg_grapheme_diagnosis *out
+);
+
+/* The diagnosis behind the most recent refusal, alongside the grapheme
+ * rg_context_last_error names. Returns 0 when nothing has been refused. */
+RG_API int rg_context_last_diagnosis(
+    const rg_context *ctx,
+    rg_grapheme_diagnosis *out
 );
 
 RG_API rg_status rg_context_segment_distance(

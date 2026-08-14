@@ -2,6 +2,7 @@
 
 #include "merkmal.h"
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,9 @@ typedef struct feature_cache_entry {
      * these into one flag makes an is_segment insert look like a failed
      * feature lookup. */
     int features_state;
+    /* Why the lookup was refused, so a cache hit repeats the reason rather
+     * than flattening every refusal to "unknown grapheme". */
+    rg_status refusal;
     int is_segment_state;
     int is_segment;
 } feature_cache_entry;
@@ -60,6 +64,9 @@ struct rg_context {
      * on its error value; a C status code cannot, and "unknown grapheme" with
      * no indication of which one is unactionable on a corpus of any size. */
     char *unknown_grapheme;
+    rg_segmentation segmentation;
+    rg_grapheme_diagnosis last_diagnosis;
+    int has_diagnosis;
     feature_cache_entry *features;
     size_t feature_count;
     size_t feature_cap;
@@ -162,7 +169,7 @@ static rg_status distance_cache_grow(rg_context *ctx) {
 }
 
 struct rg_feature_set {
-    mk_feature_set *inner;
+    mk_string_list *inner;
 };
 
 static rg_status map_merkmal_status(mk_status status) {
@@ -173,6 +180,14 @@ static rg_status map_merkmal_status(mk_status status) {
         return RG_ERR_INVALID_ARGUMENT;
     case MK_ERR_UNKNOWN_GRAPHEME:
         return RG_ERR_UNKNOWN_GRAPHEME;
+    /* A CLDF/CLTS marker is a documented gap in the source, not a sound the
+     * feature system is missing. Folding it into RG_ERR_UNKNOWN_GRAPHEME told
+     * a user to widen their transcription when the honest answer is that the
+     * dataset never transcribed that token. */
+    case MK_ERR_SOURCE_MARKER:
+        return RG_ERR_SOURCE_MARKER;
+    case MK_ERR_PARSE:
+        return RG_ERR_PARSE;
     case MK_ERR_OOM:
         return RG_ERR_OOM;
     default:
@@ -196,7 +211,7 @@ rg_status rg_context_new_builtin(rg_context **out) {
         free(ctx);
         return map_merkmal_status(status);
     }
-    status = mk_registry_get_system(ctx->registry, "descriptive", &ctx->system);
+    status = mk_registry_get_system(ctx->registry, RG_DEFAULT_FEATURE_SYSTEM, &ctx->system);
     if (status != MK_OK) {
         mk_registry_free(ctx->registry);
         free(ctx);
@@ -204,6 +219,21 @@ rg_status rg_context_new_builtin(rg_context **out) {
     }
     *out = ctx;
     return RG_OK;
+}
+
+rg_status rg_context_set_segmentation(rg_context *ctx, rg_segmentation mode) {
+    if (ctx == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    if (mode != RG_SEGMENT_ORTHOGRAPHIC && mode != RG_SEGMENT_SYSTEM_LONGEST_MATCH) {
+        return RG_ERR_UNSUPPORTED_OPTION;
+    }
+    ctx->segmentation = mode;
+    return RG_OK;
+}
+
+rg_segmentation rg_context_segmentation(const rg_context *ctx) {
+    return ctx == 0 ? RG_SEGMENT_ORTHOGRAPHIC : ctx->segmentation;
 }
 
 void rg_context_free(rg_context *ctx) {
@@ -256,7 +286,9 @@ rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int
     *out = 0;
     if (mutable_ctx->feature_cap == 0 || (mutable_ctx->feature_count + 1) * 10 >= mutable_ctx->feature_cap * 7) {
         if (feature_cache_grow(mutable_ctx) != RG_OK) {
-            status = mk_system_is_segment(ctx->system, grapheme, out);
+            bool recognised = false;
+            status = mk_system_is_segment(ctx->system, grapheme, &recognised);
+            *out = recognised ? 1 : 0;
             return map_merkmal_status(status);
         }
     }
@@ -271,9 +303,13 @@ rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int
         }
         slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
     }
-    status = mk_system_is_segment(ctx->system, grapheme, out);
-    if (status != MK_OK) {
-        return map_merkmal_status(status);
+    {
+        bool recognised = false;
+        status = mk_system_is_segment(ctx->system, grapheme, &recognised);
+        if (status != MK_OK) {
+            return map_merkmal_status(status);
+        }
+        *out = recognised ? 1 : 0;
     }
     if (mutable_ctx->features[slot].grapheme == 0) {
         mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
@@ -338,6 +374,38 @@ rg_status rg_context_segment_distance(
     return RG_OK;
 }
 
+rg_status rg_context_diagnose(
+    const rg_context *ctx,
+    const char *grapheme,
+    rg_grapheme_diagnosis *out
+) {
+    mk_diagnosis diagnosis;
+    mk_status status;
+    if (ctx == 0 || grapheme == 0 || out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    memset(out, 0, sizeof(*out));
+    memset(&diagnosis, 0, sizeof(diagnosis));
+    status = mk_system_diagnose(ctx->system, grapheme, &diagnosis);
+    if (status != MK_OK) {
+        return map_merkmal_status(status);
+    }
+    out->status = map_merkmal_status(diagnosis.status);
+    out->valid_prefix_bytes = diagnosis.valid_prefix_bytes;
+    out->offending_offset = diagnosis.offending_offset;
+    memcpy(out->offending, diagnosis.offending, sizeof(out->offending));
+    out->offending[sizeof(out->offending) - 1] = '\0';
+    return RG_OK;
+}
+
+int rg_context_last_diagnosis(const rg_context *ctx, rg_grapheme_diagnosis *out) {
+    if (ctx == 0 || out == 0 || !ctx->has_diagnosis) {
+        return 0;
+    }
+    *out = ctx->last_diagnosis;
+    return 1;
+}
+
 void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char *grapheme) {
     rg_context *mutable_ctx = (rg_context *)ctx;
     if (ctx == 0 || grapheme == 0) {
@@ -345,6 +413,20 @@ void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char
     }
     free(mutable_ctx->unknown_grapheme);
     mutable_ctx->unknown_grapheme = rg_strdup_internal(grapheme);
+    mutable_ctx->has_diagnosis =
+        rg_context_diagnose(ctx, grapheme, &mutable_ctx->last_diagnosis) == RG_OK;
+}
+
+/* The status a refused grapheme deserves. merkmal separates a sound it does
+ * not cover from CLDF markup that never transcribed a sound, and the two ask
+ * different things of the user, so the refusal carries the distinction out
+ * rather than flattening everything to "unknown grapheme". */
+rg_status rg_context_refusal_status_internal(const rg_context *ctx, const char *grapheme) {
+    rg_context_note_unknown_grapheme_internal(ctx, grapheme);
+    if (ctx != 0 && ctx->has_diagnosis && ctx->last_diagnosis.status != RG_OK) {
+        return ctx->last_diagnosis.status;
+    }
+    return RG_ERR_UNKNOWN_GRAPHEME;
 }
 
 void rg_context_last_error(const rg_context *ctx, const char **grapheme, const char **feature_system) {
@@ -388,7 +470,7 @@ rg_status rg_context_features_internal(
         if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
             if (mutable_ctx->features[slot].features_state < 0) {
                 rg_context_note_unknown_grapheme_internal(ctx, grapheme);
-                return RG_ERR_UNKNOWN_GRAPHEME;
+                return mutable_ctx->features[slot].refusal;
             }
             if (mutable_ctx->features[slot].features_state > 0) {
                 *out = mutable_ctx->features[slot].features;
@@ -409,7 +491,9 @@ rg_status rg_context_features_internal(
     }
     if (status != RG_OK) {
         mutable_ctx->features[slot].features_state = -1;
-        if (status == RG_ERR_UNKNOWN_GRAPHEME) {
+        mutable_ctx->features[slot].refusal = status;
+        if (status == RG_ERR_UNKNOWN_GRAPHEME || status == RG_ERR_SOURCE_MARKER ||
+            status == RG_ERR_PARSE) {
             rg_context_note_unknown_grapheme_internal(ctx, grapheme);
         }
         return status;
@@ -490,7 +574,7 @@ rg_status rg_context_grapheme_features(
     rg_feature_set **out
 ) {
     rg_feature_set *features;
-    mk_feature_set *inner = 0;
+    mk_string_list *inner = 0;
     mk_status status;
     if (ctx == 0 || grapheme == 0 || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
@@ -502,7 +586,7 @@ rg_status rg_context_grapheme_features(
     }
     features = (rg_feature_set *)calloc(1, sizeof(*features));
     if (features == 0) {
-        mk_feature_set_free(inner);
+        mk_string_list_free(inner);
         return RG_ERR_OOM;
     }
     features->inner = inner;
@@ -510,10 +594,19 @@ rg_status rg_context_grapheme_features(
     return RG_OK;
 }
 
-/* Splits a written word into segments through merkmal, merging trailing tone
- * digits into the segment they belong to. This is the only correct way to get
- * from "pater" to p/a/t/e/r: a naive character split breaks multi-codepoint
- * graphemes such as affricates, digraphs and combining diacritics. */
+/* Splits a written word into segments through merkmal. This is the only
+ * correct way to get from "pater" to p/a/t/e/r: a naive character split breaks
+ * multi-codepoint graphemes such as affricates, digraphs and combining
+ * diacritics.
+ *
+ * Which cut is taken is the context's rg_segmentation setting; the default
+ * reads the tie bar and leaves untied sequences apart.
+ *
+ * Tone leaves the segment string and becomes the segment's own dimension:
+ * "ma³³" gives m and a carrying ³³, and a standalone tone token, which is how
+ * CLDF wordlists are published, attaches to the segment before it. Tone must
+ * never reach feature lookup, and a corpus should not have to choose between
+ * writing tone and being readable. */
 rg_status rg_context_segment_word(
     const rg_context *ctx,
     const char *word,
@@ -523,6 +616,7 @@ rg_status rg_context_segment_word(
     mk_string_list *list = 0;
     rg_segment *segments;
     size_t count;
+    size_t written = 0;
     size_t i;
     mk_status status;
 
@@ -531,7 +625,9 @@ rg_status rg_context_segment_word(
     }
     *out = 0;
     *out_count = 0;
-    status = mk_segment_ipa_merged(word, &list);
+    status = ctx->segmentation == RG_SEGMENT_SYSTEM_LONGEST_MATCH
+                 ? mk_system_segment_ipa(ctx->system, word, &list)
+                 : mk_segment_ipa_merged(word, &list);
     if (status != MK_OK) {
         return map_merkmal_status(status);
     }
@@ -547,16 +643,57 @@ rg_status rg_context_segment_word(
     }
     for (i = 0; i < count; i++) {
         const char *item = mk_string_list_get(list, i);
-        segments[i].grapheme = rg_strdup_internal(item == 0 ? "" : item);
-        if (segments[i].grapheme == 0) {
-            rg_segments_free(segments, i + 1);
+        char *base = 0;
+        char *tone = 0;
+        const char *grapheme;
+
+        if (item == 0) {
+            item = "";
+        }
+        /* A token that is nothing but tone belongs to the segment before it.
+         * With no segment before it there is nothing to carry the tone, so it
+         * stays a segment of its own and is refused at feature lookup, which
+         * is the honest answer for a word that opens with a bare tone mark. */
+        if (mk_split_tone(item, &base, &tone) == MK_ERR_UNKNOWN_GRAPHEME &&
+            written > 0 && segments[written - 1].tone == 0) {
+            segments[written - 1].tone = rg_strdup_internal(item);
+            if (segments[written - 1].tone == 0) {
+                rg_segments_free(segments, written);
+                mk_string_list_free(list);
+                return RG_ERR_OOM;
+            }
+            continue;
+        }
+        grapheme = base != 0 ? base : item;
+        segments[written].grapheme = rg_strdup_internal(grapheme);
+        if (segments[written].grapheme == 0) {
+            mk_string_free(base);
+            mk_string_free(tone);
+            rg_segments_free(segments, written);
             mk_string_list_free(list);
             return RG_ERR_OOM;
         }
+        if (tone != 0 && tone[0] != '\0') {
+            segments[written].tone = rg_strdup_internal(tone);
+            if (segments[written].tone == 0) {
+                mk_string_free(base);
+                mk_string_free(tone);
+                rg_segments_free(segments, written + 1);
+                mk_string_list_free(list);
+                return RG_ERR_OOM;
+            }
+        }
+        mk_string_free(base);
+        mk_string_free(tone);
+        written++;
     }
     mk_string_list_free(list);
+    if (written == 0) {
+        rg_segments_free(segments, 0);
+        return RG_OK;
+    }
     *out = segments;
-    *out_count = count;
+    *out_count = written;
     return RG_OK;
 }
 
@@ -578,20 +715,20 @@ size_t rg_feature_set_size(const rg_feature_set *features) {
     if (features == 0) {
         return 0;
     }
-    return mk_feature_set_size(features->inner);
+    return mk_string_list_size(features->inner);
 }
 
 const char *rg_feature_set_get(const rg_feature_set *features, size_t index) {
     if (features == 0) {
         return 0;
     }
-    return mk_feature_set_get(features->inner, index);
+    return mk_string_list_get(features->inner, index);
 }
 
 void rg_feature_set_free(rg_feature_set *features) {
     if (features == 0) {
         return;
     }
-    mk_feature_set_free(features->inner);
+    mk_string_list_free(features->inner);
     free(features);
 }

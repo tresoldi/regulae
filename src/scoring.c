@@ -158,16 +158,14 @@ static rg_status segment_distance_checked(
         return status;
     }
     if (!is_segment) {
-        rg_context_note_unknown_grapheme_internal(ctx, source.grapheme);
-        return RG_ERR_UNKNOWN_GRAPHEME;
+        return rg_context_refusal_status_internal(ctx, source.grapheme);
     }
     status = rg_context_is_segment(ctx, target.grapheme, &is_segment);
     if (status != RG_OK) {
         return status;
     }
     if (!is_segment) {
-        rg_context_note_unknown_grapheme_internal(ctx, target.grapheme);
-        return RG_ERR_UNKNOWN_GRAPHEME;
+        return rg_context_refusal_status_internal(ctx, target.grapheme);
     }
     return rg_context_segment_distance(ctx, source.grapheme, target.grapheme, out);
 }

@@ -10,11 +10,18 @@ fixture is the positive case.
 
 - **80 pairs** generated deterministically from a grid:
   - 40 voiceless-initial pairs: initial ∈ `{p, t, k, f, s}`, vowel
-    ∈ `{i, a, u, o, e}`, source tone ∈ `{1, 2, 3, 4}`. Target
-    tone is always **`1`** regardless of the source tone.
+    ∈ `{i, a, u, o, e}`, source tone ∈ `{¹¹, ²², ³³, ⁴⁴}`. Target
+    tone is always **`¹¹`** regardless of the source tone.
   - 40 voiced-initial pairs: initial ∈ `{b, d, g, m, n}`, vowel
-    ∈ `{i, a, u, o, e}`, source tone ∈ `{1, 2, 3, 4}`. Target
-    tone is always **`4`**.
+    ∈ `{i, a, u, o, e}`, source tone ∈ `{¹¹, ²², ³³, ⁴⁴}`. Target
+    tone is always **`⁴⁴`**.
+
+  The four tones were written `1`–`4` until 2026-08-14. They are
+  arbitrary labels — the fixture attaches no pitch to them — but an
+  ASCII digit is not tone notation, so no loader could read them and
+  the corpus was reachable only through the direct API. They are now
+  four distinct Chao level tones, which is an injective relabelling
+  and changes nothing the fixture tests.
 - **Rule by construction**: the voicing of the source initial
   consonant perfectly determines the target vowel's tone.
   Source tones are irrelevant to the target — this is a
@@ -28,45 +35,69 @@ fixture is the positive case.
 ## Expected cross-dimensional discovery output
 
 - At least one committed `CrossDimensionalLink` with
-  `src_feature="voiced"` and `tgt_value="4"`, confidence 1.0.
-- A matching rule for `voiceless → tone=1`.
+  `src_feature="voiced"` and `tgt_value="⁴⁴"`, confidence 1.0.
+- A matching rule for the complementary environment, `→ tone=¹¹`.
 - The context-discovery tonal correspondence table should also show
   the source-tone-to-target-tone mappings, independent of the
   cross-dimensional discovery overlay.
 
 ## Actual cross-dimensional discovery output
 
-Cross-dimensional discovery commits **4 rules**, all at confidence 1.00:
+Two rules, which is the whole of what the fixture encodes:
 
 ```
-voiced@relative_-1    → tone=4@+0    count=40/40
-voiced@relative_0     → tone=4@+1    count=40/40
-voiceless@relative_-1 → tone=1@+0    count=40/40
-voiceless@relative_0  → tone=1@+1    count=40/40
+voiced=+@relative_-1 → tone=⁴⁴@+0   count=40  conf=1.00  vs 0.00 elsewhere
+voiced=-@relative_-1 → tone=¹¹@+0   count=40  conf=1.00  vs 0.00 elsewhere
 ```
 
-The four rules are pairwise dual framings:
+A conditioned split is a two-sided statement, and both halves are findings, so
+the complementary environment is published in its own right under
+`source_value = "-"`. The reference reported the same two facts as four rows,
+carrying each of them in both of its positional framings.
 
-- `relative_-1 → +0` is "if the preceding consonant is voiced,
-  the current (vowel) position has tone 4". This is the rule
-  applied from the perspective of a link *on the vowel*.
-- `relative_0 → +1` is "if the current consonant is voiced,
-  the next position has tone 4". Same rule seen from a link
-  *on the consonant*. Both firings produce the same alignment
-  behavior on this fixture.
+The `vs 0.00 elsewhere` is the part worth reading. Each tone is not merely
+frequent in its environment; it does not occur outside it. That is what makes
+this a conditioned split rather than a description of a skewed corpus.
+
+### What this fixture caught
+
+Between 2026-08-14, when the corpus first became loadable, and later the same
+day, this stage committed **18** rules here rather than 2. The two above were
+among them at confidence 1.00; the other sixteen sat at exactly 0.50, in
+contradictory pairs:
+
+```
+consonant=+@relative_-1 → tone=¹¹@+0   count=40  conf=0.50
+consonant=+@relative_-1 → tone=⁴⁴@+0   count=40  conf=0.50
+```
+
+Every source segment in this corpus is a consonant, so `consonant=+` predicts
+nothing, and splitting 80 observations evenly across two outcomes is what a
+predicate carrying no information looks like. They committed because the gate
+was `confidence >= 0.5` with no contrast set: on a two-valued dimension an even
+split clears one half of the threshold from either side.
+
+Three things were wrong with that gate and all three are now fixed — the
+environment must have an attested complement, the split must beat its
+parameters under BIC against that complement, and a reported value must be
+raised relative to the contrast and pass its own test. The reasoning is in
+[`docs/correspondence_discovery.md`](../../docs/correspondence_discovery.md).
+
+This is not the fixture failing. It is the fixture doing its job, one day after
+the corpus it needed could be read.
 
 The context-discovery tonal table also captures the raw tonal mappings:
 
 ```
 Tonal correspondences (8):
-  1 → 1: 10
-  2 → 2: 10    (voiceless: all preserve)
-  3 → 3: 10
-  4 → 4: 10
-  1 → 4: 10
-  2 → 4: 10    (voiced: all map to 4)
-  3 → 4: 10
-  4 → 4: 10
+  ¹¹ → ¹¹: 10
+  ²² → ²²: 10    (voiceless: all preserve)
+  ³³ → ³³: 10
+  ⁴⁴ → ⁴⁴: 10
+  ¹¹ → ⁴⁴: 10
+  ²² → ⁴⁴: 10    (voiced: all map to ⁴⁴)
+  ³³ → ⁴⁴: 10
+  ⁴⁴ → ⁴⁴: 10
 ```
 
 The cross-dimensional rules and the context-discovery tonal table are
@@ -84,34 +115,29 @@ neg_adj = -(log(ε) - log(0.5 - ε))       ≈ +3.045 nats per miss
 
 (ε is the Dirichlet smoothing correction.)
 
-Aggregate effect: 40 matches × -0.669 nats = -26.76 nats per rule,
-times 4 rules = -107 nats of cost reduction from Phase 5 alone.
-Passes BIC with massive margin.
+Aggregate effect: 40 matches × -0.669 nats = -26.76 nats per rule.
+Passes BIC with a wide margin.
 
 ## Validation status
 
 ✅ Cross-dimensional discovery commits at least one voicing→tone rule with
-   confidence >= 0.8.
-✅ The committed rules are semantically meaningful: every
-   committed rule has a voicing-related source feature and a
-   tone target.
-✅ The rules are deterministic under repeated training
-   (covered by the invariant tests in
-   `test_cross_dim_discovery.py`).
-✅ No duplicates (covered by the dedup test).
+   confidence >= 0.8. Both of them, at 1.00.
+✅ Every committed rule is semantically meaningful: two rules, both
+   voicing→tone, and nothing else.
+✅ The rules are deterministic under repeated training.
+✅ No duplicates.
 
 ## Known limitations surfaced by this fixture
 
-- **Dual-framing redundancy**: the 4 committed rules are really
-  2 rules seen from 2 link-position perspectives. A future
-  a future consolidation pass could detect and merge dual framings
-  to reduce output clutter. This is cosmetic.
+- **Aggregate cost figures below are stale.** They were computed when
+  four rules were committed rather than two, and against the ASCII
+  tone labels. The mechanism they describe is unchanged.
 - **Real-data Mandarin/Cantonese rule is more complex**. The
   actual Middle Chinese tonogenesis mapping is
   `voiced+src_tone → voiced_register_with_shifted_tone`, which
   requires a joint predictor (both voicing AND source tone).
   Cross-dimensional discovery's anomaly detection only enumerates
-  single-feature predictors, so on the original `tone_chinese_like/`
+  single-feature predictors, so on the sibling `tone_chinese_like/`
   fixture the signal is too fragmented to pass BIC. Joint-predictor
   enumeration is explicitly out of the current cross-dimensional
   discovery scope — it belongs in a future extension.
