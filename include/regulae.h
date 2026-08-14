@@ -773,6 +773,12 @@ RG_API rg_status rg_train_model(
 );
 RG_API void rg_multi_model_free(rg_multi_model *model);
 RG_API size_t rg_multi_model_lect_count(const rg_multi_model *model);
+/* Cognate sets that carried fewer than two forms, and so contributed no
+ * correspondence. Not an error: a form whose cognates are in lects the corpus
+ * did not sample has nothing to align against, and every cognate-coded
+ * wordlist has some. Worth reading as a proportion of the corpus, because a
+ * high one means the lect sample, not the method, is deciding the result. */
+RG_API size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model);
 RG_API const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index);
 RG_API size_t rg_multi_model_pair_model_count(const rg_multi_model *model);
 RG_API const rg_multi_pair_model_row *rg_multi_model_pair_model_at(

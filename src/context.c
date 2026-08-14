@@ -57,6 +57,21 @@ typedef struct distance_cache_entry {
     int resolved;
 } distance_cache_entry;
 
+/* The feature displacement between two graphemes: which features one has and
+ * the other lacks. A pure function of the pair, and the alignment DP asks for
+ * it on every candidate link it costs, so without this it is recomputed
+ * millions of times per training run -- it was 20% of the profile, and the
+ * richer feature bundles merkmal 1.0 brought made it worse. The feature names
+ * are borrowed from the cached feature sets, which outlive the entry, so a
+ * cached displacement allocates nothing per lookup. */
+typedef struct displacement_cache_entry {
+    char *a;
+    char *b;
+    rg_feature_displacement *items;
+    size_t count;
+    int resolved;
+} displacement_cache_entry;
+
 struct rg_context {
     mk_registry *registry;
     const mk_system *system;
@@ -73,6 +88,9 @@ struct rg_context {
     distance_cache_entry *distances;
     size_t distance_count;
     size_t distance_cap;
+    displacement_cache_entry *displacements;
+    size_t displacement_count;
+    size_t displacement_cap;
 };
 
 /* FNV-1a, with the constants chosen for the width of size_t. WebAssembly is
@@ -118,6 +136,19 @@ static void context_caches_clear(rg_context *ctx) {
     ctx->distances = 0;
     ctx->distance_cap = 0;
     ctx->distance_count = 0;
+    for (i = 0; i < ctx->displacement_cap; i++) {
+        if (ctx->displacements[i].a != 0) {
+            free(ctx->displacements[i].a);
+            free(ctx->displacements[i].b);
+            /* The feature names are borrowed from the feature-set cache; only
+             * the array of pairs is ours. */
+            free(ctx->displacements[i].items);
+        }
+    }
+    free(ctx->displacements);
+    ctx->displacements = 0;
+    ctx->displacement_cap = 0;
+    ctx->displacement_count = 0;
 }
 
 static rg_status feature_cache_grow(rg_context *ctx) {
@@ -165,6 +196,32 @@ static rg_status distance_cache_grow(rg_context *ctx) {
     free(ctx->distances);
     ctx->distances = next;
     ctx->distance_cap = next_cap;
+    return RG_OK;
+}
+
+static rg_status displacement_cache_grow(rg_context *ctx) {
+    size_t next_cap = ctx->displacement_cap == 0 ? 256 : ctx->displacement_cap * 2;
+    displacement_cache_entry *next =
+        (displacement_cache_entry *)calloc(next_cap, sizeof(*next));
+    size_t i;
+    if (next == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < ctx->displacement_cap; i++) {
+        size_t slot;
+        if (ctx->displacements[i].a == 0) {
+            continue;
+        }
+        slot = hash_string(ctx->displacements[i].b,
+                           hash_string(ctx->displacements[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
+        while (next[slot].a != 0) {
+            slot = (slot + 1) & (next_cap - 1);
+        }
+        next[slot] = ctx->displacements[i];
+    }
+    free(ctx->displacements);
+    ctx->displacements = next;
+    ctx->displacement_cap = next_cap;
     return RG_OK;
 }
 
@@ -501,6 +558,155 @@ rg_status rg_context_features_internal(
     mutable_ctx->features[slot].features_state = 1;
     mutable_ctx->features[slot].features = features;
     *out = features;
+    return RG_OK;
+}
+
+static int displacement_feature_cmp(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+static int feature_set_has(const rg_feature_set *features, const char *name) {
+    size_t i;
+    for (i = 0; i < rg_feature_set_size(features); i++) {
+        const char *item = rg_feature_set_get(features, i);
+        if (item != 0 && strcmp(item, name) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Features of `left` that `right` lacks, appended in sorted order so the
+ * displacement of a pair is one canonical vector rather than one per
+ * enumeration order -- the learned table keys on the whole vector. */
+static rg_status append_missing(
+    const rg_feature_set *left,
+    const rg_feature_set *right,
+    const char *from_value,
+    const char *to_value,
+    rg_feature_displacement **items,
+    size_t *count,
+    size_t *cap
+) {
+    const char **names;
+    size_t name_count = 0;
+    size_t size = rg_feature_set_size(left);
+    size_t i;
+
+    if (size == 0) {
+        return RG_OK;
+    }
+    names = (const char **)calloc(size, sizeof(*names));
+    if (names == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < size; i++) {
+        const char *name = rg_feature_set_get(left, i);
+        if (name != 0 && !feature_set_has(right, name)) {
+            names[name_count++] = name;
+        }
+    }
+    qsort(names, name_count, sizeof(*names), displacement_feature_cmp);
+    for (i = 0; i < name_count; i++) {
+        if (*count == *cap) {
+            size_t next_cap = *cap == 0 ? 8 : *cap * 2;
+            rg_feature_displacement *next = (rg_feature_displacement *)realloc(
+                *items, next_cap * sizeof(**items));
+            if (next == 0) {
+                free(names);
+                return RG_ERR_OOM;
+            }
+            *items = next;
+            *cap = next_cap;
+        }
+        /* Borrowed: the name belongs to the cached feature set, and the values
+         * are literals. Nothing here is freed with the entry. */
+        (*items)[*count].feature = names[i];
+        (*items)[*count].from_value = from_value;
+        (*items)[*count].to_value = to_value;
+        (*count)++;
+    }
+    free(names);
+    return RG_OK;
+}
+
+/* The feature displacement of a grapheme pair, derived once and shared.
+ * Borrowed: valid while the context lives and its feature system is unchanged.
+ * The alignment DP costs every candidate link with this, so it is asked for
+ * far more often than there are distinct pairs to ask about. */
+rg_status rg_context_displacement_internal(
+    const rg_context *ctx,
+    const char *source,
+    const char *target,
+    const rg_feature_displacement **out,
+    size_t *out_count
+) {
+    rg_context *mutable_ctx = (rg_context *)ctx;
+    const rg_feature_set *source_features = 0;
+    const rg_feature_set *target_features = 0;
+    rg_feature_displacement *items = 0;
+    size_t count = 0;
+    size_t cap = 0;
+    size_t slot;
+    rg_status status;
+
+    if (ctx == 0 || source == 0 || target == 0 || out == 0 || out_count == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    *out_count = 0;
+    if (mutable_ctx->displacement_cap == 0 ||
+        (mutable_ctx->displacement_count + 1) * 10 >= mutable_ctx->displacement_cap * 7) {
+        status = displacement_cache_grow(mutable_ctx);
+        if (status != RG_OK) {
+            return status;
+        }
+    }
+    slot = hash_string(target, hash_string(source, RG_FNV_OFFSET)) &
+           (mutable_ctx->displacement_cap - 1);
+    while (mutable_ctx->displacements[slot].a != 0) {
+        if (strcmp(mutable_ctx->displacements[slot].a, source) == 0 &&
+            strcmp(mutable_ctx->displacements[slot].b, target) == 0) {
+            *out = mutable_ctx->displacements[slot].items;
+            *out_count = mutable_ctx->displacements[slot].count;
+            return RG_OK;
+        }
+        slot = (slot + 1) & (mutable_ctx->displacement_cap - 1);
+    }
+    status = rg_context_features_internal(ctx, source, &source_features);
+    if (status != RG_OK) {
+        return status;
+    }
+    status = rg_context_features_internal(ctx, target, &target_features);
+    if (status != RG_OK) {
+        return status;
+    }
+    status = append_missing(source_features, target_features, "present", "absent",
+                            &items, &count, &cap);
+    if (status == RG_OK) {
+        status = append_missing(target_features, source_features, "absent", "present",
+                                &items, &count, &cap);
+    }
+    if (status != RG_OK) {
+        free(items);
+        return status;
+    }
+    mutable_ctx->displacements[slot].a = rg_strdup_internal(source);
+    mutable_ctx->displacements[slot].b = rg_strdup_internal(target);
+    if (mutable_ctx->displacements[slot].a == 0 || mutable_ctx->displacements[slot].b == 0) {
+        free(mutable_ctx->displacements[slot].a);
+        free(mutable_ctx->displacements[slot].b);
+        mutable_ctx->displacements[slot].a = 0;
+        mutable_ctx->displacements[slot].b = 0;
+        free(items);
+        return RG_ERR_OOM;
+    }
+    mutable_ctx->displacements[slot].items = items;
+    mutable_ctx->displacements[slot].count = count;
+    mutable_ctx->displacements[slot].resolved = 1;
+    mutable_ctx->displacement_count++;
+    *out = items;
+    *out_count = count;
     return RG_OK;
 }
 

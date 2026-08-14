@@ -4,92 +4,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-static int feature_cmp(const void *a, const void *b) {
-    const char *const *sa = (const char *const *)a;
-    const char *const *sb = (const char *const *)b;
-    return strcmp(*sa, *sb);
-}
-
-static int feature_set_contains_name(const rg_feature_set *features, const char *name) {
-    size_t i;
-    for (i = 0; i < rg_feature_set_size(features); i++) {
-        const char *item = rg_feature_set_get(features, i);
-        if (item != 0 && strcmp(item, name) == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-static rg_status append_displacement(
-    rg_feature_displacement **items,
-    size_t *count,
-    size_t *cap,
-    const char *feature,
-    const char *from_value,
-    const char *to_value
-) {
-    rg_feature_displacement *next;
-    if (*count == *cap) {
-        size_t next_cap = *cap == 0 ? 8 : *cap * 2;
-        next = (rg_feature_displacement *)realloc(*items, next_cap * sizeof(**items));
-        if (next == 0) {
-            return RG_ERR_OOM;
-        }
-        *items = next;
-        *cap = next_cap;
-    }
-    (*items)[*count].feature = rg_strdup_internal(feature);
-    (*items)[*count].from_value = rg_strdup_internal(from_value);
-    (*items)[*count].to_value = rg_strdup_internal(to_value);
-    if ((*items)[*count].feature == 0 || (*items)[*count].from_value == 0 || (*items)[*count].to_value == 0) {
-        free((char *)(*items)[*count].feature);
-        free((char *)(*items)[*count].from_value);
-        free((char *)(*items)[*count].to_value);
-        (*items)[*count].feature = 0;
-        (*items)[*count].from_value = 0;
-        (*items)[*count].to_value = 0;
-        return RG_ERR_OOM;
-    }
-    (*count)++;
-    return RG_OK;
-}
-
-static rg_status append_difference(
-    const rg_feature_set *left,
-    const rg_feature_set *right,
-    const char *from_value,
-    const char *to_value,
-    rg_feature_displacement **items,
-    size_t *count,
-    size_t *cap
-) {
-    const char **names = 0;
-    size_t name_count = 0;
-    size_t i;
-    rg_status status;
-    names = (const char **)calloc(rg_feature_set_size(left), sizeof(*names));
-    if (names == 0 && rg_feature_set_size(left) > 0) {
-        return RG_ERR_OOM;
-    }
-    for (i = 0; i < rg_feature_set_size(left); i++) {
-        const char *name = rg_feature_set_get(left, i);
-        if (name != 0 && !feature_set_contains_name(right, name)) {
-            names[name_count++] = name;
-        }
-    }
-    qsort(names, name_count, sizeof(*names), feature_cmp);
-    for (i = 0; i < name_count; i++) {
-        status = append_displacement(items, count, cap, names[i], from_value, to_value);
-        if (status != RG_OK) {
-            free(names);
-            return status;
-        }
-    }
-    free(names);
-    return RG_OK;
-}
-
 rg_status rg_compute_displacement(
     const rg_context *ctx,
     rg_segment source,
@@ -97,38 +11,45 @@ rg_status rg_compute_displacement(
     rg_feature_displacement **out,
     size_t *out_count
 ) {
-    const rg_feature_set *source_features = 0;
-    const rg_feature_set *target_features = 0;
-    rg_feature_displacement *items = 0;
-    size_t count = 0;
-    size_t cap = 0;
+    const rg_feature_displacement *shared = 0;
+    size_t shared_count = 0;
+    rg_feature_displacement *items;
+    size_t i;
     rg_status status;
 
-    if (ctx == 0 || source.grapheme == 0 || target.grapheme == 0 || out == 0 || out_count == 0) {
+    if (ctx == 0 || out == 0 || out_count == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
     *out_count = 0;
-    status = rg_context_features_internal(ctx, source.grapheme, &source_features);
+    if (source.grapheme == 0 || target.grapheme == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    status = rg_context_displacement_internal(ctx, source.grapheme, target.grapheme,
+                                              &shared, &shared_count);
     if (status != RG_OK) {
         return status;
     }
-    status = rg_context_features_internal(ctx, target.grapheme, &target_features);
-    if (status != RG_OK) {
-
-        return status;
+    if (shared_count == 0) {
+        return RG_OK;
     }
-    status = append_difference(source_features, target_features, "present", "absent", &items, &count, &cap);
-    if (status == RG_OK) {
-        status = append_difference(target_features, source_features, "absent", "present", &items, &count, &cap);
+    /* The shared derivation borrows its strings from the feature cache; a
+     * caller-owned result cannot, because it outlives nothing in particular. */
+    items = (rg_feature_displacement *)calloc(shared_count, sizeof(*items));
+    if (items == 0) {
+        return RG_ERR_OOM;
     }
-
-    if (status != RG_OK) {
-        rg_feature_displacement_free(items, count);
-        return status;
+    for (i = 0; i < shared_count; i++) {
+        items[i].feature = rg_strdup_internal(shared[i].feature);
+        items[i].from_value = rg_strdup_internal(shared[i].from_value);
+        items[i].to_value = rg_strdup_internal(shared[i].to_value);
+        if (items[i].feature == 0 || items[i].from_value == 0 || items[i].to_value == 0) {
+            rg_feature_displacement_free(items, i + 1);
+            return RG_ERR_OOM;
+        }
     }
     *out = items;
-    *out_count = count;
+    *out_count = shared_count;
     return RG_OK;
 }
 
@@ -238,6 +159,44 @@ static int scoring_segment_array_equal(const rg_segment *a, size_t a_count, cons
     return 1;
 }
 
+/* Orders a candidate span against a published chunk row on the same key the
+ * table was sorted by: graphemes of the shorter source first, then source
+ * length, then the same for the target. Tone, length and stress are not part of
+ * the key, and a row differing only in those would be unreachable -- chunk
+ * promotion keys on graphemes, so no such row exists. */
+static int chunk_key_cmp(
+    const rg_chunk_row *row,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count
+) {
+    size_t i;
+    size_t n = row->source_count < source_count ? row->source_count : source_count;
+    for (i = 0; i < n; i++) {
+        int c = strcmp(row->source[i].grapheme == 0 ? "" : row->source[i].grapheme,
+                       source[i].grapheme == 0 ? "" : source[i].grapheme);
+        if (c != 0) {
+            return c;
+        }
+    }
+    if (row->source_count != source_count) {
+        return row->source_count < source_count ? -1 : 1;
+    }
+    n = row->target_count < target_count ? row->target_count : target_count;
+    for (i = 0; i < n; i++) {
+        int c = strcmp(row->target[i].grapheme == 0 ? "" : row->target[i].grapheme,
+                       target[i].grapheme == 0 ? "" : target[i].grapheme);
+        if (c != 0) {
+            return c;
+        }
+    }
+    if (row->target_count != target_count) {
+        return row->target_count < target_count ? -1 : 1;
+    }
+    return 0;
+}
+
 static const rg_chunk_row *find_chunk_row(
     const rg_pairwise_model *model,
     const rg_segment *source,
@@ -245,14 +204,35 @@ static const rg_chunk_row *find_chunk_row(
     const rg_segment *target,
     size_t target_count
 ) {
+    size_t low = 0;
+    size_t high;
     size_t i;
     if (model == 0 || source_count == 0 || target_count == 0) {
         return 0;
     }
-    for (i = 0; i < model->chunk_count; i++) {
-        if (scoring_segment_array_equal(model->chunks[i].source, model->chunks[i].source_count, source, source_count) &&
-            scoring_segment_array_equal(model->chunks[i].target, model->chunks[i].target_count, target, target_count)) {
-            return &model->chunks[i];
+    high = model->chunk_count;
+    /* Lower bound of the grapheme-key block. The table is sorted on graphemes
+     * alone, so the block is where the search can end; a match must also agree
+     * on tone, length and stress, which the ordering does not distinguish, so
+     * those are checked by scanning the block. It is one row wide in practice.
+     * Returning the first full match keeps the linear scan's answer, which is
+     * the one every published model was built against. */
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        if (chunk_key_cmp(&model->chunks[mid], source, source_count, target, target_count) < 0) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    for (i = low; i < model->chunk_count; i++) {
+        const rg_chunk_row *row = &model->chunks[i];
+        if (chunk_key_cmp(row, source, source_count, target, target_count) != 0) {
+            break;
+        }
+        if (scoring_segment_array_equal(row->source, row->source_count, source, source_count) &&
+            scoring_segment_array_equal(row->target, row->target_count, target, target_count)) {
+            return row;
         }
     }
     return 0;
@@ -347,7 +327,7 @@ static rg_status displacement_model_cost(
     rg_segment target,
     double *out
 ) {
-    rg_feature_displacement *disp = 0;
+    const rg_feature_displacement *disp = 0;
     size_t disp_count = 0;
     size_t i;
     double n = 0.0;
@@ -361,7 +341,8 @@ static rg_status displacement_model_cost(
     if (model == 0 || model->displacement_row_count == 0) {
         return RG_OK;
     }
-    status = rg_compute_displacement(ctx, source, target, &disp, &disp_count);
+    status = rg_context_displacement_internal(ctx, source.grapheme, target.grapheme,
+                                              &disp, &disp_count);
     if (status != RG_OK) {
         return status;
     }
@@ -384,7 +365,7 @@ static rg_status displacement_model_cost(
             break;
         }
     }
-    rg_feature_displacement_free(disp, disp_count);
+    /* Borrowed from the context's displacement cache; nothing to free. */
     v = (double)model->displacement_row_count;
     if (v < 1.0) {
         v = 1.0;

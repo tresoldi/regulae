@@ -105,6 +105,7 @@ struct rg_multi_model {
     size_t conditioned_class_count;
     rg_multi_cross_dimensional_owned *cross_dimensional_rows;
     size_t cross_dimensional_count;
+    size_t unpaired_set_count;
 };
 
 /* Class ids realised at a given position pair, for a link of an alignment
@@ -181,6 +182,14 @@ void rg_context_spec_array_free_internal(rg_context_spec *contexts, size_t count
 
 extern const char *const rg_context_feature_names[];
 extern const size_t rg_context_feature_name_count;
+
+rg_status rg_context_displacement_internal(
+    const rg_context *ctx,
+    const char *source,
+    const char *target,
+    const rg_feature_displacement **out,
+    size_t *out_count
+);
 
 rg_status rg_context_constraints_internal(
     const rg_context *ctx,

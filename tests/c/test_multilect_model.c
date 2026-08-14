@@ -276,7 +276,16 @@ int main(void) {
         mixed[0].form_count = 2;
         mixed[0].confidence = 1.0;
         mixed[1] = invalid;
-        assert(rg_train_model(ctx, mixed, 2, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+        /* A set with one form has nothing to align against, so it contributes
+         * no correspondence -- but every cognate-coded wordlist has some, and
+         * refusing the corpus over one made regulae unable to read the field's
+         * standard data. It is counted instead, and the count is published. */
+        assert(rg_train_model(ctx, mixed, 2, &options, &model) == RG_OK);
+        assert(rg_multi_model_unpaired_set_count(model) == 1);
+        assert(rg_multi_model_lect_count(model) == 2);
+        assert(rg_multi_model_unconditioned_class_count(model) > 0);
+        rg_multi_model_free(model);
+        model = 0;
     }
     invalid.form_count = 2;
     invalid.forms = 0;

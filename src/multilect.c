@@ -2387,14 +2387,21 @@ rg_status rg_train_model(
         rg_train_options_init_defaults(&resolved_options);
         options = &resolved_options;
     }
-    /* A single-form set is fine in a single-lect corpus but is a structural
-     * error once two or more lects are in play. */
-    if (model->lect_count >= 2) {
-        for (c = 0; c < cognate_count; c++) {
-            if (cognates[c].form_count < 2) {
-                rg_multi_model_free(model);
-                return RG_ERR_INVALID_ARGUMENT;
-            }
+    /* A set with one form carries no correspondence: there is nothing to align
+     * it against. That is a fact about the data, not an error in it. Every
+     * cognate-coded wordlist has them -- an isolate, a loan, a unique
+     * retention, or a form whose cognates are in lects this corpus did not
+     * sample -- and refusing the whole corpus over one of them made regulae
+     * unable to read the field's standard datasets without preprocessing. It
+     * was also inconsistent: the wide loader drops such rows on its own, so the
+     * same data trained when read wide and failed when read long.
+     *
+     * They are counted rather than silently dropped, and the count is
+     * published: a user is entitled to know how much of their corpus
+     * contributed nothing. */
+    for (c = 0; c < cognate_count; c++) {
+        if (cognates[c].form_count < 2) {
+            model->unpaired_set_count++;
         }
     }
     /* One counter spans every lect pair and the multi-lect stages, so a caller
@@ -2453,6 +2460,10 @@ rg_status rg_train_model(
 
 size_t rg_multi_model_lect_count(const rg_multi_model *model) {
     return model == 0 ? 0 : model->lect_count;
+}
+
+size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->unpaired_set_count;
 }
 
 const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index) {
