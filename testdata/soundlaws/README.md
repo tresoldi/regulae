@@ -60,6 +60,31 @@ model was trained in. A model of P(b|a) read as P(a|b) misses nearly every
 lookup and falls back to the untrained prior, and the classes came out of an
 alignment that had learned nothing.
 
+### `lenition.tsv` — Western Romance intervocalic voicing
+
+Latin voiceless stops voice between vowels (*vīta* → *vida*, *amīcu* →
+*amigo*). The contrast set is the same stops after a consonant, where they stay
+voiceless (*campu* → *campo*, *altu* → *alto*).
+
+### `grassmann.tsv` — Grassmann's Law, and two limits it documents
+
+Of two aspirates in a word, the first loses its aspiration. The conditioning
+segment is never adjacent and never at a fixed distance, so only an existential
+predicate can express it.
+
+This fixture currently **fails to recover the environment**, and is kept for
+that reason. The test asserts only what is true today — that the
+correspondence is found — with a comment saying what would have to change for
+it to assert more. Two limits stand in the way, both written up in
+`docs/c_conversion_roadmap.md`: conditioning is discovered from the
+alphabetically first lect of a pair, and a change is only visible from the side
+that has the split; and existential predicates are never tried as a refinement
+of a positional one, so "word-initial *and* an aspirate somewhere after" cannot
+be stated.
+
+A fixture that documents a limit is worth more than one that avoids it. This is
+the corpus to run after changing anything in discovery.
+
 ## Adding one
 
 A fixture earns its place by being able to fail. Before adding one, write down

@@ -183,11 +183,60 @@ static void test_row_order_does_not_change_the_model(rg_context *ctx) {
     rg_corpus_free(reversed);
 }
 
+/* Western Romance lenition: voiceless stops voice between vowels. The corpus
+ * carries the same stops after a consonant, where they do not lenite. */
+static void test_lenition(rg_context *ctx) {
+    rg_corpus *corpus = load("lenition");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "p", "b"));
+    assert(has_correspondence(model, "t", "d"));
+    assert(has_conditioned(model, "p", "b", "vowel"));
+    assert(has_conditioned(model, "t", "d", "vowel"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* Grassmann's Law: of two aspirates in a word the first loses its aspiration.
+ *
+ * This one documents a limit rather than a success, and is kept because a
+ * limit nobody can point at is a limit nobody fixes. The correspondence is
+ * found -- pie tʰ answers to greek t as well as to greek tʰ -- but the
+ * environment is not: what conditions it is an aspirate later in the word,
+ * which is neither adjacent nor at a fixed distance, and the only predicate
+ * that can express it is an existential one. Two things stand in the way, both
+ * recorded in c_conversion_roadmap.md:
+ *
+ *   - Conditioning is discovered from the alphabetically first lect of a pair,
+ *     and a change is only visible from the side that has the split. Here
+ *     "greek" sorts before "pie", and every Greek segment has exactly one PIE
+ *     source, so there is nothing on that side to split.
+ *   - Existential predicates are searched only at the top of their own stage,
+ *     never as a refinement of a positional split, so "word-initial *and* an
+ *     aspirate somewhere after" cannot be reached.
+ *
+ * The test asserts what is true today. When either limit is lifted it should
+ * be tightened to assert the environment. */
+static void test_grassmann_finds_the_correspondence(rg_context *ctx) {
+    rg_corpus *corpus = load("grassmann");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "t\xca\xb0", "t"));
+    assert(has_correspondence(model, "k\xca\xb0", "k"));
+    assert(has_correspondence(model, "p\xca\xb0", "p"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     test_grimm(ctx);
     test_rhotacism(ctx);
+    test_lenition(ctx);
+    test_grassmann_finds_the_correspondence(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);
     printf("sound-law tests passed\n");
