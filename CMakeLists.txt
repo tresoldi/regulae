@@ -175,6 +175,11 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_json PRIVATE regulae::regulae)
     add_test(NAME json COMMAND test_json)
 
+    add_executable(test_sound_laws tests/c/test_sound_laws.c)
+    target_compile_definitions(test_sound_laws PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_sound_laws PRIVATE regulae::regulae)
+    add_test(NAME sound_laws COMMAND test_sound_laws)
+
     add_executable(test_loaders tests/c/test_loaders.c)
     target_compile_definitions(test_loaders PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_loaders PRIVATE regulae::regulae)
@@ -284,5 +289,21 @@ if(REGULAE_BUILD_TESTS)
 
         add_test(NAME cli_missing_file COMMAND regulae_cli train "${CMAKE_CURRENT_SOURCE_DIR}/no_such_corpus.tsv")
         set_tests_properties(cli_missing_file PROPERTIES WILL_FAIL TRUE)
+
+        # A corpus the engine can read reports nothing and exits zero, so the
+        # command is usable as a gate in a data pipeline.
+        add_test(NAME cli_check_clean
+            COMMAND regulae_cli check --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/latin_spanish/cognates.tsv")
+        set_tests_properties(cli_check_clean PROPERTIES PASS_REGULAR_EXPRESSION "unreadable	0")
+
+        # One that cannot names the grapheme, says what kind of problem it is,
+        # counts it, and shows a form it came from -- rather than stopping at
+        # the first occurrence the way training has to.
+        add_test(NAME cli_check_reports_every_grapheme
+            COMMAND regulae_cli check --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/morph_boundary_synthetic/cognates.tsv")
+        # PASS_REGULAR_EXPRESSION decides the result, so the non-zero exit the
+        # command uses to signal findings does not fail the test.
+        set_tests_properties(cli_check_reports_every_grapheme PROPERTIES
+            PASS_REGULAR_EXPRESSION "GRAPHEME	\\+	source marker, not a sound	16	pat\\+a")
     endif()
 endif()

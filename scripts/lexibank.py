@@ -111,21 +111,41 @@ def convert(clone, name, lects=None, min_lects=2, max_lects=None, drop_doubt=Tru
     return rows, stats
 
 
-def clean_segments(segments, drop_markers=True):
-    """CLDF markup is not a transcription of a sound.
+# Notation the field's datasets carry that is not a transcription of a sound.
+# Each is a convention with a meaning, and the meaning decides what to do with
+# it -- which is a decision for whoever builds the corpus, not for the feature
+# system, and certainly not a silent one.
+BOUNDARY_MARKS = ("+", "_", "#")   # morphological and word boundaries
+ZERO_MARKS = ("\u2205",)           # zero: a segment that is not there
 
-    `+` and `_` are boundary marks, `<?>` is CLTS's mark for a grapheme it could
-    not convert, and `<<...>>` is source material left unparsed. regulae refuses
-    all of them at the feature system, correctly, so a corpus built for training
-    has to say what it means to do with them. Dropping the boundary marks keeps
-    the form; a form containing an unconvertible grapheme is dropped whole,
-    because the gap is in the middle of the word and the rest is not a word.
+
+def clean_segments(segments, drop_markers=True):
+    """Returns a segment string regulae can read, or None to drop the form.
+
+    Boundary marks are removed: regulae carries morpheme boundaries as indices
+    on the form rather than as segments, so the mark has no segmental content
+    to lose. Zero is removed for the same reason -- it says a segment is absent,
+    which an alignment expresses as a gap.
+
+    Everything else that will not resolve drops the form whole, and is reported
+    rather than repaired. A dataset writing `ks/kˢ` is saying it could not
+    decide between two readings, and picking one would invent data; `∼` is a
+    mis-encoded tilde and `→` an editorial arrow, neither of which this script
+    can safely guess the intent of; and `*R` is a Proto-Micronesian
+    archiphoneme, a real notation for a segment specified only partly, which
+    regulae has no way to represent. Use `regulae check` on the result to see
+    what a given dataset costs.
     """
     tokens = segments.split()
+    if not tokens:
+        return None
+    # CLDF escapes unparsed source material as <<...>>, and CLTS marks a
+    # grapheme it could not convert as <?>. Either way the word has a hole in
+    # the middle and the rest of it is not a word.
     if any(t.startswith("<") for t in tokens):
         return None
     if drop_markers:
-        tokens = [t for t in tokens if t not in ("+", "_", "#")]
+        tokens = [t for t in tokens if t not in BOUNDARY_MARKS and t not in ZERO_MARKS]
     return " ".join(tokens) if tokens else None
 
 

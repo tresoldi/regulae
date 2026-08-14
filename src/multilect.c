@@ -2404,6 +2404,28 @@ rg_status rg_train_model(
             model->unpaired_set_count++;
         }
     }
+    /* Lects are held in ascending id order, which every later stage assumes.
+     * They used to be held in the order they were first seen in the corpus,
+     * while reconciliation, class discovery and the outlier ranking all walk
+     * pairs in ascending order -- so whenever a corpus did not happen to list
+     * its lects alphabetically, those stages aligned a pair in the opposite
+     * direction from the one its model was trained in. A model of P(b|a) read
+     * as P(a|b) misses on nearly every lookup and falls back to the prior, so
+     * the classes came out of an untrained alignment. Renaming a lect changed
+     * a quarter of the published classes on real data, which is how this
+     * surfaced: a name is metadata, and no analysis may turn on it. */
+    if (model->lect_count > 1) {
+        size_t a;
+        for (a = 1; a < model->lect_count; a++) {
+            char *key = model->lect_ids[a];
+            size_t b = a;
+            while (b > 0 && strcmp(model->lect_ids[b - 1], key) > 0) {
+                model->lect_ids[b] = model->lect_ids[b - 1];
+                b--;
+            }
+            model->lect_ids[b] = key;
+        }
+    }
     /* One counter spans every lect pair and the multi-lect stages, so a caller
      * sees a single monotonic fraction rather than a bar that restarts. */
     {

@@ -34,27 +34,27 @@ Trained through the wide loader with default options.
 | corpus | lects | classes | conditioned |
 | --- | --- | --- | --- |
 | arabic_hebrew | arabic, hebrew | 33 | 7 |
-| contaminated_cognates_synthetic | proto, derived | 7 | 0 |
-| finnish_estonian | finnish, estonian | 29 | 4 |
+| contaminated_cognates_synthetic | derived, proto | 9 | 0 |
+| finnish_estonian | estonian, finnish | 36 | 8 |
 | georgian_svan | georgian, svan | 51 | 10 |
-| harmony_synthetic | proto, derived | 13 | 0 |
-| latin_french | latin, french | 70 | 17 |
-| latin_italian | latin, italian | 40 | 14 |
+| harmony_synthetic | derived, proto | 14 | 3 |
+| latin_french | french, latin | 81 | 17 |
+| latin_italian | italian, latin | 68 | 20 |
 | latin_spanish | latin, spanish | 60 | 22 |
-| length_conditioned_synthetic | proto, derived | 12 | 0 |
-| mandarin_historical | middle_chinese, mandarin | 44 | 4 |
-| navajo_chipewyan | navajo, chipewyan | 49 | 2 |
-| oe_english | old_english, modern_english | 51 | 14 |
-| ppn_hawaiian | ppn, hawaiian | 13 | 0 |
+| length_conditioned_synthetic | derived, proto | 13 | 1 |
+| mandarin_historical | mandarin, middle_chinese | 50 | 8 |
+| navajo_chipewyan | chipewyan, navajo | 53 | 5 |
+| oe_english | modern_english, old_english | 58 | 22 |
+| ppn_hawaiian | hawaiian, ppn | 22 | 7 |
 | swahili_zulu | swahili, zulu | 41 | 7 |
-| tone_3way_synthetic | proto, daughter_a, daughter_b | 9 | 0 |
-| tone_chinese_like | mandarin, cantonese | 35 | 9 |
-| tone_chinese_like_clean | mandarin, cantonese | 9 | 0 |
+| tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
+| tone_chinese_like | cantonese, mandarin | 48 | 20 |
+| tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |
-| tone_yoruba_like | standard, ekiti | 21 | 0 |
-| turkish_azerbaijani | turkish, azerbaijani | 27 | 3 |
-| umlaut_synthetic | proto, derived | 13 | 0 |
+| tone_yoruba_like | ekiti, standard | 21 | 0 |
+| turkish_azerbaijani | azerbaijani, turkish | 34 | 5 |
+| umlaut_synthetic | derived, proto | 14 | 1 |
 
 ## Corpora regulae cannot read yet (2 of 24)
 

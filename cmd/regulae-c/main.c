@@ -18,6 +18,7 @@ static int usage(void) {
     printf("  train <file>      train a multi-lect model and print a summary\n");
     printf("  outliers <file>   rank cognate sets by alignment cost\n");
     printf("  align <file>      print the alignment of every lect pair per cognate\n");
+    printf("  check <file>      report every grapheme the feature system cannot read\n");
     printf("  version           print version\n");
     printf("  help              print this help\n");
     printf("\n");
@@ -330,6 +331,208 @@ static void report_failure(const rg_context *ctx, const char *what, rg_status st
 static int fail(const char *what, rg_status status) {
     report_failure(0, what, status);
     return 1;
+}
+
+
+/* ---- check ------------------------------------------------------------- */
+
+typedef struct grapheme_report {
+    char *grapheme;
+    rg_status status;
+    size_t count;
+    char *first_context;
+} grapheme_report;
+
+static int grapheme_report_cmp(const void *a, const void *b) {
+    const grapheme_report *ra = (const grapheme_report *)a;
+    const grapheme_report *rb = (const grapheme_report *)b;
+    if (ra->count != rb->count) {
+        return ra->count > rb->count ? -1 : 1;
+    }
+    return strcmp(ra->grapheme, rb->grapheme);
+}
+
+static void report_grapheme(
+    grapheme_report **items,
+    size_t *count,
+    size_t *cap,
+    const char *grapheme,
+    rg_status status,
+    const char *where
+) {
+    size_t i;
+    for (i = 0; i < *count; i++) {
+        if (strcmp((*items)[i].grapheme, grapheme) == 0) {
+            (*items)[i].count++;
+            return;
+        }
+    }
+    if (*count == *cap) {
+        size_t next_cap = *cap == 0 ? 16 : *cap * 2;
+        grapheme_report *next = (grapheme_report *)realloc(*items, next_cap * sizeof(*next));
+        if (next == 0) {
+            return;
+        }
+        *items = next;
+        *cap = next_cap;
+    }
+    (*items)[*count].grapheme = dup_string(grapheme);
+    (*items)[*count].status = status;
+    (*items)[*count].count = 1;
+    (*items)[*count].first_context = where == 0 ? 0 : dup_string(where);
+    (*count)++;
+}
+
+/* Reports every grapheme a corpus contains that the feature system cannot
+ * read, rather than stopping at the first one.
+ *
+ * Training refuses an unreadable grapheme, and should: silently skipping input
+ * would train a model on a corpus the user did not supply. But that makes
+ * reading an unfamiliar dataset a fix-one-rerun loop, and real datasets carry
+ * whole families of unreadable tokens at once -- source markup, cover symbols
+ * from a reconstruction, a systematic diacritic the feature system lacks. Those
+ * are one decision each, not one per occurrence, and a user cannot make them
+ * without seeing the whole list. */
+static int command_check(const char *path, const char *format) {
+    rg_context *ctx = 0;
+    FILE *handle;
+    char line[8192];
+    grapheme_report *items = 0;
+    size_t count = 0;
+    size_t cap = 0;
+    size_t forms = 0;
+    size_t bad_forms = 0;
+    size_t i;
+    long segments_column = -1;
+    int is_word[64];
+    int wide = format != 0 && strcmp(format, "wide") == 0;
+    rg_status status;
+
+    memset(is_word, 0, sizeof(is_word));
+    status = rg_context_new_builtin(&ctx);
+    if (status != RG_OK) {
+        return fail("context", status);
+    }
+    handle = fopen(path, "r");
+    if (handle == 0) {
+        rg_context_free(ctx);
+        return fail("reading", RG_ERR_IO);
+    }
+    if (fgets(line, sizeof(line), handle) == 0) {
+        fclose(handle);
+        rg_context_free(ctx);
+        fprintf(stderr, "regulae: check: %s is empty\n", path);
+        return 2;
+    }
+    {
+        char *tok;
+        long col = 0;
+        line[strcspn(line, "\r\n")] = '\0';
+        for (tok = strtok(line, "\t"); tok != 0 && col < 64; tok = strtok(0, "\t")) {
+            size_t n = strlen(tok);
+            if (strcmp(tok, "segments") == 0) {
+                segments_column = col;
+            }
+            /* A companion column holds boundaries, tone or a weight, not a
+             * word. Reading one as a form reports its digits as graphemes. */
+            is_word[col] = col > 0 &&
+                strcmp(tok, "confidence") != 0 &&
+                !(n > 7 && strcmp(tok + n - 7, "_breaks") == 0) &&
+                !(n > 5 && strcmp(tok + n - 5, "_tone") == 0);
+            col++;
+        }
+        if (!wide && segments_column < 0) {
+            fclose(handle);
+            rg_context_free(ctx);
+            fprintf(stderr, "regulae: check: no \"segments\" column; use --format wide\n");
+            return 2;
+        }
+    }
+    while (fgets(line, sizeof(line), handle) != 0) {
+        char *fields[64];
+        size_t field_count = 0;
+        char *tok;
+        line[strcspn(line, "\r\n")] = '\0';
+        if (line[0] == '\0') {
+            continue;
+        }
+        for (tok = strtok(line, "\t"); tok != 0 && field_count < 64; tok = strtok(0, "\t")) {
+            fields[field_count++] = tok;
+        }
+        if (wide) {
+            size_t f;
+            /* Every cell but the first is a candidate word; a cell the
+             * segmenter refuses is reported against the word it came from. */
+            for (f = 1; f < field_count; f++) {
+                rg_segment *segments = 0;
+                size_t n = 0;
+                if (!is_word[f] || fields[f][0] == '\0' || strcmp(fields[f], "-") == 0) {
+                    continue;
+                }
+                forms++;
+                if (rg_context_segment_word(ctx, fields[f], &segments, &n) != RG_OK) {
+                    const char *grapheme = 0;
+                    rg_grapheme_diagnosis diagnosis;
+                    rg_context_last_error(ctx, &grapheme, 0);
+                    diagnosis.status = RG_ERR_UNKNOWN_GRAPHEME;
+                    rg_context_last_diagnosis(ctx, &diagnosis);
+                    bad_forms++;
+                    report_grapheme(&items, &count, &cap,
+                                    grapheme == 0 ? fields[f] : grapheme,
+                                    diagnosis.status, fields[f]);
+                    continue;
+                }
+                for (i = 0; i < n; i++) {
+                    rg_grapheme_diagnosis diagnosis;
+                    if (rg_context_diagnose(ctx, segments[i].grapheme, &diagnosis) == RG_OK &&
+                        diagnosis.status != RG_OK) {
+                        bad_forms++;
+                        report_grapheme(&items, &count, &cap, segments[i].grapheme,
+                                        diagnosis.status, fields[f]);
+                        break;
+                    }
+                }
+                rg_segments_free(segments, n);
+            }
+        } else if ((size_t)segments_column < field_count) {
+            char *cell = fields[segments_column];
+            char *segment;
+            int reported = 0;
+            forms++;
+            for (segment = strtok(cell, " "); segment != 0; segment = strtok(0, " ")) {
+                rg_grapheme_diagnosis diagnosis;
+                if (rg_context_diagnose(ctx, segment, &diagnosis) == RG_OK &&
+                    diagnosis.status != RG_OK) {
+                    if (!reported) {
+                        bad_forms++;
+                        reported = 1;
+                    }
+                    report_grapheme(&items, &count, &cap, segment, diagnosis.status, 0);
+                }
+            }
+        }
+    }
+    fclose(handle);
+
+    if (count > 1) {
+        qsort(items, count, sizeof(*items), grapheme_report_cmp);
+    }
+    printf("forms\t%lu\nunreadable\t%lu\ngraphemes\t%lu\n",
+           (unsigned long)forms, (unsigned long)bad_forms, (unsigned long)count);
+    for (i = 0; i < count; i++) {
+        printf("GRAPHEME\t%s\t%s\t%lu",
+               items[i].grapheme, rg_status_string(items[i].status),
+               (unsigned long)items[i].count);
+        if (items[i].first_context != 0) {
+            printf("\t%s", items[i].first_context);
+        }
+        printf("\n");
+        free(items[i].grapheme);
+        free(items[i].first_context);
+    }
+    free(items);
+    rg_context_free(ctx);
+    return count == 0 ? 0 : 1;
 }
 
 static int command_train(const char *path, const char *format, int pairwise, int human, int json) {
@@ -656,6 +859,9 @@ int main(int argc, char **argv) {
     }
     if (strcmp(argv[1], "align") == 0) {
         return use_model ? command_align_with_model(path, format) : command_align(path, format);
+    }
+    if (strcmp(argv[1], "check") == 0) {
+        return command_check(path, format);
     }
     fprintf(stderr, "regulae: unknown command: %s\n", argv[1]);
     usage();
