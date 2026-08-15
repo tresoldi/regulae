@@ -934,7 +934,44 @@ static const split_candidate immediate_feature_inventory[] = {
     {"following", "voiced", "+"},
     {"following", "voiceless", "+"},
     {"following", "aspirated", "+"},
-    {"preceding", "aspirated", "+"}
+    {"preceding", "aspirated", "+"},
+    /* Place. Assimilation is the commonest conditioned change there is, and
+     * until 2026-08-15 it could not be stated: nothing in these tables named a
+     * place, so "the nasal takes the place of what follows it" had no term.
+     *
+     * The major classes are the natural classes assimilation refers to, and go
+     * everywhere. The specific places are here on the immediate neighbours
+     * only, where there are two slots rather than nine: adjacent assimilation
+     * is regularly to a particular place, while assimilation at a distance is
+     * almost always to a major class, and putting ten more features against
+     * nine long-range slots would double that search for cases no attested
+     * change seems to need. */
+    {"following", "coronal", "+"},
+    {"preceding", "coronal", "+"},
+    {"following", "dorsal", "+"},
+    {"preceding", "dorsal", "+"},
+    {"following", "labial", "+"},
+    {"preceding", "labial", "+"},
+    {"following", "alveolar", "+"},
+    {"preceding", "alveolar", "+"},
+    {"following", "bilabial", "+"},
+    {"preceding", "bilabial", "+"},
+    {"following", "dental", "+"},
+    {"preceding", "dental", "+"},
+    {"following", "glottal", "+"},
+    {"preceding", "glottal", "+"},
+    {"following", "guttural", "+"},
+    {"preceding", "guttural", "+"},
+    {"following", "labio-dental", "+"},
+    {"preceding", "labio-dental", "+"},
+    {"following", "palatal", "+"},
+    {"preceding", "palatal", "+"},
+    {"following", "post-alveolar", "+"},
+    {"preceding", "post-alveolar", "+"},
+    {"following", "uvular", "+"},
+    {"preceding", "uvular", "+"},
+    {"following", "velar", "+"},
+    {"preceding", "velar", "+"}
 };
 
 static const char *const split_positions[] = {"initial", "medial", "final"};
@@ -945,7 +982,8 @@ static const char *const stress_slot_names[] = {"self_stress", "preceding_stress
  * slots. */
 static const char *const long_range_feature_names[] = {
     "front", "back", "close", "open", "voiced", "voiceless", "long",
-    "nasal", "stop", "fricative", "sonorant", "aspirated"
+    "nasal", "stop", "fricative", "sonorant", "aspirated",
+    "labial", "coronal", "dorsal"
 };
 
 static const char *const long_range_slot_names[] = {

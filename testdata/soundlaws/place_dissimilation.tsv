@@ -1,0 +1,73 @@
+cognate_id	lect_id	segments
+d00	proto	p a l e m a
+d00	daughter	t a l e m a
+d01	proto	p a l i t a m e
+d01	daughter	t a l i t a m e
+d02	proto	p a l o m a
+d02	daughter	t a l o m a
+d03	proto	p a l u t a m e
+d03	daughter	t a l u t a m e
+d04	proto	p e l a m a
+d04	daughter	t e l a m a
+d05	proto	p e l i t a m e
+d05	daughter	t e l i t a m e
+d06	proto	p a l e p a
+d06	daughter	t a l e p a
+d07	proto	p a l i t a p e
+d07	daughter	t a l i t a p e
+d08	proto	p a l o p a
+d08	daughter	t a l o p a
+d09	proto	p a l u t a p e
+d09	daughter	t a l u t a p e
+d10	proto	p e l a p a
+d10	daughter	t e l a p a
+d11	proto	p e l i t a p e
+d11	daughter	t e l i t a p e
+d12	proto	p a l e b a
+d12	daughter	t a l e b a
+d13	proto	p a l i t a b e
+d13	daughter	t a l i t a b e
+d14	proto	p a l o b a
+d14	daughter	t a l o b a
+d15	proto	p a l u t a b e
+d15	daughter	t a l u t a b e
+d16	proto	p e l a b a
+d16	daughter	t e l a b a
+d17	proto	p e l i t a b e
+d17	daughter	t e l i t a b e
+d18	proto	p a l e n a
+d18	daughter	p a l e n a
+d19	proto	p a l i t a n e
+d19	daughter	p a l i t a n e
+d20	proto	p a l o n a
+d20	daughter	p a l o n a
+d21	proto	p a l u t a n e
+d21	daughter	p a l u t a n e
+d22	proto	p e l a n a
+d22	daughter	p e l a n a
+d23	proto	p e l i t a n e
+d23	daughter	p e l i t a n e
+d24	proto	p a l e t a
+d24	daughter	p a l e t a
+d25	proto	p a l i t a t e
+d25	daughter	p a l i t a t e
+d26	proto	p a l o t a
+d26	daughter	p a l o t a
+d27	proto	p a l u t a t e
+d27	daughter	p a l u t a t e
+d28	proto	p e l a t a
+d28	daughter	p e l a t a
+d29	proto	p e l i t a t e
+d29	daughter	p e l i t a t e
+d30	proto	p a l e s a
+d30	daughter	p a l e s a
+d31	proto	p a l i t a s e
+d31	daughter	p a l i t a s e
+d32	proto	p a l o s a
+d32	daughter	p a l o s a
+d33	proto	p a l u t a s e
+d33	daughter	p a l u t a s e
+d34	proto	p e l a s a
+d34	daughter	p e l a s a
+d35	proto	p e l i t a s e
+d35	daughter	p e l i t a s e

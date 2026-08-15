@@ -90,6 +90,28 @@ and six that lose it, all filed under `@initial ∧ somewhere-fol[stop:+]`.
 This fixture documented a limit for a day and now documents a capability. The
 paragraph above is kept because the shape of the failure is the useful part.
 
+### `place_assimilation.tsv` — nasal place assimilation
+
+The nasal takes the place of the consonant after it: `m` before a labial, `ŋ`
+before a dorsal, unchanged before a coronal. The commonest conditioned change
+there is, and until place entered the conditioning vocabulary it produced no
+conditioned class at all — nothing in the candidate tables named a place, so
+"before a labial" had no term to be stated in.
+
+All three environments are present, so no two-way predicate can stand in for
+the three-way one. Two come out named and the third as the elsewhere case,
+which is how a sound law is conventionally written.
+
+The same rule turns up in the real Latin/Italian data:
+`italian ŋ ~ latin n / next-syl[dorsal:+]`, which is *lingua* and *anca*.
+
+### `place_dissimilation.tsv` — labial dissimilation
+
+An initial labial goes coronal when another labial appears later in the word,
+at no fixed distance. Place in an existential environment, which is what place
+conditioning looks like when it is not adjacent, and the reason the major
+classes are searchable at long range rather than only next door.
+
 ## The graded ladder — `graded_*.tsv`
 
 Seven corpora with the same shape and the same change, proto /p/ answering to

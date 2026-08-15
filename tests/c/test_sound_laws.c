@@ -370,6 +370,44 @@ static void test_conditioning_ladder(rg_context *ctx) {
     }
 }
 
+/* Nasal place assimilation: the nasal takes the place of the consonant after
+ * it. The commonest conditioned change there is, and until place entered the
+ * conditioning vocabulary on 2026-08-15 it produced no conditioned class at
+ * all -- nothing in the candidate tables named a place, so "before a labial"
+ * had no term to be stated in.
+ *
+ * All three environments are present, so no two-way predicate can stand in for
+ * the three-way one. Two are named and the third is the elsewhere case, which
+ * is how a sound law is conventionally written. */
+static void test_place_assimilation(rg_context *ctx) {
+    rg_corpus *corpus = load("place_assimilation");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "n", "m"));
+    assert(has_correspondence(model, "n", "\xc5\x8b"));
+    assert(has_conditioned(model, "n", "m", "labial"));
+    assert(has_conditioned(model, "n", "n", "coronal"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* Labial dissimilation: an initial labial goes coronal when another labial
+ * appears later in the word, at no fixed distance. Place in an existential
+ * environment, which is what place conditioning looks like when it is not
+ * adjacent -- and which needs the major classes to be searchable at long range
+ * rather than only next door. */
+static void test_place_dissimilation(rg_context *ctx) {
+    rg_corpus *corpus = load("place_dissimilation");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "p", "t"));
+    assert(has_conditioned(model, "p", "t", "labial"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -378,6 +416,8 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_place_assimilation(ctx);
+    test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);

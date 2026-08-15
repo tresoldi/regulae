@@ -477,7 +477,10 @@ static const char *const multi_long_range_features[] = {
     "stop",
     "fricative",
     "sonorant",
-    "aspirated"
+    "aspirated",
+    "labial",
+    "coronal",
+    "dorsal"
 };
 
 static const char *const multi_stress_slots[] = {

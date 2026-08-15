@@ -39,8 +39,8 @@ Trained through the wide loader with default options.
 | finnish_estonian | estonian, finnish | 36 | 8 |
 | georgian_svan | georgian, svan | 49 | 10 |
 | harmony_synthetic | derived, proto | 14 | 3 |
-| latin_french | french, latin | 81 | 19 |
-| latin_italian | italian, latin | 68 | 20 |
+| latin_french | french, latin | 79 | 19 |
+| latin_italian | italian, latin | 70 | 21 |
 | latin_spanish | latin, spanish | 60 | 23 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 50 | 8 |
