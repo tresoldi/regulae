@@ -14,7 +14,7 @@
      0  a20c99447fc87774e3b447ef47be56230b04741b27f88cab2b4d3f642a0f10b8  experiments/latin_italian/cognates.tsv
      0  38d8d1086e0e6a193f283be432fc4d4afc0448db0b8705b7056f4ab69d0e4656  experiments/latin_spanish/cognates.tsv
      0  2d62df31ab3423927e1afaf60d6af771657df61d0bacac8134afc08a35489e66  experiments/length_conditioned_synthetic/cognates.tsv
-     0  865751e3e33a65d4f81b5df83e791859f27d526260105194e2c1f91989f290ff  experiments/mandarin_historical/cognates.tsv
+     0  21032294203a4a9230e13927eecfe8b339b908e26045464681bd973cbe5dd618  experiments/mandarin_historical/cognates.tsv
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  experiments/morph_boundary_synthetic/cognates.tsv
      0  0d6071ab2a5b364bb7d11ab23b8386af91c5c033018909b6985b17384f7109c7  experiments/navajo_chipewyan/cognates.tsv
      0  87f08c9801e8c9e0e54d8844a15f7ce6160473c89137689dae53d39ce915ec48  experiments/oe_english/cognates.tsv
@@ -22,7 +22,7 @@
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  experiments/stress_conditioned_synthetic/cognates.tsv
      0  e3e113161ac49deb0979e3474ccb284141f057c9f9570cedd0659ebeb9343a55  experiments/swahili_zulu/cognates.tsv
      0  03c3aa499ac73b522a08951ef07089d54c90e987df5328273764876c4f4b43ce  experiments/tone_3way_synthetic/cognates.tsv
-     0  f1bbcb833a1756ea700d33e20c7722a7903b18f80909e699a0147a6adf9c625c  experiments/tone_chinese_like/cognates.tsv
+     0  28157d4a2c50bdc50e555513a278fbb64b2ded7f7ac6b6c2949fc83426dfdb05  experiments/tone_chinese_like/cognates.tsv
      0  3ed33c3bfabc9d96727b466e072e110ff91414000e2621a3e145cef6f236f16b  experiments/tone_chinese_like_clean/cognates.tsv
      0  8bada6687096fe2bced735131bdc747e4881f9bdd0d74fa1e0f24f2123f0b83a  experiments/tone_synthetic/cognates.tsv
      0  c81505bde0ab64dbde3603371a64b7f0ad872a9e3ca61dcef104426e31e369c3  experiments/tone_vietnamese_like/cognates.tsv

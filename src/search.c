@@ -310,7 +310,25 @@ static rg_status align_forms_internal(
                     if (status != RG_OK) {
                         break;
                     }
-                    total = prev + link_cost + RG_CHUNK_COMPLEXITY_PENALTY * (double)((int)k + (int)l - 2);
+                    /* What the committed cross-dimensional rules make of this
+                     * position, charged here rather than added to the finished
+                     * alignment afterwards.
+                     *
+                     * The adjustment is local to the transition -- its source
+                     * predicate reads the source form at i-k and its target
+                     * value the target form at (j-l)+offset, and both forms are
+                     * fixed input -- so the DP can price it. Until it did, the
+                     * search chose an alignment without knowing the rules would
+                     * fire and the rules re-scored what it had already chosen,
+                     * which docs/correspondence_discovery.md called provisional
+                     * and more principled to integrate.
+                     *
+                     * Zero until cross-dimensional discovery has committed
+                     * something, which is every stage before it. */
+                    total = prev + link_cost
+                          + cross_dimensional_link_adjustment(ctx, model, source, i - k,
+                                                              target, j - l, k, l)
+                          + RG_CHUNK_COMPLEXITY_PENALTY * (double)((int)k + (int)l - 2);
                     if (total < cost[i * width + j] - RG_TIE_EPSILON) {
                         cost[i * width + j] = total;
                         back[i * width + j].prev_i = i - k;

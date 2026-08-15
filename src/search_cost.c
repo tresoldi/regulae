@@ -135,6 +135,56 @@ static double cross_dimensional_adjustment_for_row(
     return -(log(1.0 - p_cond) - log(1.0 - p_base));
 }
 
+/* What the committed cross-dimensional rules make of one aligned position.
+ *
+ * Local to a single link, and to the two forms, which are fixed input: the
+ * source predicate is read at src_pos and the target value at
+ * tgt_pos + offset. Nothing here depends on any other link. That is what lets
+ * the DP charge for it while it searches instead of the rules re-scoring an
+ * alignment already chosen -- see docs/correspondence_discovery.md.
+ *
+ * Only 1-to-1 links carry it. A chunk spans several positions and the rules are
+ * stated about one. */
+double cross_dimensional_link_adjustment(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_form *source_form,
+    size_t src_pos,
+    const rg_form *target_form,
+    size_t tgt_pos,
+    size_t source_count,
+    size_t target_count
+) {
+    size_t row_i;
+    double total = 0.0;
+    if (ctx == 0 || model == 0 || model->cross_dimensional_count == 0) {
+        return 0.0;
+    }
+    if (source_count != 1 || target_count != 1) {
+        return 0.0;
+    }
+    for (row_i = 0; row_i < model->cross_dimensional_count; row_i++) {
+        const rg_cross_dimensional_row *row = &model->cross_dimensional_rows[row_i];
+        int tgt_index = (int)tgt_pos + row->target_position_offset;
+        const char *actual = "";
+        if (!cross_dimensional_source_holds(ctx, source_form, src_pos, row)) {
+            continue;
+        }
+        if (tgt_index < 0 || (size_t)tgt_index >= target_form->segment_count) {
+            continue;
+        }
+        if (strcmp(row->target_dimension, "tone") == 0) {
+            actual = target_form->segments[tgt_index].tone == 0 ? "" : target_form->segments[tgt_index].tone;
+        } else if (strcmp(row->target_dimension, "length") == 0) {
+            actual = target_form->segments[tgt_index].length == 0 ? "" : target_form->segments[tgt_index].length;
+        } else if (strcmp(row->target_dimension, "stress") == 0) {
+            actual = target_form->segments[tgt_index].stress == 0 ? "" : target_form->segments[tgt_index].stress;
+        }
+        total += cross_dimensional_adjustment_for_row(model, row, actual);
+    }
+    return total;
+}
+
 double cross_dimensional_alignment_adjustment(
     const rg_context *ctx,
     const rg_pairwise_model *model,
@@ -149,28 +199,10 @@ double cross_dimensional_alignment_adjustment(
     }
     for (link_i = 0; link_i < alignment->link_count; link_i++) {
         const rg_link *link = &alignment->links[link_i];
-        if (link->source_count == 1 && link->target_count == 1) {
-            size_t row_i;
-            for (row_i = 0; row_i < model->cross_dimensional_count; row_i++) {
-                const rg_cross_dimensional_row *row = &model->cross_dimensional_rows[row_i];
-                int tgt_index = (int)tgt_pos + row->target_position_offset;
-                const char *actual = "";
-                if (!cross_dimensional_source_holds(ctx, &alignment->source_form, src_pos, row)) {
-                    continue;
-                }
-                if (tgt_index < 0 || (size_t)tgt_index >= alignment->target_form.segment_count) {
-                    continue;
-                }
-                if (strcmp(row->target_dimension, "tone") == 0) {
-                    actual = alignment->target_form.segments[tgt_index].tone == 0 ? "" : alignment->target_form.segments[tgt_index].tone;
-                } else if (strcmp(row->target_dimension, "length") == 0) {
-                    actual = alignment->target_form.segments[tgt_index].length == 0 ? "" : alignment->target_form.segments[tgt_index].length;
-                } else if (strcmp(row->target_dimension, "stress") == 0) {
-                    actual = alignment->target_form.segments[tgt_index].stress == 0 ? "" : alignment->target_form.segments[tgt_index].stress;
-                }
-                total += cross_dimensional_adjustment_for_row(model, row, actual);
-            }
-        }
+        total += cross_dimensional_link_adjustment(
+            ctx, model, &alignment->source_form, src_pos,
+            &alignment->target_form, tgt_pos,
+            link->source_count, link->target_count);
         src_pos += link->source_count;
         tgt_pos += link->target_count;
     }

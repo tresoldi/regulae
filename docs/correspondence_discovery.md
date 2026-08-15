@@ -769,11 +769,38 @@ adjustment. Rules that explain a real correspondence produce negative
 adjustments (lower cost), making the alignment cheaper on matching
 data and more expensive on mismatching data.
 
-The overlay is *not* inside the DP: the search picks alignments
-without knowing rules will fire, and the rules re-score afterwards.
-This is a provisional design — integrating the overlay into the DP
-cost function would be more principled but requires substantial
-refactoring.
+The overlay *is* inside the DP, as of 2026-08-16. It had not been:
+the search picked an alignment without knowing the rules would fire
+and the rules re-scored what it had already chosen, so the alignment
+returned was not the one that minimised the function reporting its
+cost. This note called that provisional, and integrating it more
+principled but a substantial refactor.
+
+It was neither substantial nor a refactor of the cost algebra. The
+adjustment is local to a DP transition: its source predicate reads the
+source form at the link's start and its target value the target form
+at that position plus the rule's offset, and both forms are fixed
+input, so nothing in it depends on any other link. At a transition
+those two positions are exactly the DP's own indices. The whole-
+alignment walk existed because the function was called after the fact,
+not because the quantity was non-local.
+
+What it cost, measured over all 63 corpora in the tree: no detectable
+time — the rule table is empty for every stage before cross-dimensional
+discovery commits, and the guard returns immediately — and two corpora
+changed, `mandarin_historical` and `tone_chinese_like`, the two with
+committed tonogenesis rules. Both improved: `cost_per_segment` went
+from −1.833 to −1.854 and from −1.926 to −1.980. Class counts and rule
+counts are unchanged in both, so the rules found are the same rules;
+what moved is which alignments the search settled on. Every fixture in
+`testdata/soundlaws/` is bit-identical, so no sound law was lost.
+
+One consequence is worth stating because it is easy to miss. Stage
+order is load-bearing, and the long-range context stage runs *after*
+cross-dimensional discovery and re-aligns. So from now on it sees
+alignments that were chosen knowing the cross-dimensional rules, which
+is a change in what that stage is shown, not only in what the caller is
+told an alignment cost.
 
 ## 6. Long-range context predicates
 

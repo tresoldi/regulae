@@ -64,6 +64,7 @@ void build_link_context_borrowed( const rg_form *source, const rg_feature_constr
 void morpheme_placement( const rg_form *form, size_t start, size_t end, const char **out_position, const char **out_index );
 
 /* ---- search_cost.c: cross-dimensional adjustment to a scored alignment */
+double cross_dimensional_link_adjustment( const rg_context *ctx, const rg_pairwise_model *model, const rg_form *source_form, size_t src_pos, const rg_form *target_form, size_t tgt_pos, size_t source_count, size_t target_count );
 double cross_dimensional_alignment_adjustment( const rg_context *ctx, const rg_pairwise_model *model, const rg_alignment *alignment );
 
 /* ---- search_features.c: a segment's features, and the constraint arrays built from them */
