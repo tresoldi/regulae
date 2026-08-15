@@ -376,11 +376,36 @@ static void test_the_shuffled_baseline_is_reproducible(rg_context *ctx) {
  * the two conditionals, which is the same number whichever lect is called the
  * source.
  *
+ * Chunk promotion carried the same fault one level up and kept
+ * place_dissimilation out of this list until 2026-08-15. A chunk's promoted
+ * cost was P(target chunk | source chunk) and its compositional baseline was
+ * the forward segment posterior, so a chunk whose source was ambiguous in one
+ * lect and determined in the other was priced differently each way: the t-lect
+ * promoted "ta ~ pa", "tal ~ pal" and "te ~ pe", the p-lect promoted none of
+ * them, and the evidence for p > t before a labial went into chunk rows in one
+ * direction and into a conditioned rule in the other. Both quantities are now
+ * the geometric mean of the two directions, and the chunk tables mirror.
+ *
  * The alignment DP still resolves exact cost ties by enumeration order, which
  * is not invariant under the exchange, so this is asserted on corpora large
  * enough to have a decided answer rather than on a handful of forms. */
+static int segments_equal(const rg_segment *a, size_t a_count, const rg_segment *b, size_t b_count) {
+    size_t i;
+    if (a_count != b_count) {
+        return 0;
+    }
+    for (i = 0; i < a_count; i++) {
+        if (strcmp(a[i].grapheme, b[i].grapheme) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static void test_the_analysis_does_not_depend_on_which_lect_is_named_first(rg_context *ctx) {
-    static const char *fixtures[] = { "rhotacism", "grimm", "verner", "lenition" };
+    static const char *fixtures[] = {
+        "rhotacism", "grimm", "verner", "lenition", "place_dissimilation"
+    };
     size_t f;
     for (f = 0; f < sizeof(fixtures) / sizeof(fixtures[0]); f++) {
         rg_corpus *corpus = load(fixtures[f]);
@@ -427,6 +452,24 @@ static void test_the_analysis_does_not_depend_on_which_lect_is_named_first(rg_co
                     assert(row->count == other->count);
                     assert(row->source_total == other->target_total);
                     assert(row->target_total == other->source_total);
+                    mirrored = 1;
+                    break;
+                }
+            }
+            assert(mirrored);
+        }
+
+        /* Every promoted chunk answers to a chunk promoted the other way with
+         * the two sides exchanged, carrying the same mass. */
+        assert(rg_pairwise_model_chunk_row_count(a) == rg_pairwise_model_chunk_row_count(b));
+        for (i = 0; i < rg_pairwise_model_chunk_row_count(a); i++) {
+            const rg_chunk_row *row = rg_pairwise_model_chunk_row_at(a, i);
+            int mirrored = 0;
+            for (j = 0; j < rg_pairwise_model_chunk_row_count(b); j++) {
+                const rg_chunk_row *other = rg_pairwise_model_chunk_row_at(b, j);
+                if (segments_equal(row->source, row->source_count, other->target, other->target_count) &&
+                    segments_equal(row->target, row->target_count, other->source, other->source_count)) {
+                    assert(row->count == other->count);
                     mirrored = 1;
                     break;
                 }

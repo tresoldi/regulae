@@ -372,6 +372,15 @@ int rg_segment_posterior_internal(
     double *out
 );
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source);
+
+/* Half of -log P(t|s) plus half of -log P(s|t), with no log-Z offset. Returns 0
+ * when the pair is unknown to the model. */
+int rg_segment_symmetric_raw_cost_internal(
+    const rg_pairwise_model *model,
+    const char *source,
+    const char *target,
+    double *out
+);
 size_t rg_segment_vocab_size_internal(const rg_pairwise_model *model);
 rg_status rg_score_link_with_context_model_internal(
     const rg_context *ctx,

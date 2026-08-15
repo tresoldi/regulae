@@ -39,13 +39,13 @@ Trained through the wide loader with default options.
 | finnish_estonian | estonian, finnish | 36 | 2 |
 | georgian_svan | georgian, svan | 51 | 9 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 82 | 15 |
+| latin_french | french, latin | 82 | 16 |
 | latin_italian | italian, latin | 69 | 14 |
 | latin_spanish | latin, spanish | 62 | 20 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 48 | 7 |
 | navajo_chipewyan | chipewyan, navajo | 53 | 2 |
-| oe_english | modern_english, old_english | 60 | 13 |
+| oe_english | modern_english, old_english | 60 | 12 |
 | ppn_hawaiian | hawaiian, ppn | 22 | 4 |
 | swahili_zulu | swahili, zulu | 41 | 2 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |

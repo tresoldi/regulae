@@ -663,6 +663,32 @@ static int segment_symmetric_cost(
     return 1;
 }
 
+/* The same quantity without the log-Z offset: half of -log P(t|s) plus half of
+ * -log P(s|t) and nothing else.
+ *
+ * Chunk promotion needs this. It weighs a chunk's promoted cost against the
+ * cost of building it from segment draws, and both sides of that comparison
+ * have to be the same kind of number or the winner depends on which lect the
+ * corpus named first. The compositional side used to be the bare forward
+ * posterior: on place_dissimilation the p-lect's /t/ answers only to /t/, so
+ * building "at" from segments looked free from that side and cost 0.48 nats
+ * from the other, and chunks promoted in one direction that did not promote in
+ * the other. */
+int rg_segment_symmetric_raw_cost_internal(
+    const rg_pairwise_model *model,
+    const char *source,
+    const char *target,
+    double *out
+) {
+    double cost;
+    if (!segment_symmetric_cost(model, source, target, 0, 0, &cost)) {
+        return 0;
+    }
+    *out = cost + 0.5 * (segment_log_normalizer(model, source) +
+                         segment_log_normalizer(model, target));
+    return 1;
+}
+
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source) {
     return segment_log_normalizer(model, source);
 }

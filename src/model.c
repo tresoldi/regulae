@@ -2400,6 +2400,21 @@ static rg_status discover_both_sides(
     rg_status status = RG_OK;
 
     for (side = 0; side < 2 && status == RG_OK; side++) {
+        /* Immediate discovery looks inside promoted chunks; long-range
+         * discovery does not, and that costs it evidence. Promotion runs
+         * first, so by the time this stage sees the corpus the segments a
+         * long-range rule would be stated over may already be inside a chunk
+         * row: on place_dissimilation the rule that names the following labial
+         * is left with 6 of its 18 observations, the other 12 having gone into
+         * "pa ~ ta" and "pal ~ tal".
+         *
+         * Decomposing here recovers all 18 in both directions, and is not
+         * committed because it uncovers a further asymmetry it does not cause:
+         * with the extra observations in view, long-range discovery commits
+         * rows in one direction that it does not commit in the other (two on
+         * rhotacism, one on verner) although its inputs mirror exactly -- the
+         * same source groups, the same masses, the same target counts. That is
+         * its own defect and wants its own change. */
         status = flatten_context_observations(
             ctx, pairs, pair_count, options, model, long_range ? 0 : 1, side,
             &observations[side], &counts[side], &totals[side]
@@ -2585,6 +2600,22 @@ static double chunk_source_total(const chunk_candidate *items, size_t count, con
     return total;
 }
 
+/* The same, counting from the target chunk: how much mass answers to it, and
+ * from how many distinct sources. */
+static double chunk_target_total(const chunk_candidate *items, size_t count, const chunk_candidate *candidate, size_t *source_variants) {
+    size_t i;
+    double total = 0.0;
+    size_t variants = 0;
+    for (i = 0; i < count; i++) {
+        if (segment_array_equal(items[i].target, items[i].target_count, candidate->target, candidate->target_count)) {
+            total += items[i].count;
+            variants++;
+        }
+    }
+    *source_variants = variants;
+    return total;
+}
+
 /* Raw compositional cost of a chunk: the negative log probability of producing
  * it from independent segment-level draws under the best one-segment
  * decomposition. No log-Z offset, so it is directly comparable with the
@@ -2635,17 +2666,13 @@ static rg_status compositional_chunk_cost_raw(
     for (i = 0; i < rg_alignment_link_count(sub); i++) {
         const rg_link *link = rg_alignment_link_at(sub, i);
         if (link->source_count == 1 && link->target_count == 1) {
-            rg_context_spec empty;
-            double posterior = 0.0;
-            rg_context_spec_init_empty(&empty);
-            if (!rg_segment_posterior_internal(model, link->source[0].grapheme, link->target[0].grapheme, &empty, 0, &posterior) ||
-                posterior <= 0.0) {
-                rg_context_spec_clear_internal(&empty);
+            double segment_cost = 0.0;
+            if (!rg_segment_symmetric_raw_cost_internal(
+                    model, link->source[0].grapheme, link->target[0].grapheme, &segment_cost)) {
                 rg_alignment_free(sub);
                 return RG_OK;
             }
-            rg_context_spec_clear_internal(&empty);
-            cost += -log(posterior);
+            cost += segment_cost;
         } else {
             size_t span = link->source_count > link->target_count ? link->source_count : link->target_count;
             cost += gap_cost_per_segment * (double)span;
@@ -2656,24 +2683,42 @@ static rg_status compositional_chunk_cost_raw(
     return RG_OK;
 }
 
-/* Laplace-smoothed MLE cost of the chunk under the candidate counts. */
+/* Laplace-smoothed MLE cost of the chunk under the candidate counts, as the
+ * geometric mean of the two conditionals.
+ *
+ * P(target chunk | source chunk) alone is a claim about one direction, and it
+ * prices the same chunk differently depending on which lect the corpus happens
+ * to name first. On place_dissimilation the p-lect's "pa" is ambiguous -- it
+ * answers to both "ta" and "pa" -- while the t-lect's "ta" answers to "pa" and
+ * nothing else, so read from the t-lect the chunk was free and always beat its
+ * compositional cost, and read from the p-lect it did not. Chunk promotion then
+ * swallowed the evidence for p > t / _ [labial ...] in one direction only.
+ *
+ * The segment scorer was symmetrized for the same reason; this is the same
+ * quantity one level up. One log call, not two: four of them in the segment
+ * cost were enough to make native and wasm disagree in the last bit. */
 static double promoted_chunk_cost(
     const chunk_candidate *items,
     size_t count,
     const chunk_candidate *candidate,
     double alpha
 ) {
-    size_t variants = 0;
-    double source_total = chunk_source_total(items, count, candidate, &variants);
-    double probability;
-    if (variants == 0) {
+    size_t target_variants = 0;
+    size_t source_variants = 0;
+    double source_total = chunk_source_total(items, count, candidate, &target_variants);
+    double target_total = chunk_target_total(items, count, candidate, &source_variants);
+    double numerator;
+    double denominator;
+    if (target_variants == 0 || source_variants == 0) {
         return INFINITY;
     }
-    probability = (candidate->count + alpha) / (source_total + alpha * (double)variants);
-    if (probability <= 0.0) {
+    numerator = (source_total + alpha * (double)target_variants) *
+                (target_total + alpha * (double)source_variants);
+    denominator = (candidate->count + alpha) * (candidate->count + alpha);
+    if (!(numerator > 0.0) || !(denominator > 0.0)) {
         return INFINITY;
     }
-    return -log(probability);
+    return 0.5 * log(numerator / denominator);
 }
 
 /* Enumerates contiguous sub-alignments as candidate chunks and promotes the
