@@ -5,6 +5,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The test allocated these strings and stored them in fields the API declares
+ * `const char *`, because that is what they are to a reader of a form. Freeing
+ * them means taking the qualifier back off; going through a copy of the pointer
+ * value keeps that defined. The library does the same thing in one place, as
+ * rg_free_owned_internal. */
+static void free_owned(const void *owned) {
+    void *value;
+    memcpy(&value, &owned, sizeof(value));
+    free(value);
+}
+
 static rg_segment seg(const char *g) {
     rg_segment s = {g, 0, 0, 0};
     return s;
@@ -131,7 +142,7 @@ static void test_uninformative_environments_commit_nothing(rg_context *ctx) {
     assert(rg_pairwise_model_cross_dimensional_row_count(model) == 0);
     rg_pairwise_model_free(model);
     for (i = 0; i < 40; i++) {
-        free((void *)pairs[i].source.segments);
+        free_owned(pairs[i].source.segments);
     }
 }
 
@@ -256,9 +267,6 @@ int main(void) {
     rg_segment pa[] = {{"p", 0, 0, 0}, {"a", 0, 0, 0}};
     rg_segment fa[] = {{"f", 0, 0, 0}, {"a", 0, 0, 0}};
     rg_segment pi[] = {{"p", 0, 0, 0}, {"i", 0, 0, 0}};
-    rg_segment atp[] = {{"a", 0, 0, 0}, {"t", 0, 0, 0}, {"p", 0, 0, 0}};
-    rg_segment atf[] = {{"a", 0, 0, 0}, {"t", 0, 0, 0}, {"f", 0, 0, 0}};
-    rg_segment itp[] = {{"i", 0, 0, 0}, {"t", 0, 0, 0}, {"p", 0, 0, 0}};
     rg_segment ka[] = {{"k", 0, 0, 0}, {"a", 0, 0, 0}};
     rg_segment kt[] = {{"k", 0, 0, 0}, {"t", 0, 0, 0}};
     rg_segment tt[] = {{"t", 0, 0, 0}, {"t", 0, 0, 0}};

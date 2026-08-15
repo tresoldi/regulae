@@ -24,13 +24,13 @@ static void form_clear(rg_form *form) {
     if (form == 0) {
         return;
     }
-    free((char *)form->lect_id);
+    rg_free_owned_internal(form->lect_id);
     for (i = 0; i < form->segment_count; i++) {
-        rg_segment_clear_internal((rg_segment *)&form->segments[i]);
+        rg_segment_clear_internal(rg_owned_internal(&form->segments[i]));
     }
-    free((rg_segment *)form->segments);
-    free((int *)form->syllable_breaks);
-    free((int *)form->morpheme_breaks);
+    rg_free_owned_internal(form->segments);
+    rg_free_owned_internal(form->syllable_breaks);
+    rg_free_owned_internal(form->morpheme_breaks);
     memset(form, 0, sizeof(*form));
 }
 
@@ -139,7 +139,7 @@ static void feature_matrix_clear(
 ) {
     (void)count;
     free(features);
-    free((size_t *)feature_counts);
+    rg_free_owned_internal(feature_counts);
 }
 
 static rg_status feature_matrix_build(
@@ -249,8 +249,8 @@ static rg_status distance_context_copy_two(
         if (status != RG_OK) {
             while (pos > 0) {
                 pos--;
-                free((char *)copy[pos].constraint.feature);
-                free((char *)copy[pos].constraint.value);
+                rg_free_owned_internal(copy[pos].constraint.feature);
+                rg_free_owned_internal(copy[pos].constraint.value);
             }
             free(copy);
             return status;
@@ -263,8 +263,8 @@ static rg_status distance_context_copy_two(
         if (status != RG_OK) {
             while (pos > 0) {
                 pos--;
-                free((char *)copy[pos].constraint.feature);
-                free((char *)copy[pos].constraint.value);
+                rg_free_owned_internal(copy[pos].constraint.feature);
+                rg_free_owned_internal(copy[pos].constraint.value);
             }
             free(copy);
             return status;
@@ -562,7 +562,7 @@ static rg_status append_syllable_shape(
             return RG_ERR_OOM;
         }
     }
-    free((void *)*union_out);
+    rg_free_owned_internal(*union_out);
     *union_out = grown;
     *union_count += extra_count;
     return RG_OK;
@@ -1637,19 +1637,6 @@ const rg_link *rg_alignment_link_at(const rg_alignment *alignment, size_t index)
         return 0;
     }
     return &alignment->links[index];
-}
-
-static int parse_cross_dimensional_offset(const char *position) {
-    if (position == 0) {
-        return 0;
-    }
-    if (strcmp(position, "relative_-1") == 0) {
-        return -1;
-    }
-    if (strcmp(position, "relative_+1") == 0) {
-        return 1;
-    }
-    return 0;
 }
 
 /* Whether the source form satisfies a cross-dimensional rule's environment at

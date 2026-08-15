@@ -472,7 +472,7 @@ fail:
     {
         size_t i;
         for (i = 0; i < count; i++) {
-            free((char *)segments[i].grapheme);
+            rg_free_owned_internal(segments[i].grapheme);
         }
     }
     free(segments);
@@ -517,9 +517,9 @@ static rg_status lift_stress_mark(rg_segment *segment) {
     if (stripped == 0) {
         return RG_ERR_OOM;
     }
-    free((char *)segment->grapheme);
+    rg_free_owned_internal(segment->grapheme);
     segment->grapheme = stripped;
-    free((char *)segment->stress);
+    rg_free_owned_internal(segment->stress);
     segment->stress = rg_strdup_internal(value);
     return segment->stress == 0 ? RG_ERR_OOM : RG_OK;
 }
@@ -574,7 +574,7 @@ static rg_status attach_dimension(
             }
             memcpy(value, start, length);
             value[length] = '\0';
-            free((char *)*slot);
+            rg_free_owned_internal(*slot);
             *slot = value;
         }
         index++;
@@ -615,10 +615,10 @@ static void loader_form_clear(loader_form *form) {
     }
     free(form->lect_id);
     for (i = 0; i < form->segment_count; i++) {
-        free((char *)form->segments[i].grapheme);
-        free((char *)form->segments[i].tone);
-        free((char *)form->segments[i].stress);
-        free((char *)form->segments[i].length);
+        rg_free_owned_internal(form->segments[i].grapheme);
+        rg_free_owned_internal(form->segments[i].tone);
+        rg_free_owned_internal(form->segments[i].stress);
+        rg_free_owned_internal(form->segments[i].length);
     }
     free(form->segments);
     free(form->morpheme_breaks);

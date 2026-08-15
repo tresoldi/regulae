@@ -17,16 +17,36 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
+/* The four functions -sEXPORTED_FUNCTIONS names. Declared here so the compiler
+ * can check each definition against the shape the page calls it with, and so
+ * -Wmissing-prototypes has something to match: a definition with no prior
+ * declaration is how a wasm export and its JavaScript caller drift apart. */
+EMSCRIPTEN_KEEPALIVE char *regulae_train_json(
+    const char *corpus_text,
+    const char *format,
+    const char *options_json
+);
+EMSCRIPTEN_KEEPALIVE char *regulae_segment_json(const char *word);
+EMSCRIPTEN_KEEPALIVE const char *regulae_version(void);
+EMSCRIPTEN_KEEPALIVE void regulae_free(char *text);
+
 #ifdef __EMSCRIPTEN__
 /* Progress crosses into JavaScript. Returning a truthy value from
  * Module.onProgress cancels the run, which surfaces to the caller as an
  * ok:false payload with status "cancelled". */
+/* EM_JS's documented spelling ends in a semicolon, which after expansion is a
+ * stray one at file scope -- ISO C forbids it and -Wpedantic says so. The macro
+ * is emscripten's, so the suppression is scoped to the one construct rather
+ * than to the file. */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wextra-semi"
 EM_JS(int, regulae_js_progress, (const char *stage, int completed, int total), {
     if (typeof Module !== "undefined" && typeof Module.onProgress === "function") {
         return Module.onProgress(UTF8ToString(stage), completed, total) ? 1 : 0;
     }
     return 0;
 });
+#pragma clang diagnostic pop
 #else
 static int regulae_js_progress(const char *stage, int completed, int total) {
     (void)stage;
@@ -136,7 +156,7 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
                             &options, &model);
     if (status != RG_OK) {
         char detail_buffer[256];
-        const char *detail = 0;
+        const char *train_detail = 0;
         if (status == RG_ERR_UNKNOWN_GRAPHEME) {
             const char *grapheme = 0;
             const char *system = 0;
@@ -145,11 +165,11 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
                 snprintf(detail_buffer, sizeof(detail_buffer),
                          "grapheme \"%s\" is not in the \"%s\" feature system",
                          grapheme, system == 0 ? "" : system);
-                detail = detail_buffer;
+                train_detail = detail_buffer;
             }
         }
         rg_corpus_free(corpus);
-        return error_payload(status, detail);
+        return error_payload(status, train_detail);
     }
 
     text = rg_model_to_json(ctx, model, rg_corpus_cognates(corpus),

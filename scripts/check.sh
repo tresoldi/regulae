@@ -37,7 +37,12 @@ fail() {
 }
 
 step "native build"
-cmake -S . -B build/c >/dev/null || fail "cmake configure"
+# -Werror here rather than in the build's defaults. A warning is a reason to
+# stop before committing; it is not a reason to deny a downstream consumer on
+# some other compiler a build at all. The flags themselves are a directory
+# property in CMakeLists.txt, so every target carries them -- the CLI, the
+# tests and the WebAssembly shim all compiled with none until 2026-08-15.
+cmake -S . -B build/c -DREGULAE_WERROR=ON >/dev/null || fail "cmake configure"
 # Not piped: a configure failure has to be visible, and piping it into a
 # filter is exactly how it was missed before.
 cmake --build build/c -j"$(nproc)" || fail "cmake build"
@@ -72,7 +77,7 @@ ctest --test-dir build/c --output-on-failure || fail "ctest"
 
 if [ "$full" = "1" ]; then
     step "sanitizer build and tests"
-    cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address >/dev/null || fail "asan configure"
+    cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address -DREGULAE_WERROR=ON >/dev/null || fail "asan configure"
     cmake --build build/c-asan -j"$(nproc)" || fail "asan build"
     ctest --test-dir build/c-asan --output-on-failure || fail "asan ctest"
 fi

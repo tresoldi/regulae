@@ -152,6 +152,10 @@ size_t rg_model_classes_at_internal(
     size_t capacity
 );
 
+/* The one place the `const` on library-owned storage comes off, for freeing it
+ * or for handing it to a clear helper; see memory.c for why it has to. */
+void *rg_owned_internal(const void *owned);
+void rg_free_owned_internal(const void *owned);
 char *rg_strdup_internal(const char *value);
 char *rg_strndup_internal(const char *text, size_t length);
 

@@ -22,6 +22,17 @@ typedef struct fixture_pair {
     double weight;
 } fixture_pair;
 
+/* The test allocated these strings and stored them in fields the API declares
+ * `const char *`, because that is what they are to a reader of a form. Freeing
+ * them means taking the qualifier back off; going through a copy of the pointer
+ * value keeps that defined. The library does the same thing in one place, as
+ * rg_free_owned_internal. */
+static void free_owned(const void *owned) {
+    void *value;
+    memcpy(&value, &owned, sizeof(value));
+    free(value);
+}
+
 static char *dup_string(const char *value) {
     size_t len = strlen(value);
     char *out = (char *)malloc(len + 1);
@@ -31,8 +42,8 @@ static char *dup_string(const char *value) {
 }
 
 static void segment_clear(rg_segment *segment) {
-    free((char *)segment->grapheme);
-    free((char *)segment->tone);
+    free_owned(segment->grapheme);
+    free_owned(segment->tone);
     memset(segment, 0, sizeof(*segment));
 }
 

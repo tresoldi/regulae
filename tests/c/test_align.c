@@ -4,11 +4,6 @@
 #include <math.h>
 #include <string.h>
 
-static rg_segment seg(const char *g) {
-    rg_segment s = {g, 0, 0, 0};
-    return s;
-}
-
 static rg_form form(const char *lect, const rg_segment *segments, size_t count) {
     rg_form f;
     f.lect_id = lect;

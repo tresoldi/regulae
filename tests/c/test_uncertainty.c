@@ -222,5 +222,7 @@ int main(void) {
     test_percentile_clamps_samples_to_a_rate();
     test_no_samples_is_unconstrained();
     test_method_names_are_stable();
+    test_bootstrap_resamples_cognate_sets();
+    test_conditioned_intervals_say_they_are_post_selection();
     return 0;
 }

@@ -5,9 +5,15 @@
 #include <stdlib.h>
 #include <string.h>
 
-static rg_segment seg(const char *g) {
-    rg_segment s = {g, 0, 0, 0};
-    return s;
+/* The test allocated these strings and stored them in fields the API declares
+ * `const char *`, because that is what they are to a reader of a form. Freeing
+ * them means taking the qualifier back off; going through a copy of the pointer
+ * value keeps that defined. The library does the same thing in one place, as
+ * rg_free_owned_internal. */
+static void free_owned(const void *owned) {
+    void *value;
+    memcpy(&value, &owned, sizeof(value));
+    free(value);
 }
 
 static rg_form form(const char *lect, const rg_segment *segments, size_t count) {
@@ -48,7 +54,7 @@ static rg_segment *segments_from_ascii(const char *word, size_t *count) {
 static void segments_free(rg_segment *segments, size_t count) {
     size_t i;
     for (i = 0; i < count; i++) {
-        free((char *)segments[i].grapheme);
+        free_owned(segments[i].grapheme);
     }
     free(segments);
 }

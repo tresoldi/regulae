@@ -32,8 +32,17 @@ emcmake cmake -S "$repo_dir" -B "$build_dir" \
 
 cmake --build "$build_dir" -j"$(nproc)" > /dev/null
 
+# The same warning set CMake applies to every other target, and -Werror
+# unconditionally: this shim is built by one script for one purpose, so there
+# is no downstream consumer to be kind to. It compiled with no warnings at all
+# until 2026-08-15 and had four, three of them missing prototypes on the four
+# functions the page actually calls.
 emcc \
     -O3 \
+    -std=c99 \
+    -Wall -Wextra -Wpedantic -Wconversion \
+    -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-qual \
+    -Werror \
     "$script_dir/regulae_wasm.c" \
     "$build_dir/libregulae.a" \
     "$build_dir/_deps/merkmal/libmerkmal.a" \

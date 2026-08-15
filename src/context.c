@@ -148,14 +148,25 @@ typedef struct displacement_cache_entry {
     int resolved;
 } displacement_cache_entry;
 
-struct rg_context {
-    mk_registry *registry;
-    const mk_system *system;
+/* The state a lookup writes while answering a question about a grapheme.
+ *
+ * Every accessor here takes a `const rg_context *`, because asking what /p/ is
+ * does not change the context as far as a caller is concerned -- and every one
+ * of them memoises, because without the caches merkmal string matching
+ * dominates the profile. Those two facts contradict each other, and the
+ * contradiction was settled for a while by casting the const away six times.
+ * That is undefined the moment anyone allocates a context that really is
+ * const, and it silences nothing: it just moves the lie out of the type.
+ *
+ * Holding the mutable half behind a pointer states the same thing in a way the
+ * language agrees with. Through a `const rg_context *`, `ctx->cache` is a
+ * const *pointer* to a non-const cache, so a lookup writes what it memoises
+ * with no cast at all, and the context proper stays genuinely immutable. */
+struct rg_context_cache {
     /* The grapheme that last failed to resolve. The Go reference carries this
      * on its error value; a C status code cannot, and "unknown grapheme" with
      * no indication of which one is unactionable on a corpus of any size. */
     char *unknown_grapheme;
-    rg_segmentation segmentation;
     rg_grapheme_diagnosis last_diagnosis;
     int has_diagnosis;
     feature_cache_entry *features;
@@ -167,6 +178,13 @@ struct rg_context {
     displacement_cache_entry *displacements;
     size_t displacement_count;
     size_t displacement_cap;
+};
+
+struct rg_context {
+    mk_registry *registry;
+    const mk_system *system;
+    rg_segmentation segmentation;
+    struct rg_context_cache *cache;
 };
 
 /* FNV-1a, with the constants chosen for the width of size_t. WebAssembly is
@@ -191,120 +209,120 @@ static size_t hash_string(const char *value, size_t seed) {
 
 static void context_caches_clear(rg_context *ctx) {
     size_t i;
-    for (i = 0; i < ctx->feature_cap; i++) {
-        if (ctx->features[i].grapheme != 0) {
-            free(ctx->features[i].grapheme);
-            rg_feature_set_free(ctx->features[i].features);
+    for (i = 0; i < ctx->cache->feature_cap; i++) {
+        if (ctx->cache->features[i].grapheme != 0) {
+            free(ctx->cache->features[i].grapheme);
+            rg_feature_set_free(ctx->cache->features[i].features);
             {
                 size_t j;
-                for (j = 0; j < ctx->features[i].constraint_count; j++) {
-                    free((char *)ctx->features[i].constraints[j].feature);
-                    free((char *)ctx->features[i].constraints[j].value);
+                for (j = 0; j < ctx->cache->features[i].constraint_count; j++) {
+                    rg_free_owned_internal(ctx->cache->features[i].constraints[j].feature);
+                    rg_free_owned_internal(ctx->cache->features[i].constraints[j].value);
                 }
             }
-            free(ctx->features[i].constraints);
+            free(ctx->cache->features[i].constraints);
         }
     }
-    free(ctx->features);
-    ctx->features = 0;
-    ctx->feature_cap = 0;
-    ctx->feature_count = 0;
-    for (i = 0; i < ctx->distance_cap; i++) {
-        if (ctx->distances[i].a != 0) {
-            free(ctx->distances[i].a);
-            free(ctx->distances[i].b);
+    free(ctx->cache->features);
+    ctx->cache->features = 0;
+    ctx->cache->feature_cap = 0;
+    ctx->cache->feature_count = 0;
+    for (i = 0; i < ctx->cache->distance_cap; i++) {
+        if (ctx->cache->distances[i].a != 0) {
+            free(ctx->cache->distances[i].a);
+            free(ctx->cache->distances[i].b);
         }
     }
-    free(ctx->distances);
-    ctx->distances = 0;
-    ctx->distance_cap = 0;
-    ctx->distance_count = 0;
-    for (i = 0; i < ctx->displacement_cap; i++) {
-        if (ctx->displacements[i].a != 0) {
-            free(ctx->displacements[i].a);
-            free(ctx->displacements[i].b);
+    free(ctx->cache->distances);
+    ctx->cache->distances = 0;
+    ctx->cache->distance_cap = 0;
+    ctx->cache->distance_count = 0;
+    for (i = 0; i < ctx->cache->displacement_cap; i++) {
+        if (ctx->cache->displacements[i].a != 0) {
+            free(ctx->cache->displacements[i].a);
+            free(ctx->cache->displacements[i].b);
             /* The feature names are borrowed from the feature-set cache; only
              * the array of pairs is ours. */
-            free(ctx->displacements[i].items);
+            free(ctx->cache->displacements[i].items);
         }
     }
-    free(ctx->displacements);
-    ctx->displacements = 0;
-    ctx->displacement_cap = 0;
-    ctx->displacement_count = 0;
+    free(ctx->cache->displacements);
+    ctx->cache->displacements = 0;
+    ctx->cache->displacement_cap = 0;
+    ctx->cache->displacement_count = 0;
 }
 
-static rg_status feature_cache_grow(rg_context *ctx) {
-    size_t next_cap = ctx->feature_cap == 0 ? 64 : ctx->feature_cap * 2;
+static rg_status feature_cache_grow(const rg_context *ctx) {
+    size_t next_cap = ctx->cache->feature_cap == 0 ? 64 : ctx->cache->feature_cap * 2;
     feature_cache_entry *next = (feature_cache_entry *)calloc(next_cap, sizeof(*next));
     size_t i;
     if (next == 0) {
         return RG_ERR_OOM;
     }
-    for (i = 0; i < ctx->feature_cap; i++) {
+    for (i = 0; i < ctx->cache->feature_cap; i++) {
         size_t slot;
-        if (ctx->features[i].grapheme == 0) {
+        if (ctx->cache->features[i].grapheme == 0) {
             continue;
         }
-        slot = hash_string(ctx->features[i].grapheme, RG_FNV_OFFSET) & (next_cap - 1);
+        slot = hash_string(ctx->cache->features[i].grapheme, RG_FNV_OFFSET) & (next_cap - 1);
         while (next[slot].grapheme != 0) {
             slot = (slot + 1) & (next_cap - 1);
         }
-        next[slot] = ctx->features[i];
+        next[slot] = ctx->cache->features[i];
     }
-    free(ctx->features);
-    ctx->features = next;
-    ctx->feature_cap = next_cap;
+    free(ctx->cache->features);
+    ctx->cache->features = next;
+    ctx->cache->feature_cap = next_cap;
     return RG_OK;
 }
 
-static rg_status distance_cache_grow(rg_context *ctx) {
-    size_t next_cap = ctx->distance_cap == 0 ? 256 : ctx->distance_cap * 2;
+static rg_status distance_cache_grow(const rg_context *ctx) {
+    size_t next_cap = ctx->cache->distance_cap == 0 ? 256 : ctx->cache->distance_cap * 2;
     distance_cache_entry *next = (distance_cache_entry *)calloc(next_cap, sizeof(*next));
     size_t i;
     if (next == 0) {
         return RG_ERR_OOM;
     }
-    for (i = 0; i < ctx->distance_cap; i++) {
+    for (i = 0; i < ctx->cache->distance_cap; i++) {
         size_t slot;
-        if (ctx->distances[i].a == 0) {
+        if (ctx->cache->distances[i].a == 0) {
             continue;
         }
-        slot = hash_string(ctx->distances[i].b, hash_string(ctx->distances[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
+        slot = hash_string(ctx->cache->distances[i].b, hash_string(ctx->cache->distances[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
         while (next[slot].a != 0) {
             slot = (slot + 1) & (next_cap - 1);
         }
-        next[slot] = ctx->distances[i];
+        next[slot] = ctx->cache->distances[i];
     }
-    free(ctx->distances);
-    ctx->distances = next;
-    ctx->distance_cap = next_cap;
+    free(ctx->cache->distances);
+    ctx->cache->distances = next;
+    ctx->cache->distance_cap = next_cap;
     return RG_OK;
 }
 
-static rg_status displacement_cache_grow(rg_context *ctx) {
-    size_t next_cap = ctx->displacement_cap == 0 ? 256 : ctx->displacement_cap * 2;
+static rg_status displacement_cache_grow(const rg_context *ctx) {
+    size_t next_cap = ctx->cache->displacement_cap == 0 ? 256 : ctx->cache->displacement_cap * 2;
     displacement_cache_entry *next =
         (displacement_cache_entry *)calloc(next_cap, sizeof(*next));
     size_t i;
     if (next == 0) {
         return RG_ERR_OOM;
     }
-    for (i = 0; i < ctx->displacement_cap; i++) {
+    for (i = 0; i < ctx->cache->displacement_cap; i++) {
         size_t slot;
-        if (ctx->displacements[i].a == 0) {
+        if (ctx->cache->displacements[i].a == 0) {
             continue;
         }
-        slot = hash_string(ctx->displacements[i].b,
-                           hash_string(ctx->displacements[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
+        slot = hash_string(ctx->cache->displacements[i].b,
+                           hash_string(ctx->cache->displacements[i].a, RG_FNV_OFFSET)) & (next_cap - 1);
         while (next[slot].a != 0) {
             slot = (slot + 1) & (next_cap - 1);
         }
-        next[slot] = ctx->displacements[i];
+        next[slot] = ctx->cache->displacements[i];
     }
-    free(ctx->displacements);
-    ctx->displacements = next;
-    ctx->displacement_cap = next_cap;
+    free(ctx->cache->displacements);
+    ctx->cache->displacements = next;
+    ctx->cache->displacement_cap = next_cap;
     return RG_OK;
 }
 
@@ -346,14 +364,21 @@ rg_status rg_context_new_builtin(rg_context **out) {
     if (ctx == 0) {
         return RG_ERR_OOM;
     }
+    ctx->cache = (struct rg_context_cache *)calloc(1, sizeof(*ctx->cache));
+    if (ctx->cache == 0) {
+        free(ctx);
+        return RG_ERR_OOM;
+    }
     status = mk_registry_new_builtin(&ctx->registry);
     if (status != MK_OK) {
+        free(ctx->cache);
         free(ctx);
         return map_merkmal_status(status);
     }
     status = mk_registry_get_system(ctx->registry, RG_DEFAULT_FEATURE_SYSTEM, &ctx->system);
     if (status != MK_OK) {
         mk_registry_free(ctx->registry);
+        free(ctx->cache);
         free(ctx);
         return map_merkmal_status(status);
     }
@@ -380,8 +405,9 @@ void rg_context_free(rg_context *ctx) {
     if (ctx == 0) {
         return;
     }
-    free(ctx->unknown_grapheme);
+    free(ctx->cache->unknown_grapheme);
     context_caches_clear(ctx);
+    free(ctx->cache);
     mk_registry_free(ctx->registry);
     free(ctx);
 }
@@ -397,8 +423,8 @@ rg_status rg_context_use_system(rg_context *ctx, const char *system_name) {
         return map_merkmal_status(status);
     }
     ctx->system = system;
-    free(ctx->unknown_grapheme);
-    ctx->unknown_grapheme = 0;
+    free(ctx->cache->unknown_grapheme);
+    ctx->cache->unknown_grapheme = 0;
     context_caches_clear(ctx);
     return RG_OK;
 }
@@ -416,7 +442,6 @@ rg_status rg_context_system_name(const rg_context *ctx, const char **out) {
 /* Memoised: the scoring path asks this for both graphemes of every link it
  * considers, and resolving a grapheme in merkmal is not cheap. */
 rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int *out) {
-    rg_context *mutable_ctx = (rg_context *)ctx;
     mk_status status;
     size_t slot;
 
@@ -424,24 +449,24 @@ rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
-    if (mutable_ctx->feature_cap == 0 || (mutable_ctx->feature_count + 1) * 10 >= mutable_ctx->feature_cap * 7) {
-        if (feature_cache_grow(mutable_ctx) != RG_OK) {
+    if (ctx->cache->feature_cap == 0 || (ctx->cache->feature_count + 1) * 10 >= ctx->cache->feature_cap * 7) {
+        if (feature_cache_grow(ctx) != RG_OK) {
             bool recognised = false;
             status = mk_system_is_segment(ctx->system, grapheme, &recognised);
             *out = recognised ? 1 : 0;
             return map_merkmal_status(status);
         }
     }
-    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
-    while (mutable_ctx->features[slot].grapheme != 0) {
-        if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
-            if (mutable_ctx->features[slot].is_segment_state != 0) {
-                *out = mutable_ctx->features[slot].is_segment;
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (ctx->cache->feature_cap - 1);
+    while (ctx->cache->features[slot].grapheme != 0) {
+        if (strcmp(ctx->cache->features[slot].grapheme, grapheme) == 0) {
+            if (ctx->cache->features[slot].is_segment_state != 0) {
+                *out = ctx->cache->features[slot].is_segment;
                 return RG_OK;
             }
             break;
         }
-        slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
+        slot = (slot + 1) & (ctx->cache->feature_cap - 1);
     }
     {
         bool recognised = false;
@@ -451,15 +476,15 @@ rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int
         }
         *out = recognised ? 1 : 0;
     }
-    if (mutable_ctx->features[slot].grapheme == 0) {
-        mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
-        if (mutable_ctx->features[slot].grapheme == 0) {
+    if (ctx->cache->features[slot].grapheme == 0) {
+        ctx->cache->features[slot].grapheme = rg_strdup_internal(grapheme);
+        if (ctx->cache->features[slot].grapheme == 0) {
             return RG_OK;
         }
-        mutable_ctx->feature_count++;
+        ctx->cache->feature_count++;
     }
-    mutable_ctx->features[slot].is_segment = *out;
-    mutable_ctx->features[slot].is_segment_state = 1;
+    ctx->cache->features[slot].is_segment = *out;
+    ctx->cache->features[slot].is_segment_state = 1;
     return RG_OK;
 }
 
@@ -730,8 +755,8 @@ void rg_feature_vocabulary_clear_internal(rg_feature_vocabulary *vocabulary) {
         return;
     }
     for (i = 0; i < vocabulary->count; i++) {
-        free((char *)vocabulary->entries[i].feature);
-        free((char *)vocabulary->entries[i].value);
+        rg_free_owned_internal(vocabulary->entries[i].feature);
+        rg_free_owned_internal(vocabulary->entries[i].value);
     }
     free(vocabulary->entries);
     vocabulary->entries = 0;
@@ -750,41 +775,40 @@ rg_status rg_context_segment_distance(
     }
     *out = 0.0;
     {
-        rg_context *mutable_ctx = (rg_context *)ctx;
         size_t slot;
-        if (mutable_ctx->distance_cap == 0 || (mutable_ctx->distance_count + 1) * 10 >= mutable_ctx->distance_cap * 7) {
-            if (distance_cache_grow(mutable_ctx) != RG_OK) {
+        if (ctx->cache->distance_cap == 0 || (ctx->cache->distance_count + 1) * 10 >= ctx->cache->distance_cap * 7) {
+            if (distance_cache_grow(ctx) != RG_OK) {
                 status = mk_system_segment_distance(ctx->system, a, b, out);
                 return map_merkmal_status(status);
             }
         }
-        slot = hash_string(b, hash_string(a, RG_FNV_OFFSET)) & (mutable_ctx->distance_cap - 1);
-        while (mutable_ctx->distances[slot].a != 0) {
-            if (strcmp(mutable_ctx->distances[slot].a, a) == 0 && strcmp(mutable_ctx->distances[slot].b, b) == 0) {
-                if (!mutable_ctx->distances[slot].resolved) {
+        slot = hash_string(b, hash_string(a, RG_FNV_OFFSET)) & (ctx->cache->distance_cap - 1);
+        while (ctx->cache->distances[slot].a != 0) {
+            if (strcmp(ctx->cache->distances[slot].a, a) == 0 && strcmp(ctx->cache->distances[slot].b, b) == 0) {
+                if (!ctx->cache->distances[slot].resolved) {
                     return RG_ERR_MERKMAL;
                 }
-                *out = mutable_ctx->distances[slot].value;
+                *out = ctx->cache->distances[slot].value;
                 return RG_OK;
             }
-            slot = (slot + 1) & (mutable_ctx->distance_cap - 1);
+            slot = (slot + 1) & (ctx->cache->distance_cap - 1);
         }
         status = mk_system_segment_distance(ctx->system, a, b, out);
         if (status != MK_OK) {
             return map_merkmal_status(status);
         }
-        mutable_ctx->distances[slot].a = rg_strdup_internal(a);
-        mutable_ctx->distances[slot].b = rg_strdup_internal(b);
-        if (mutable_ctx->distances[slot].a == 0 || mutable_ctx->distances[slot].b == 0) {
-            free(mutable_ctx->distances[slot].a);
-            free(mutable_ctx->distances[slot].b);
-            mutable_ctx->distances[slot].a = 0;
-            mutable_ctx->distances[slot].b = 0;
+        ctx->cache->distances[slot].a = rg_strdup_internal(a);
+        ctx->cache->distances[slot].b = rg_strdup_internal(b);
+        if (ctx->cache->distances[slot].a == 0 || ctx->cache->distances[slot].b == 0) {
+            free(ctx->cache->distances[slot].a);
+            free(ctx->cache->distances[slot].b);
+            ctx->cache->distances[slot].a = 0;
+            ctx->cache->distances[slot].b = 0;
             return RG_OK;
         }
-        mutable_ctx->distances[slot].value = *out;
-        mutable_ctx->distances[slot].resolved = 1;
-        mutable_ctx->distance_count++;
+        ctx->cache->distances[slot].value = *out;
+        ctx->cache->distances[slot].resolved = 1;
+        ctx->cache->distance_count++;
     }
     return RG_OK;
 }
@@ -814,22 +838,21 @@ rg_status rg_context_diagnose(
 }
 
 int rg_context_last_diagnosis(const rg_context *ctx, rg_grapheme_diagnosis *out) {
-    if (ctx == 0 || out == 0 || !ctx->has_diagnosis) {
+    if (ctx == 0 || out == 0 || !ctx->cache->has_diagnosis) {
         return 0;
     }
-    *out = ctx->last_diagnosis;
+    *out = ctx->cache->last_diagnosis;
     return 1;
 }
 
 void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char *grapheme) {
-    rg_context *mutable_ctx = (rg_context *)ctx;
     if (ctx == 0 || grapheme == 0) {
         return;
     }
-    free(mutable_ctx->unknown_grapheme);
-    mutable_ctx->unknown_grapheme = rg_strdup_internal(grapheme);
-    mutable_ctx->has_diagnosis =
-        rg_context_diagnose(ctx, grapheme, &mutable_ctx->last_diagnosis) == RG_OK;
+    free(ctx->cache->unknown_grapheme);
+    ctx->cache->unknown_grapheme = rg_strdup_internal(grapheme);
+    ctx->cache->has_diagnosis =
+        rg_context_diagnose(ctx, grapheme, &ctx->cache->last_diagnosis) == RG_OK;
 }
 
 /* The status a refused grapheme deserves. merkmal separates a sound it does
@@ -838,15 +861,15 @@ void rg_context_note_unknown_grapheme_internal(const rg_context *ctx, const char
  * rather than flattening everything to "unknown grapheme". */
 rg_status rg_context_refusal_status_internal(const rg_context *ctx, const char *grapheme) {
     rg_context_note_unknown_grapheme_internal(ctx, grapheme);
-    if (ctx != 0 && ctx->has_diagnosis && ctx->last_diagnosis.status != RG_OK) {
-        return ctx->last_diagnosis.status;
+    if (ctx != 0 && ctx->cache->has_diagnosis && ctx->cache->last_diagnosis.status != RG_OK) {
+        return ctx->cache->last_diagnosis.status;
     }
     return RG_ERR_UNKNOWN_GRAPHEME;
 }
 
 void rg_context_last_error(const rg_context *ctx, const char **grapheme, const char **feature_system) {
     if (grapheme != 0) {
-        *grapheme = ctx == 0 ? 0 : ctx->unknown_grapheme;
+        *grapheme = ctx == 0 ? 0 : ctx->cache->unknown_grapheme;
     }
     if (feature_system != 0) {
         const char *name = 0;
@@ -865,7 +888,6 @@ rg_status rg_context_features_internal(
     const char *grapheme,
     const rg_feature_set **out
 ) {
-    rg_context *mutable_ctx = (rg_context *)ctx;
     rg_feature_set *features = 0;
     size_t slot;
     rg_status status;
@@ -874,47 +896,47 @@ rg_status rg_context_features_internal(
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
-    if (mutable_ctx->feature_cap == 0 || (mutable_ctx->feature_count + 1) * 10 >= mutable_ctx->feature_cap * 7) {
-        status = feature_cache_grow(mutable_ctx);
+    if (ctx->cache->feature_cap == 0 || (ctx->cache->feature_count + 1) * 10 >= ctx->cache->feature_cap * 7) {
+        status = feature_cache_grow(ctx);
         if (status != RG_OK) {
             return status;
         }
     }
-    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
-    while (mutable_ctx->features[slot].grapheme != 0) {
-        if (strcmp(mutable_ctx->features[slot].grapheme, grapheme) == 0) {
-            if (mutable_ctx->features[slot].features_state < 0) {
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (ctx->cache->feature_cap - 1);
+    while (ctx->cache->features[slot].grapheme != 0) {
+        if (strcmp(ctx->cache->features[slot].grapheme, grapheme) == 0) {
+            if (ctx->cache->features[slot].features_state < 0) {
                 rg_context_note_unknown_grapheme_internal(ctx, grapheme);
-                return mutable_ctx->features[slot].refusal;
+                return ctx->cache->features[slot].refusal;
             }
-            if (mutable_ctx->features[slot].features_state > 0) {
-                *out = mutable_ctx->features[slot].features;
+            if (ctx->cache->features[slot].features_state > 0) {
+                *out = ctx->cache->features[slot].features;
                 return RG_OK;
             }
             break;
         }
-        slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
+        slot = (slot + 1) & (ctx->cache->feature_cap - 1);
     }
     status = rg_context_grapheme_features(ctx, grapheme, &features);
-    if (mutable_ctx->features[slot].grapheme == 0) {
-        mutable_ctx->features[slot].grapheme = rg_strdup_internal(grapheme);
-        if (mutable_ctx->features[slot].grapheme == 0) {
+    if (ctx->cache->features[slot].grapheme == 0) {
+        ctx->cache->features[slot].grapheme = rg_strdup_internal(grapheme);
+        if (ctx->cache->features[slot].grapheme == 0) {
             rg_feature_set_free(features);
             return status == RG_OK ? RG_ERR_OOM : status;
         }
-        mutable_ctx->feature_count++;
+        ctx->cache->feature_count++;
     }
     if (status != RG_OK) {
-        mutable_ctx->features[slot].features_state = -1;
-        mutable_ctx->features[slot].refusal = status;
+        ctx->cache->features[slot].features_state = -1;
+        ctx->cache->features[slot].refusal = status;
         if (status == RG_ERR_UNKNOWN_GRAPHEME || status == RG_ERR_SOURCE_MARKER ||
             status == RG_ERR_PARSE) {
             rg_context_note_unknown_grapheme_internal(ctx, grapheme);
         }
         return status;
     }
-    mutable_ctx->features[slot].features_state = 1;
-    mutable_ctx->features[slot].features = features;
+    ctx->cache->features[slot].features_state = 1;
+    ctx->cache->features[slot].features = features;
     *out = features;
     return RG_OK;
 }
@@ -999,7 +1021,6 @@ rg_status rg_context_displacement_internal(
     const rg_feature_displacement **out,
     size_t *out_count
 ) {
-    rg_context *mutable_ctx = (rg_context *)ctx;
     const rg_feature_set *source_features = 0;
     const rg_feature_set *target_features = 0;
     rg_feature_displacement *items = 0;
@@ -1013,23 +1034,23 @@ rg_status rg_context_displacement_internal(
     }
     *out = 0;
     *out_count = 0;
-    if (mutable_ctx->displacement_cap == 0 ||
-        (mutable_ctx->displacement_count + 1) * 10 >= mutable_ctx->displacement_cap * 7) {
-        status = displacement_cache_grow(mutable_ctx);
+    if (ctx->cache->displacement_cap == 0 ||
+        (ctx->cache->displacement_count + 1) * 10 >= ctx->cache->displacement_cap * 7) {
+        status = displacement_cache_grow(ctx);
         if (status != RG_OK) {
             return status;
         }
     }
     slot = hash_string(target, hash_string(source, RG_FNV_OFFSET)) &
-           (mutable_ctx->displacement_cap - 1);
-    while (mutable_ctx->displacements[slot].a != 0) {
-        if (strcmp(mutable_ctx->displacements[slot].a, source) == 0 &&
-            strcmp(mutable_ctx->displacements[slot].b, target) == 0) {
-            *out = mutable_ctx->displacements[slot].items;
-            *out_count = mutable_ctx->displacements[slot].count;
+           (ctx->cache->displacement_cap - 1);
+    while (ctx->cache->displacements[slot].a != 0) {
+        if (strcmp(ctx->cache->displacements[slot].a, source) == 0 &&
+            strcmp(ctx->cache->displacements[slot].b, target) == 0) {
+            *out = ctx->cache->displacements[slot].items;
+            *out_count = ctx->cache->displacements[slot].count;
             return RG_OK;
         }
-        slot = (slot + 1) & (mutable_ctx->displacement_cap - 1);
+        slot = (slot + 1) & (ctx->cache->displacement_cap - 1);
     }
     status = rg_context_features_internal(ctx, source, &source_features);
     if (status != RG_OK) {
@@ -1049,20 +1070,20 @@ rg_status rg_context_displacement_internal(
         free(items);
         return status;
     }
-    mutable_ctx->displacements[slot].a = rg_strdup_internal(source);
-    mutable_ctx->displacements[slot].b = rg_strdup_internal(target);
-    if (mutable_ctx->displacements[slot].a == 0 || mutable_ctx->displacements[slot].b == 0) {
-        free(mutable_ctx->displacements[slot].a);
-        free(mutable_ctx->displacements[slot].b);
-        mutable_ctx->displacements[slot].a = 0;
-        mutable_ctx->displacements[slot].b = 0;
+    ctx->cache->displacements[slot].a = rg_strdup_internal(source);
+    ctx->cache->displacements[slot].b = rg_strdup_internal(target);
+    if (ctx->cache->displacements[slot].a == 0 || ctx->cache->displacements[slot].b == 0) {
+        free(ctx->cache->displacements[slot].a);
+        free(ctx->cache->displacements[slot].b);
+        ctx->cache->displacements[slot].a = 0;
+        ctx->cache->displacements[slot].b = 0;
         free(items);
         return RG_ERR_OOM;
     }
-    mutable_ctx->displacements[slot].items = items;
-    mutable_ctx->displacements[slot].count = count;
-    mutable_ctx->displacements[slot].resolved = 1;
-    mutable_ctx->displacement_count++;
+    ctx->cache->displacements[slot].items = items;
+    ctx->cache->displacements[slot].count = count;
+    ctx->cache->displacements[slot].resolved = 1;
+    ctx->cache->displacement_count++;
     *out = items;
     *out_count = count;
     return RG_OK;
@@ -1078,7 +1099,6 @@ rg_status rg_context_constraints_internal(
     const rg_feature_constraint **out,
     size_t *out_count
 ) {
-    rg_context *mutable_ctx = (rg_context *)ctx;
     const rg_feature_set *features = 0;
     size_t slot;
     size_t count = 0;
@@ -1094,17 +1114,17 @@ rg_status rg_context_constraints_internal(
     if (status != RG_OK) {
         return status;
     }
-    slot = hash_string(grapheme, RG_FNV_OFFSET) & (mutable_ctx->feature_cap - 1);
-    while (mutable_ctx->features[slot].grapheme != 0 &&
-           strcmp(mutable_ctx->features[slot].grapheme, grapheme) != 0) {
-        slot = (slot + 1) & (mutable_ctx->feature_cap - 1);
+    slot = hash_string(grapheme, RG_FNV_OFFSET) & (ctx->cache->feature_cap - 1);
+    while (ctx->cache->features[slot].grapheme != 0 &&
+           strcmp(ctx->cache->features[slot].grapheme, grapheme) != 0) {
+        slot = (slot + 1) & (ctx->cache->feature_cap - 1);
     }
-    if (mutable_ctx->features[slot].grapheme == 0) {
+    if (ctx->cache->features[slot].grapheme == 0) {
         return RG_ERR_MERKMAL;
     }
-    if (mutable_ctx->features[slot].constraints != 0) {
-        *out = mutable_ctx->features[slot].constraints;
-        *out_count = mutable_ctx->features[slot].constraint_count;
+    if (ctx->cache->features[slot].constraints != 0) {
+        *out = ctx->cache->features[slot].constraints;
+        *out_count = ctx->cache->features[slot].constraint_count;
         return RG_OK;
     }
     {
@@ -1139,8 +1159,8 @@ rg_status rg_context_constraints_internal(
             if (constraints[count].feature == 0 || constraints[count].value == 0) {
                 size_t k;
                 for (k = 0; k <= count; k++) {
-                    free((char *)constraints[k].feature);
-                    free((char *)constraints[k].value);
+                    rg_free_owned_internal(constraints[k].feature);
+                    rg_free_owned_internal(constraints[k].value);
                 }
                 free(constraints);
                 return RG_ERR_OOM;
@@ -1148,8 +1168,8 @@ rg_status rg_context_constraints_internal(
             count++;
         }
     }
-    mutable_ctx->features[slot].constraints = constraints;
-    mutable_ctx->features[slot].constraint_count = count;
+    ctx->cache->features[slot].constraints = constraints;
+    ctx->cache->features[slot].constraint_count = count;
     *out = constraints;
     *out_count = count;
     return RG_OK;
@@ -1389,10 +1409,10 @@ void rg_segments_free(rg_segment *segments, size_t count) {
         return;
     }
     for (i = 0; i < count; i++) {
-        free((char *)segments[i].grapheme);
-        free((char *)segments[i].tone);
-        free((char *)segments[i].length);
-        free((char *)segments[i].stress);
+        rg_free_owned_internal(segments[i].grapheme);
+        rg_free_owned_internal(segments[i].tone);
+        rg_free_owned_internal(segments[i].length);
+        rg_free_owned_internal(segments[i].stress);
     }
     free(segments);
 }

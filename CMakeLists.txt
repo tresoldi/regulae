@@ -11,6 +11,9 @@ set(REGULAE_LICENSE "MIT")
 option(REGULAE_BUILD_TESTS "Build native C tests" ON)
 option(REGULAE_BUILD_CLI "Build the regulae CLI" ON)
 option(REGULAE_BUILD_PYTHON_TESTS "Reserve Python wrapper test option" ON)
+# Off by default: a warning in a consumer's toolchain is not a reason to deny
+# them a build. scripts/check.sh turns it on, which is where the gate belongs.
+option(REGULAE_WERROR "Treat compiler warnings as errors" OFF)
 set(REGULAE_ENABLE_SANITIZER "" CACHE STRING "Sanitizer: address or undefined")
 set_property(CACHE REGULAE_ENABLE_SANITIZER PROPERTY STRINGS "" address undefined)
 
@@ -38,6 +41,27 @@ if(NOT TARGET merkmal::merkmal)
         add_subdirectory("${REGULAE_MERKMAL_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/_deps/merkmal")
     else()
         message(FATAL_ERROR "merkmal::merkmal not found; install merkmal or set REGULAE_MERKMAL_SOURCE_DIR")
+    endif()
+endif()
+
+# Warnings are set as a directory property, not per target, so that a target
+# added later cannot quietly opt out of them. One did, three times over: the
+# CLI, every test executable and the WebAssembly shim compiled with no warning
+# flags at all until 2026-08-15, because the flags were PRIVATE to the library.
+# This has to come after the merkmal add_subdirectory above, or it would reach
+# a dependency's sources; the vendored cJSON is exempted per-source below.
+if(MSVC)
+    add_compile_options(/W4)
+    if(REGULAE_WERROR)
+        add_compile_options(/WX)
+    endif()
+else()
+    add_compile_options(
+        -Wall -Wextra -Wpedantic -Wconversion
+        -Wshadow -Wstrict-prototypes -Wmissing-prototypes -Wcast-qual
+    )
+    if(REGULAE_WERROR)
+        add_compile_options(-Werror)
     endif()
 endif()
 
@@ -74,12 +98,6 @@ set_target_properties(regulae PROPERTIES C_VISIBILITY_PRESET hidden VISIBILITY_I
 target_compile_definitions(regulae PRIVATE REGULAE_BUILDING_LIBRARY)
 if(BUILD_SHARED_LIBS)
     target_compile_definitions(regulae PUBLIC REGULAE_SHARED)
-endif()
-
-if(MSVC)
-    target_compile_options(regulae PRIVATE /W4)
-else()
-    target_compile_options(regulae PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 endif()
 
 # Vendored third-party source is not held to regulae's warning settings; doing

@@ -205,15 +205,15 @@ static void multi_class_clear(rg_multi_class_owned *klass) {
     if (klass == 0) {
         return;
     }
-    string_array_clear((char **)klass->view.lect_ids, klass->view.segment_count);
-    string_array_clear((char **)klass->view.graphemes, klass->view.segment_count);
+    string_array_clear(rg_owned_internal(klass->view.lect_ids), klass->view.segment_count);
+    string_array_clear(rg_owned_internal(klass->view.graphemes), klass->view.segment_count);
     if (klass->view.contexts != 0) {
         for (i = 0; i < klass->view.segment_count; i++) {
-            rg_context_spec_clear_internal((rg_context_spec *)&klass->view.contexts[i]);
+            rg_context_spec_clear_internal(rg_owned_internal(&klass->view.contexts[i]));
         }
-        free((rg_context_spec *)klass->view.contexts);
+        rg_free_owned_internal(klass->view.contexts);
     }
-    string_array_clear((char **)klass->view.supporting_cognates, klass->view.supporting_cognate_count);
+    string_array_clear(rg_owned_internal(klass->view.supporting_cognates), klass->view.supporting_cognate_count);
     memset(klass, 0, sizeof(*klass));
 }
 
@@ -2988,7 +2988,7 @@ void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
         return;
     }
     for (i = 0; i < count; i++) {
-        free((char *)rows[i].cognate_id);
+        rg_free_owned_internal(rows[i].cognate_id);
     }
     free(rows);
 }

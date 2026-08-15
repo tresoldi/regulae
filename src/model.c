@@ -22,8 +22,8 @@ static void segment_count_row_clear(rg_segment_count_row *row) {
     if (row == 0) {
         return;
     }
-    free((char *)row->source);
-    free((char *)row->target);
+    rg_free_owned_internal(row->source);
+    rg_free_owned_internal(row->target);
     row->source = 0;
     row->target = 0;
     row->count = 0.0;
@@ -35,8 +35,8 @@ static void conditioned_segment_count_row_clear(rg_conditioned_segment_count_row
     if (row == 0) {
         return;
     }
-    free((char *)row->source);
-    free((char *)row->target);
+    rg_free_owned_internal(row->source);
+    rg_free_owned_internal(row->target);
     rg_context_spec_clear_internal(&row->context);
     row->source = 0;
     row->target = 0;
@@ -51,9 +51,9 @@ static void segment_array_clear(const rg_segment *segments, size_t count) {
         return;
     }
     for (i = 0; i < count; i++) {
-        rg_segment_clear_internal((rg_segment *)&segments[i]);
+        rg_segment_clear_internal(rg_owned_internal(&segments[i]));
     }
-    free((rg_segment *)segments);
+    rg_free_owned_internal(segments);
 }
 
 static rg_status segment_array_copy(const rg_segment *segments, size_t count, const rg_segment **out) {
@@ -102,8 +102,8 @@ static void cross_dimensional_row_clear(rg_cross_dimensional_row *row) {
         return;
     }
     rg_context_spec_clear_internal(&row->source_environment);
-    free((char *)row->target_dimension);
-    free((char *)row->target_value);
+    rg_free_owned_internal(row->target_dimension);
+    rg_free_owned_internal(row->target_value);
 
     row->target_dimension = 0;
     row->target_value = 0;
@@ -120,11 +120,11 @@ static void displacement_row_clear(rg_displacement_row *row) {
         return;
     }
     for (i = 0; i < row->item_count; i++) {
-        free((char *)row->items[i].feature);
-        free((char *)row->items[i].from_value);
-        free((char *)row->items[i].to_value);
+        rg_free_owned_internal(row->items[i].feature);
+        rg_free_owned_internal(row->items[i].from_value);
+        rg_free_owned_internal(row->items[i].to_value);
     }
-    free((rg_feature_displacement *)row->items);
+    rg_free_owned_internal(row->items);
     memset(row, 0, sizeof(*row));
 }
 
@@ -154,8 +154,8 @@ void rg_pairwise_model_free(rg_pairwise_model *model) {
     }
     free(model->displacement_rows);
     for (i = 0; i < model->tonal_count_count; i++) {
-        free((char *)model->tonal_counts[i].source_tone);
-        free((char *)model->tonal_counts[i].target_tone);
+        rg_free_owned_internal(model->tonal_counts[i].source_tone);
+        rg_free_owned_internal(model->tonal_counts[i].target_tone);
     }
     free(model->tonal_counts);
     for (i = 0; i < model->segment_prior_count; i++) {
@@ -606,9 +606,9 @@ static rg_status add_displacement_vector(
         if (copy[i].feature == 0 || copy[i].from_value == 0 || copy[i].to_value == 0) {
             size_t j;
             for (j = 0; j <= i; j++) {
-                free((char *)copy[j].feature);
-                free((char *)copy[j].from_value);
-                free((char *)copy[j].to_value);
+                rg_free_owned_internal(copy[j].feature);
+                rg_free_owned_internal(copy[j].from_value);
+                rg_free_owned_internal(copy[j].to_value);
             }
             free(copy);
             return RG_ERR_OOM;
@@ -666,8 +666,8 @@ static rg_status add_tonal_count(
     (*rows)[*count].count = weight;
     (*rows)[*count].source_total = 0.0;
     if ((*rows)[*count].source_tone == 0 || (*rows)[*count].target_tone == 0) {
-        free((char *)(*rows)[*count].source_tone);
-        free((char *)(*rows)[*count].target_tone);
+        rg_free_owned_internal((*rows)[*count].source_tone);
+        rg_free_owned_internal((*rows)[*count].target_tone);
         return RG_ERR_OOM;
     }
     (*count)++;
@@ -1388,7 +1388,7 @@ rg_status rg_context_extend_internal(
         return status;
     }
     if (strcmp(candidate->slot, "position") == 0) {
-        free((char *)out->position);
+        rg_free_owned_internal(out->position);
         out->position = rg_strdup_internal(candidate->feature);
         if (out->position == 0) {
             rg_context_spec_clear_internal(out);
@@ -1397,7 +1397,7 @@ rg_status rg_context_extend_internal(
         return RG_OK;
     }
     if (strcmp(candidate->slot, "morphological") == 0) {
-        free((char *)out->morphological);
+        rg_free_owned_internal(out->morphological);
         out->morphological = rg_strdup_internal(candidate->feature);
         if (out->morphological == 0) {
             rg_context_spec_clear_internal(out);
@@ -1406,7 +1406,7 @@ rg_status rg_context_extend_internal(
         return RG_OK;
     }
     if (strcmp(candidate->slot, "morpheme_index") == 0) {
-        free((char *)out->morpheme_index);
+        rg_free_owned_internal(out->morpheme_index);
         out->morpheme_index = rg_strdup_internal(candidate->feature);
         if (out->morpheme_index == 0) {
             rg_context_spec_clear_internal(out);
@@ -1480,11 +1480,11 @@ rg_status rg_context_extend_internal(
             return RG_ERR_OOM;
         }
         if (preceding) {
-            rg_distance_constraint_array_clear_internal((rg_distance_constraint *)out->preceding_at_distance, out->preceding_at_distance_count);
+            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->preceding_at_distance), out->preceding_at_distance_count);
             out->preceding_at_distance = items;
             out->preceding_at_distance_count = base_count + 1;
         } else {
-            rg_distance_constraint_array_clear_internal((rg_distance_constraint *)out->following_at_distance, out->following_at_distance_count);
+            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->following_at_distance), out->following_at_distance_count);
             out->following_at_distance = items;
             out->following_at_distance_count = base_count + 1;
         }
@@ -4512,8 +4512,8 @@ static rg_status aggregate_tonal_counts(
     }
     if (status != RG_OK || !any_toned) {
         for (i = 0; i < row_count; i++) {
-            free((char *)rows[i].source_tone);
-            free((char *)rows[i].target_tone);
+            rg_free_owned_internal(rows[i].source_tone);
+            rg_free_owned_internal(rows[i].target_tone);
         }
         free(rows);
         return status;
@@ -4521,8 +4521,8 @@ static rg_status aggregate_tonal_counts(
     fill_tonal_source_totals(rows, row_count);
     qsort(rows, row_count, sizeof(*rows), tonal_row_cmp);
     for (i = 0; i < model->tonal_count_count; i++) {
-        free((char *)model->tonal_counts[i].source_tone);
-        free((char *)model->tonal_counts[i].target_tone);
+        rg_free_owned_internal(model->tonal_counts[i].source_tone);
+        rg_free_owned_internal(model->tonal_counts[i].target_tone);
     }
     free(model->tonal_counts);
     model->tonal_counts = rows;

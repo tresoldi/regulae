@@ -59,9 +59,9 @@ void rg_feature_displacement_free(rg_feature_displacement *items, size_t count) 
         return;
     }
     for (i = 0; i < count; i++) {
-        free((char *)items[i].feature);
-        free((char *)items[i].from_value);
-        free((char *)items[i].to_value);
+        rg_free_owned_internal(items[i].feature);
+        rg_free_owned_internal(items[i].from_value);
+        rg_free_owned_internal(items[i].to_value);
     }
     free(items);
 }

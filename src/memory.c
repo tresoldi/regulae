@@ -3,6 +3,31 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Releases storage a public struct advertises as `const` but the library owns.
+ *
+ * The `const` on `rg_segment.grapheme`, on a feature name, on the arrays behind
+ * an `rg_context_spec` is a statement to the caller: this is borrowed, valid
+ * while the owner handle lives, and yours to read. It is not a statement about
+ * who allocated it. The library did, so the library has to release it, and C
+ * has no way to spell "const to you, mine to me".
+ *
+ * So the qualifier has to come off somewhere. It comes off here, once, with the
+ * reason attached, rather than at ninety-odd call sites with none -- which is
+ * what `-Wcast-qual` was reporting before 2026-08-15, and why it could not be
+ * enabled. Going through a copy of the pointer value rather than a cast keeps
+ * the conversion defined without an intervening integer type.
+ *
+ * Takes NULL, like every other free in this file. */
+void *rg_owned_internal(const void *owned) {
+    void *value;
+    memcpy(&value, &owned, sizeof(value));
+    return value;
+}
+
+void rg_free_owned_internal(const void *owned) {
+    free(rg_owned_internal(owned));
+}
+
 char *rg_strdup_internal(const char *value) {
     char *out;
     size_t len;
@@ -37,10 +62,10 @@ void rg_segment_clear_internal(rg_segment *segment) {
     if (segment == 0) {
         return;
     }
-    free((char *)segment->grapheme);
-    free((char *)segment->tone);
-    free((char *)segment->length);
-    free((char *)segment->stress);
+    rg_free_owned_internal(segment->grapheme);
+    rg_free_owned_internal(segment->tone);
+    rg_free_owned_internal(segment->length);
+    rg_free_owned_internal(segment->stress);
     segment->grapheme = 0;
     segment->tone = 0;
     segment->length = 0;
@@ -89,8 +114,8 @@ static void feature_constraint_clear(rg_feature_constraint *constraint) {
     if (constraint == 0) {
         return;
     }
-    free((char *)constraint->feature);
-    free((char *)constraint->value);
+    rg_free_owned_internal(constraint->feature);
+    rg_free_owned_internal(constraint->value);
     constraint->feature = 0;
     constraint->value = 0;
 }
@@ -160,9 +185,9 @@ void rg_feature_constraint_array_clear_internal(const rg_feature_constraint *ite
         return;
     }
     for (i = 0; i < count; i++) {
-        feature_constraint_clear((rg_feature_constraint *)&items[i]);
+        feature_constraint_clear(rg_owned_internal(&items[i]));
     }
-    free((rg_feature_constraint *)items);
+    rg_free_owned_internal(items);
 }
 
 void rg_distance_constraint_array_clear_internal(const rg_distance_constraint *items, size_t count) {
@@ -171,9 +196,9 @@ void rg_distance_constraint_array_clear_internal(const rg_distance_constraint *i
         return;
     }
     for (i = 0; i < count; i++) {
-        feature_constraint_clear((rg_feature_constraint *)&items[i].constraint);
+        feature_constraint_clear(rg_owned_internal(&items[i].constraint));
     }
-    free((rg_distance_constraint *)items);
+    rg_free_owned_internal(items);
 }
 
 static rg_status distance_constraint_array_copy(
@@ -201,8 +226,8 @@ static rg_status distance_constraint_array_copy(
         if (status != RG_OK) {
             while (i > 0) {
                 i--;
-                free((char *)copy[i].constraint.feature);
-                free((char *)copy[i].constraint.value);
+                rg_free_owned_internal(copy[i].constraint.feature);
+                rg_free_owned_internal(copy[i].constraint.value);
             }
             free(copy);
             return status;
@@ -274,11 +299,11 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
     if (context == 0) {
         return;
     }
-    free((char *)context->position);
+    rg_free_owned_internal(context->position);
     rg_feature_constraint_array_clear_internal(context->preceding, context->preceding_count);
     rg_feature_constraint_array_clear_internal(context->following, context->following_count);
-    free((char *)context->morphological);
-    free((char *)context->morpheme_index);
+    rg_free_owned_internal(context->morphological);
+    rg_free_owned_internal(context->morpheme_index);
     rg_distance_constraint_array_clear_internal(context->preceding_at_distance, context->preceding_at_distance_count);
     rg_distance_constraint_array_clear_internal(context->following_at_distance, context->following_at_distance_count);
     rg_feature_constraint_array_clear_internal(context->somewhere_preceding, context->somewhere_preceding_count);
@@ -299,15 +324,15 @@ void rg_link_clear_internal(rg_link *link) {
         return;
     }
     for (i = 0; i < link->source_count; i++) {
-        rg_segment_clear_internal((rg_segment *)&link->source[i]);
+        rg_segment_clear_internal(rg_owned_internal(&link->source[i]));
     }
     for (i = 0; i < link->target_count; i++) {
-        rg_segment_clear_internal((rg_segment *)&link->target[i]);
+        rg_segment_clear_internal(rg_owned_internal(&link->target[i]));
     }
-    free((rg_segment *)link->source);
-    free((rg_segment *)link->target);
+    rg_free_owned_internal(link->source);
+    rg_free_owned_internal(link->target);
     rg_context_spec_clear_internal(&link->context);
-    rg_feature_displacement_free((rg_feature_displacement *)link->feature_displacement, link->feature_displacement_count);
+    rg_feature_displacement_free(rg_owned_internal(link->feature_displacement), link->feature_displacement_count);
     link->source = 0;
     link->source_count = 0;
     link->target = 0;
