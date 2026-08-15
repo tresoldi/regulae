@@ -61,6 +61,42 @@ static int has_correspondence(const rg_multi_model *model, const char *a, const 
     return 0;
 }
 
+/* Every constraint slot of a context, so a test can ask "is this conditioned on
+ * nasality anywhere" without caring which slot carried it. */
+static int context_names(const rg_context_spec *c, const char *feature) {
+    size_t i;
+    const rg_feature_constraint *slots[] = {
+        c->preceding, c->following, c->somewhere_preceding, c->somewhere_following,
+        c->same_syllable, c->next_syllable, c->previous_syllable,
+        c->self_stress, c->preceding_stress, c->following_stress
+    };
+    const size_t counts[] = {
+        c->preceding_count, c->following_count, c->somewhere_preceding_count,
+        c->somewhere_following_count, c->same_syllable_count, c->next_syllable_count,
+        c->previous_syllable_count, c->self_stress_count, c->preceding_stress_count,
+        c->following_stress_count
+    };
+    for (i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
+        size_t j;
+        for (j = 0; j < counts[i]; j++) {
+            if (strcmp(slots[i][j].feature, feature) == 0) {
+                return 1;
+            }
+        }
+    }
+    for (i = 0; i < c->preceding_at_distance_count; i++) {
+        if (strcmp(c->preceding_at_distance[i].constraint.feature, feature) == 0) {
+            return 1;
+        }
+    }
+    for (i = 0; i < c->following_at_distance_count; i++) {
+        if (strcmp(c->following_at_distance[i].constraint.feature, feature) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 /* Whether a conditioned class pairs the two graphemes and names `feature` in
  * some lect's environment. */
 static int has_conditioned(
@@ -85,17 +121,8 @@ static int has_conditioned(
             }
         }
         for (j = 0; j < row->segment_count; j++) {
-            const rg_context_spec *context = &row->contexts[j];
-            size_t k;
-            for (k = 0; k < context->preceding_count; k++) {
-                if (strcmp(context->preceding[k].feature, feature) == 0) {
-                    seen_feature = 1;
-                }
-            }
-            for (k = 0; k < context->following_count; k++) {
-                if (strcmp(context->following[k].feature, feature) == 0) {
-                    seen_feature = 1;
-                }
+            if (context_names(&row->contexts[j], feature)) {
+                seen_feature = 1;
             }
         }
         if (seen_a && seen_b && seen_feature) {
@@ -230,6 +257,83 @@ static void test_grassmann_finds_the_correspondence(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* Verner's Law: Proto-Germanic voiceless fricatives voice unless the accent
+ * fell on the immediately preceding syllable. The canonical stress-conditioned
+ * change, and until 2026-08-15 not expressible at all -- the model has carried
+ * a stress field and stress split candidates since the port, and no loader ever
+ * filled the field, so the whole apparatus was reachable only from C.
+ *
+ * Each stem appears twice, in the two accent placements, so the fricative is
+ * the only thing that can vary and the accent is the only thing that can
+ * explain it. */
+static void test_verner(rg_context *ctx) {
+    rg_corpus *corpus = load("verner");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "s", "z"));
+    assert(has_correspondence(model, "f", "b"));
+    assert(has_conditioned(model, "s", "z", "stress"));
+    assert(has_conditioned(model, "\xce\xb8", "\xce\xb8", "stress"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The graded ladder: one change, seven kinds of conditioning, so a failure
+ * says which *kind* the search cannot reach rather than only that something is
+ * wrong. Asserts what is true today; a rung that starts passing more should
+ * have its assertion tightened rather than left loose. */
+static void test_conditioning_ladder(rg_context *ctx) {
+    struct { const char *name; const char *feature; int reachable; } rungs[] = {
+        /* Unconditioned: the change must NOT acquire an environment. */
+        {"graded_0_unconditioned", 0, 0},
+        {"graded_1_adjacent", "front", 1},
+        /* Position is found, though by way of a correlate rather than the
+         * position predicate itself; the test asks only that it is conditioned
+         * at all, because which of two equally good predicates wins is a
+         * tie-break. */
+        {"graded_2_position", 0, 1},
+        {"graded_3_stress", "stress", 1},
+        /* Two predicates at once. Only one of them is ever committed: the
+         * search is greedy and refinement does not reach the second here. The
+         * change is conditioned, but under-described. */
+        {"graded_4_conjunction", "front", 1},
+        {"graded_5_distance_two", "nasal", 1},
+        {"graded_6_existential", "nasal", 1}
+    };
+    size_t i;
+    for (i = 0; i < sizeof(rungs) / sizeof(rungs[0]); i++) {
+        rg_corpus *corpus = load(rungs[i].name);
+        rg_multi_model *model = train(ctx, corpus);
+        int conditioned = 0;
+        size_t j;
+        assert(has_correspondence(model, "p", "f"));
+        for (j = 0; j < rg_multi_model_conditioned_class_count(model); j++) {
+            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, j);
+            size_t k;
+            int seen_p = 0;
+            int seen_f = 0;
+            for (k = 0; k < row->segment_count; k++) {
+                if (strcmp(row->graphemes[k], "p") == 0) {
+                    seen_p = 1;
+                }
+                if (strcmp(row->graphemes[k], "f") == 0) {
+                    seen_f = 1;
+                }
+            }
+            if (seen_p && seen_f) {
+                conditioned = 1;
+            }
+        }
+        assert(conditioned == rungs[i].reachable);
+        if (rungs[i].feature != 0) {
+            assert(has_conditioned(model, "p", "f", rungs[i].feature));
+        }
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -237,6 +341,8 @@ int main(void) {
     test_rhotacism(ctx);
     test_lenition(ctx);
     test_grassmann_finds_the_correspondence(ctx);
+    test_verner(ctx);
+    test_conditioning_ladder(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);
     printf("sound-law tests passed\n");

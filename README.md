@@ -136,6 +136,14 @@ reported as an unknown grapheme. A `<lect>_tone` column can
 annotate tone per segment instead, and overrides what the word
 carries.
 
+Stress is carried the same way. The IPA marks in a word are lifted
+onto the syllable nucleus — `ˈpater` accents the first syllable,
+`paˈter` the second — and a `<lect>_stress` column annotates it per
+segment for corpora that record it separately. Leaving the mark in
+the grapheme would make a stressed segment a different segment from
+its unstressed self, which splits every correspondence it takes part
+in and puts stress out of reach of the conditioning it drives.
+
 ## Run experiments
 
 Each experiment under `experiments/` is a curated corpus and a

@@ -22,7 +22,8 @@ the engine changed to allow it.
 | morpheme boundaries | supported | arcaverborum, and wide via `<lect>_breaks` | `testdata/corpora/morph_boundary.csv` |
 | cross-dimensional rules | supported | every loader | `tests/c/test_pairwise_model.c` |
 | tone | supported | every loader, from Chao superscripts or a `_tone` column | `tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c` |
-| stress conditioning | supported | **none** — no loader carries stress | `src/model.c` stress split candidates |
+| stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
+| manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
 | bootstrap uncertainty | **not ported** | n/a | never ported; `bootstrap_n` is accepted and ignored |
 | chunk transparency screening | **not ported** | n/a | never ported; `chunk_min_transparency > 0` is refused |
 | anomaly detection | **not ported** | n/a | never ported |
@@ -36,15 +37,15 @@ Trained through the wide loader with default options.
 | arabic_hebrew | arabic, hebrew | 33 | 7 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
 | finnish_estonian | estonian, finnish | 36 | 8 |
-| georgian_svan | georgian, svan | 51 | 10 |
+| georgian_svan | georgian, svan | 49 | 10 |
 | harmony_synthetic | derived, proto | 14 | 3 |
-| latin_french | french, latin | 81 | 17 |
+| latin_french | french, latin | 81 | 19 |
 | latin_italian | italian, latin | 68 | 20 |
-| latin_spanish | latin, spanish | 60 | 22 |
+| latin_spanish | latin, spanish | 60 | 23 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 50 | 8 |
 | navajo_chipewyan | chipewyan, navajo | 53 | 5 |
-| oe_english | modern_english, old_english | 58 | 22 |
+| oe_english | modern_english, old_english | 61 | 24 |
 | ppn_hawaiian | hawaiian, ppn | 22 | 7 |
 | swahili_zulu | swahili, zulu | 41 | 7 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |

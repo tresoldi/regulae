@@ -198,7 +198,13 @@ Four readers are available, and all of them arrive at the same model.
 column, whole unsegmented words. A `<lect>_breaks` column supplies morpheme
 boundary positions for that lect, and a `confidence` column weights the set.
 A `<lect>_tone` column supplies tone per segment, and is recognised so it is
-not mistaken for a lect.
+not mistaken for a lect. `<lect>_stress` does the same for stress.
+
+Stress can also be written in the word, with the IPA marks: `ˈpater` puts the
+accent on the first syllable, `paˈter` on the second. The mark stands before a
+syllable and the accent is realised on its nucleus, so that is where it lands —
+which is what makes "the vowel before this consonant was accented" a question
+the model can answer. That question is Verner's Law.
 
 **Long TSV** wants `cognate_id`, `lect_id` and `segments` columns, with
 segments already space-separated, plus an optional `confidence`. Use it when

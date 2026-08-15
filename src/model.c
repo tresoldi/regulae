@@ -914,7 +914,25 @@ static const split_candidate immediate_feature_inventory[] = {
     {"preceding", "voiced", "+"},
     {"preceding", "voiceless", "+"},
     {"preceding", "consonant", "+"},
-    {"preceding", "long", "+"}
+    {"preceding", "long", "+"},
+    /* Manner. These four are computed for every segment and attached to every
+     * context, and until 2026-08-15 none of them was ever searched, so nasal
+     * assimilation, stop lenition and fricative conditioning could not be
+     * stated at all -- the constraint was on the observation and no candidate
+     * ever asked about it. Appended rather than inserted: equal-scoring
+     * candidates are resolved by taking the first, so the order above is
+     * load-bearing for every model already published. */
+    {"following", "nasal", "+"},
+    {"preceding", "nasal", "+"},
+    {"following", "stop", "+"},
+    {"preceding", "stop", "+"},
+    {"following", "fricative", "+"},
+    {"preceding", "fricative", "+"},
+    {"following", "sonorant", "+"},
+    {"preceding", "sonorant", "+"},
+    {"following", "consonant", "+"},
+    {"following", "voiced", "+"},
+    {"following", "voiceless", "+"}
 };
 
 static const char *const split_positions[] = {"initial", "medial", "final"};
@@ -924,7 +942,8 @@ static const char *const stress_slot_names[] = {"self_stress", "preceding_stress
 /* Long-range axes omit "vowel"/"consonant", which are tautological on syllable
  * slots. */
 static const char *const long_range_feature_names[] = {
-    "front", "back", "close", "open", "voiced", "voiceless", "long"
+    "front", "back", "close", "open", "voiced", "voiceless", "long",
+    "nasal", "stop", "fricative", "sonorant"
 };
 
 static const char *const long_range_slot_names[] = {

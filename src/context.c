@@ -800,54 +800,30 @@ rg_status rg_context_grapheme_features(
     return RG_OK;
 }
 
-/* Splits a written word into segments through merkmal. This is the only
- * correct way to get from "pater" to p/a/t/e/r: a naive character split breaks
- * multi-codepoint graphemes such as affricates, digraphs and combining
- * diacritics.
- *
- * Which cut is taken is the context's rg_segmentation setting; the default
- * reads the tie bar and leaves untied sequences apart.
- *
- * Tone leaves the segment string and becomes the segment's own dimension:
- * "ma³³" gives m and a carrying ³³, and a standalone tone token, which is how
- * CLDF wordlists are published, attaches to the segment before it. Tone must
- * never reach feature lookup, and a corpus should not have to choose between
- * writing tone and being readable. */
-rg_status rg_context_segment_word(
+/* Appends the segments of one stress-free piece of a word. Tone leaves the
+ * grapheme here: "ma³³" gives m and a carrying ³³, and a token that is nothing
+ * but tone attaches to the segment before it, which is how CLDF wordlists
+ * publish it. */
+static rg_status append_word_piece(
     const rg_context *ctx,
-    const char *word,
-    rg_segment **out,
-    size_t *out_count
+    const char *piece,
+    rg_segment **segments,
+    size_t *count,
+    size_t *cap
 ) {
     mk_string_list *list = 0;
-    rg_segment *segments;
-    size_t count;
-    size_t written = 0;
+    size_t n;
     size_t i;
     mk_status status;
 
-    if (ctx == 0 || word == 0 || out == 0 || out_count == 0) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
-    *out = 0;
-    *out_count = 0;
     status = ctx->segmentation == RG_SEGMENT_SYSTEM_LONGEST_MATCH
-                 ? mk_system_segment_ipa(ctx->system, word, &list)
-                 : mk_segment_ipa_merged(word, &list);
+                 ? mk_system_segment_ipa(ctx->system, piece, &list)
+                 : mk_segment_ipa_merged(piece, &list);
     if (status != MK_OK) {
         return map_merkmal_status(status);
     }
-    count = mk_string_list_size(list);
-    if (count == 0) {
-        mk_string_list_free(list);
-        return RG_OK;
-    }
-    segments = (rg_segment *)calloc(count, sizeof(*segments));
-    if (segments == 0) {
-        mk_string_list_free(list);
-        return RG_ERR_OOM;
-    }
-    for (i = 0; i < count; i++) {
+    n = mk_string_list_size(list);
+    for (i = 0; i < n; i++) {
         const char *item = mk_string_list_get(list, i);
         char *base = 0;
         char *tone = 0;
@@ -856,50 +832,173 @@ rg_status rg_context_segment_word(
         if (item == 0) {
             item = "";
         }
-        /* A token that is nothing but tone belongs to the segment before it.
-         * With no segment before it there is nothing to carry the tone, so it
-         * stays a segment of its own and is refused at feature lookup, which
-         * is the honest answer for a word that opens with a bare tone mark. */
         if (mk_split_tone(item, &base, &tone) == MK_ERR_UNKNOWN_GRAPHEME &&
-            written > 0 && segments[written - 1].tone == 0) {
-            segments[written - 1].tone = rg_strdup_internal(item);
-            if (segments[written - 1].tone == 0) {
-                rg_segments_free(segments, written);
+            *count > 0 && (*segments)[*count - 1].tone == 0) {
+            (*segments)[*count - 1].tone = rg_strdup_internal(item);
+            if ((*segments)[*count - 1].tone == 0) {
                 mk_string_list_free(list);
                 return RG_ERR_OOM;
             }
             continue;
         }
+        if (*count == *cap) {
+            size_t next_cap = *cap == 0 ? 8 : *cap * 2;
+            rg_segment *next = (rg_segment *)realloc(*segments, next_cap * sizeof(**segments));
+            if (next == 0) {
+                mk_string_free(base);
+                mk_string_free(tone);
+                mk_string_list_free(list);
+                return RG_ERR_OOM;
+            }
+            *segments = next;
+            *cap = next_cap;
+        }
+        memset(&(*segments)[*count], 0, sizeof((*segments)[*count]));
         grapheme = base != 0 ? base : item;
-        segments[written].grapheme = rg_strdup_internal(grapheme);
-        if (segments[written].grapheme == 0) {
+        (*segments)[*count].grapheme = rg_strdup_internal(grapheme);
+        if ((*segments)[*count].grapheme == 0) {
             mk_string_free(base);
             mk_string_free(tone);
-            rg_segments_free(segments, written);
             mk_string_list_free(list);
             return RG_ERR_OOM;
         }
         if (tone != 0 && tone[0] != '\0') {
-            segments[written].tone = rg_strdup_internal(tone);
-            if (segments[written].tone == 0) {
+            (*segments)[*count].tone = rg_strdup_internal(tone);
+            if ((*segments)[*count].tone == 0) {
                 mk_string_free(base);
                 mk_string_free(tone);
-                rg_segments_free(segments, written + 1);
+                (*count)++;
                 mk_string_list_free(list);
                 return RG_ERR_OOM;
             }
         }
         mk_string_free(base);
         mk_string_free(tone);
-        written++;
+        (*count)++;
     }
     mk_string_list_free(list);
-    if (written == 0) {
+    return RG_OK;
+}
+
+static int segment_is_vowel(const rg_context *ctx, const char *grapheme) {
+    const rg_feature_set *features = 0;
+    size_t i;
+    if (rg_context_features_internal(ctx, grapheme, &features) != RG_OK) {
+        return 0;
+    }
+    for (i = 0; i < rg_feature_set_size(features); i++) {
+        const char *item = rg_feature_set_get(features, i);
+        if (item != 0 && strcmp(item, "vowel") == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Splits a written word into segments through merkmal. This is the only
+ * correct way to get from "pater" to p/a/t/e/r: a naive character split breaks
+ * multi-codepoint graphemes such as affricates, digraphs and combining
+ * diacritics. Which cut is taken is the context's rg_segmentation setting; the
+ * default reads the tie bar and leaves untied sequences apart.
+ *
+ * The word is cut at its stress marks first, and each piece segmented on its
+ * own. Two things make that necessary rather than tidy. merkmal resolves "ˈp"
+ * and "aˈ" as graphemes, so a mark left in place becomes part of a segment --
+ * and a stressed segment that is a different segment from its unstressed self
+ * splits every correspondence it takes part in. And the orthographic tokeniser
+ * attaches a mid-word mark to the vowel *before* it, which is the opposite of
+ * what the notation means: "paˈter" is stress on "ter".
+ *
+ * The mark stands before a syllable but stress is realised on its nucleus, and
+ * that is where the conditioning needs it. Verner's Law turns on whether the
+ * preceding vowel carried the accent, which a mark sitting on an onset cannot
+ * answer. */
+rg_status rg_context_segment_word(
+    const rg_context *ctx,
+    const char *word,
+    rg_segment **out,
+    size_t *out_count
+) {
+    rg_segment *segments = 0;
+    size_t count = 0;
+    size_t cap = 0;
+    const char *cursor;
+    const char *pending_stress = 0;
+    rg_status status = RG_OK;
+
+    if (ctx == 0 || word == 0 || out == 0 || out_count == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    *out_count = 0;
+
+    cursor = word;
+    while (*cursor != '\0' && status == RG_OK) {
+        const char *mark = cursor;
+        const char *stress = 0;
+        size_t length;
+        char *piece;
+        size_t first = count;
+
+        /* Find the next mark, which ends this piece. */
+        while (*mark != '\0') {
+            if (mark[0] == '\xcb' && (mark[1] == '\x88' || mark[1] == '\x8c')) {
+                stress = mark[1] == '\x88' ? "primary" : "secondary";
+                break;
+            }
+            mark++;
+        }
+        length = (size_t)(mark - cursor);
+        if (length > 0) {
+            piece = (char *)malloc(length + 1);
+            if (piece == 0) {
+                rg_segments_free(segments, count);
+                return RG_ERR_OOM;
+            }
+            memcpy(piece, cursor, length);
+            piece[length] = '\0';
+            status = append_word_piece(ctx, piece, &segments, &count, &cap);
+            free(piece);
+        }
+        if (status == RG_OK && pending_stress != 0) {
+            size_t i;
+            for (i = first; i < count; i++) {
+                if (segment_is_vowel(ctx, segments[i].grapheme)) {
+                    segments[i].stress = rg_strdup_internal(pending_stress);
+                    if (segments[i].stress == 0) {
+                        status = RG_ERR_OOM;
+                    }
+                    break;
+                }
+            }
+            pending_stress = 0;
+        }
+        if (stress == 0) {
+            break;
+        }
+        pending_stress = stress;
+        cursor = mark + 2;
+    }
+    /* A mark with nothing after it stresses nothing; the word simply ends. */
+    if (status == RG_OK && pending_stress != 0) {
+        size_t i;
+        for (i = 0; i < count; i++) {
+            if (segments[i].stress == 0 && segment_is_vowel(ctx, segments[i].grapheme)) {
+                segments[i].stress = rg_strdup_internal(pending_stress);
+                break;
+            }
+        }
+    }
+    if (status != RG_OK) {
+        rg_segments_free(segments, count);
+        return status;
+    }
+    if (count == 0) {
         rg_segments_free(segments, 0);
         return RG_OK;
     }
     *out = segments;
-    *out_count = written;
+    *out_count = count;
     return RG_OK;
 }
 

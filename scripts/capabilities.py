@@ -81,8 +81,14 @@ CAPABILITIES = [
     (
         "stress conditioning",
         "supported",
-        "**none** — no loader carries stress",
-        "`src/model.c` stress split candidates",
+        "every loader, from IPA marks or a `_stress` column",
+        "`testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c`",
+    ),
+    (
+        "manner conditioning",
+        "supported",
+        "every loader",
+        "`testdata/soundlaws/graded_5_distance_two.tsv`",
     ),
     (
         "bootstrap uncertainty",

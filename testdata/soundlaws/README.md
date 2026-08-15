@@ -85,6 +85,57 @@ be stated.
 A fixture that documents a limit is worth more than one that avoids it. This is
 the corpus to run after changing anything in discovery.
 
+### `verner.tsv` — Verner's Law
+
+Proto-Germanic voiceless fricatives voice unless the accent fell on the
+immediately preceding syllable. Each stem appears twice, in the two accent
+placements, so the fricative is the only thing that can vary and the accent is
+the only thing that can explain it.
+
+This is the canonical stress-conditioned change, and until 2026-08-15 it was
+not expressible: the model has carried a stress field and stress split
+candidates since the port, and no loader ever filled the field, so the whole
+apparatus was reachable only from C. It is found now, in the right terms —
+`θ ~ θ / pre-stress[primary]` and `s ~ z / fol-stress[primary]`.
+
+## The graded ladder — `graded_*.tsv`
+
+Seven corpora with the same shape and the same change, proto /p/ answering to
+daughter /f/, differing only in what conditions it. Regenerate with
+`scripts/graded.py`.
+
+A single fixture that fails tells you something is wrong. A ladder tells you
+where the ceiling is:
+
+| rung | conditioning | found |
+| --- | --- | --- |
+| 0 | none | correctly leaves the change unconditioned |
+| 1 | adjacent segment | yes, `fol[front:+]` |
+| 2 | word position | yes, though by a correlate rather than the position predicate |
+| 3 | stress on the preceding vowel | yes, `pre-stress[stress:primary]` |
+| 4 | two predicates at once | **partly** — one of the two, so the change is under-described |
+| 5 | a segment two places back | yes, `prev-syl[nasal:+]` |
+| 6 | a segment somewhere later | yes, `somewhere-fol[nasal:+]` |
+
+Rungs 5 and 6 found nothing at all until 2026-08-15. Of the thirteen features
+regulae computes for every segment, four — `nasal`, `stop`, `fricative`,
+`sonorant` — were attached to every context and never searched as candidates,
+so no manner could ever condition anything. Nasal assimilation is among the
+commonest conditioned changes there is, and it was inexpressible. Completing
+the candidate tables changed nothing on the real corpora, which is the expected
+result: the new predicates only win where manner genuinely conditions.
+
+Rung 4 is the standing limit. The search is greedy and commits one predicate at
+a time; refinement continues within the group that satisfied it, but on this
+corpus it does not reach the second half of the conjunction.
+
+The forms are nonsense words on purpose. A rung tests one property of the
+search, and real lexical material brings correlations with it — real words that
+share an environment tend to share other things too, and then a failure is
+ambiguous between the environment and its company. An earlier draft of rung 6
+tied the trigger to the preceding vowel's frontness, and the search duly found
+the vowel, which was a fact about the fixture rather than about the tool.
+
 ## Adding one
 
 A fixture earns its place by being able to fail. Before adding one, write down

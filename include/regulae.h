@@ -615,6 +615,14 @@ typedef struct rg_tsv_load_options {
      * column also keeps the tone out of feature lookup entirely, which is
      * where it belongs: tone is a suprasegmental, not part of the grapheme. */
     const char *tone_column;
+    /* Per-segment stress, laid out like tone: one value per segment, "-" for a
+     * segment that carries none. Defaults to the "stress" column when present.
+     *
+     * A corpus can also write the IPA marks in the word, where the segmenter
+     * lifts them onto the syllable nucleus. The column is for corpora that
+     * record stress as an annotation rather than in the transcription, and for
+     * anything the marks cannot express. */
+    const char *stress_column;
 } rg_tsv_load_options;
 
 /* Wide-format TSV: one row per cognate, one column per lect, cells holding

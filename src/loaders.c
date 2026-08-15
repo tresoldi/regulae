@@ -368,6 +368,8 @@ static char *trim_copy(const char *value) {
 /* Splits a whitespace-separated segment cell. "-" gap markers are dropped and,
  * when track_boundaries is set, "+" tokens record a morpheme boundary at the
  * current position instead of producing a segment. */
+static rg_status lift_stress_mark(rg_segment *segment);
+
 static rg_status parse_segments(
     const char *raw,
     int track_boundaries,
@@ -444,6 +446,14 @@ static rg_status parse_segments(
         }
         count++;
     }
+    {
+        size_t i;
+        for (i = 0; i < count; i++) {
+            if (lift_stress_mark(&segments[i]) != RG_OK) {
+                goto fail;
+            }
+        }
+    }
     *out_segments = segments;
     *out_count = count;
     if (out_breaks != 0) {
@@ -466,8 +476,10 @@ fail:
     return RG_ERR_OOM;
 }
 
-/* Attaches a tone cell's whitespace-separated values to already-parsed
- * segments, by position. A value replaces whatever the word itself carried, so
+/* Attaches a suprasegmental cell's whitespace-separated values to
+ * already-parsed segments, by position. Tone and stress take the same shape,
+ * so they take the same code: both are properties of a segment that must never
+ * reach feature lookup, and both are annotated one value per segment. A value replaces whatever the word itself carried, so
  * an explicit column wins over tone written into the transcription. "-" and
  * empty tokens leave the segment as segmentation found it, so a tone-bearing
  * corpus can mark its consonants without inventing a tone for them, and a
@@ -475,7 +487,45 @@ fail:
  * Rejects a cell whose token count disagrees with the segment count:
  * silently truncating would tone the wrong vowels, and a corpus that annotates
  * tone at all is annotating it deliberately. */
-static rg_status attach_tones(const char *raw, rg_segment *segments, size_t segment_count) {
+/* Lifts a leading IPA stress mark off a pre-segmented token.
+ *
+ * merkmal resolves "ˈa" as a grapheme, so a mark left in place makes a stressed
+ * segment a different segment from its unstressed self, splitting every
+ * correspondence it takes part in. The unsegmented path lifts the mark onto the
+ * syllable nucleus, because there the mark stands before a syllable and the
+ * writer has not chosen a segment. Here they have: a pre-segmented corpus
+ * writes the mark on the token it means, and that is where the stress goes. */
+static rg_status lift_stress_mark(rg_segment *segment) {
+    const char *grapheme = segment->grapheme;
+    const char *value;
+    char *stripped;
+    if (grapheme == 0 || grapheme[0] != '\xcb' || grapheme[2] == '\0') {
+        return RG_OK;
+    }
+    if (grapheme[1] == '\x88') {
+        value = "primary";
+    } else if (grapheme[1] == '\x8c') {
+        value = "secondary";
+    } else {
+        return RG_OK;
+    }
+    stripped = rg_strdup_internal(grapheme + 2);
+    if (stripped == 0) {
+        return RG_ERR_OOM;
+    }
+    free((char *)segment->grapheme);
+    segment->grapheme = stripped;
+    free((char *)segment->stress);
+    segment->stress = rg_strdup_internal(value);
+    return segment->stress == 0 ? RG_ERR_OOM : RG_OK;
+}
+
+static rg_status attach_dimension(
+    const char *raw,
+    rg_segment *segments,
+    size_t segment_count,
+    int stress
+) {
     const char *p = raw == 0 ? "" : raw;
     size_t index = 0;
     for (;;) {
@@ -500,14 +550,15 @@ static rg_status attach_tones(const char *raw, rg_segment *segments, size_t segm
             continue;
         }
         {
-            char *tone = (char *)malloc(length + 1);
-            if (tone == 0) {
+            char *value = (char *)malloc(length + 1);
+            const char **slot = stress ? &segments[index].stress : &segments[index].tone;
+            if (value == 0) {
                 return RG_ERR_OOM;
             }
-            memcpy(tone, start, length);
-            tone[length] = '\0';
-            free((char *)segments[index].tone);
-            segments[index].tone = tone;
+            memcpy(value, start, length);
+            value[length] = '\0';
+            free((char *)*slot);
+            *slot = value;
         }
         index++;
     }
@@ -549,6 +600,8 @@ static void loader_form_clear(loader_form *form) {
     for (i = 0; i < form->segment_count; i++) {
         free((char *)form->segments[i].grapheme);
         free((char *)form->segments[i].tone);
+        free((char *)form->segments[i].stress);
+        free((char *)form->segments[i].length);
     }
     free(form->segments);
     free(form->morpheme_breaks);
@@ -827,6 +880,7 @@ static rg_status load_wide_tsv(
     long *lect_cols = 0;
     long *break_cols = 0;
     long *tone_cols = 0;
+    long *stress_cols = 0;
     size_t lect_count = 0;
     size_t c;
     size_t r;
@@ -860,10 +914,12 @@ static rg_status load_wide_tsv(
     lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
     break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
     tone_cols = (long *)calloc(table.column_count, sizeof(*tone_cols));
-    if (lect_cols == 0 || break_cols == 0 || tone_cols == 0) {
+    stress_cols = (long *)calloc(table.column_count, sizeof(*stress_cols));
+    if (lect_cols == 0 || break_cols == 0 || tone_cols == 0 || stress_cols == 0) {
         free(lect_cols);
         free(break_cols);
         free(tone_cols);
+        free(stress_cols);
         loader_table_clear(&table);
         return RG_ERR_OOM;
     }
@@ -874,6 +930,7 @@ static rg_status load_wide_tsv(
                 free(lect_cols);
                 free(break_cols);
                 free(tone_cols);
+                free(stress_cols);
                 loader_table_clear(&table);
                 return RG_ERR_PARSE;
             }
@@ -886,7 +943,9 @@ static rg_status load_wide_tsv(
             if ((long)c == id_col || (long)c == confidence_col) {
                 continue;
             }
-            if (has_suffix(table.header[c], "_breaks") || has_suffix(table.header[c], "_tone")) {
+            if (has_suffix(table.header[c], "_breaks") ||
+                has_suffix(table.header[c], "_tone") ||
+                has_suffix(table.header[c], "_stress")) {
                 continue;
             }
             lect_cols[lect_count++] = (long)c;
@@ -896,6 +955,7 @@ static rg_status load_wide_tsv(
         free(lect_cols);
         free(break_cols);
         free(tone_cols);
+        free(stress_cols);
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -905,6 +965,8 @@ static rg_status load_wide_tsv(
         break_cols[c] = column_index(&table, companion);
         snprintf(companion, sizeof(companion), "%s_tone", table.header[lect_cols[c]]);
         tone_cols[c] = column_index(&table, companion);
+        snprintf(companion, sizeof(companion), "%s_stress", table.header[lect_cols[c]]);
+        stress_cols[c] = column_index(&table, companion);
     }
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
@@ -912,6 +974,7 @@ static rg_status load_wide_tsv(
         free(lect_cols);
         free(break_cols);
         free(tone_cols);
+        free(stress_cols);
         loader_table_clear(&table);
         return RG_ERR_OOM;
     }
@@ -970,7 +1033,14 @@ static rg_status load_wide_tsv(
                 }
             }
             if (tone_cols[c] >= 0) {
-                status = attach_tones(cell(row, tone_cols[c]), form.segments, form.segment_count);
+                status = attach_dimension(cell(row, tone_cols[c]), form.segments, form.segment_count, 0);
+                if (status != RG_OK) {
+                    loader_form_clear(&form);
+                    break;
+                }
+            }
+            if (stress_cols[c] >= 0) {
+                status = attach_dimension(cell(row, stress_cols[c]), form.segments, form.segment_count, 1);
                 if (status != RG_OK) {
                     loader_form_clear(&form);
                     break;
@@ -1014,6 +1084,7 @@ static rg_status load_wide_tsv(
     free(lect_cols);
     free(break_cols);
     free(tone_cols);
+    free(stress_cols);
     loader_table_clear(&table);
     if (status == RG_OK) {
         /* A wide row with a single filled cell has nothing to align against. */
@@ -1051,10 +1122,27 @@ static rg_status loader_form_from(const rg_form *src, const char *lect_id, loade
                 return RG_ERR_OOM;
             }
             /* Suprasegmentals are part of the segment's identity, and dropping
-             * them here silently untoned every corpus built from form pairs. */
+             * them here silently untoned -- and later unstressed -- every
+             * corpus built from form pairs. */
             if (src->segments[i].tone != 0 && src->segments[i].tone[0] != '\0') {
                 out->segments[i].tone = rg_strdup_internal(src->segments[i].tone);
                 if (out->segments[i].tone == 0) {
+                    out->segment_count = i + 1;
+                    loader_form_clear(out);
+                    return RG_ERR_OOM;
+                }
+            }
+            if (src->segments[i].stress != 0 && src->segments[i].stress[0] != '\0') {
+                out->segments[i].stress = rg_strdup_internal(src->segments[i].stress);
+                if (out->segments[i].stress == 0) {
+                    out->segment_count = i + 1;
+                    loader_form_clear(out);
+                    return RG_ERR_OOM;
+                }
+            }
+            if (src->segments[i].length != 0 && src->segments[i].length[0] != '\0') {
+                out->segments[i].length = rg_strdup_internal(src->segments[i].length);
+                if (out->segments[i].length == 0) {
                     out->segment_count = i + 1;
                     loader_form_clear(out);
                     return RG_ERR_OOM;
@@ -1160,6 +1248,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     long alignment_col = -1;
     long confidence_col = -1;
     long tone_col = -1;
+    long stress_col = -1;
     size_t r;
     rg_status status;
 
@@ -1182,6 +1271,9 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     }
     if (opts.tone_column == 0) {
         opts.tone_column = "tone";
+    }
+    if (opts.stress_column == 0) {
+        opts.stress_column = "stress";
     }
 
     status = read_table_source(path, text, '\t', &table);
@@ -1206,6 +1298,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         confidence_col = column_index(&table, opts.confidence_column);
     }
     tone_col = column_index(&table, opts.tone_column);
+    stress_col = column_index(&table, opts.stress_column);
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
     if (corpus == 0) {
@@ -1244,8 +1337,15 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
             free(lect_id);
             continue;
         }
+        if (stress_col >= 0) {
+            status = attach_dimension(cell(row, stress_col), form.segments, form.segment_count, 1);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                break;
+            }
+        }
         if (tone_col >= 0) {
-            status = attach_tones(cell(row, tone_col), form.segments, form.segment_count);
+            status = attach_dimension(cell(row, tone_col), form.segments, form.segment_count, 0);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 free(cognate_id);
