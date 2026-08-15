@@ -373,6 +373,22 @@ int rg_segment_posterior_internal(
 );
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source);
 
+/* How readable a promoted chunk is as a single historical process, in [0, 1].
+ * `rows` is the promoted set the chunk belongs to, which the score consults to
+ * see whether this chunk merely wraps a smaller one. */
+rg_status rg_chunk_transparency_internal(
+    const rg_context *ctx,
+    const rg_train_options *options,
+    const rg_pairwise_model *model,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    const rg_chunk_row *rows,
+    size_t row_count,
+    double *out
+);
+
 /* Half of -log P(t|s) plus half of -log P(s|t), with no log-Z offset. Returns 0
  * when the pair is unknown to the model. */
 int rg_segment_symmetric_raw_cost_internal(

@@ -2739,7 +2739,9 @@ static rg_status promote_chunk_rows(
     size_t row_cap = 0;
     double n_observations = 0.0;
     double min_chunk_obs = 2.0;
+    double min_transparency = 0.0;
     size_t i;
+    size_t kept;
     int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
     rg_status status = RG_OK;
 
@@ -2750,11 +2752,7 @@ static rg_status promote_chunk_rows(
         if (options->bic.min_chunk_observations > 0) {
             min_chunk_obs = (double)options->bic.min_chunk_observations;
         }
-        if (options->chunk_min_transparency > 0.0) {
-            /* The transparency screen needs the chunk-diagnostics analyzer,
-             * which is not ported yet; refusing beats silently skipping it. */
-            return RG_ERR_UNSUPPORTED_OPTION;
-        }
+        min_transparency = options->chunk_min_transparency;
     }
 
     for (i = 0; i < pair_count && status == RG_OK; i++) {
@@ -2945,6 +2943,37 @@ static rg_status promote_chunk_rows(
     if (row_count > 1) {
         qsort(rows, row_count, sizeof(*rows), chunk_row_cmp);
     }
+
+    /* Transparency is scored after the whole promoted set is known, because
+     * part of the score is whether a chunk merely wraps a smaller chunk that
+     * was also promoted, and that cannot be asked of a row in isolation. */
+    for (i = 0; i < row_count && status == RG_OK; i++) {
+        status = rg_chunk_transparency_internal(
+            ctx, options, model,
+            rows[i].source, rows[i].source_count,
+            rows[i].target, rows[i].target_count,
+            rows, row_count, &rows[i].transparency);
+    }
+    if (status != RG_OK) {
+        for (i = 0; i < row_count; i++) {
+            chunk_row_clear(&rows[i]);
+        }
+        free(rows);
+        return status;
+    }
+    kept = 0;
+    for (i = 0; i < row_count; i++) {
+        if (rows[i].transparency < min_transparency) {
+            chunk_row_clear(&rows[i]);
+            continue;
+        }
+        if (kept != i) {
+            rows[kept] = rows[i];
+        }
+        kept++;
+    }
+    row_count = kept;
+
     for (i = 0; i < model->chunk_count; i++) {
         chunk_row_clear(&model->chunks[i]);
     }

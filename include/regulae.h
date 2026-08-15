@@ -394,6 +394,16 @@ typedef struct rg_chunk_row {
      * matching pairs -- s answering s, k answering k -- so without this the
      * model would say nothing happened. */
     int reordering;
+    /* How readable this chunk is as one historical process, in [0, 1]. A chunk
+     * that is short, balanced, decomposes without gaps and does not merely
+     * wrap a smaller promoted chunk scores high; a long lopsided bundle of
+     * unrelated changes that happened to pay for itself jointly scores low.
+     * Always computed. `rg_train_options.chunk_min_transparency` is what acts
+     * on it, and its default of zero drops nothing.
+     *
+     * A heuristic, and advisory: it is a claim about how easy the chunk is to
+     * read, not about whether it is right. */
+    double transparency;
     rg_uncertainty_estimate uncertainty;
 } rg_chunk_row;
 

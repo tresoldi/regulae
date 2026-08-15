@@ -1,6 +1,7 @@
 #include "regulae.h"
 
 #include <assert.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -470,6 +471,12 @@ static void test_the_analysis_does_not_depend_on_which_lect_is_named_first(rg_co
                 if (segments_equal(row->source, row->source_count, other->target, other->target_count) &&
                     segments_equal(row->target, row->target_count, other->source, other->source_count)) {
                     assert(row->count == other->count);
+                    /* How readable a chunk is does not depend on which side of
+                     * it is called the source. The reference's nasal-fusion
+                     * and glide-fusion profiles were directional and would
+                     * have broken this; both are tested in either
+                     * orientation. */
+                    assert(fabs(row->transparency - other->transparency) < 1e-12);
                     mirrored = 1;
                     break;
                 }
@@ -979,6 +986,68 @@ static void test_place_assimilation(rg_context *ctx) {
  * environment, which is what place conditioning looks like when it is not
  * adjacent -- and which needs the major classes to be searchable at long range
  * rather than only next door. */
+/* chunk_min_transparency drops the chunks that are hardest to read as a single
+ * historical process, and nothing else.
+ *
+ * metathesis_adjacent is the fixture that separates the two: the transposition
+ * itself promotes as "ask ~ aks", three segments a side, and the same
+ * transposition with its onset attached promotes as "pask ~ paks", four a
+ * side, saying nothing more. The second scores 0.240 and the first 0.550, so a
+ * threshold between them keeps the process and discards the padded restatement
+ * of it -- which is what the option is for.
+ *
+ * Until 2026-08-15 setting this option returned RG_ERR_UNSUPPORTED_OPTION.
+ * That was honest, and it was still a knob in the public header that did
+ * nothing. */
+static void test_chunk_transparency_filters_the_least_readable_chunks(rg_context *ctx) {
+    rg_corpus *corpus = load("metathesis_adjacent");
+    static const double thresholds[] = { 0.0, 0.3, 0.6, 0.95 };
+    size_t counts[4];
+    size_t t;
+
+    for (t = 0; t < sizeof(thresholds) / sizeof(thresholds[0]); t++) {
+        rg_train_options options;
+        rg_multi_model *model = 0;
+        const rg_pairwise_model *pair;
+        size_t count;
+        size_t i;
+
+        rg_train_options_init_defaults(&options);
+        options.chunk_min_transparency = thresholds[t];
+        assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                              rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+        pair = rg_multi_model_pair_model_at(model, 0)->model;
+        count = rg_pairwise_model_chunk_row_count(pair);
+
+        /* Every surviving row clears the bar, and every row is scored whether
+         * or not the bar is set. */
+        for (i = 0; i < count; i++) {
+            const rg_chunk_row *row = rg_pairwise_model_chunk_row_at(pair, i);
+            assert(row->transparency >= thresholds[t]);
+            assert(row->transparency >= 0.0 && row->transparency <= 1.0);
+        }
+        counts[t] = count;
+        rg_multi_model_free(model);
+    }
+
+    /* The default drops nothing, so there is a table to filter and the rest of
+     * this is not vacuous. */
+    assert(counts[0] > 0);
+    /* Raising the bar never adds a chunk ... */
+    assert(counts[1] <= counts[0]);
+    assert(counts[2] <= counts[1]);
+    assert(counts[3] <= counts[2]);
+    /* ... and somewhere in the middle it bites, which is the assertion that
+     * would fail if the score were constant or the filter were not wired in.
+     * A monotone sequence of equal numbers is monotone. */
+    assert(counts[2] < counts[0]);
+    /* Nothing in this corpus reads as cleanly as 0.95, so the whole table
+     * goes: the option means what it says at the top of its range rather than
+     * saturating. */
+    assert(counts[3] == 0);
+    rg_corpus_free(corpus);
+}
+
 static void test_place_dissimilation(rg_context *ctx) {
     rg_corpus *corpus = load("place_dissimilation");
     rg_multi_model *model = train(ctx, corpus);
@@ -1049,6 +1118,7 @@ int main(void) {
     test_rounding_harmony(ctx);
     test_conditioning_works_in_any_feature_system();
     test_place_assimilation(ctx);
+    test_chunk_transparency_filters_the_least_readable_chunks(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
     test_conditioning_is_found_from_both_sides(ctx);

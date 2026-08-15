@@ -25,7 +25,7 @@ the engine changed to allow it.
 | stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
 | manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
 | bootstrap uncertainty | **not ported** | n/a | never ported; `bootstrap_n` is accepted and ignored |
-| chunk transparency screening | **not ported** | n/a | never ported; `chunk_min_transparency > 0` is refused |
+| chunk transparency screening | supported | `chunk_min_transparency`; every chunk row carries its score | `testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c` |
 | anomaly detection | **not ported** | n/a | never ported |
 
 ## Corpora regulae reads (22 of 24)

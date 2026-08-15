@@ -98,9 +98,9 @@ CAPABILITIES = [
     ),
     (
         "chunk transparency screening",
-        "**not ported**",
-        "n/a",
-        "never ported; `chunk_min_transparency > 0` is refused",
+        "supported",
+        "`chunk_min_transparency`; every chunk row carries its score",
+        "`testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c`",
     ),
     (
         "anomaly detection",

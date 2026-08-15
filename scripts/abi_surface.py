@@ -59,16 +59,15 @@ EXPECTED_PLUMBING_ONLY = {
 }
 
 # A public option the library declares, accepts, and then refuses. Each entry
-# is a promise in the header the code does not keep, recorded so that adding
-# another is deliberate. Removing one -- by implementing it, or by dropping it
-# from the ABI -- means deleting its line.
-EXPECTED_REFUSED_OPTIONS = {
-    "chunk_min_transparency": (
-        "Needs the chunk-diagnostics analyzer, never ported from the Go "
-        "reference. Setting it returns RG_ERR_UNSUPPORTED_OPTION rather than "
-        "being silently ignored, which is the honest half of the situation."
-    ),
-}
+# would be a promise in the header the code does not keep, recorded so that
+# adding one is deliberate rather than an oversight.
+#
+# Empty, and the check keeps it empty in both directions: it fails on an
+# unrecorded refusal, and it fails on a recorded one that no longer exists.
+# `chunk_min_transparency` was the only entry, and implementing it is what
+# emptied the list -- the check said so rather than the line being quietly
+# deleted.
+EXPECTED_REFUSED_OPTIONS = {}
 
 STRUCT_START = re.compile(r"^typedef struct (rg_\w+) \{")
 STRUCT_END = re.compile(r"^\} (rg_\w+);")

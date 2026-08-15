@@ -48,6 +48,7 @@ add_library(regulae
     src/format.c
     src/json.c
     src/loaders.c
+    src/chunk_diagnostics.c
     src/model.c
     src/multilect.c
     src/options.c
