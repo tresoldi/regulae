@@ -68,29 +68,28 @@ void morpheme_placement(
     }
 }
 
-/* Two builders for one concept, and they do not agree.
+/* Two builders for one environment, and the difference between them is
+ * ownership and nothing else.
  *
  * This one borrows: every slot points into the caller's precomputed per-form
  * arrays, nothing is allocated, and clearing the result would free memory the
- * form still owns. The DP scores against it, once per transition, which is why
- * it may not allocate. `build_link_context` below owns what it returns and is
- * what a published link carries.
+ * form still owns -- which is why `position` is a literal here and a strdup in
+ * the owning builder, and why a borrowed context must never be cleared. The DP
+ * scores against this one, once per transition, which is why it may not
+ * allocate. `build_link_context` owns what it returns and is what a published
+ * link carries.
  *
- * Where they diverge, and it is not cosmetic: when `syllables` is absent or
- * empty this one returns after the immediate neighbours, so the distance,
- * existential and stress slots stay empty, while the owning builder fills all
- * three -- it computes the distance slots inline from `source_features` and
- * reads stress off the segments rather than off the syllable data. So on such a
- * form the link carries an environment the DP never scored against. They also
- * disagree about `position`: this one stores a literal and that one a strdup,
- * while `rg_context_spec_clear_internal` frees it unconditionally, which is why
- * a borrowed context must never be cleared.
+ * They used to differ in substance as well. When syllable data was absent this
+ * one returned after the immediate neighbours while the owning one filled the
+ * distance, existential and stress slots by a longer route, so a link could
+ * carry an environment the DP had never scored against. That case cannot arise:
+ * syllable data is built for every form with segments, and a form without
+ * segments produces no links. The longer route was removed rather than
+ * mirrored, and all 63 corpora hash identically without it, which is the
+ * evidence it was unreachable.
  *
- * Both are left standing here on purpose. Making them one changes which
- * environment the DP sees, and that is a change to what regulae learns, not a
- * tidy-up; it belongs with moving the cross-dimensional overlay into the DP,
- * where the environment is built once per position and the question is already
- * on the table. See docs/architecture_plan.md, phase 6. */
+ * The early return below is kept as the guard it is, not as a second
+ * behaviour. */
 void build_link_context_borrowed(
     const rg_form *source,
     const rg_feature_constraint *const *source_features,
@@ -277,44 +276,28 @@ rg_status build_link_context(
             return status;
         }
     }
-    if (syllables != 0 && syllables->left_cumulative != 0 && source_start <= syllables->segment_count) {
-        status = context_copy_constraints(
-            syllables->left_cumulative[source_start],
-            syllables->left_cumulative_counts[source_start],
-            &out->somewhere_preceding,
-            &out->somewhere_preceding_count
-        );
-    } else {
-        status = context_feature_union_copy(
-            source_features,
-            source_feature_counts,
-            0,
-            source_start,
-            &out->somewhere_preceding,
-            &out->somewhere_preceding_count
-        );
-    }
+    /* Syllable data is built for every form that has segments, and a form with
+     * none produces no links, so the precomputed cumulative arrays are always
+     * there to copy from. The union fallback that stood here computed the same
+     * answer the long way for a case that cannot arise -- and, being reachable
+     * only in theory, was the half of the divergence that made this builder
+     * disagree with the borrowed one the DP scores against. */
+    status = context_copy_constraints(
+        syllables->left_cumulative[source_start],
+        syllables->left_cumulative_counts[source_start],
+        &out->somewhere_preceding,
+        &out->somewhere_preceding_count
+    );
     if (status != RG_OK) {
         rg_context_spec_clear_internal(out);
         return status;
     }
-    if (syllables != 0 && syllables->right_cumulative != 0 && source_end <= syllables->segment_count) {
-        status = context_copy_constraints(
-            syllables->right_cumulative[source_end],
-            syllables->right_cumulative_counts[source_end],
-            &out->somewhere_following,
-            &out->somewhere_following_count
-        );
-    } else {
-        status = context_feature_union_copy(
-            source_features,
-            source_feature_counts,
-            source_end,
-            source->segment_count,
-            &out->somewhere_following,
-            &out->somewhere_following_count
-        );
-    }
+    status = context_copy_constraints(
+        syllables->right_cumulative[source_end],
+        syllables->right_cumulative_counts[source_end],
+        &out->somewhere_following,
+        &out->somewhere_following_count
+    );
     if (status != RG_OK) {
         rg_context_spec_clear_internal(out);
         return status;
