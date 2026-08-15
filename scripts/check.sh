@@ -143,6 +143,14 @@ if [ "$full" = "1" ]; then
     cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address -DREGULAE_WERROR=ON >/dev/null || fail "asan configure"
     cmake --build build/c-asan -j"$(nproc)" || fail "asan build"
     ctest --test-dir build/c-asan --output-on-failure || fail "asan ctest"
+
+    # The build adds -fno-sanitize-recover=all for this one, so a finding is a
+    # failing exit status rather than a line of output nobody reads. It was
+    # skipped here for weeks on the belief that this machine could not link
+    # libubsan; it can, and could all along.
+    cmake -S . -B build/c-ubsan -DREGULAE_ENABLE_SANITIZER=undefined -DREGULAE_WERROR=ON >/dev/null || fail "ubsan configure"
+    cmake --build build/c-ubsan -j"$(nproc)" || fail "ubsan build"
+    ctest --test-dir build/c-ubsan --output-on-failure || fail "ubsan ctest"
 fi
 
 # Regenerating must not have changed anything: if it did, what was committed

@@ -138,6 +138,16 @@ endif()
 if(REGULAE_ENABLE_SANITIZER)
     target_compile_options(regulae PUBLIC -fsanitize=${REGULAE_ENABLE_SANITIZER} -fno-omit-frame-pointer)
     target_link_options(regulae PUBLIC -fsanitize=${REGULAE_ENABLE_SANITIZER})
+    # UndefinedBehaviorSanitizer prints and carries on by default, so a suite
+    # can report 100% passed while every run of it emits "runtime error". That
+    # is the exact shape of failure scripts/check.sh exists to prevent -- a
+    # green exit status that is not true -- and the answer here is the same one:
+    # decide by exit status, so make the exit status mean something.
+    # AddressSanitizer already aborts.
+    if(REGULAE_ENABLE_SANITIZER STREQUAL "undefined")
+        target_compile_options(regulae PUBLIC -fno-sanitize-recover=all)
+        target_link_options(regulae PUBLIC -fno-sanitize-recover=all)
+    endif()
 endif()
 
 if(REGULAE_BUILD_CLI)

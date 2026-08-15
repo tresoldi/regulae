@@ -68,8 +68,12 @@ jobs:
         run: ctest --test-dir build/ci --output-on-failure -j"$(nproc)"
 
   sanitizer:
-    name: address sanitizer
+    name: ${{ matrix.sanitizer }} sanitizer
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        sanitizer: [address, undefined]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -86,18 +90,18 @@ jobs:
       - name: Configure
         working-directory: regulae
         run: >
-          cmake -S . -B build/ci-asan
-          -DREGULAE_ENABLE_SANITIZER=address
+          cmake -S . -B build/ci-${{ matrix.sanitizer }}
+          -DREGULAE_ENABLE_SANITIZER=${{ matrix.sanitizer }}
           -DREGULAE_WERROR=ON
           -DMERKMAL_REQUIRE_UTF8PROC=ON
 
       - name: Build
         working-directory: regulae
-        run: cmake --build build/ci-asan -j"$(nproc)"
+        run: cmake --build build/ci-${{ matrix.sanitizer }} -j"$(nproc)"
 
       - name: Test
         working-directory: regulae
-        run: ctest --test-dir build/ci-asan --output-on-failure -j"$(nproc)"
+        run: ctest --test-dir build/ci-${{ matrix.sanitizer }} --output-on-failure -j"$(nproc)"
 
   static-analysis:
     name: clang-tidy
