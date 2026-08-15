@@ -14,6 +14,9 @@ option(REGULAE_BUILD_PYTHON_TESTS "Reserve Python wrapper test option" ON)
 # Off by default: a warning in a consumer's toolchain is not a reason to deny
 # them a build. scripts/check.sh turns it on, which is where the gate belongs.
 option(REGULAE_WERROR "Treat compiler warnings as errors" OFF)
+# libFuzzer harnesses over the parse entry points. Off by default and clang
+# only; an ordinary build is unaffected.
+option(REGULAE_BUILD_FUZZERS "Build the libFuzzer harnesses (clang only)" OFF)
 set(REGULAE_ENABLE_SANITIZER "" CACHE STRING "Sanitizer: address or undefined")
 set_property(CACHE REGULAE_ENABLE_SANITIZER PROPERTY STRINGS "" address undefined)
 
@@ -63,6 +66,20 @@ else()
     if(REGULAE_WERROR)
         add_compile_options(-Werror)
     endif()
+endif()
+
+# Coverage instrumentation has to reach the code being fuzzed, not just the
+# harness, or libFuzzer is guessing. This is a directory property for the same
+# reason the warnings are, and it sits here rather than above the merkmal
+# add_subdirectory, so merkmal is not instrumented: the target is regulae's
+# loaders. Inputs still reach merkmal's segmenter through the wide loader, the
+# fuzzer is simply blind inside it.
+if(REGULAE_BUILD_FUZZERS)
+    if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "REGULAE_BUILD_FUZZERS needs clang; configure with -DCMAKE_C_COMPILER=clang")
+    endif()
+    add_compile_options(-fsanitize=fuzzer-no-link)
+    add_link_options(-fsanitize=fuzzer-no-link)
 endif()
 
 add_library(regulae
@@ -119,6 +136,14 @@ if(REGULAE_BUILD_CLI)
     add_executable(regulae_cli cmd/regulae-c/main.c)
     set_target_properties(regulae_cli PROPERTIES OUTPUT_NAME regulae)
     target_link_libraries(regulae_cli PRIVATE regulae::regulae)
+endif()
+
+if(REGULAE_BUILD_FUZZERS)
+    foreach(target parse_tsv parse_wide_tsv parse_gled parse_arcaverborum)
+        add_executable(fuzz_${target} fuzz/fuzz_${target}.c)
+        target_link_libraries(fuzz_${target} PRIVATE regulae::regulae)
+        target_link_options(fuzz_${target} PRIVATE -fsanitize=fuzzer)
+    endforeach()
 endif()
 
 include(GNUInstallDirs)

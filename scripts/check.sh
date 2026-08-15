@@ -105,6 +105,31 @@ fi
 step "native tests"
 ctest --test-dir build/c --output-on-failure || fail "ctest"
 
+# The loaders are the only part of regulae that reads input nobody wrote for
+# it. A short run is not a proof; it is enough to catch a regression in the
+# parsing paths, and the two defects the first run found -- a read past the end
+# of a truncated stress mark, and a leak on a refused row -- are regression
+# tests in tests/c/test_loaders.c now rather than something only a fuzzer
+# reaches. REGULAE_FUZZ_SECONDS raises the per-target time for a real session.
+if [ "$full" = "1" ] && command -v clang >/dev/null 2>&1; then
+    step "fuzz harnesses"
+    cmake -S . -B build/c-fuzz -DCMAKE_C_COMPILER=clang \
+        -DREGULAE_BUILD_FUZZERS=ON -DREGULAE_ENABLE_SANITIZER=address \
+        -DREGULAE_BUILD_TESTS=OFF -DREGULAE_BUILD_CLI=OFF -DREGULAE_WERROR=ON \
+        >/dev/null || fail "fuzz configure"
+    cmake --build build/c-fuzz -j"$(nproc)" >/dev/null || fail "fuzz build"
+    mkdir -p build/c-fuzz/corpus
+    for target in parse_tsv parse_wide_tsv parse_gled parse_arcaverborum; do
+        # The first path is the corpus libFuzzer *writes* to, so it has to be
+        # under build/; the rest are read-only seeds.
+        "./build/c-fuzz/fuzz_$target" \
+            -max_total_time="${REGULAE_FUZZ_SECONDS:-15}" \
+            -artifact_prefix=build/c-fuzz/ \
+            build/c-fuzz/corpus testdata/corpora testdata/soundlaws \
+            || fail "fuzz_$target found something; the input is under build/c-fuzz/"
+    done
+fi
+
 if [ "$full" = "1" ]; then
     step "sanitizer build and tests"
     cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address -DREGULAE_WERROR=ON >/dev/null || fail "asan configure"

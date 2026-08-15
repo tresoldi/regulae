@@ -599,6 +599,43 @@ static void test_doublets_expand_into_weighted_sets(void) {
     rg_corpus_free(corpus);
 }
 
+/* Found by fuzz/fuzz_parse_tsv within a minute of first being run.
+ *
+ * A stress mark is two bytes, 0xCB 0x88. The check for one read grapheme[2] to
+ * see whether anything followed the mark, having only established that
+ * grapheme[0] was 0xCB -- so a lone 0xCB, which is one byte and a NUL, was read
+ * one past the end of its allocation. A mark truncated mid-character is not an
+ * exotic input: it is what a file cut at a byte boundary hands over. */
+static void test_a_truncated_stress_mark_is_not_read_past(void) {
+    rg_corpus *corpus = 0;
+    const char *text =
+        "cognate_id\tlect_id\tsegments\n"
+        "c1\tone\t\xcb\n"
+        "c1\ttwo\tp\n";
+
+    /* The status is not the point -- either answer is defensible for a byte
+     * that is not a grapheme. Not reading past the allocation is the point,
+     * and it is ASAN that decides whether this passed. */
+    if (rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK) {
+        rg_corpus_free(corpus);
+    }
+}
+
+/* Also from the fuzzer. A stress column with fewer values than the row has
+ * segments is refused, correctly -- and the refusal leaked the row's cognate
+ * and lect ids, because that one branch of eight in the loop had been written
+ * without the two frees the other seven have. */
+static void test_a_refused_row_releases_what_it_read(void) {
+    rg_corpus *corpus = 0;
+    const char *text =
+        "cognate_id\tlect_id\tsegments\tstress\n"
+        "c1\tone\tp a b a\t- - - -\n"
+        "c1\ttwo\tp a b a\t- l\n";
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) != RG_OK);
+    assert(corpus == 0);
+}
+
 /* "parse error" names neither the line nor the reason, on a file that may have
  * ten thousand rows. */
 static void test_load_failure_names_the_reason(void) {
@@ -666,6 +703,8 @@ int main(void) {
     test_doublets_expand_into_weighted_sets();
     test_load_failure_names_the_reason();
     test_a_diagnosis_belongs_to_its_own_call();
+    test_a_truncated_stress_mark_is_not_read_past();
+    test_a_refused_row_releases_what_it_read();
     printf("loader tests passed\n");
     return 0;
 }

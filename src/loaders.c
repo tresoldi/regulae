@@ -503,7 +503,11 @@ static rg_status lift_stress_mark(rg_segment *segment) {
     const char *grapheme = segment->grapheme;
     const char *value;
     char *stripped;
-    if (grapheme == 0 || grapheme[0] != '\xcb' || grapheme[2] == '\0') {
+    /* Tested in order: a lone 0xCB is a one-byte string, and reaching [2] to
+     * find out whether anything follows the mark reads past its NUL. A stress
+     * mark truncated mid-character is not exotic -- it is what a file cut at a
+     * byte boundary, or written in the wrong encoding, hands over. */
+    if (grapheme == 0 || grapheme[0] != '\xcb' || grapheme[1] == '\0' || grapheme[2] == '\0') {
         return RG_OK;
     }
     if (grapheme[1] == '\x88') {
@@ -1537,6 +1541,8 @@ static rg_status load_tsv(
             status = attach_dimension(cell(row, stress_col), form.segments, form.segment_count, RG_DIMENSION_STRESS);
             if (status != RG_OK) {
                 loader_form_clear(&form);
+                free(cognate_id);
+                free(lect_id);
                 break;
             }
         }
