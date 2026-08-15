@@ -97,11 +97,13 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
 - **No phylogeny.** regulae never builds a tree, network, or
   distance matrix. The output has no notion of which lects are
   "closer" than which others.
-- **No morphology.** The alignment is purely phonological.
-  Morpheme boundaries are captured from loaders if present in
-  the source data, stored on `CognateSet.morpheme_boundaries`,
-  and currently not consumed (reserved for a future
-  morph-aware extension).
+- **No morphological analysis.** regulae never segments a word.
+  It does consume boundaries the caller supplies: they block
+  chunk promotion across a seam, and they condition rules
+  through `rg_context_spec.morphological` (where the segment
+  sits in its morpheme) and `morpheme_index` (which morpheme).
+  A corpus without boundaries gets neither axis. Deciding where
+  the boundaries are is the job of the package upstream.
 
 These are all **design choices**, not gaps. Each of them is a
 presupposition that regulae refuses to smuggle in; they belong in

@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 11
+#define RG_ABI_VERSION 12
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -167,7 +167,14 @@ typedef struct rg_context_spec {
     size_t preceding_count;
     const rg_feature_constraint *following;
     size_t following_count;
+    /* Where the segment sits in its own morpheme -- "initial", "final",
+     * "internal", or "only" -- derived from the morpheme boundaries the caller
+     * supplied on the form. Absent when the form carries none. */
     const char *morphological;
+    /* Which morpheme, counted from the start of the word: "0", "1", ... A rule
+     * stated in it does not travel between a suffixing language and a
+     * prefixing one, where the same index is a different thing. */
+    const char *morpheme_index;
     const rg_distance_constraint *preceding_at_distance;
     size_t preceding_at_distance_count;
     const rg_distance_constraint *following_at_distance;
@@ -727,6 +734,8 @@ typedef struct rg_tsv_load_options {
      * record stress as an annotation rather than in the transcription, and for
      * anything the marks cannot express. */
     const char *stress_column;
+    /* Morpheme boundaries as segment indices, default "breaks". */
+    const char *morpheme_breaks_column;
 } rg_tsv_load_options;
 
 /* Wide-format TSV: one row per cognate, one column per lect, cells holding

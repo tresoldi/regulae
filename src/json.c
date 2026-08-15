@@ -84,6 +84,9 @@ static cJSON *json_context(const rg_context_spec *context) {
     if (context->position != 0 && context->position[0] != '\0') {
         cJSON_AddStringToObject(out, "position", context->position);
     }
+    if (context->morpheme_index != 0 && context->morpheme_index[0] != '\0') {
+        cJSON_AddStringToObject(out, "morpheme_index", context->morpheme_index);
+    }
     if (context->morphological != 0 && context->morphological[0] != '\0') {
         cJSON_AddStringToObject(out, "morphological", context->morphological);
     }

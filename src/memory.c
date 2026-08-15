@@ -224,6 +224,13 @@ rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_s
             return RG_ERR_OOM;
         }
     }
+    if (src->morpheme_index != 0) {
+        out->morpheme_index = rg_strdup_internal(src->morpheme_index);
+        if (out->morpheme_index == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+    }
     if (src->morphological != 0) {
         out->morphological = rg_strdup_internal(src->morphological);
         if (out->morphological == 0) {
@@ -270,6 +277,7 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
     rg_feature_constraint_array_clear_internal(context->preceding, context->preceding_count);
     rg_feature_constraint_array_clear_internal(context->following, context->following_count);
     free((char *)context->morphological);
+    free((char *)context->morpheme_index);
     rg_distance_constraint_array_clear_internal(context->preceding_at_distance, context->preceding_at_distance_count);
     rg_distance_constraint_array_clear_internal(context->following_at_distance, context->following_at_distance_count);
     rg_feature_constraint_array_clear_internal(context->somewhere_preceding, context->somewhere_preceding_count);

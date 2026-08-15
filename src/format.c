@@ -154,6 +154,9 @@ static void append_context(string_builder *builder, const rg_context_spec *conte
     if (context->position != 0 && context->position[0] != '\0') {
         builder_appendf(builder, " @%s", context->position);
     }
+    if (context->morpheme_index != 0 && context->morpheme_index[0] != '\0') {
+        builder_appendf(builder, " morph#%s", context->morpheme_index);
+    }
     if (context->morphological != 0 && context->morphological[0] != '\0') {
         builder_appendf(builder, " morph=%s", context->morphological);
     }

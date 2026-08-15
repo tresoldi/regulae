@@ -262,6 +262,8 @@ own licence file; it is regulae's only dependency other than merkmal.
 
 - Cognate detection. Cognate sets are user input.
 - Historical inference. Reconstruction, phylogeny, dating.
-- Morphological segmentation (a reserved slot exists on
-  `CognateSet` but the pipeline is purely phonological).
+- Morphological segmentation. Boundaries are user input. Given
+  them, regulae will condition rules on them — Latin rhotacism
+  applies inside a morpheme and not across a compound seam, and
+  that is expressible — but it will not decide where they are.
 - Directionality. The alignment search is symmetric.

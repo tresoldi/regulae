@@ -1081,7 +1081,6 @@ rg_status rg_context_constraints_internal(
     rg_context *mutable_ctx = (rg_context *)ctx;
     const rg_feature_set *features = 0;
     size_t slot;
-    size_t i;
     size_t count = 0;
     rg_feature_constraint *constraints;
     rg_status status;

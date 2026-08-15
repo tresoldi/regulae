@@ -1248,6 +1248,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     long alignment_col = -1;
     long confidence_col = -1;
     long tone_col = -1;
+    long breaks_col = -1;
     long stress_col = -1;
     size_t r;
     rg_status status;
@@ -1298,6 +1299,12 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         confidence_col = column_index(&table, opts.confidence_column);
     }
     tone_col = column_index(&table, opts.tone_column);
+    /* Morpheme boundaries, as indices into the segment sequence, the same
+     * shape the wide loader's <lect>_breaks column carries. Without a column
+     * for them the long format could describe a morphologically conditioned
+     * change but not supply the boundaries that condition it. */
+    breaks_col = column_index(&table, opts.morpheme_breaks_column == 0
+                              ? "breaks" : opts.morpheme_breaks_column);
     stress_col = column_index(&table, opts.stress_column);
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
@@ -1346,6 +1353,16 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         }
         if (tone_col >= 0) {
             status = attach_dimension(cell(row, tone_col), form.segments, form.segment_count, 0);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                free(cognate_id);
+                free(lect_id);
+                break;
+            }
+        }
+        if (breaks_col >= 0) {
+            status = parse_break_indices(cell(row, breaks_col), &form.morpheme_breaks,
+                                         &form.morpheme_break_count);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 free(cognate_id);

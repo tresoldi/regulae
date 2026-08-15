@@ -97,6 +97,9 @@ size_t rg_context_spec_constraint_count(const rg_context_spec *context) {
     if (!string_absent(context->position)) {
         count++;
     }
+    if (!string_absent(context->morpheme_index)) {
+        count++;
+    }
     if (!string_absent(context->morphological)) {
         count++;
     }
@@ -125,6 +128,10 @@ rg_status rg_context_spec_is_subset(
     }
     *out = 0;
     if (!string_absent(subset->position) && !string_equal(subset->position, other->position)) {
+        return RG_OK;
+    }
+    if (!string_absent(subset->morpheme_index) && !string_equal(subset->morpheme_index, other->morpheme_index)) {
+        *out = 0;
         return RG_OK;
     }
     if (!string_absent(subset->morphological) && !string_equal(subset->morphological, other->morphological)) {

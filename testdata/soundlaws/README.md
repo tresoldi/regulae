@@ -185,6 +185,26 @@ whole time.
 It is here as a standing check that the vocabulary is derived from the corpus
 rather than from whichever languages the author had in mind.
 
+### `morphological_rhotacism.tsv` — a change the phonology gets wrong
+
+Latin rhotacism again, but built to fail the phonological answer. Intervocalic
+/s/ became /r/ inside a morpheme — *honos-is > honoris — and did not across a
+compound seam, where it stands between the same two vowels. "Intervocalic" is
+necessary and not sufficient, and what separates the two sets is the morpheme
+boundary.
+
+The two intervocalic sets are the **same word**. One is monomorphemic and
+rhotacises; the other carries a boundary after the prefix and does not. Nothing
+phonological distinguishes them, so any environment stated in features alone is
+wrong on half of them. Word-initial, word-final and preconsonantal /s/ are
+present too, so "morpheme-internal" cannot answer on its own either.
+
+This is the fixture for `rg_context_spec.morphological`, which until
+2026-08-15 was copied, compared, sorted on and printed by regulae and assigned
+by nothing at all. The boundaries come from a `breaks` column, which the long
+TSV loader learned to read for this — the wide loader has carried
+`<lect>_breaks` all along.
+
 ## Adding one
 
 A fixture earns its place by being able to fail. Before adding one, write down

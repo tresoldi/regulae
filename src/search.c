@@ -697,6 +697,70 @@ static rg_status syllable_data_build(
  * while the syllable_data and the feature matrix live, and only for reading.
  * The DP scores millions of these, so building an owned copy per cell was the
  * single largest cost in training. */
+/* Where a segment sits in its own morpheme, and which morpheme that is.
+ *
+ * Boundaries are indices into the segment sequence: a break at i means a new
+ * morpheme starts at i. A form with no boundaries reports neither value, so
+ * the axis simply does not exist for corpora that do not carry them -- which
+ * is most of them -- and the contrastive filter drops it.
+ *
+ * The names are borrowed from static storage and the index from a small table,
+ * so a borrowed context owns nothing here. Words longer than the table are
+ * reported as being in its last slot rather than not at all: a rule about the
+ * ninth morpheme of a word is not one this is going to find. */
+static const char *const morpheme_index_names[] = {
+    "0", "1", "2", "3", "4", "5", "6", "7"
+};
+
+static void morpheme_placement(
+    const rg_form *form,
+    size_t start,
+    size_t end,
+    const char **out_position,
+    const char **out_index
+) {
+    size_t index = 0;
+    size_t morpheme_start = 0;
+    size_t morpheme_end = form->segment_count;
+    size_t i;
+
+    *out_position = 0;
+    *out_index = 0;
+    if (form->morpheme_break_count == 0 || form->morpheme_breaks == 0) {
+        return;
+    }
+    for (i = 0; i < form->morpheme_break_count; i++) {
+        size_t at;
+        if (form->morpheme_breaks[i] < 0) {
+            continue;
+        }
+        at = (size_t)form->morpheme_breaks[i];
+        if (at <= start) {
+            if (at > morpheme_start) {
+                morpheme_start = at;
+            }
+            if (at > 0) {
+                index++;
+            }
+        } else if (at < morpheme_end) {
+            morpheme_end = at;
+        }
+    }
+    if (index >= sizeof(morpheme_index_names) / sizeof(morpheme_index_names[0])) {
+        index = sizeof(morpheme_index_names) / sizeof(morpheme_index_names[0]) - 1;
+    }
+    *out_index = morpheme_index_names[index];
+    if (morpheme_start == start && end == morpheme_end) {
+        *out_position = "only";
+    } else if (morpheme_start == start) {
+        *out_position = "initial";
+    } else if (end == morpheme_end) {
+        *out_position = "final";
+    } else {
+        *out_position = "internal";
+    }
+}
+
 static void build_link_context_borrowed(
     const rg_form *source,
     const rg_feature_constraint *const *source_features,
@@ -718,6 +782,7 @@ static void build_link_context_borrowed(
     } else {
         out->position = "medial";
     }
+    morpheme_placement(source, source_start, source_end, &out->morphological, &out->morpheme_index);
     if (source_start > 0) {
         out->preceding = source_features[source_start - 1];
         out->preceding_count = source_feature_counts[source_start - 1];
@@ -789,6 +854,18 @@ static rg_status build_link_context(
     }
     if (out->position == 0) {
         return RG_ERR_OOM;
+    }
+    {
+        const char *placement = 0;
+        const char *index = 0;
+        morpheme_placement(source, source_start, source_end, &placement, &index);
+        if (placement != 0) {
+            out->morphological = rg_strdup_internal(placement);
+            out->morpheme_index = rg_strdup_internal(index);
+            if (out->morphological == 0 || out->morpheme_index == 0) {
+                return RG_ERR_OOM;
+            }
+        }
     }
     if (source_start > 0) {
         status = context_copy_constraints(

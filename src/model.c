@@ -248,6 +248,10 @@ static int context_spec_cmp(const rg_context_spec *a, const rg_context_spec *b) 
     if (c != 0) {
         return c;
     }
+    c = nullable_strcmp(a->morpheme_index, b->morpheme_index);
+    if (c != 0) {
+        return c;
+    }
     c = constraint_list_cmp(a->preceding, a->preceding_count, b->preceding, b->preceding_count);
     if (c != 0) {
         return c;
@@ -857,6 +861,12 @@ int rg_predicate_holds_internal(const rg_context_spec *context, const rg_split_c
     if (strcmp(candidate->slot, "position") == 0) {
         return context->position != 0 && strcmp(context->position, candidate->feature) == 0;
     }
+    if (strcmp(candidate->slot, "morphological") == 0) {
+        return context->morphological != 0 && strcmp(context->morphological, candidate->feature) == 0;
+    }
+    if (strcmp(candidate->slot, "morpheme_index") == 0) {
+        return context->morpheme_index != 0 && strcmp(context->morpheme_index, candidate->feature) == 0;
+    }
     if (strcmp(candidate->slot, "preceding@2") == 0) {
         return context_has_distance_constraint(context->preceding_at_distance, context->preceding_at_distance_count, 2, candidate->feature, candidate->value);
     }
@@ -904,6 +914,14 @@ rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate
     if (strcmp(candidate->slot, "position") == 0) {
         out->position = rg_strdup_internal(candidate->feature);
         return out->position == 0 ? RG_ERR_OOM : RG_OK;
+    }
+    if (strcmp(candidate->slot, "morphological") == 0) {
+        out->morphological = rg_strdup_internal(candidate->feature);
+        return out->morphological == 0 ? RG_ERR_OOM : RG_OK;
+    }
+    if (strcmp(candidate->slot, "morpheme_index") == 0) {
+        out->morpheme_index = rg_strdup_internal(candidate->feature);
+        return out->morpheme_index == 0 ? RG_ERR_OOM : RG_OK;
     }
     constraint.feature = candidate->feature;
     constraint.value = candidate->value;
@@ -1170,9 +1188,41 @@ static rg_status collect_observed_stress(stress_inventory *inventory, const rg_c
  * from the preceding/following slots once that slot constrains it, the position
  * axis disappears once a position is fixed, and a stress value disappears once
  * that slot already carries it. */
+/* Which morphological values the corpus actually shows, collected the same way
+ * the stress values are: from the observations, so a corpus without boundaries
+ * gets no candidates and pays nothing for the axis. */
+typedef struct morphology_inventory {
+    const char *placements[8];
+    size_t placement_count;
+    const char *indices[8];
+    size_t index_count;
+} morphology_inventory;
+
+static void morphology_inventory_add(const char **values, size_t *count, size_t cap, const char *value) {
+    size_t i;
+    if (value == 0 || value[0] == '\0') {
+        return;
+    }
+    for (i = 0; i < *count; i++) {
+        if (strcmp(values[i], value) == 0) {
+            return;
+        }
+    }
+    if (*count < cap) {
+        values[*count] = value;
+        (*count)++;
+    }
+}
+
+static void collect_observed_morphology(morphology_inventory *inventory, const rg_context_spec *context) {
+    morphology_inventory_add(inventory->placements, &inventory->placement_count, 8, context->morphological);
+    morphology_inventory_add(inventory->indices, &inventory->index_count, 8, context->morpheme_index);
+}
+
 static size_t immediate_candidates_for(
     const rg_context_spec *base_context,
     const stress_inventory *stress,
+    const morphology_inventory *morphology,
     const rg_feature_vocabulary *vocabulary,
     split_candidate *out,
     size_t capacity
@@ -1214,6 +1264,29 @@ static size_t immediate_candidates_for(
             if (count < capacity) {
                 out[count].slot = "position";
                 out[count].feature = split_positions[i];
+                out[count].value = "+";
+                count++;
+            }
+        }
+    }
+    /* The morphological axes exist only for corpora that carry boundaries, and
+     * `morphology` holds the values actually observed -- there is no point
+     * asking about a fourth morpheme in a corpus whose words have two. */
+    if (base_context->morphological == 0 || base_context->morphological[0] == '\0') {
+        for (i = 0; i < morphology->placement_count; i++) {
+            if (count < capacity) {
+                out[count].slot = "morphological";
+                out[count].feature = morphology->placements[i];
+                out[count].value = "+";
+                count++;
+            }
+        }
+    }
+    if (base_context->morpheme_index == 0 || base_context->morpheme_index[0] == '\0') {
+        for (i = 0; i < morphology->index_count; i++) {
+            if (count < capacity) {
+                out[count].slot = "morpheme_index";
+                out[count].feature = morphology->indices[i];
                 out[count].value = "+";
                 count++;
             }
@@ -1300,6 +1373,24 @@ rg_status rg_context_extend_internal(
         free((char *)out->position);
         out->position = rg_strdup_internal(candidate->feature);
         if (out->position == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        return RG_OK;
+    }
+    if (strcmp(candidate->slot, "morphological") == 0) {
+        free((char *)out->morphological);
+        out->morphological = rg_strdup_internal(candidate->feature);
+        if (out->morphological == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        return RG_OK;
+    }
+    if (strcmp(candidate->slot, "morpheme_index") == 0) {
+        free((char *)out->morpheme_index);
+        out->morpheme_index = rg_strdup_internal(candidate->feature);
+        if (out->morpheme_index == 0) {
             rg_context_spec_clear_internal(out);
             return RG_ERR_OOM;
         }
@@ -2071,6 +2162,7 @@ static rg_status discover_context_counts(
     size_t source_count = 0;
     size_t source_cap = 0;
     stress_inventory stress;
+    morphology_inventory morphology;
     split_candidate *long_range_list = 0;
     size_t long_range_count = 0;
     const context_observation **rows = 0;
@@ -2097,6 +2189,7 @@ static rg_status discover_context_counts(
         return RG_ERR_INVALID_ARGUMENT;
     }
     memset(&stress, 0, sizeof(stress));
+    memset(&morphology, 0, sizeof(morphology));
     if (options != 0) {
         max_depth = options->bic.max_split_depth > 0 ? options->bic.max_split_depth : 3;
         if (options->bic.min_split_observations > 0) {
@@ -2126,6 +2219,7 @@ static rg_status discover_context_counts(
         if (status == RG_OK && !long_range) {
             status = collect_observed_stress(&stress, &observations[i].context);
         }
+        collect_observed_morphology(&morphology, &observations[i].context);
     }
     /* Both lists are built whatever this stage leads with: the stage decides
      * which kind of predicate opens a split, and refinement may then conjoin
@@ -2134,7 +2228,7 @@ static rg_status discover_context_counts(
         size_t immediate_cap =
             2 * vocabulary->count +
             sizeof(split_positions) / sizeof(split_positions[0]) +
-            3 * stress.count + 8;
+            3 * stress.count + 8 + morphology.placement_count + morphology.index_count;
         size_t long_cap =
             sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
             (vocabulary->count == 0 ? 1 : vocabulary->count);
@@ -2150,7 +2244,7 @@ static rg_status discover_context_counts(
             status = RG_ERR_OOM;
         } else {
             rg_context_spec_init_empty(&empty);
-            immediate_count = immediate_candidates_for(&empty, &stress, vocabulary, immediate_list, immediate_cap);
+            immediate_count = immediate_candidates_for(&empty, &stress, &morphology, vocabulary, immediate_list, immediate_cap);
             rg_context_spec_clear_internal(&empty);
         }
     }

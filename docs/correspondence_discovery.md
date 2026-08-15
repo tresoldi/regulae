@@ -192,6 +192,36 @@ all. `testdata/soundlaws/rounding_harmony.tsv` — twenty-four regular instances
 environments differing in rounding alone — produced nothing under it. A
 vocabulary that fits one family is a claim about the others.
 
+### Morphological environments
+
+A morpheme boundary is not a sound, and a change that respects one is not
+stating a phonological fact. Latin rhotacism is the standard case: intervocalic
+/s/ became /r/ inside a morpheme and did not across a compound seam, where it
+stands between the same two vowels. Any environment stated in features alone is
+wrong on half of the data.
+
+Two axes carry it, both derived in `search.c` from the `morpheme_breaks` the
+caller supplies on the form:
+
+- `morphological` — where the segment sits in its own morpheme: `initial`,
+  `final`, `internal`, `only`.
+- `morpheme_index` — which morpheme, counted from the start of the word: `0`,
+  `1`, … A rule stated in it does not travel between a suffixing language and a
+  prefixing one, where the same index is a different thing.
+
+Both conjoin with the feature predicates through the ordinary refinement
+machinery, so "intervocalic and morpheme-initial" is one environment rather
+than two rules.
+
+**regulae does not segment words and will not start.** The boundaries are
+input. A corpus that carries none gets no morphological axis at all — the
+candidate list is built from the values actually observed, so the axis costs
+nothing where the data is silent, which is most corpora. Morphological analysis
+belongs to the package upstream of this one.
+
+Boundaries reach the model from the wide loader's `<lect>_breaks` column and,
+since 2026-08-15, the long loader's `breaks` column.
+
 ### Pricing the search, not only the parameter
 
 Widening the vocabulary widens the argmax, and BIC does not price an argmax. It

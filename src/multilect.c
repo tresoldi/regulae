@@ -524,6 +524,12 @@ typedef struct discovery_state {
     char **stress_values;
     size_t stress_count;
     size_t stress_cap;
+    /* Morphological values the corpus actually shows. A corpus without
+     * boundaries reports none and pays nothing for the axis. */
+    const char *morph_placements[8];
+    size_t morph_placement_count;
+    const char *morph_indices[8];
+    size_t morph_index_count;
     rg_split_candidate *immediate;
     size_t immediate_count;
     rg_split_candidate *long_range;
@@ -745,6 +751,27 @@ static rg_status record_stress_value(discovery_state *state, const char *value) 
     return RG_OK;
 }
 
+static void record_morphology_value(const char **values, size_t *count, const char *value) {
+    size_t i;
+    if (value == 0 || value[0] == '\0') {
+        return;
+    }
+    for (i = 0; i < *count; i++) {
+        if (strcmp(values[i], value) == 0) {
+            return;
+        }
+    }
+    if (*count < 8) {
+        values[*count] = value;
+        (*count)++;
+    }
+}
+
+static void collect_morphology_values(discovery_state *state, const rg_context_spec *context) {
+    record_morphology_value(state->morph_placements, &state->morph_placement_count, context->morphological);
+    record_morphology_value(state->morph_indices, &state->morph_index_count, context->morpheme_index);
+}
+
 static rg_status collect_stress_values(discovery_state *state, const rg_context_spec *context) {
     const rg_feature_constraint *slots[3];
     size_t counts[3];
@@ -776,7 +803,8 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     size_t slot_count = sizeof(multi_stress_slots) / sizeof(multi_stress_slots[0]);
     size_t long_slots = sizeof(multi_long_range_slots) / sizeof(multi_long_range_slots[0]);
     size_t long_features = vocabulary->count == 0 ? 1 : vocabulary->count;
-    size_t total = immediate_total + slot_count * state->stress_count;
+    size_t total = immediate_total + slot_count * state->stress_count
+        + state->morph_placement_count + state->morph_index_count;
     size_t i;
     size_t s;
     size_t n = 0;
@@ -802,6 +830,18 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
             state->immediate[n].value = state->stress_values[i];
             n++;
         }
+    }
+    for (i = 0; i < state->morph_placement_count; i++) {
+        state->immediate[n].slot = "morphological";
+        state->immediate[n].feature = state->morph_placements[i];
+        state->immediate[n].value = "+";
+        n++;
+    }
+    for (i = 0; i < state->morph_index_count; i++) {
+        state->immediate[n].slot = "morpheme_index";
+        state->immediate[n].feature = state->morph_indices[i];
+        state->immediate[n].value = "+";
+        n++;
     }
     state->immediate_count = n;
 
@@ -1693,6 +1733,7 @@ static rg_status multi_lect_context_discovery(
             );
             if (status == RG_OK) {
                 status = collect_stress_values(&state, &form_contexts[cache_index][obs->positions[p]]);
+                collect_morphology_values(&state, &form_contexts[cache_index][obs->positions[p]]);
             }
         }
     }

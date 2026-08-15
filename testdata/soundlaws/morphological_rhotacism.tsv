@@ -1,0 +1,113 @@
+cognate_id	lect_id	segments	breaks
+internal00	old_latin	d o s e t e r	
+internal00	latin	d o r e t e r	
+seam00	old_latin	d o s e t e r	2
+seam00	latin	d o s e t e r	2
+internal01	old_latin	n o s a t e r	
+internal01	latin	n o r a t e r	
+seam01	old_latin	n o s a t e r	2
+seam01	latin	n o s a t e r	2
+internal02	old_latin	t o s u t e r	
+internal02	latin	t o r u t e r	
+seam02	old_latin	t o s u t e r	2
+seam02	latin	t o s u t e r	2
+internal03	old_latin	p o s i t e r	
+internal03	latin	p o r i t e r	
+seam03	old_latin	p o s i t e r	2
+seam03	latin	p o s i t e r	2
+internal04	old_latin	d e s o t e r	
+internal04	latin	d e r o t e r	
+seam04	old_latin	d e s o t e r	2
+seam04	latin	d e s o t e r	2
+internal05	old_latin	n e s a t e r	
+internal05	latin	n e r a t e r	
+seam05	old_latin	n e s a t e r	2
+seam05	latin	n e s a t e r	2
+internal06	old_latin	t e s u t e r	
+internal06	latin	t e r u t e r	
+seam06	old_latin	t e s u t e r	2
+seam06	latin	t e s u t e r	2
+internal07	old_latin	p e s i t e r	
+internal07	latin	p e r i t e r	
+seam07	old_latin	p e s i t e r	2
+seam07	latin	p e s i t e r	2
+internal08	old_latin	d a s o t e r	
+internal08	latin	d a r o t e r	
+seam08	old_latin	d a s o t e r	2
+seam08	latin	d a s o t e r	2
+internal09	old_latin	n a s e t e r	
+internal09	latin	n a r e t e r	
+seam09	old_latin	n a s e t e r	2
+seam09	latin	n a s e t e r	2
+internal10	old_latin	t a s u t e r	
+internal10	latin	t a r u t e r	
+seam10	old_latin	t a s u t e r	2
+seam10	latin	t a s u t e r	2
+internal11	old_latin	p a s i t e r	
+internal11	latin	p a r i t e r	
+seam11	old_latin	p a s i t e r	2
+seam11	latin	p a s i t e r	2
+internal12	old_latin	d u s o t e r	
+internal12	latin	d u r o t e r	
+seam12	old_latin	d u s o t e r	2
+seam12	latin	d u s o t e r	2
+internal13	old_latin	n u s e t e r	
+internal13	latin	n u r e t e r	
+seam13	old_latin	n u s e t e r	2
+seam13	latin	n u s e t e r	2
+internal14	old_latin	t u s a t e r	
+internal14	latin	t u r a t e r	
+seam14	old_latin	t u s a t e r	2
+seam14	latin	t u s a t e r	2
+internal15	old_latin	p u s i t e r	
+internal15	latin	p u r i t e r	
+seam15	old_latin	p u s i t e r	2
+seam15	latin	p u s i t e r	2
+initial00	old_latin	s o d e	
+initial00	latin	s o d e	
+final00	old_latin	d o d e s	
+final00	latin	d o d e s	
+cluster00	old_latin	d o s t e	
+cluster00	latin	d o s t e	
+initial01	old_latin	s o n a	
+initial01	latin	s o n a	
+final01	old_latin	n o n a s	
+final01	latin	n o n a s	
+cluster01	old_latin	n o s t a	
+cluster01	latin	n o s t a	
+initial02	old_latin	s o t u	
+initial02	latin	s o t u	
+final02	old_latin	t o t u s	
+final02	latin	t o t u s	
+cluster02	old_latin	t o s t u	
+cluster02	latin	t o s t u	
+initial03	old_latin	s o p i	
+initial03	latin	s o p i	
+final03	old_latin	p o p i s	
+final03	latin	p o p i s	
+cluster03	old_latin	p o s t i	
+cluster03	latin	p o s t i	
+initial04	old_latin	s e d o	
+initial04	latin	s e d o	
+final04	old_latin	d e d o s	
+final04	latin	d e d o s	
+cluster04	old_latin	d e s t o	
+cluster04	latin	d e s t o	
+initial05	old_latin	s e n a	
+initial05	latin	s e n a	
+final05	old_latin	n e n a s	
+final05	latin	n e n a s	
+cluster05	old_latin	n e s t a	
+cluster05	latin	n e s t a	
+initial06	old_latin	s e t u	
+initial06	latin	s e t u	
+final06	old_latin	t e t u s	
+final06	latin	t e t u s	
+cluster06	old_latin	t e s t u	
+cluster06	latin	t e s t u	
+initial07	old_latin	s e p i	
+initial07	latin	s e p i	
+final07	old_latin	p e p i s	
+final07	latin	p e p i s	
+cluster07	old_latin	p e s t i	
+cluster07	latin	p e s t i	

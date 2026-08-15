@@ -685,6 +685,59 @@ static void test_conditioning_works_in_any_feature_system(void) {
     }
 }
 
+/* Latin rhotacism is the textbook case of a change a phonological environment
+ * gets wrong. Intervocalic /s/ became /r/ inside a morpheme -- *honos-is >
+ * honoris -- and did not across a compound seam, where it stands between the
+ * same two vowels. "Intervocalic" is necessary and not sufficient.
+ *
+ * The fixture makes the two sets the *same word*, one monomorphemic and one
+ * prefix-plus-stem, so nothing phonological separates them and any environment
+ * stated in features alone has to be wrong on half of them. Until 2026-08-15
+ * regulae could not state the right one: rg_context_spec.morphological was
+ * copied, compared, sorted on and printed, and assigned by nothing. */
+static void test_morphological_conditioning(rg_context *ctx) {
+    rg_corpus *corpus = load("morphological_rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int boundary_conditioned = 0;
+
+    assert(has_correspondence(model, "s", "r"));
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        for (j = 0; j < row->segment_count; j++) {
+            const char *placement = row->contexts[j].morphological;
+            if (placement != 0 && placement[0] != '\0') {
+                boundary_conditioned = 1;
+            }
+        }
+    }
+    assert(boundary_conditioned);
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A corpus that carries no boundaries must not acquire a morphological
+ * environment out of nowhere. The axis exists only where the data does. */
+static void test_no_boundaries_means_no_morphological_axis(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        for (j = 0; j < row->segment_count; j++) {
+            const char *placement = row->contexts[j].morphological;
+            const char *index = row->contexts[j].morpheme_index;
+            assert(placement == 0 || placement[0] == '\0');
+            assert(index == 0 || index[0] == '\0');
+        }
+    }
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* A change conditioned by lip rounding. Regular, twenty-four instances, and the
  * two environments differ in rounding alone -- and until the conditioning
  * vocabulary became corpus-derived on 2026-08-15 it produced no conditioned
@@ -790,6 +843,8 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_morphological_conditioning(ctx);
+    test_no_boundaries_means_no_morphological_axis(ctx);
     test_rounding_harmony(ctx);
     test_conditioning_works_in_any_feature_system();
     test_place_assimilation(ctx);
