@@ -15,7 +15,7 @@ static char *train_json(rg_context *ctx, const char *corpus_path, int alignments
     rg_train_options options;
     char *text;
 
-    assert(rg_corpus_load_tsv(corpus_path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(corpus_path, 0, &corpus, 0) == RG_OK);
     rg_train_options_init_defaults(&options);
     assert(rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
                           &options, &model) == RG_OK);

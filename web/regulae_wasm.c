@@ -56,9 +56,9 @@ static int regulae_js_progress(const char *stage, int completed, int total) {
 }
 #endif
 
-static int progress_bridge(const char *stage, size_t completed, size_t total, void *user_data) {
+static bool progress_bridge(const char *stage, size_t completed, size_t total, void *user_data) {
     (void)user_data;
-    return regulae_js_progress(stage, (int)completed, (int)total);
+    return regulae_js_progress(stage, (int)completed, (int)total) != 0;
 }
 
 /* The context owns merkmal's built-in registry and its caches. It is built
@@ -119,16 +119,16 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
     options.progress_user_data = 0;
 
     if (format == 0 || format[0] == '\0' || strcmp(format, "wide") == 0) {
-        status = rg_corpus_parse_wide_tsv(ctx, corpus_text, 0, &corpus);
+        status = rg_corpus_parse_wide_tsv(ctx, corpus_text, 0, &corpus, 0);
     } else if (strcmp(format, "tsv") == 0) {
         rg_tsv_load_options tsv_options;
         memset(&tsv_options, 0, sizeof(tsv_options));
         tsv_options.confidence_column = "confidence";
-        status = rg_corpus_parse_tsv(corpus_text, &tsv_options, &corpus);
+        status = rg_corpus_parse_tsv(corpus_text, &tsv_options, &corpus, 0);
     } else if (strcmp(format, "gled") == 0) {
-        status = rg_corpus_parse_gled(corpus_text, 0, &corpus);
+        status = rg_corpus_parse_gled(corpus_text, 0, &corpus, 0);
     } else if (strcmp(format, "arcaverborum") == 0) {
-        status = rg_corpus_parse_arcaverborum(corpus_text, 0, &corpus);
+        status = rg_corpus_parse_arcaverborum(corpus_text, 0, &corpus, 0);
     } else {
         return error_payload(RG_ERR_UNSUPPORTED_OPTION, "unknown corpus format");
     }
@@ -173,7 +173,7 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
     }
 
     text = rg_model_to_json(ctx, model, rg_corpus_cognates(corpus),
-                            rg_corpus_cognate_count(corpus), &options, 1, 1);
+                            rg_corpus_cognate_count(corpus), &options, true, true);
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
     if (text == 0) {

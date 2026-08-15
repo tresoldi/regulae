@@ -47,12 +47,23 @@ cmake -S . -B build/c -DREGULAE_WERROR=ON >/dev/null || fail "cmake configure"
 # filter is exactly how it was missed before.
 cmake --build build/c -j"$(nproc)" || fail "cmake build"
 
-# The archive must be newer than every source it is built from. A build system
-# that silently declines to rebuild is the failure this whole script is for.
+# Each artifact must be newer than every source it is built from. A build
+# system that silently declines to rebuild is the failure this whole script is
+# for.
+#
+# The CLI is checked against its own binary rather than against the archive.
+# cmd/ was in the archive's list, which is wrong in a way that only shows on a
+# commit that touches the CLI and nothing else: main.c is not compiled into
+# libregulae.a, so it stays newer than the archive forever and the step fails
+# with a message naming the wrong artifact.
 step "build is current"
-newest_source="$(find src include third_party cmd -newer build/c/libregulae.a -type f 2>/dev/null | head -1 || true)"
+newest_source="$(find src include third_party -newer build/c/libregulae.a -type f 2>/dev/null | head -1 || true)"
 if [ -n "$newest_source" ]; then
     fail "libregulae.a is older than $newest_source"
+fi
+newest_cli_source="$(find cmd -newer build/c/regulae -type f 2>/dev/null | head -1 || true)"
+if [ -n "$newest_cli_source" ]; then
+    fail "the regulae binary is older than $newest_cli_source"
 fi
 
 # The WebAssembly artifacts are committed and the native suite checks them

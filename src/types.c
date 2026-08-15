@@ -122,7 +122,7 @@ size_t rg_context_spec_constraint_count(const rg_context_spec *context) {
 rg_status rg_context_spec_is_subset(
     const rg_context_spec *subset,
     const rg_context_spec *other,
-    int *out
+    bool *out
 ) {
     if (subset == 0 || other == 0 || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;

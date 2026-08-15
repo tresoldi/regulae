@@ -72,7 +72,7 @@ static rg_status segment_distance_checked(
     rg_segment target,
     double *out
 ) {
-    int is_segment = 0;
+    bool is_segment = false;
     rg_status status;
     status = rg_context_is_segment(ctx, source.grapheme, &is_segment);
     if (status != RG_OK) {
@@ -306,7 +306,7 @@ static const rg_conditioned_segment_count_row *find_conditioned_segment_count(
     }
     for (i = low; i < model->conditioned_segment_count_count; i++) {
         const rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[i];
-        int subset = 0;
+        bool subset = false;
         size_t specificity;
         if (strcmp(row->source, source) != 0 || strcmp(row->target, target) != 0) {
             break;

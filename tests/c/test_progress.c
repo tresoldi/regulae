@@ -19,7 +19,7 @@ typedef struct recorder {
     size_t cancel_after;
 } recorder;
 
-static int record(const char *stage, size_t completed, size_t total, void *user_data) {
+static bool record(const char *stage, size_t completed, size_t total, void *user_data) {
     recorder *r = (recorder *)user_data;
     if (r->count < MAX_STAGES) {
         snprintf(r->stages[r->count], sizeof(r->stages[0]), "%s", stage);
@@ -28,16 +28,16 @@ static int record(const char *stage, size_t completed, size_t total, void *user_
         r->count++;
     }
     if (r->cancel_after > 0 && r->count >= r->cancel_after) {
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 static rg_corpus *load(const char *name) {
     rg_corpus *corpus = 0;
     char path[1024];
     snprintf(path, sizeof(path), "%s/testdata/corpora/%s", REGULAE_SOURCE_DIR, name);
-    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
     return corpus;
 }
 

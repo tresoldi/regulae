@@ -210,7 +210,7 @@ static void test_tone_clean_fixture(rg_context *ctx) {
 
     assert(rg_corpus_load_wide_tsv(
         ctx, REGULAE_SOURCE_DIR "/experiments/tone_chinese_like_clean/cognates.tsv",
-        0, &corpus) == RG_OK);
+        0, &corpus, 0) == RG_OK);
     count = rg_corpus_cognate_count(corpus);
     assert(count == 80);
     views = (rg_form_pair *)calloc(count, sizeof(*views));

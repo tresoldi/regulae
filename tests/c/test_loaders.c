@@ -35,7 +35,7 @@ static void test_tsv_grouping_and_order(void) {
 
     memset(&options, 0, sizeof(options));
     options.confidence_column = "confidence";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus, 0) == RG_OK);
     assert(rg_corpus_cognate_count(corpus) == 6);
 
     /* Cognate sets keep first-appearance order, and so do the forms inside
@@ -63,7 +63,7 @@ static void test_tsv_confidence_is_the_minimum(void) {
 
     memset(&options, 0, sizeof(options));
     options.confidence_column = "confidence";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", &options, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", &options, &corpus, 0) == RG_OK);
 
     low = find_cognate(corpus, "q5");
     assert(low != 0);
@@ -81,7 +81,7 @@ static void test_tsv_without_confidence_column(void) {
     rg_corpus *corpus = 0;
     const rg_cognate_set *low;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/partial_coverage.tsv", 0, &corpus, 0) == RG_OK);
     low = find_cognate(corpus, "q5");
     assert(low != 0);
     assert(low->confidence == 1.0);
@@ -93,7 +93,7 @@ static void test_arcaverborum_morpheme_boundaries(void) {
     const rg_cognate_set *set;
     const rg_form *form;
 
-    assert(rg_corpus_load_arcaverborum(REGULAE_SOURCE_DIR "/testdata/corpora/morph_boundary.csv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_arcaverborum(REGULAE_SOURCE_DIR "/testdata/corpora/morph_boundary.csv", 0, &corpus, 0) == RG_OK);
     assert(rg_corpus_cognate_count(corpus) == 6);
 
     set = find_cognate(corpus, "b1");
@@ -114,12 +114,12 @@ static void test_missing_file_and_columns(void) {
     rg_corpus *corpus = 0;
     rg_tsv_load_options options;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/does_not_exist.tsv", 0, &corpus) == RG_ERR_IO);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/does_not_exist.tsv", 0, &corpus, 0) == RG_ERR_IO);
     assert(corpus == 0);
 
     memset(&options, 0, sizeof(options));
     options.segments_column = "not_a_column";
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus) == RG_ERR_PARSE);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/three_lect_basic.tsv", &options, &corpus, 0) == RG_ERR_PARSE);
     assert(corpus == 0);
 }
 
@@ -183,8 +183,8 @@ static void test_wide_matches_the_parity_verified_corpus(rg_context *ctx) {
 
     memset(&tsv_options, 0, sizeof(tsv_options));
     tsv_options.confidence_column = "confidence";
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &wide) == RG_OK);
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/real_latin_spanish.tsv", &tsv_options, &long_form) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &wide, 0) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/real_latin_spanish.tsv", &tsv_options, &long_form, 0) == RG_OK);
     assert(rg_corpus_cognate_count(wide) == rg_corpus_cognate_count(long_form));
     assert(rg_corpus_cognate_count(wide) > 90);
 
@@ -213,7 +213,7 @@ static void test_wide_repeated_gloss_is_not_merged(rg_context *ctx) {
     size_t i;
     size_t die_like = 0;
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus, 0) == RG_OK);
     for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
         const char *id = rg_corpus_cognate_at(corpus, i)->cognate_id;
         if (strncmp(id, "die", 3) == 0) {
@@ -232,7 +232,7 @@ static void test_wide_breaks_and_column_conventions(rg_context *ctx) {
     size_t i;
     size_t with_breaks = 0;
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus, 0) == RG_OK);
     for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
         const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
         size_t f;
@@ -252,7 +252,7 @@ static void test_wide_breaks_and_column_conventions(rg_context *ctx) {
     assert(with_breaks > 0);
     rg_corpus_free(corpus);
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/mandarin_historical/cognates.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/mandarin_historical/cognates.tsv", 0, &corpus, 0) == RG_OK);
     for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
         const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
         size_t f;
@@ -276,7 +276,7 @@ static void test_wide_carries_tone(rg_context *ctx) {
 
     assert(rg_corpus_load_wide_tsv(
         ctx, REGULAE_SOURCE_DIR "/experiments/tone_vietnamese_like/cognates.tsv",
-        0, &corpus) == RG_OK);
+        0, &corpus, 0) == RG_OK);
     assert(rg_corpus_cognate_count(corpus) > 0);
     set = rg_corpus_cognate_at(corpus, 0);
     for (f = 0; f < set->form_count; f++) {
@@ -296,7 +296,7 @@ static void test_wide_carries_tone(rg_context *ctx) {
     /* The same corpus written with Chao superscripts on the word instead. */
     assert(rg_corpus_load_wide_tsv(
         ctx, REGULAE_SOURCE_DIR "/experiments/tone_synthetic/cognates.tsv",
-        0, &corpus) == RG_OK);
+        0, &corpus, 0) == RG_OK);
     set = rg_corpus_cognate_at(corpus, 0);
     for (f = 0; f < set->form_count; f++) {
         size_t g;
@@ -319,7 +319,7 @@ static void test_wide_confidence_and_bad_input(rg_context *ctx) {
     size_t i;
     int saw_low = 0;
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/contaminated_cognates_synthetic/cognates.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/contaminated_cognates_synthetic/cognates.tsv", 0, &corpus, 0) == RG_OK);
     for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
         if (rg_corpus_cognate_at(corpus, i)->confidence < 1.0) {
             saw_low = 1;
@@ -328,9 +328,9 @@ static void test_wide_confidence_and_bad_input(rg_context *ctx) {
     assert(saw_low);
     rg_corpus_free(corpus);
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/no_such_file.tsv", 0, &corpus) == RG_ERR_IO);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/no_such_file.tsv", 0, &corpus, 0) == RG_ERR_IO);
     assert(corpus == 0);
-    assert(rg_corpus_load_wide_tsv(0, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_corpus_load_wide_tsv(0, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus, 0) == RG_ERR_INVALID_ARGUMENT);
 }
 
 /* Segmentation must respect multi-codepoint graphemes rather than splitting
@@ -388,7 +388,7 @@ static void test_parse_matches_load(rg_context *ctx) {
     size_t i;
 
     /* Wide: parsed text against the same file on disk. */
-    assert(rg_corpus_parse_wide_tsv(ctx, wide_text, 0, &from_text) == RG_OK);
+    assert(rg_corpus_parse_wide_tsv(ctx, wide_text, 0, &from_text, 0) == RG_OK);
     assert(rg_corpus_cognate_count(from_text) == 2);
     {
         const rg_cognate_set *woman = rg_corpus_cognate_at(from_text, 1);
@@ -399,7 +399,7 @@ static void test_parse_matches_load(rg_context *ctx) {
     }
     rg_corpus_free(from_text);
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &from_path) == RG_OK);
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &from_path, 0) == RG_OK);
     {
         char *text = 0;
         long size;
@@ -413,7 +413,7 @@ static void test_parse_matches_load(rg_context *ctx) {
         assert(fread(text, 1, (size_t)size, fh) == (size_t)size);
         text[size] = '\0';
         fclose(fh);
-        assert(rg_corpus_parse_wide_tsv(ctx, text, 0, &from_text) == RG_OK);
+        assert(rg_corpus_parse_wide_tsv(ctx, text, 0, &from_text, 0) == RG_OK);
         free(text);
     }
     assert(rg_corpus_cognate_count(from_text) == rg_corpus_cognate_count(from_path));
@@ -438,7 +438,7 @@ static void test_parse_matches_load(rg_context *ctx) {
     /* Long format, including the minimum-confidence rule. */
     memset(&tsv_options, 0, sizeof(tsv_options));
     tsv_options.confidence_column = "confidence";
-    assert(rg_corpus_parse_tsv(long_text, &tsv_options, &from_text) == RG_OK);
+    assert(rg_corpus_parse_tsv(long_text, &tsv_options, &from_text, 0) == RG_OK);
     assert(rg_corpus_cognate_count(from_text) == 1);
     assert(rg_corpus_cognate_at(from_text, 0)->confidence == 0.5);
     rg_corpus_free(from_text);
@@ -446,7 +446,7 @@ static void test_parse_matches_load(rg_context *ctx) {
     /* Arcaverborum text has no extension to sniff, so it defaults to comma. */
     assert(rg_corpus_parse_arcaverborum("Language_ID,Segments,Cognacy\n"
                                         "one,p a + t a,b1\n"
-                                        "two,f a + t a,b1\n", 0, &from_text) == RG_OK);
+                                        "two,f a + t a,b1\n", 0, &from_text, 0) == RG_OK);
     assert(rg_corpus_cognate_count(from_text) == 1);
     assert(rg_corpus_cognate_at(from_text, 0)->forms[0].form.morpheme_break_count == 1);
     rg_corpus_free(from_text);
@@ -457,14 +457,14 @@ static void test_parse_matches_load(rg_context *ctx) {
         arca.delimiter = '\t';
         assert(rg_corpus_parse_arcaverborum("Language_ID\tSegments\tCognacy\n"
                                             "one\tp a\tb1\n"
-                                            "two\tf a\tb1\n", &arca, &from_text) == RG_OK);
+                                            "two\tf a\tb1\n", &arca, &from_text, 0) == RG_OK);
         assert(rg_corpus_cognate_count(from_text) == 1);
         rg_corpus_free(from_text);
     }
 
     /* Neither a path nor text is a caller error, not a crash. */
-    assert(rg_corpus_parse_tsv(0, 0, &from_text) == RG_ERR_INVALID_ARGUMENT);
-    assert(rg_corpus_parse_wide_tsv(ctx, 0, 0, &from_text) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_corpus_parse_tsv(0, 0, &from_text, 0) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_corpus_parse_wide_tsv(ctx, 0, 0, &from_text, 0) == RG_ERR_INVALID_ARGUMENT);
 }
 
 /* Tone is a suprasegmental in its own column, positionally parallel to the
@@ -481,7 +481,7 @@ static void test_tsv_tone_column_attaches_by_position(void) {
     const rg_cognate_set *set;
     const rg_form *form;
 
-    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_OK);
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
 
     set = find_cognate(corpus, "c1");
     assert(set != 0);
@@ -508,7 +508,7 @@ static void test_tsv_tone_length_mismatch_is_refused(void) {
         "cognate_id\tlect_id\tsegments\ttone\n"
         "c1\tsrc\tb a\t- 2 3\n";
     rg_corpus *corpus = 0;
-    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_ERR_PARSE);
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_ERR_PARSE);
     assert(corpus == 0);
 }
 
@@ -521,7 +521,7 @@ static void test_tsv_without_tone_column_is_untoned(void) {
     rg_corpus *corpus = 0;
     const rg_form *form;
 
-    assert(rg_corpus_parse_tsv(text, 0, &corpus) == RG_OK);
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
     form = form_for(find_cognate(corpus, "c1"), "src");
     assert(form->segments[0].tone == 0 || form->segments[0].tone[0] == '\0');
     assert(form->segments[1].tone == 0 || form->segments[1].tone[0] == '\0');
@@ -538,7 +538,7 @@ static void test_syllable_breaks_column(void) {
 
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/syllable_breaks_column.tsv",
-                              0, &corpus) == RG_OK);
+                              0, &corpus, 0) == RG_OK);
     set = rg_corpus_cognate_at(corpus, 0);
     assert(set != 0);
     assert(set->form_count == 2);
@@ -567,7 +567,7 @@ static void test_doublets_expand_into_weighted_sets(void) {
     int saw_d = 0;
     int saw_l = 0;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/doublet.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/doublet.tsv", 0, &corpus, 0) == RG_OK);
     assert(rg_corpus_doublet_set_count(corpus) == 1);
     assert(rg_corpus_doublet_expansion_count(corpus) == 1);
     /* Two readings of w1 plus the plain w2. */
@@ -603,15 +603,43 @@ static void test_doublets_expand_into_weighted_sets(void) {
  * ten thousand rows. */
 static void test_load_failure_names_the_reason(void) {
     rg_corpus *corpus = 0;
-    size_t line = 0;
-    const char *detail;
+    rg_load_diagnosis diagnosis;
 
     assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/missing_lect_column.tsv",
-                              0, &corpus) == RG_ERR_PARSE);
-    detail = rg_loader_last_error(&line);
-    assert(detail != 0);
-    assert(strstr(detail, "lect_id") != 0);
-    assert(line == 1);
+                              0, &corpus, &diagnosis) == RG_ERR_PARSE);
+    assert(strstr(diagnosis.message, "lect_id") != 0);
+    assert(diagnosis.line == 1);
+}
+
+/* The diagnosis belongs to the call, not to the process.
+ *
+ * While it was a file-scope buffer, two loads shared one, and only the load_*
+ * entry points cleared it -- so a parse_* that succeeded after any earlier
+ * failure still reported that failure to anyone who asked. Both are stated
+ * here, because neither is visible from a single successful load. */
+static void test_a_diagnosis_belongs_to_its_own_call(void) {
+    rg_corpus *first = 0;
+    rg_corpus *second = 0;
+    rg_corpus *good = 0;
+    rg_load_diagnosis a;
+    rg_load_diagnosis b;
+    rg_load_diagnosis after;
+    rg_tsv_load_options options;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/missing_lect_column.tsv",
+                              0, &first, &a) == RG_ERR_PARSE);
+    assert(rg_corpus_parse_tsv("", 0, &second, &b) != RG_OK);
+    /* The first call's diagnosis is still the first call's. */
+    assert(strstr(a.message, "lect_id") != 0);
+
+    /* And a success does not hand back the last failure. */
+    memset(&options, 0, sizeof(options));
+    assert(rg_corpus_parse_tsv("cognate_id\tlect_id\tsegments\n"
+                               "c1\tone\tp a\n"
+                               "c1\ttwo\tf a\n", &options, &good, &after) == RG_OK);
+    assert(after.message[0] == '\0');
+    assert(after.line == 0);
+    rg_corpus_free(good);
 }
 
 int main(void) {
@@ -637,6 +665,7 @@ int main(void) {
     test_syllable_breaks_column();
     test_doublets_expand_into_weighted_sets();
     test_load_failure_names_the_reason();
+    test_a_diagnosis_belongs_to_its_own_call();
     printf("loader tests passed\n");
     return 0;
 }

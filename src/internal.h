@@ -312,13 +312,13 @@ typedef struct rg_progress_state {
     void *user_data;
     size_t completed;
     size_t total;
-    int cancelled;
+    bool cancelled;
 } rg_progress_state;
 
 void rg_progress_init_internal(rg_progress_state *state, const rg_train_options *options, size_t total);
 /* Reports one finished stage. Returns non-zero once the caller has asked to
  * stop, and keeps returning it so unwinding callers all see the same answer. */
-int rg_progress_step_internal(rg_progress_state *state, const char *stage);
+bool rg_progress_step_internal(rg_progress_state *state, const char *stage);
 
 rg_status rg_train_pairwise_internal(
     const rg_context *ctx,
@@ -335,8 +335,8 @@ char *rg_json_from_multi_model_internal(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
-    int include_alignments,
-    int include_outliers
+    bool include_alignments,
+    bool include_outliers
 );
 char *rg_json_error_internal(rg_status status, const char *detail);
 rg_status rg_json_read_train_options_internal(

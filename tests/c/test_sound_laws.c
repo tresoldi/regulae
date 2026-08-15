@@ -23,7 +23,7 @@ static rg_corpus *load(const char *name) {
     rg_corpus *corpus = 0;
     char path[512];
     snprintf(path, sizeof(path), "%s/testdata/soundlaws/%s.tsv", REGULAE_SOURCE_DIR, name);
-    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
     assert(corpus != 0);
     return corpus;
 }
@@ -523,7 +523,7 @@ static void test_row_order_does_not_change_the_model(rg_context *ctx) {
 
     snprintf(path, sizeof(path), "%s/testdata/soundlaws/rhotacism_reordered.tsv",
              REGULAE_SOURCE_DIR);
-    assert(rg_corpus_load_tsv(path, 0, &reversed) == RG_OK);
+    assert(rg_corpus_load_tsv(path, 0, &reversed, 0) == RG_OK);
 
     a = train(ctx, forward);
     b = train(ctx, reversed);
@@ -806,7 +806,7 @@ static void test_cross_dimensional_rules_report_whether_they_stand(rg_context *c
     int margin_seen = 0;
 
     snprintf(path, sizeof(path), "%s/testdata/corpora/joint_tonogenesis.tsv", REGULAE_SOURCE_DIR);
-    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
 
     rg_train_options_init_defaults(&options);
     options.permutation_count = 10;
@@ -888,7 +888,7 @@ static void test_rules_carry_the_order_they_were_decided(rg_context *ctx) {
     char path[512];
 
     snprintf(path, sizeof(path), "%s/testdata/corpora/joint_tonogenesis.tsv", REGULAE_SOURCE_DIR);
-    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
     model = train(ctx, corpus);
 
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {

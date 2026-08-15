@@ -423,8 +423,8 @@ char *rg_model_to_json(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
-    int include_alignments,
-    int include_outliers
+    bool include_alignments,
+    bool include_outliers
 ) {
     return rg_json_from_multi_model_internal(ctx, model, cognates, cognate_count, options,
                                              include_alignments, include_outliers);
@@ -436,8 +436,8 @@ char *rg_json_from_multi_model_internal(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
-    int include_alignments,
-    int include_outliers
+    bool include_alignments,
+    bool include_outliers
 ) {
     cJSON *root;
     cJSON *lects;

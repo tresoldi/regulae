@@ -889,32 +889,31 @@ size_t rg_corpus_doublet_expansion_count(const rg_corpus *corpus) {
     return corpus == 0 ? 0 : corpus->doublet_expansion_count;
 }
 
-/* Process-wide, in the style of rg_context_last_error but without a handle to
- * hang it on: a load that fails returns no corpus. Not thread-safe, and
- * documented as such; loading is a startup operation. */
-static char loader_error_message[256];
-static size_t loader_error_line;
-static int loader_error_set;
-
-static void loader_fail(size_t line, const char *message) {
-    size_t i = 0;
-    loader_error_line = line;
-    while (message[i] != '\0' && i + 1 < sizeof(loader_error_message)) {
-        loader_error_message[i] = message[i];
-        i++;
+/* The diagnosis belongs to the caller's struct, so two loads on two threads
+ * cannot overwrite each other's and a successful one cannot be read as the
+ * previous failure. Both were true of the process-wide buffer this replaced:
+ * the load_* entry points cleared it and the parse_* ones did not.
+ *
+ * Null means the caller did not ask, which is not an error. */
+static void loader_clear_diagnosis(rg_load_diagnosis *diagnosis) {
+    if (diagnosis == 0) {
+        return;
     }
-    loader_error_message[i] = '\0';
-    loader_error_set = 1;
+    diagnosis->line = 0;
+    diagnosis->message[0] = '\0';
 }
 
-const char *rg_loader_last_error(size_t *line) {
-    if (!loader_error_set) {
-        return 0;
+static void loader_fail(rg_load_diagnosis *diagnosis, size_t line, const char *message) {
+    size_t i = 0;
+    if (diagnosis == 0) {
+        return;
     }
-    if (line != 0) {
-        *line = loader_error_line;
+    diagnosis->line = line;
+    while (message[i] != '\0' && i + 1 < sizeof(diagnosis->message)) {
+        diagnosis->message[i] = message[i];
+        i++;
     }
-    return loader_error_message;
+    diagnosis->message[i] = '\0';
 }
 
 void rg_corpus_free(rg_corpus *corpus) {
@@ -1011,7 +1010,8 @@ static rg_status load_wide_tsv(
     const char *path,
     const char *text,
     const rg_wide_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
     loader_table table;
     rg_corpus *corpus = 0;
@@ -1049,7 +1049,8 @@ static rg_status load_wide_tsv(
      * in this repository is written. */
     id_col = opts.cognate_id_column == 0 ? 0 : column_index(&table, opts.cognate_id_column);
     if (id_col < 0) {
-        loader_fail(1, "no gloss column: the wide format needs one identifier column then one column per lect");
+        loader_fail(diagnosis, 1,
+                    "no gloss column: the wide format needs one identifier column then one column per lect");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1411,7 +1412,13 @@ rg_status rg_corpus_from_pairs(
 
 /* ---- generic TSV -------------------------------------------------------- */
 
-static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_options *options, rg_corpus **out) {
+static rg_status load_tsv(
+    const char *path,
+    const char *text,
+    const rg_tsv_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
     loader_table table;
     rg_corpus *corpus = 0;
     rg_tsv_load_options opts;
@@ -1457,7 +1464,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         return status;
     }
     if (table.column_count == 0) {
-        loader_fail(1, "the file has no columns");
+        loader_fail(diagnosis, 1, "the file has no columns");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1465,7 +1472,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     lect_col = column_index(&table, opts.lect_id_column);
     segments_col = column_index(&table, opts.segments_column);
     if (cognate_col < 0 || lect_col < 0 || segments_col < 0) {
-        loader_fail(1, cognate_col < 0
+        loader_fail(diagnosis, 1, cognate_col < 0
                     ? "no cognate_id column"
                     : (lect_col < 0 ? "no lect_id column" : "no segments column"));
         loader_table_clear(&table);
@@ -1634,7 +1641,13 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
 
 /* ---- GLED --------------------------------------------------------------- */
 
-static rg_status load_gled(const char *path, const char *text, const rg_gled_load_options *options, rg_corpus **out) {
+static rg_status load_gled(
+    const char *path,
+    const char *text,
+    const rg_gled_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
     loader_table table;
     rg_corpus *corpus = 0;
     long doculect_col;
@@ -1663,6 +1676,8 @@ static rg_status load_gled(const char *path, const char *text, const rg_gled_loa
     cogset_col = column_index(&table, "COGSET");
     alignment_col = column_index(&table, "ALIGNMENT");
     if (doculect_col < 0 || family_col < 0 || ipa_col < 0 || cogset_col < 0) {
+        loader_fail(diagnosis, 1,
+                    "not a GLED table: it needs DOCULECT, FAMILY, IPA and COGSET columns");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1755,7 +1770,8 @@ static rg_status load_arcaverborum(
     const char *path,
     const char *text,
     const rg_arcaverborum_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
     loader_table table;
     rg_corpus *corpus = 0;
@@ -1794,6 +1810,7 @@ static rg_status load_arcaverborum(
         return status;
     }
     if (table.column_count == 0) {
+        loader_fail(diagnosis, 1, "the file has no columns");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1804,6 +1821,8 @@ static rg_status load_arcaverborum(
     family_col = column_index(&table, "Family");
     alignment_col = column_index(&table, "Alignment");
     if (language_col < 0 || segments_col < 0 || cognacy_col < 0) {
+        loader_fail(diagnosis, 1,
+                    "not an Arca Verborum table: it needs Language_ID, Segments and Cognacy columns");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1927,56 +1946,84 @@ static rg_status load_arcaverborum(
 
 /* ---- public entry points ------------------------------------------------ */
 
-rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *options, rg_corpus **out) {
-    loader_error_set = 0;
-    return load_tsv(path, 0, options, out);
+rg_status rg_corpus_load_tsv(
+    const char *path,
+    const rg_tsv_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
+    loader_clear_diagnosis(diagnosis);
+    return load_tsv(path, 0, options, out, diagnosis);
 }
 
-rg_status rg_corpus_parse_tsv(const char *text, const rg_tsv_load_options *options, rg_corpus **out) {
-    return load_tsv(0, text, options, out);
+rg_status rg_corpus_parse_tsv(
+    const char *text,
+    const rg_tsv_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
+    loader_clear_diagnosis(diagnosis);
+    return load_tsv(0, text, options, out, diagnosis);
 }
 
 rg_status rg_corpus_load_wide_tsv(
     const rg_context *ctx,
     const char *path,
     const rg_wide_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
-    loader_error_set = 0;
-    return load_wide_tsv(ctx, path, 0, options, out);
+    loader_clear_diagnosis(diagnosis);
+    return load_wide_tsv(ctx, path, 0, options, out, diagnosis);
 }
 
 rg_status rg_corpus_parse_wide_tsv(
     const rg_context *ctx,
     const char *text,
     const rg_wide_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
-    return load_wide_tsv(ctx, 0, text, options, out);
+    loader_clear_diagnosis(diagnosis);
+    return load_wide_tsv(ctx, 0, text, options, out, diagnosis);
 }
 
-rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *options, rg_corpus **out) {
-    loader_error_set = 0;
-    return load_gled(path, 0, options, out);
+rg_status rg_corpus_load_gled(
+    const char *path,
+    const rg_gled_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
+    loader_clear_diagnosis(diagnosis);
+    return load_gled(path, 0, options, out, diagnosis);
 }
 
-rg_status rg_corpus_parse_gled(const char *text, const rg_gled_load_options *options, rg_corpus **out) {
-    return load_gled(0, text, options, out);
+rg_status rg_corpus_parse_gled(
+    const char *text,
+    const rg_gled_load_options *options,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
+    loader_clear_diagnosis(diagnosis);
+    return load_gled(0, text, options, out, diagnosis);
 }
 
 rg_status rg_corpus_load_arcaverborum(
     const char *path,
     const rg_arcaverborum_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
-    loader_error_set = 0;
-    return load_arcaverborum(path, 0, options, out);
+    loader_clear_diagnosis(diagnosis);
+    return load_arcaverborum(path, 0, options, out, diagnosis);
 }
 
 rg_status rg_corpus_parse_arcaverborum(
     const char *text,
     const rg_arcaverborum_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
-    return load_arcaverborum(0, text, options, out);
+    loader_clear_diagnosis(diagnosis);
+    return load_arcaverborum(0, text, options, out, diagnosis);
 }

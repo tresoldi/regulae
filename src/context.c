@@ -123,7 +123,7 @@ typedef struct feature_cache_entry {
      * than flattening every refusal to "unknown grapheme". */
     rg_status refusal;
     int is_segment_state;
-    int is_segment;
+    bool is_segment;
 } feature_cache_entry;
 
 typedef struct distance_cache_entry {
@@ -441,7 +441,7 @@ rg_status rg_context_system_name(const rg_context *ctx, const char **out) {
 
 /* Memoised: the scoring path asks this for both graphemes of every link it
  * considers, and resolving a grapheme in merkmal is not cheap. */
-rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int *out) {
+rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, bool *out) {
     mk_status status;
     size_t slot;
 
@@ -837,7 +837,7 @@ rg_status rg_context_diagnose(
     return RG_OK;
 }
 
-int rg_context_last_diagnosis(const rg_context *ctx, rg_grapheme_diagnosis *out) {
+bool rg_context_last_diagnosis(const rg_context *ctx, rg_grapheme_diagnosis *out) {
     if (ctx == 0 || out == 0 || !ctx->cache->has_diagnosis) {
         return 0;
     }

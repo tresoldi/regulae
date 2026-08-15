@@ -141,7 +141,7 @@ static void test_bootstrap_resamples_cognate_sets(void) {
     int any_differ = 0;
 
     assert(rg_context_new_builtin(&ctx) == RG_OK);
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/soundlaws/rhotacism.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/soundlaws/rhotacism.tsv", 0, &corpus, 0) == RG_OK);
     rg_train_options_init_defaults(&options);
     assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
                           rg_corpus_cognate_count(corpus), &options, &closed_form) == RG_OK);
@@ -194,7 +194,7 @@ static void test_conditioned_intervals_say_they_are_post_selection(void) {
     size_t i;
 
     assert(rg_context_new_builtin(&ctx) == RG_OK);
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/soundlaws/rhotacism.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/soundlaws/rhotacism.tsv", 0, &corpus, 0) == RG_OK);
     rg_train_options_init_defaults(&options);
     assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
                           rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);

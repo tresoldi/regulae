@@ -233,7 +233,12 @@ static void print_summary(const rg_multi_model *model) {
     }
 }
 
-static rg_status load_corpus(const char *path, const char *format, rg_corpus **out);
+static rg_status load_corpus(
+    const char *path,
+    const char *format,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+);
 
 /* Dumps the per-pair learned tables, one row per line, for diffing. */
 static void print_pairwise(const rg_multi_model *model) {
@@ -289,26 +294,32 @@ static rg_status load_corpus_with_context(
     const rg_context *ctx,
     const char *path,
     const char *format,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 ) {
     if (format != 0 && strcmp(format, "wide") == 0) {
-        return rg_corpus_load_wide_tsv(ctx, path, 0, out);
+        return rg_corpus_load_wide_tsv(ctx, path, 0, out, diagnosis);
     }
-    return load_corpus(path, format, out);
+    return load_corpus(path, format, out, diagnosis);
 }
 
-static rg_status load_corpus(const char *path, const char *format, rg_corpus **out) {
+static rg_status load_corpus(
+    const char *path,
+    const char *format,
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
+) {
     if (format == 0 || strcmp(format, "tsv") == 0) {
         rg_tsv_load_options options;
         memset(&options, 0, sizeof(options));
         options.confidence_column = "confidence";
-        return rg_corpus_load_tsv(path, &options, out);
+        return rg_corpus_load_tsv(path, &options, out, diagnosis);
     }
     if (strcmp(format, "gled") == 0) {
-        return rg_corpus_load_gled(path, 0, out);
+        return rg_corpus_load_gled(path, 0, out, diagnosis);
     }
     if (strcmp(format, "arcaverborum") == 0) {
-        return rg_corpus_load_arcaverborum(path, 0, out);
+        return rg_corpus_load_arcaverborum(path, 0, out, diagnosis);
     }
     return RG_ERR_UNSUPPORTED_OPTION;
 }
@@ -558,17 +569,21 @@ static int command_check(const char *path, const char *format) {
 
 /* A corpus that will not load is the first thing a new user meets, and "parse
  * error" names neither the line nor the reason. */
-static void report_load_failure(rg_context *ctx, rg_status status) {
-    size_t line = 0;
-    const char *detail = rg_loader_last_error(&line);
-    if (detail != 0) {
-        fprintf(stderr, "regulae: line %lu: %s\n", (unsigned long)line, detail);
+static void report_load_failure(
+    rg_context *ctx,
+    rg_status status,
+    const rg_load_diagnosis *diagnosis
+) {
+    if (diagnosis != 0 && diagnosis->message[0] != '\0') {
+        fprintf(stderr, "regulae: line %lu: %s\n",
+                (unsigned long)diagnosis->line, diagnosis->message);
         return;
     }
     report_failure(ctx, "loading corpus", status);
 }
 
 static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations, int tune_search) {
+    rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -579,9 +594,9 @@ static int command_train(const char *path, const char *format, int pairwise, int
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus_with_context(ctx, path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
     if (status != RG_OK) {
-        report_load_failure(ctx, status);
+        report_load_failure(ctx, status, &load_diagnosis);
         rg_context_free(ctx);
         return 1;
     }
@@ -604,7 +619,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
     if (json) {
         char *text = rg_model_to_json(ctx, model,
                                       rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
-                                      &options, 1, 1);
+                                      &options, true, true);
         if (text == 0) {
             rg_multi_model_free(model);
             rg_corpus_free(corpus);
@@ -631,6 +646,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
 }
 
 static int command_outliers(const char *path, const char *format, int top_k) {
+    rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -644,9 +660,9 @@ static int command_outliers(const char *path, const char *format, int top_k) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus_with_context(ctx, path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
     if (status != RG_OK) {
-        report_load_failure(ctx, status);
+        report_load_failure(ctx, status, &load_diagnosis);
         rg_context_free(ctx);
         return 1;
     }
@@ -690,6 +706,7 @@ static int command_outliers(const char *path, const char *format, int top_k) {
 /* Aligns each cognate's lect pairs in ascending lect-id order under the trained
  * pairwise model, which is the same view of the data reconciliation sees. */
 static int command_align_with_model(const char *path, const char *format) {
+    rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -701,9 +718,9 @@ static int command_align_with_model(const char *path, const char *format) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus_with_context(ctx, path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
     if (status != RG_OK) {
-        report_load_failure(ctx, status);
+        report_load_failure(ctx, status, &load_diagnosis);
         rg_context_free(ctx);
         return 1;
     }
@@ -791,6 +808,7 @@ static int command_align_with_model(const char *path, const char *format) {
 }
 
 static int command_align(const char *path, const char *format) {
+    rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     size_t c;
@@ -800,9 +818,9 @@ static int command_align(const char *path, const char *format) {
     if (status != RG_OK) {
         return fail("creating context", status);
     }
-    status = load_corpus_with_context(ctx, path, format, &corpus);
+    status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
     if (status != RG_OK) {
-        report_load_failure(ctx, status);
+        report_load_failure(ctx, status, &load_diagnosis);
         rg_context_free(ctx);
         return 1;
     }

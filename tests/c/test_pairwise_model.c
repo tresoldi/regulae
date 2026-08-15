@@ -165,7 +165,7 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
     int found_voiceless = 0;
 
     assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/joint_tonogenesis.tsv",
-                              0, &corpus) == RG_OK);
+                              0, &corpus, 0) == RG_OK);
     count = rg_corpus_cognate_count(corpus);
     views = (rg_form_pair *)calloc(count, sizeof(*views));
     assert(views != 0);
@@ -224,7 +224,7 @@ static void test_cross_dimensional_dimension_target(rg_context *ctx, const char 
     size_t i;
     int found = 0;
 
-    assert(rg_corpus_load_tsv(corpus_path, 0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(corpus_path, 0, &corpus, 0) == RG_OK);
     count = rg_corpus_cognate_count(corpus);
     views = (rg_form_pair *)calloc(count, sizeof(*views));
     assert(views != 0);

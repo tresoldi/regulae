@@ -1,6 +1,7 @@
 #ifndef REGULAE_H
 #define REGULAE_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -24,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 21
+#define RG_ABI_VERSION 22
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -58,9 +59,9 @@ typedef enum rg_status {
 
 /* Reports training progress. stage names the pipeline step just finished;
  * completed and total count steps, so completed/total is a usable fraction.
- * Return non-zero to abort the run, which surfaces as RG_ERR_CANCELLED.
+ * Return true to abort the run, which surfaces as RG_ERR_CANCELLED.
  * Called from the training thread, between stages, never mid-stage. */
-typedef int (*rg_progress_fn)(
+typedef bool (*rg_progress_fn)(
     const char *stage,
     size_t completed,
     size_t total,
@@ -87,7 +88,7 @@ typedef struct rg_bic_config {
      * Set this only to suppress weak rules in a report. */
     double cross_dim_min_rule_confidence;
     double cross_dim_delta_bic_threshold;
-    int multi_lect_bic_small_sample_correction;
+    bool multi_lect_bic_small_sample_correction;
     double multi_lect_min_commit_scale;
     /* How much of the search a split is charged for, on top of its parameter.
      * The penalty gains `search_penalty_gamma * 2 * ln(candidates)`: BIC prices
@@ -133,7 +134,7 @@ typedef struct rg_train_options {
      * This buys precision with recall, and the trade is real: a corpus whose
      * genuine conditioning is weak relative to its own noise will lose rules
      * that the fixed 0.5 keeps. It is off by default for that reason. */
-    int tune_search_penalty;
+    bool tune_search_penalty;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -264,7 +265,7 @@ typedef struct rg_uncertainty_estimate {
      * is computed from. The interval then says how well the rate is pinned
      * *given* that environment, and not whether the environment is real -- for
      * which see `search_margin` against `rg_corpus_fit.null_search_margin`. */
-    int post_selection;
+    bool post_selection;
 } rg_uncertainty_estimate;
 
 typedef struct rg_link {
@@ -352,7 +353,7 @@ typedef struct rg_conditioned_segment_count_row {
     const char *source;
     const char *target;
     rg_context_spec context;
-    int context_is_target;
+    bool context_is_target;
     double count;
     double source_total;
     /* Where this rule sits in the decision list.
@@ -393,7 +394,7 @@ typedef struct rg_chunk_row {
      * reordering, not a set of substitutions. The segment table records the
      * matching pairs -- s answering s, k answering k -- so without this the
      * model would say nothing happened. */
-    int reordering;
+    bool reordering;
     /* How readable this chunk is as one historical process, in [0, 1]. A chunk
      * that is short, balanced, decomposes without gaps and does not merely
      * wrap a smaller promoted chunk scores high; a long lopsided bundle of
@@ -619,7 +620,7 @@ RG_API rg_segmentation rg_context_segmentation(const rg_context *ctx);
 RG_API void rg_context_free(rg_context *ctx);
 RG_API rg_status rg_context_use_system(rg_context *ctx, const char *system_name);
 RG_API rg_status rg_context_system_name(const rg_context *ctx, const char **out);
-RG_API rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, int *out);
+RG_API rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, bool *out);
 /* Names the grapheme behind the most recent RG_ERR_UNKNOWN_GRAPHEME, and the
  * feature system that rejected it. Both are borrowed and valid until the next
  * failure or until the context is freed; grapheme is null if none has failed.
@@ -658,8 +659,8 @@ RG_API rg_status rg_context_diagnose(
 );
 
 /* The diagnosis behind the most recent refusal, alongside the grapheme
- * rg_context_last_error names. Returns 0 when nothing has been refused. */
-RG_API int rg_context_last_diagnosis(
+ * rg_context_last_error names. Returns false when nothing has been refused. */
+RG_API bool rg_context_last_diagnosis(
     const rg_context *ctx,
     rg_grapheme_diagnosis *out
 );
@@ -693,7 +694,7 @@ RG_API size_t rg_context_spec_constraint_count(const rg_context_spec *context);
 RG_API rg_status rg_context_spec_is_subset(
     const rg_context_spec *subset,
     const rg_context_spec *other,
-    int *out
+    bool *out
 );
 
 RG_API rg_status rg_score_link(
@@ -874,26 +875,48 @@ typedef struct rg_arcaverborum_load_options {
     char delimiter;
 } rg_arcaverborum_load_options;
 
+/* Why a load failed, and where.
+ *
+ * The caller owns the storage, which is the whole point. A failed load returns
+ * no corpus to hang a message on, and the answer until ABI 22 was a
+ * process-wide buffer: not thread-safe, and stale between calls, because the
+ * parse_* entry points never cleared it and a successful parse after a failed
+ * load still reported the failure.
+ *
+ * Every load and parse entry point clears this on entry when one is supplied,
+ * and passing null asks for no reporting. line is 1-based, and 0 when the
+ * failure is not tied to one. message is empty when the loader recorded no
+ * detail beyond the status -- "parse error" with no line is unactionable on a
+ * corpus of any size, which is the first thing a new user meets. */
+typedef struct rg_load_diagnosis {
+    size_t line;
+    char message[256];
+} rg_load_diagnosis;
+
 RG_API rg_status rg_corpus_load_tsv(
     const char *path,
     const rg_tsv_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_load_wide_tsv(
     const rg_context *ctx,
     const char *path,
     const rg_wide_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_load_gled(
     const char *path,
     const rg_gled_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_load_arcaverborum(
     const char *path,
     const rg_arcaverborum_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_from_pairs(
     const rg_form_pair *pairs,
@@ -909,23 +932,27 @@ RG_API rg_status rg_corpus_from_pairs(
 RG_API rg_status rg_corpus_parse_tsv(
     const char *text,
     const rg_tsv_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_parse_wide_tsv(
     const rg_context *ctx,
     const char *text,
     const rg_wide_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_parse_gled(
     const char *text,
     const rg_gled_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 RG_API rg_status rg_corpus_parse_arcaverborum(
     const char *text,
     const rg_arcaverborum_load_options *options,
-    rg_corpus **out
+    rg_corpus **out,
+    rg_load_diagnosis *diagnosis
 );
 
 RG_API void rg_corpus_free(rg_corpus *corpus);
@@ -942,13 +969,6 @@ RG_API size_t rg_corpus_cognate_count(const rg_corpus *corpus);
 RG_API size_t rg_corpus_doublet_set_count(const rg_corpus *corpus);
 RG_API size_t rg_corpus_doublet_expansion_count(const rg_corpus *corpus);
 
-/* Why the last load in this process failed, and on which line. Returns 0 when
- * nothing has failed. The message is borrowed and valid until the next load.
- *
- * Process-wide rather than per-corpus, because a failed load returns no corpus
- * to hang it on. "parse error" without a line is unactionable on a corpus of
- * any size, which is the first thing a new user meets.  */
-RG_API const char *rg_loader_last_error(size_t *line);
 RG_API const rg_cognate_set *rg_corpus_cognates(const rg_corpus *corpus);
 RG_API const rg_cognate_set *rg_corpus_cognate_at(const rg_corpus *corpus, size_t index);
 
@@ -991,8 +1011,8 @@ RG_API char *rg_model_to_json(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
-    int include_alignments,
-    int include_outliers
+    bool include_alignments,
+    bool include_outliers
 );
 
 /* Renders an error as the same JSON envelope a successful call uses, so a

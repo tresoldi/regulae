@@ -74,7 +74,7 @@ int main(void) {
     rg_context *ctx = 0;
     rg_feature_set *features = 0;
     const char *name = 0;
-    int is_segment = 0;
+    bool is_segment = false;
     double distance = 0.0;
 
     assert(rg_context_new_builtin(&ctx) == RG_OK);

@@ -218,7 +218,14 @@ rg_multi_model *model = NULL;
 rg_train_options options;
 
 rg_context_new_builtin(&ctx);                 /* owns the merkmal bridge */
-rg_corpus_load_tsv("cognates.tsv", NULL, &corpus);
+
+/* The last argument is where a failed load says what went wrong and on which
+ * line. Pass NULL to decline it. */
+rg_load_diagnosis why;
+if (rg_corpus_load_tsv("cognates.tsv", NULL, &corpus, &why) != RG_OK) {
+    fprintf(stderr, "line %lu: %s\n", (unsigned long)why.line, why.message);
+    return 1;
+}
 rg_train_options_init_defaults(&options);
 
 /* Multi-lect training: the canonical entry point. */
@@ -252,7 +259,10 @@ provided for generic TSV, GLED and arcaverborum data
 lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
-moves on any layout, signature or ownership change.
+moves on any layout, signature or ownership change. It is at
+22: booleans in the public header are `bool` rather than `int`,
+and each loader reports its own failure into a caller-supplied
+`rg_load_diagnosis` instead of a process-wide buffer.
 
 ## Documentation
 

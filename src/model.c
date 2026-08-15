@@ -461,8 +461,8 @@ static rg_status add_conditioned_segment_count(
     size_t i;
     rg_conditioned_segment_count_row *next;
     for (i = 0; i < *count; i++) {
-        int a_subset_b = 0;
-        int b_subset_a = 0;
+        bool a_subset_b = false;
+        bool b_subset_a = false;
         if ((*rows)[i].context_is_target == context_is_target &&
             strcmp((*rows)[i].source, source) == 0 &&
             strcmp((*rows)[i].target, target) == 0 &&
@@ -1657,8 +1657,8 @@ static rg_status commit_observation_group(
         }
         for (existing = 0; existing < model->conditioned_segment_count_count; existing++) {
             rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[existing];
-            int a_subset_b = 0;
-            int b_subset_a = 0;
+            bool a_subset_b = false;
+            bool b_subset_a = false;
             const char *want_source = target_side ? targets[i].target : source;
             const char *want_target = target_side ? source : targets[i].target;
             if (row->context_is_target != target_side ||

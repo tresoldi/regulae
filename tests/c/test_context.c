@@ -11,7 +11,7 @@ int main(void) {
     rg_feature_constraint following[] = {{"front", "present"}};
     rg_feature_constraint somewhere[] = {{"voiced", "present"}};
     rg_distance_constraint distance[] = {{2, {"back", "present"}}};
-    int ok = 0;
+    bool ok = false;
 
     rg_context_spec_init_empty(&empty);
     assert(rg_context_spec_constraint_count(&empty) == 0);

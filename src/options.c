@@ -51,21 +51,21 @@ void rg_progress_init_internal(rg_progress_state *state, const rg_train_options 
     state->user_data = options == 0 ? 0 : options->progress_user_data;
     state->completed = 0;
     state->total = total == 0 ? 1 : total;
-    state->cancelled = 0;
+    state->cancelled = false;
 }
 
-int rg_progress_step_internal(rg_progress_state *state, const char *stage) {
+bool rg_progress_step_internal(rg_progress_state *state, const char *stage) {
     if (state == 0 || state->fn == 0) {
-        return 0;
+        return false;
     }
     if (state->cancelled) {
-        return 1;
+        return true;
     }
     if (state->completed < state->total) {
         state->completed++;
     }
-    if (state->fn(stage, state->completed, state->total, state->user_data) != 0) {
-        state->cancelled = 1;
+    if (state->fn(stage, state->completed, state->total, state->user_data)) {
+        state->cancelled = true;
     }
     return state->cancelled;
 }
