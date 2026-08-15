@@ -37,6 +37,11 @@ typedef struct rg_segment_prior_row {
 typedef struct rg_log_normalizer_row {
     char *source;
     double value;
+    /* How much mass answers to this grapheme as a *target*. The forward
+     * denominator is the total for a source; a symmetric score needs the other
+     * one too, and this is already the only table keyed by a single grapheme
+     * and binary-searched, so it carries both. */
+    double target_total;
 } rg_log_normalizer_row;
 
 struct rg_pairwise_model {

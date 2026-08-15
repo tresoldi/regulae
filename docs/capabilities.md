@@ -36,20 +36,20 @@ Trained through the wide loader with default options.
 | --- | --- | --- | --- |
 | arabic_hebrew | arabic, hebrew | 33 | 7 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
-| finnish_estonian | estonian, finnish | 36 | 8 |
-| georgian_svan | georgian, svan | 50 | 11 |
+| finnish_estonian | estonian, finnish | 37 | 9 |
+| georgian_svan | georgian, svan | 51 | 11 |
 | harmony_synthetic | derived, proto | 14 | 3 |
 | latin_french | french, latin | 77 | 20 |
-| latin_italian | italian, latin | 70 | 21 |
-| latin_spanish | latin, spanish | 61 | 24 |
+| latin_italian | italian, latin | 70 | 22 |
+| latin_spanish | latin, spanish | 62 | 25 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 50 | 10 |
 | navajo_chipewyan | chipewyan, navajo | 53 | 5 |
-| oe_english | modern_english, old_english | 61 | 24 |
-| ppn_hawaiian | hawaiian, ppn | 22 | 7 |
+| oe_english | modern_english, old_english | 60 | 26 |
+| ppn_hawaiian | hawaiian, ppn | 23 | 7 |
 | swahili_zulu | swahili, zulu | 41 | 7 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 49 | 19 |
+| tone_chinese_like | cantonese, mandarin | 48 | 18 |
 | tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |

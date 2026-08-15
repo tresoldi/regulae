@@ -1223,7 +1223,7 @@ static rg_status align_forms_internal(
                         break;
                     }
                     total = prev + link_cost + RG_CHUNK_COMPLEXITY_PENALTY * (double)((int)k + (int)l - 2);
-                    if (total < cost[i * width + j]) {
+                    if (total < cost[i * width + j] - RG_TIE_EPSILON) {
                         cost[i * width + j] = total;
                         back[i * width + j].prev_i = i - k;
                         back[i * width + j].prev_j = j - l;

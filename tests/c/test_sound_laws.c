@@ -216,6 +216,105 @@ static void test_rhotacism(rg_context *ctx) {
  * alphabetically had those stages align each pair in the opposite direction
  * from the one its model was trained in. Reading a model of P(b|a) as P(a|b)
  * misses nearly every lookup and falls back to the untrained prior. */
+/* Which lect a corpus names first is a fact about the file, not about the
+ * languages. Training the same cognate sets with the two lects exchanged has to
+ * produce the same analysis read backwards.
+ *
+ * It did not while the segment score was P(target|source): the two directions
+ * carry different denominators, so the same correspondence was cheaper read one
+ * way than the other, and the conditioned rows discovered from those alignments
+ * inherited the difference -- Grimm's law came back with six rows that had no
+ * counterpart in the other direction. The score is now the geometric mean of
+ * the two conditionals, which is the same number whichever lect is called the
+ * source.
+ *
+ * The alignment DP still resolves exact cost ties by enumeration order, which
+ * is not invariant under the exchange, so this is asserted on corpora large
+ * enough to have a decided answer rather than on a handful of forms. */
+static void test_the_analysis_does_not_depend_on_which_lect_is_named_first(rg_context *ctx) {
+    static const char *fixtures[] = { "rhotacism", "grimm", "verner", "lenition" };
+    size_t f;
+    for (f = 0; f < sizeof(fixtures) / sizeof(fixtures[0]); f++) {
+        rg_corpus *corpus = load(fixtures[f]);
+        rg_train_options options;
+        rg_pairwise_model *a = 0;
+        rg_pairwise_model *b = 0;
+        rg_form_pair *forward;
+        rg_form_pair *reverse;
+        size_t sets = rg_corpus_cognate_count(corpus);
+        size_t count = 0;
+        size_t i;
+        size_t j;
+
+        rg_train_options_init_defaults(&options);
+        forward = (rg_form_pair *)calloc(sets, sizeof(*forward));
+        reverse = (rg_form_pair *)calloc(sets, sizeof(*reverse));
+        assert(forward != 0 && reverse != 0);
+        for (i = 0; i < sets; i++) {
+            const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+            if (set->form_count != 2) {
+                continue;
+            }
+            forward[count].source = set->forms[0].form;
+            forward[count].target = set->forms[1].form;
+            forward[count].weight = 1.0;
+            reverse[count].source = set->forms[1].form;
+            reverse[count].target = set->forms[0].form;
+            reverse[count].weight = 1.0;
+            count++;
+        }
+        assert(count > 0);
+        assert(rg_train_pairwise(ctx, forward, count, &options, &a) == RG_OK);
+        assert(rg_train_pairwise(ctx, reverse, count, &options, &b) == RG_OK);
+
+        assert(rg_pairwise_model_segment_count_row_count(a) ==
+               rg_pairwise_model_segment_count_row_count(b));
+        for (i = 0; i < rg_pairwise_model_segment_count_row_count(a); i++) {
+            const rg_segment_count_row *row = rg_pairwise_model_segment_count_row_at(a, i);
+            int mirrored = 0;
+            for (j = 0; j < rg_pairwise_model_segment_count_row_count(b); j++) {
+                const rg_segment_count_row *other = rg_pairwise_model_segment_count_row_at(b, j);
+                if (strcmp(row->source, other->target) == 0 &&
+                    strcmp(row->target, other->source) == 0) {
+                    assert(row->count == other->count);
+                    assert(row->source_total == other->target_total);
+                    assert(row->target_total == other->source_total);
+                    mirrored = 1;
+                    break;
+                }
+            }
+            assert(mirrored);
+        }
+
+        assert(rg_pairwise_model_conditioned_segment_count_row_count(a) ==
+               rg_pairwise_model_conditioned_segment_count_row_count(b));
+        for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(a); i++) {
+            const rg_conditioned_segment_count_row *row =
+                rg_pairwise_model_conditioned_segment_count_row_at(a, i);
+            int mirrored = 0;
+            for (j = 0; j < rg_pairwise_model_conditioned_segment_count_row_count(b); j++) {
+                const rg_conditioned_segment_count_row *other =
+                    rg_pairwise_model_conditioned_segment_count_row_at(b, j);
+                /* The environment stays attached to the lect it was measured
+                 * on, so which side of the link carries it flips. */
+                if (strcmp(row->source, other->target) == 0 &&
+                    strcmp(row->target, other->source) == 0 &&
+                    row->count == other->count &&
+                    (row->context_is_target != 0) == (other->context_is_target == 0)) {
+                    mirrored = 1;
+                    break;
+                }
+            }
+            assert(mirrored);
+        }
+        rg_pairwise_model_free(a);
+        rg_pairwise_model_free(b);
+        free(forward);
+        free(reverse);
+        rg_corpus_free(corpus);
+    }
+}
+
 static void test_row_order_does_not_change_the_model(rg_context *ctx) {
     rg_corpus *forward = load("rhotacism");
     rg_corpus *reversed = 0;
@@ -462,6 +561,7 @@ int main(void) {
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
+    test_the_analysis_does_not_depend_on_which_lect_is_named_first(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);
     printf("sound-law tests passed\n");

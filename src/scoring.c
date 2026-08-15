@@ -545,6 +545,124 @@ int rg_segment_posterior_internal(
     return 1;
 }
 
+static double segment_target_total(const rg_pairwise_model *model, const char *target) {
+    size_t low = 0;
+    size_t high;
+    if (model == 0 || target == 0) {
+        return 0.0;
+    }
+    high = model->log_normalizer_count;
+    while (low < high) {
+        size_t mid = low + (high - low) / 2;
+        int c = strcmp(model->log_normalizers[mid].source, target);
+        if (c == 0) {
+            return model->log_normalizers[mid].target_total;
+        }
+        if (c < 0) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return 0.0;
+}
+
+/* The cost of pairing two segments, scored the same in either direction.
+ *
+ * P(b|a) and P(a|b) are different models. Scoring with one of them made the
+ * whole analysis depend on which lect the corpus happened to name first: the
+ * denominators differ, so aligning A against B and B against A cost different
+ * amounts, and every class reconciled from those alignments inherited the
+ * difference. regulae takes no view on which lect is ancestral, and a score
+ * that does is making the claim by accident.
+ *
+ * The cost is the geometric mean of the two directions -- half the surprisal of
+ * seeing b given a plus half of seeing a given b -- which keeps each direction
+ * a proper conditional and is exactly symmetric in the pair. The observed count
+ * is shared between them; only the denominators and the prior differ.
+ *
+ * The reverse prior needs no table of its own. alpha(a,b) is the concentration
+ * times a softmax over merkmal distances from a, distance is symmetric, so
+ * alpha(b,a) is alpha(a,b) scaled by the ratio of the two partition functions,
+ * both of which are already stored.
+ *
+ * Returns 0 when the pair is unknown to the model, and the caller falls back to
+ * the bare merkmal distance. */
+static int segment_symmetric_cost(
+    const rg_pairwise_model *model,
+    const char *source,
+    const char *target,
+    const rg_context_spec *link_context,
+    const rg_context_spec *target_context,
+    double *out
+) {
+    const rg_conditioned_segment_count_row *conditioned;
+    const rg_segment_count_row *unconditioned;
+    double alpha = 0.0;
+    double n = 0.0;
+    double z_source;
+    double z_target;
+    double alpha_reverse;
+    double forward;
+    double reverse;
+    double denominator_source;
+    double denominator_target;
+
+    *out = 0.0;
+    if (model == 0 || source == 0 || target == 0) {
+        return 0;
+    }
+    conditioned = find_conditioned_segment_count(model, source, target, link_context, target_context);
+    unconditioned = find_segment_count(model, source, target);
+    if (conditioned != 0) {
+        /* Conditioned keys carry no prior mass of their own. */
+        alpha = 0.0;
+        n = conditioned->count;
+    } else if (segment_prior_lookup(model, source, target, &alpha)) {
+        n = unconditioned == 0 ? 0.0 : unconditioned->count;
+    } else if (unconditioned != 0) {
+        alpha = 0.0;
+        n = unconditioned->count;
+    } else {
+        return 0;
+    }
+    denominator_source = model->concentration + segment_source_total(model, source);
+    denominator_target = model->concentration + segment_target_total(model, target);
+    if (denominator_source <= 0.0 || denominator_target <= 0.0) {
+        return 0;
+    }
+    z_source = segment_log_normalizer(model, source);
+    z_target = segment_log_normalizer(model, target);
+    /* alpha(t,s) could be derived as alpha(s,t) * exp(z(s) - z(t)) -- merkmal's
+     * distance is symmetric, so the two differ only by their partition
+     * functions. Reading it out of the table instead costs one binary search
+     * and avoids an exp of a difference of logs, which is the one step in this
+     * function whose last bit moves between libm implementations. The tables
+     * have to agree bit for bit across platforms; the published models are
+     * compared that way. */
+    if (alpha <= 0.0 || !segment_prior_lookup(model, target, source, &alpha_reverse)) {
+        alpha_reverse = 0.0;
+    }
+    forward = alpha + n;
+    reverse = alpha_reverse + n;
+    if (forward <= 0.0 || reverse <= 0.0 || !isfinite(reverse)) {
+        return 0;
+    }
+    /* Half of -log P(t|s) plus half of -log P(s|t), written as one logarithm of
+     * the combined ratio. Four separate logs say the same thing in exact
+     * arithmetic and disagree in the last bit between libm implementations,
+     * which is enough to flip a tied alignment and make the wasm build publish
+     * a different model from the native one.
+     *
+     * The trailing -z is the reference's own term: the one-sided cost was
+     * -log P(t|s) - z(s), which discounts a source whose distance distribution
+     * is diffuse. Symmetrising it means averaging the two directions' z as
+     * well, not dropping it. */
+    *out = 0.5 * log((denominator_source * denominator_target) / (forward * reverse))
+         - 0.5 * (z_source + z_target);
+    return 1;
+}
+
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source) {
     return segment_log_normalizer(model, source);
 }
@@ -647,13 +765,13 @@ rg_status rg_score_link_with_context_model_internal(
         double layered_cost;
         double disp_cost = 0.0;
 
-        if (!rg_segment_posterior_internal(model, src, tgt, link_context, target_context, &posterior)) {
+        if (!segment_symmetric_cost(model, src, tgt, link_context, target_context, &seg_cost)) {
             /* The prior never saw this pair, so fall back to the bare merkmal
              * distance. Computed here rather than up front: the model path is
              * the common case and does not need it. */
             return rg_score_link(ctx, source, source_count, target, target_count, out);
         }
-        seg_cost = (posterior <= 0.0 ? INFINITY : -log(posterior)) - segment_log_normalizer(model, src);
+        (void)posterior;
         if (model->displacement_row_count > 0) {
             status = displacement_model_cost(ctx, model, source[0], target[0], &disp_cost);
             if (status == RG_ERR_UNKNOWN_GRAPHEME) {

@@ -181,6 +181,128 @@ static int count_row_cmp(const void *a, const void *b) {
     return strcmp(ra->target, rb->target);
 }
 
+static int nullable_strcmp(const char *a, const char *b) {
+    return strcmp(a == 0 ? "" : a, b == 0 ? "" : b);
+}
+
+static int constraint_list_cmp(
+    const rg_feature_constraint *a, size_t a_count,
+    const rg_feature_constraint *b, size_t b_count
+) {
+    size_t i;
+    if (a_count != b_count) {
+        return a_count < b_count ? -1 : 1;
+    }
+    for (i = 0; i < a_count; i++) {
+        int c = nullable_strcmp(a[i].feature, b[i].feature);
+        if (c != 0) {
+            return c;
+        }
+        c = nullable_strcmp(a[i].value, b[i].value);
+        if (c != 0) {
+            return c;
+        }
+    }
+    return 0;
+}
+
+static int distance_list_cmp(
+    const rg_distance_constraint *a, size_t a_count,
+    const rg_distance_constraint *b, size_t b_count
+) {
+    size_t i;
+    if (a_count != b_count) {
+        return a_count < b_count ? -1 : 1;
+    }
+    for (i = 0; i < a_count; i++) {
+        int c;
+        if (a[i].offset != b[i].offset) {
+            return a[i].offset < b[i].offset ? -1 : 1;
+        }
+        c = nullable_strcmp(a[i].constraint.feature, b[i].constraint.feature);
+        if (c != 0) {
+            return c;
+        }
+        c = nullable_strcmp(a[i].constraint.value, b[i].constraint.value);
+        if (c != 0) {
+            return c;
+        }
+    }
+    return 0;
+}
+
+/* A total order over everything a context can express. Ordering on a summary of
+ * the environment -- position and constraint count -- leaves rows that differ
+ * only in which constraint they carry comparing equal, and qsort is free to
+ * return them in either order. It did: the same corpus published the same rows
+ * in a different order under the native and the WebAssembly build, which moved
+ * every class id downstream. */
+static int context_spec_cmp(const rg_context_spec *a, const rg_context_spec *b) {
+    int c = nullable_strcmp(a->position, b->position);
+    if (c != 0) {
+        return c;
+    }
+    c = nullable_strcmp(a->morphological, b->morphological);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->preceding, a->preceding_count, b->preceding, b->preceding_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->following, a->following_count, b->following, b->following_count);
+    if (c != 0) {
+        return c;
+    }
+    c = distance_list_cmp(a->preceding_at_distance, a->preceding_at_distance_count,
+                          b->preceding_at_distance, b->preceding_at_distance_count);
+    if (c != 0) {
+        return c;
+    }
+    c = distance_list_cmp(a->following_at_distance, a->following_at_distance_count,
+                          b->following_at_distance, b->following_at_distance_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->somewhere_preceding, a->somewhere_preceding_count,
+                            b->somewhere_preceding, b->somewhere_preceding_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->somewhere_following, a->somewhere_following_count,
+                            b->somewhere_following, b->somewhere_following_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->same_syllable, a->same_syllable_count,
+                            b->same_syllable, b->same_syllable_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->next_syllable, a->next_syllable_count,
+                            b->next_syllable, b->next_syllable_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->previous_syllable, a->previous_syllable_count,
+                            b->previous_syllable, b->previous_syllable_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->self_stress, a->self_stress_count,
+                            b->self_stress, b->self_stress_count);
+    if (c != 0) {
+        return c;
+    }
+    c = constraint_list_cmp(a->preceding_stress, a->preceding_stress_count,
+                            b->preceding_stress, b->preceding_stress_count);
+    if (c != 0) {
+        return c;
+    }
+    return constraint_list_cmp(a->following_stress, a->following_stress_count,
+                               b->following_stress, b->following_stress_count);
+}
+
 static int conditioned_count_row_cmp(const void *a, const void *b) {
     const rg_conditioned_segment_count_row *ra = (const rg_conditioned_segment_count_row *)a;
     const rg_conditioned_segment_count_row *rb = (const rg_conditioned_segment_count_row *)b;
@@ -192,15 +314,14 @@ static int conditioned_count_row_cmp(const void *a, const void *b) {
     if (c != 0) {
         return c;
     }
-    c = strcmp(ra->context.position == 0 ? "" : ra->context.position, rb->context.position == 0 ? "" : rb->context.position);
-    if (c != 0) {
-        return c;
+    if (ra->context_is_target != rb->context_is_target) {
+        return ra->context_is_target < rb->context_is_target ? -1 : 1;
     }
     c = (int)rg_context_spec_constraint_count(&ra->context) - (int)rg_context_spec_constraint_count(&rb->context);
     if (c != 0) {
         return c;
     }
-    return 0;
+    return context_spec_cmp(&ra->context, &rb->context);
 }
 
 static int segment_equal(const rg_segment *a, const rg_segment *b) {
@@ -535,18 +656,50 @@ static rg_status add_tonal_count(
     return RG_OK;
 }
 
-static void fill_source_totals(rg_segment_count_row *rows, size_t count) {
+static void fill_totals(rg_segment_count_row *rows, size_t count) {
     size_t i;
     size_t j;
     for (i = 0; i < count; i++) {
-        double total = 0.0;
+        double source_total = 0.0;
+        double target_total = 0.0;
         for (j = 0; j < count; j++) {
             if (strcmp(rows[i].source, rows[j].source) == 0) {
-                total += rows[j].count;
+                source_total += rows[j].count;
+            }
+            if (strcmp(rows[i].target, rows[j].target) == 0) {
+                target_total += rows[j].count;
             }
         }
-        rows[i].source_total = total;
-        rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, total);
+        rows[i].source_total = source_total;
+        rows[i].target_total = target_total;
+        rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, source_total);
+    }
+}
+
+/* Publishes the target totals onto the normalizer table, which the scorer can
+ * binary-search by a single grapheme. Recomputed with the counts, since EM
+ * rebuilds them every iteration. */
+static void publish_target_totals(rg_pairwise_model *model, const rg_segment_count_row *rows, size_t count) {
+    size_t i;
+    for (i = 0; i < model->log_normalizer_count; i++) {
+        model->log_normalizers[i].target_total = 0.0;
+    }
+    for (i = 0; i < count; i++) {
+        size_t low = 0;
+        size_t high = model->log_normalizer_count;
+        while (low < high) {
+            size_t mid = low + (high - low) / 2;
+            int c = strcmp(model->log_normalizers[mid].source, rows[i].target);
+            if (c == 0) {
+                model->log_normalizers[mid].target_total += rows[i].count;
+                break;
+            }
+            if (c < 0) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
     }
 }
 
@@ -1549,7 +1702,11 @@ static int find_best_split(
         split_cost = observation_group_cost(search->yes, yes_count) + observation_group_cost(search->no, no_count);
         delta_bic = -2.0 * (baseline - split_cost) + penalty;
         margin = delta_threshold - delta_bic;
-        if (margin > best_margin) {
+        /* Two predicates can carve the same partition and so clear their bar by
+         * the same amount. Requiring a later candidate to beat the incumbent by
+         * more than the tie epsilon hands the tie to candidate order, which is
+         * the same everywhere, rather than to the last bit of a log. */
+        if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
             *best_candidate = candidates[ci];
             memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
@@ -1890,11 +2047,11 @@ static rg_status discover_context_counts(
     const rg_train_options *options,
     rg_pairwise_model *model,
     int long_range,
-    int target_side
+    int target_side,
+    context_observation *observations,
+    size_t observation_count,
+    double n_total
 ) {
-    context_observation *observations = 0;
-    size_t observation_count = 0;
-    double n_total = 0.0;
     const char **sources = 0;
     size_t source_count = 0;
     size_t source_cap = 0;
@@ -1944,15 +2101,8 @@ static rg_status discover_context_counts(
     (void)delta_threshold;
     (void)dominant_fraction;
 
-    status = flatten_context_observations(
-        ctx, pairs, pair_count, options, model, long_range ? 0 : 1, target_side,
-        &observations, &observation_count, &n_total
-    );
-    if (status != RG_OK) {
-        return status;
-    }
+    status = RG_OK;
     if (observation_count == 0 || n_total <= 0.0) {
-        free(observations);
         return RG_OK;
     }
 
@@ -2071,10 +2221,6 @@ static rg_status discover_context_counts(
         );
     }
 
-    for (i = 0; i < observation_count; i++) {
-        context_observation_clear(&observations[i]);
-    }
-    free(observations);
     free(sources);
     free(rows);
     free(long_range_list);
@@ -2087,6 +2233,48 @@ static rg_status discover_context_counts(
     if (status == RG_OK && model->conditioned_segment_count_count > 1) {
         qsort(model->conditioned_segment_counts, model->conditioned_segment_count_count,
               sizeof(*model->conditioned_segment_counts), conditioned_count_row_cmp);
+    }
+    return status;
+}
+
+/* Both sides, flattened before either is committed.
+ *
+ * The order matters and must not: committing the source-side rules first would
+ * change the alignments the target-side pass then reads, so which side ran
+ * first would leave a mark on the result -- and which side runs first is
+ * decided by which lect the corpus happened to name first. Reading both views
+ * off the same model is what makes the two passes commute. */
+static rg_status discover_both_sides(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model,
+    int long_range
+) {
+    context_observation *observations[2] = {0, 0};
+    size_t counts[2] = {0, 0};
+    double totals[2] = {0.0, 0.0};
+    int side;
+    size_t i;
+    rg_status status = RG_OK;
+
+    for (side = 0; side < 2 && status == RG_OK; side++) {
+        status = flatten_context_observations(
+            ctx, pairs, pair_count, options, model, long_range ? 0 : 1, side,
+            &observations[side], &counts[side], &totals[side]
+        );
+    }
+    for (side = 0; side < 2 && status == RG_OK; side++) {
+        status = discover_context_counts(ctx, pairs, pair_count, options, model,
+                                         long_range, side,
+                                         observations[side], counts[side], totals[side]);
+    }
+    for (side = 0; side < 2; side++) {
+        for (i = 0; i < counts[side]; i++) {
+            context_observation_clear(&observations[side][i]);
+        }
+        free(observations[side]);
     }
     return status;
 }
@@ -2105,11 +2293,7 @@ static rg_status discover_immediate_context_counts(
      * one source and there is nothing to condition. Looking from one side only
      * left half of every pair's conditioning unreachable, and which half
      * depended on which lect happened to sort first. */
-    rg_status status = discover_context_counts(ctx, pairs, pair_count, options, model, 0, 0);
-    if (status == RG_OK) {
-        status = discover_context_counts(ctx, pairs, pair_count, options, model, 0, 1);
-    }
-    return status;
+    return discover_both_sides(ctx, pairs, pair_count, options, model, 0);
 }
 
 /* Long-range discovery runs after cross-dimensional discovery and adds more
@@ -2121,11 +2305,7 @@ static rg_status discover_long_range_context_counts(
     const rg_train_options *options,
     rg_pairwise_model *model
 ) {
-    rg_status status = discover_context_counts(ctx, pairs, pair_count, options, model, 1, 0);
-    if (status == RG_OK) {
-        status = discover_context_counts(ctx, pairs, pair_count, options, model, 1, 1);
-    }
-    return status;
+    return discover_both_sides(ctx, pairs, pair_count, options, model, 1);
 }
 typedef struct chunk_candidate {
     const rg_segment *source;
@@ -3100,7 +3280,7 @@ static rg_status discover_cross_dimensional_rows(
                 break;
             }
             if (scored.usable && scored.delta_bic < delta_threshold &&
-                (!found || scored.delta_bic < best.delta_bic)) {
+                (!found || scored.delta_bic < best.delta_bic - RG_TIE_EPSILON)) {
                 if (found) {
                     xdim_scored_clear(&best);
                 }
@@ -3364,6 +3544,10 @@ static rg_status build_initial_prior_model(
             break;
         }
         model->log_normalizers[model->log_normalizer_count].value = max_logit + log(total);
+        /* The reverse direction has no observations yet; publish_target_totals
+         * fills this in once counts exist. The row comes from realloc, so the
+         * first cost evaluation reads whatever it is left as. */
+        model->log_normalizers[model->log_normalizer_count].target_total = 0.0;
         model->log_normalizer_count++;
 
         for (j = 0; j < logit_count && status == RG_OK; j++) {
@@ -3448,7 +3632,8 @@ static rg_status update_segment_counts(
         free(rows);
         return status;
     }
-    fill_source_totals(rows, row_count);
+    fill_totals(rows, row_count);
+    publish_target_totals(model, rows, row_count);
     qsort(rows, row_count, sizeof(*rows), count_row_cmp);
     for (i = 0; i < model->segment_count_count; i++) {
         segment_count_row_clear(&model->segment_counts[i]);

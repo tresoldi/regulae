@@ -35,6 +35,44 @@ the alignment E-step are added to the prior pseudo-counts. The
 posterior probability of `s → t` given context `c` is
 `P(t | s, c) = (count(s,t,c) + α(s,t)) / (Σ_t' count(s,t',c) + Σ_t' α(s,t'))`.
 
+### Scoring in both directions at once
+
+`P(t | s, c)` is a directional quantity, and a cost built from it
+alone makes the analysis depend on which lect the corpus happened to
+name first: the two directions carry different denominators, so
+aligning A against B and B against A cost different amounts, and every
+class reconciled from those alignments inherited the difference.
+regulae takes no view on which lect is ancestral, so a score that
+takes one is making the claim by accident.
+
+The segment cost is therefore the geometric mean of the two
+conditionals — half the surprisal of seeing `t` given `s`, plus half
+of seeing `s` given `t`:
+
+```
+cost_seg = −½ log P(t | s, c) − ½ log P(s | t, c)
+```
+
+Both directions share the observed count; only the denominators and
+the prior differ. The reverse prior needs no table of its own —
+`α(s,t)` is the concentration times a softmax over merkmal distances
+from `s`, and the distance is symmetric, so `α(t,s)` is the same
+number rescaled by the ratio of the two partition functions. It is
+read straight out of the prior table rather than derived, because an
+`exp` of a difference of logs is the one step here whose last bit
+moves between C libraries, and the published tables have to agree bit
+for bit between the native and the WebAssembly build.
+
+The reverse denominator needs the mass answering to `t` as a *target*,
+which is why `rg_segment_count_row` publishes `target_total` alongside
+`source_total`.
+
+This makes the score symmetric. It does not yet make a whole training
+run symmetric: the displacement term describes a feature moving from
+one value to another and is directional by construction, and the
+alignment DP resolves exact cost ties by enumeration order, which the
+exchange does not preserve.
+
 ### Graceful degradation
 
 At zero observations, the posterior equals the prior, so the model

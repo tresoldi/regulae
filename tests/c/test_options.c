@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 7);
+    assert(rg_abi_version() == 8);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);

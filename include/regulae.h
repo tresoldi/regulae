@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 7
+#define RG_ABI_VERSION 8
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -229,6 +229,10 @@ typedef struct rg_segment_count_row {
     const char *target;
     double count;
     double source_total;
+    /* How much mass answers to this target overall. Alignment is scored
+     * symmetrically -- the geometric mean of the two conditional directions --
+     * and that needs both denominators, so both are published. */
+    double target_total;
     rg_uncertainty_estimate uncertainty;
 } rg_segment_count_row;
 

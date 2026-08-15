@@ -56,9 +56,15 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
 - **No directionality.** The pairwise alignment and scoring
   functions are symmetric. "Source" and "target" in the API are
   positional labels inside a pair, not a claim that one is the
-  ancestor. A `LearnedModel` trained on (Latin, Spanish) and one
-  trained on (Spanish, Latin) produce symmetric tables up to
-  relabeling.
+  ancestor. The segment cost is the geometric mean of the two
+  conditional directions, so a model trained on (Latin, Spanish)
+  and one trained on (Spanish, Latin) give the same tables read
+  backwards. Two caveats: the displacement table describes a
+  feature moving from one value to another and so is directional
+  by construction, and the alignment DP breaks exact cost ties by
+  enumeration order, which the exchange does not preserve — on a
+  corpus small enough for a tie to decide an alignment, the two
+  directions can still differ.
 - **No time.** Lects are referred to by string IDs; there are no
   dates, epochs, or temporal orderings anywhere in the output.
 - **No proto-forms.** A `MultiLectCorrespondenceClass` names
