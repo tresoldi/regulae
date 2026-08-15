@@ -432,28 +432,6 @@ static rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
 
 /* ---- multi-lect context discovery ------------------------------------- */
 
-/* Candidate conditioning axes for class-level splits. The immediate inventory
- * and the long-range inventory are searched by separate commit loops, matching
- * the Go reference; the order of this table is load-bearing, because equal-BIC
- * candidates are resolved by taking the first. */
-static const rg_split_candidate multi_immediate_candidates[] = {
-    {"following", "vowel", "+"},
-    {"following", "front", "+"},
-    {"following", "back", "+"},
-    {"following", "close", "+"},
-    {"following", "open", "+"},
-    {"following", "long", "+"},
-    {"preceding", "vowel", "+"},
-    {"preceding", "front", "+"},
-    {"preceding", "back", "+"},
-    {"preceding", "voiced", "+"},
-    {"preceding", "voiceless", "+"},
-    {"preceding", "consonant", "+"},
-    {"preceding", "long", "+"},
-    {"position", "initial", "+"},
-    {"position", "medial", "+"},
-    {"position", "final", "+"}
-};
 
 static const char *const multi_long_range_slots[] = {
     "same_syllable",
@@ -467,23 +445,6 @@ static const char *const multi_long_range_slots[] = {
     "somewhere_following"
 };
 
-static const char *const multi_long_range_features[] = {
-    "front",
-    "back",
-    "close",
-    "open",
-    "voiced",
-    "voiceless",
-    "long",
-    "nasal",
-    "stop",
-    "fricative",
-    "sonorant",
-    "aspirated",
-    "labial",
-    "coronal",
-    "dorsal"
-};
 
 static const char *const multi_stress_slots[] = {
     "self_stress",
@@ -808,11 +769,11 @@ static rg_status collect_stress_values(discovery_state *state, const rg_context_
 
 /* The candidate lists are fixed once the observed stress values are known,
  * because every multi-lect split is searched against an empty base context. */
-static rg_status build_candidate_lists(discovery_state *state) {
-    size_t immediate_total = sizeof(multi_immediate_candidates) / sizeof(multi_immediate_candidates[0]);
+static rg_status build_candidate_lists(discovery_state *state, const rg_feature_vocabulary *vocabulary) {
+    size_t immediate_total = 2 * rg_context_feature_name_count;
     size_t slot_count = sizeof(multi_stress_slots) / sizeof(multi_stress_slots[0]);
     size_t long_slots = sizeof(multi_long_range_slots) / sizeof(multi_long_range_slots[0]);
-    size_t long_features = sizeof(multi_long_range_features) / sizeof(multi_long_range_features[0]);
+    size_t long_features = rg_context_feature_name_count;
     size_t total = immediate_total + slot_count * state->stress_count;
     size_t i;
     size_t s;
@@ -822,8 +783,18 @@ static rg_status build_candidate_lists(discovery_state *state) {
     if (state->immediate == 0) {
         return RG_ERR_OOM;
     }
-    for (i = 0; i < immediate_total; i++) {
-        state->immediate[n++] = multi_immediate_candidates[i];
+    for (i = 0; i < rg_context_feature_name_count; i++) {
+        if (!vocabulary->contrastive[i]) {
+            continue;
+        }
+        state->immediate[n].slot = "preceding";
+        state->immediate[n].feature = rg_context_feature_names[i];
+        state->immediate[n].value = "+";
+        n++;
+        state->immediate[n].slot = "following";
+        state->immediate[n].feature = rg_context_feature_names[i];
+        state->immediate[n].value = "+";
+        n++;
     }
     for (s = 0; s < slot_count; s++) {
         for (i = 0; i < state->stress_count; i++) {
@@ -841,9 +812,12 @@ static rg_status build_candidate_lists(discovery_state *state) {
     }
     n = 0;
     for (s = 0; s < long_slots; s++) {
-        for (i = 0; i < long_features; i++) {
+        for (i = 0; i < rg_context_feature_name_count; i++) {
+            if (!vocabulary->contrastive[i]) {
+                continue;
+            }
             state->long_range[n].slot = multi_long_range_slots[s];
-            state->long_range[n].feature = multi_long_range_features[i];
+            state->long_range[n].feature = rg_context_feature_names[i];
             state->long_range[n].value = "+";
             n++;
         }
@@ -1132,6 +1106,8 @@ static int pivot_best_split(
     double *best_delta_bic
 ) {
     double baseline = group_cost(state, rows, count);
+    /* The same charge for the same reason as find_best_split in model.c. */
+    double search_penalty = candidate_count > 1 ? RG_SEARCH_PENALTY_GAMMA * 2.0 * log((double)candidate_count) : 0.0;
     double best_margin = 0.0;
     int found = 0;
     size_t ci;
@@ -1159,7 +1135,7 @@ static int pivot_best_split(
             continue;
         }
         split_cost = group_cost(state, yes, yes_count) + group_cost(state, no, no_count);
-        delta_bic = -2.0 * (baseline - split_cost) + penalty;
+        delta_bic = -2.0 * (baseline - split_cost) + penalty + search_penalty;
         margin = gates[ci].delta_threshold - delta_bic;
         /* Ties go to candidate order, which is the same everywhere, rather
          * than to the last bit of a log. */
@@ -1706,7 +1682,12 @@ static rg_status multi_lect_context_discovery(
     }
 
     if (status == RG_OK) {
-        status = build_candidate_lists(&state);
+        rg_feature_vocabulary vocabulary;
+        status = rg_feature_vocabulary_build_from_sets_internal(ctx, cognates, cognate_count, &vocabulary);
+        if (status == RG_OK) {
+            status = build_candidate_lists(&state, &vocabulary);
+            rg_feature_vocabulary_clear_internal(&vocabulary);
+        }
     }
     /* One bar per candidate: the immediate axes are few and cheap to trust,
      * the long-range ones many and easy to fit by chance, and refinement has

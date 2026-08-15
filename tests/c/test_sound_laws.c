@@ -608,13 +608,40 @@ static void test_conditioning_ladder(rg_context *ctx) {
         }
         /* The conjunction rung is the one that needs two predicates in one
          * environment; naming either alone is the wrong answer, not a partial
-         * one, because it commits both outcomes under the same context. */
+         * one, because it commits both outcomes under the same context.
+         *
+         * The onset predicate is asserted as `sonorant` rather than `voiced`,
+         * which is what this asserted until the conditioning vocabulary became
+         * corpus-derived. The rung's onsets are `n` against `k`, which differ
+         * in nasality, sonorancy and voicing at once, so all three separate
+         * this corpus identically and the search cannot tell them apart. It
+         * reports the one that claims least, which is what it should do -- but
+         * it means the fixture never tested nasality, only that *some* onset
+         * predicate is conjoined with the follower. That hole is recorded in
+         * testdata/soundlaws/README.md. */
         if (strcmp(rungs[i].name, "graded_4_conjunction") == 0) {
-            assert(has_conjunction(model, "p", "f", "voiced", "front"));
+            assert(has_conjunction(model, "p", "f", "sonorant", "front"));
         }
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
+}
+
+/* A change conditioned by lip rounding. Regular, twenty-four instances, and the
+ * two environments differ in rounding alone -- and until the conditioning
+ * vocabulary became corpus-derived on 2026-08-15 it produced no conditioned
+ * class at all, because `rounded` was not one of the 27 names the search could
+ * state an environment in. Nothing about the change was hard; the vocabulary
+ * simply had no word for it. */
+static void test_rounding_harmony(rg_context *ctx) {
+    rg_corpus *corpus = load("rounding_harmony");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "p", "f"));
+    assert(has_conditioned(model, "p", "f", "rounded"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
 }
 
 /* Nasal place assimilation: the nasal takes the place of the consonant after
@@ -705,6 +732,7 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_rounding_harmony(ctx);
     test_place_assimilation(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);

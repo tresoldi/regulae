@@ -55,7 +55,10 @@ carrying:
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy
-  BIC-driven search over a feature vocabulary. Every committed
+  BIC-driven search over a feature vocabulary derived from the
+  corpus itself — every feature merkmal reports, filtered to
+  those the corpus actually contrasts. A fixed list fits the
+  language its author had in mind and silently loses the rest. Every committed
   rule publishes the contrast it was measured against — the same
   correspondence where the environment does not hold — and the
   ΔBIC it scored, because a conditioning claim without its

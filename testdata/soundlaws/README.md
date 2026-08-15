@@ -150,12 +150,40 @@ What remains is that the ladder tests one predicate *kind* per rung. A rung
 combining stress with distance, or three predicates at once, would say more
 about the ceiling than rung 4 now does.
 
+Rung 4 also does not test what its generator says it tests. The onsets are `n`
+against `k`, which differ in nasality, sonorancy **and** voicing at once, so all
+three predicates separate the corpus identically and no search can prefer one.
+The rung therefore tests that *some* onset predicate is conjoined with the
+follower, not that the onset predicate is nasality. Contrasting `n` with `l` —
+both voiced sonorants — would isolate it. Recorded 2026-08-15, when the
+conditioning vocabulary became corpus-derived and the reported name moved from
+`voiced` to `sonorant` with nothing about the search having changed.
+
 The forms are nonsense words on purpose. A rung tests one property of the
 search, and real lexical material brings correlations with it — real words that
 share an environment tend to share other things too, and then a failure is
 ambiguous between the environment and its company. An earlier draft of rung 6
 tied the trigger to the preceding vowel's frontness, and the search duly found
 the vowel, which was a fact about the fixture rather than about the tool.
+
+### `rounding_harmony.tsv` — a change conditioned by lip rounding
+
+Proto `p` answers daughter `f` before a front **rounded** vowel (`y`, `ø`) and
+stays `p` before a front unrounded one (`i`, `e`). Twenty-four sets each side,
+perfectly regular, and the two environments differ in rounding alone: both are
+front, both are vowels, and the preceding vowel is drawn from the same pair
+either way, so nothing but rounding separates them.
+
+This is the fixture that would have caught the old conditioning vocabulary.
+Until 2026-08-15 the searchable feature list was 27 hand-picked names with no
+`rounded` among them, and this corpus produced **zero** conditioned classes —
+not a weak rule or a wrong environment, but silence, on a change as regular as
+any in the directory. Rounding harmony organises the Turkic and Uralic vowel
+systems and `experiments/turkish_azerbaijani/` has been in this repository the
+whole time.
+
+It is here as a standing check that the vocabulary is derived from the corpus
+rather than from whichever languages the author had in mind.
 
 ## Adding one
 

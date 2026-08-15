@@ -312,15 +312,38 @@ static rg_status json_add_alignments(
                     if (link->source_count > 0 && link->target_count > 0) {
                         int ids[64];
                         size_t found = 0;
-                        size_t span = link->source_count < link->target_count
-                            ? link->source_count : link->target_count;
-                        size_t offset;
-                        for (offset = 0; offset < span && found < 64; offset++) {
-                            found += rg_model_classes_at_internal(
-                                model, c,
-                                lect_index_a, source_pos + offset,
-                                lect_index_b, target_pos + offset,
-                                ids + found, 64 - found);
+                        size_t si;
+                        /* Every source position against every target position
+                         * the link spans, not just the diagonal. A 2-to-1 link
+                         * has one diagonal cell and two positions, and a class
+                         * reconciled at the off-diagonal one used to be
+                         * unreportable: the model held its evidence and the
+                         * export could not name it, so the class appeared to
+                         * rest on nothing. */
+                        for (si = 0; si < link->source_count && found < 64; si++) {
+                            size_t ti;
+                            for (ti = 0; ti < link->target_count && found < 64; ti++) {
+                                int candidates[64];
+                                size_t n = rg_model_classes_at_internal(
+                                    model, c,
+                                    lect_index_a, source_pos + si,
+                                    lect_index_b, target_pos + ti,
+                                    candidates, 64);
+                                size_t k;
+                                for (k = 0; k < n && found < 64; k++) {
+                                    size_t seen;
+                                    int duplicate = 0;
+                                    for (seen = 0; seen < found; seen++) {
+                                        if (ids[seen] == candidates[k]) {
+                                            duplicate = 1;
+                                            break;
+                                        }
+                                    }
+                                    if (!duplicate) {
+                                        ids[found++] = candidates[k];
+                                    }
+                                }
+                            }
                         }
                         if (found > 0) {
                             cJSON *class_ids = cJSON_CreateArray();

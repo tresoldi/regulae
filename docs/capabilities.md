@@ -34,27 +34,27 @@ Trained through the wide loader with default options.
 
 | corpus | lects | classes | conditioned |
 | --- | --- | --- | --- |
-| arabic_hebrew | arabic, hebrew | 33 | 7 |
+| arabic_hebrew | arabic, hebrew | 33 | 4 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
-| finnish_estonian | estonian, finnish | 37 | 9 |
-| georgian_svan | georgian, svan | 51 | 11 |
-| harmony_synthetic | derived, proto | 14 | 3 |
-| latin_french | french, latin | 77 | 20 |
-| latin_italian | italian, latin | 70 | 22 |
-| latin_spanish | latin, spanish | 62 | 25 |
+| finnish_estonian | estonian, finnish | 36 | 2 |
+| georgian_svan | georgian, svan | 51 | 6 |
+| harmony_synthetic | derived, proto | 14 | 2 |
+| latin_french | french, latin | 82 | 16 |
+| latin_italian | italian, latin | 70 | 13 |
+| latin_spanish | latin, spanish | 60 | 20 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
-| mandarin_historical | mandarin, middle_chinese | 50 | 10 |
-| navajo_chipewyan | chipewyan, navajo | 53 | 5 |
-| oe_english | modern_english, old_english | 60 | 26 |
-| ppn_hawaiian | hawaiian, ppn | 23 | 7 |
-| swahili_zulu | swahili, zulu | 41 | 7 |
+| mandarin_historical | mandarin, middle_chinese | 48 | 7 |
+| navajo_chipewyan | chipewyan, navajo | 53 | 3 |
+| oe_english | modern_english, old_english | 60 | 13 |
+| ppn_hawaiian | hawaiian, ppn | 23 | 4 |
+| swahili_zulu | swahili, zulu | 41 | 2 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 48 | 18 |
+| tone_chinese_like | cantonese, mandarin | 50 | 15 |
 | tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |
 | tone_yoruba_like | ekiti, standard | 21 | 0 |
-| turkish_azerbaijani | azerbaijani, turkish | 34 | 5 |
+| turkish_azerbaijani | azerbaijani, turkish | 34 | 3 |
 | umlaut_synthetic | derived, proto | 14 | 1 |
 
 ## Corpora regulae cannot read yet (2 of 24)

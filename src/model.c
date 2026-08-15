@@ -1071,94 +1071,11 @@ static rg_status append_unique_source(const char ***items, size_t *count, size_t
 
 /* ---- pairwise context discovery ---------------------------------------- */
 
-/* Immediate-neighbour conditioning axes, searched by discover_context_counts.
- * Long-range axes live in a separate inventory and a separate pass, because
- * they carry different thresholds and a dominance filter. Table order is
- * load-bearing: equal-BIC candidates are resolved by taking the first. */
-static const split_candidate immediate_feature_inventory[] = {
-    {"following", "vowel", "+"},
-    {"following", "front", "+"},
-    {"following", "back", "+"},
-    {"following", "close", "+"},
-    {"following", "open", "+"},
-    {"following", "long", "+"},
-    {"preceding", "vowel", "+"},
-    {"preceding", "front", "+"},
-    {"preceding", "back", "+"},
-    {"preceding", "voiced", "+"},
-    {"preceding", "voiceless", "+"},
-    {"preceding", "consonant", "+"},
-    {"preceding", "long", "+"},
-    /* Manner. These four are computed for every segment and attached to every
-     * context, and until 2026-08-15 none of them was ever searched, so nasal
-     * assimilation, stop lenition and fricative conditioning could not be
-     * stated at all -- the constraint was on the observation and no candidate
-     * ever asked about it. Appended rather than inserted: equal-scoring
-     * candidates are resolved by taking the first, so the order above is
-     * load-bearing for every model already published. */
-    {"following", "nasal", "+"},
-    {"preceding", "nasal", "+"},
-    {"following", "stop", "+"},
-    {"preceding", "stop", "+"},
-    {"following", "fricative", "+"},
-    {"preceding", "fricative", "+"},
-    {"following", "sonorant", "+"},
-    {"preceding", "sonorant", "+"},
-    {"following", "consonant", "+"},
-    {"following", "voiced", "+"},
-    {"following", "voiceless", "+"},
-    {"following", "aspirated", "+"},
-    {"preceding", "aspirated", "+"},
-    /* Place. Assimilation is the commonest conditioned change there is, and
-     * until 2026-08-15 it could not be stated: nothing in these tables named a
-     * place, so "the nasal takes the place of what follows it" had no term.
-     *
-     * The major classes are the natural classes assimilation refers to, and go
-     * everywhere. The specific places are here on the immediate neighbours
-     * only, where there are two slots rather than nine: adjacent assimilation
-     * is regularly to a particular place, while assimilation at a distance is
-     * almost always to a major class, and putting ten more features against
-     * nine long-range slots would double that search for cases no attested
-     * change seems to need. */
-    {"following", "coronal", "+"},
-    {"preceding", "coronal", "+"},
-    {"following", "dorsal", "+"},
-    {"preceding", "dorsal", "+"},
-    {"following", "labial", "+"},
-    {"preceding", "labial", "+"},
-    {"following", "alveolar", "+"},
-    {"preceding", "alveolar", "+"},
-    {"following", "bilabial", "+"},
-    {"preceding", "bilabial", "+"},
-    {"following", "dental", "+"},
-    {"preceding", "dental", "+"},
-    {"following", "glottal", "+"},
-    {"preceding", "glottal", "+"},
-    {"following", "guttural", "+"},
-    {"preceding", "guttural", "+"},
-    {"following", "labio-dental", "+"},
-    {"preceding", "labio-dental", "+"},
-    {"following", "palatal", "+"},
-    {"preceding", "palatal", "+"},
-    {"following", "post-alveolar", "+"},
-    {"preceding", "post-alveolar", "+"},
-    {"following", "uvular", "+"},
-    {"preceding", "uvular", "+"},
-    {"following", "velar", "+"},
-    {"preceding", "velar", "+"}
-};
 
 static const char *const split_positions[] = {"initial", "medial", "final"};
 
 static const char *const stress_slot_names[] = {"self_stress", "preceding_stress", "following_stress"};
 
-/* Long-range axes omit "vowel"/"consonant", which are tautological on syllable
- * slots. */
-static const char *const long_range_feature_names[] = {
-    "front", "back", "close", "open", "voiced", "voiceless", "long",
-    "nasal", "stop", "fricative", "sonorant", "aspirated",
-    "labial", "coronal", "dorsal"
-};
 
 static const char *const long_range_slot_names[] = {
     "same_syllable",
@@ -1251,15 +1168,24 @@ static rg_status collect_observed_stress(stress_inventory *inventory, const rg_c
 static size_t immediate_candidates_for(
     const rg_context_spec *base_context,
     const stress_inventory *stress,
+    const rg_feature_vocabulary *vocabulary,
     split_candidate *out,
     size_t capacity
 ) {
     size_t count = 0;
     size_t i;
     size_t s;
-    for (i = 0; i < sizeof(immediate_feature_inventory) / sizeof(immediate_feature_inventory[0]); i++) {
-        const split_candidate *candidate = &immediate_feature_inventory[i];
+    for (i = 0; i < 2 * rg_context_feature_name_count; i++) {
+        split_candidate generated;
+        const split_candidate *candidate = &generated;
         int skip = 0;
+        size_t feature_index = i / 2;
+        if (!vocabulary->contrastive[feature_index]) {
+            continue;
+        }
+        generated.slot = (i % 2) == 0 ? "preceding" : "following";
+        generated.feature = rg_context_feature_names[feature_index];
+        generated.value = "+";
         if (strcmp(candidate->slot, "following") == 0) {
             size_t j;
             for (j = 0; j < base_context->following_count; j++) {
@@ -1325,15 +1251,22 @@ static size_t immediate_candidates_for(
     return count;
 }
 
-static size_t long_range_candidates(split_candidate *out, size_t capacity) {
+static size_t long_range_candidates(
+    const rg_feature_vocabulary *vocabulary,
+    split_candidate *out,
+    size_t capacity
+) {
     size_t count = 0;
     size_t s;
     size_t f;
     for (s = 0; s < sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]); s++) {
-        for (f = 0; f < sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]); f++) {
+        for (f = 0; f < rg_context_feature_name_count; f++) {
+            if (!vocabulary->contrastive[f]) {
+                continue;
+            }
             if (count < capacity) {
                 out[count].slot = long_range_slot_names[s];
-                out[count].feature = long_range_feature_names[f];
+                out[count].feature = rg_context_feature_names[f];
                 out[count].value = "+";
                 count++;
             }
@@ -1710,9 +1643,20 @@ static int find_best_split(
     double *best_delta_bic
 ) {
     double baseline = observation_group_cost(rows, count);
-    /* Each candidate is measured against its own bar, so the best split is the
-     * one that clears its bar by the most rather than the one with the lowest
-     * raw score -- otherwise the larger pool wins on volume. */
+    /* Charge for the search, not only for the parameter.
+     *
+     * BIC prices one added term against the likelihood it buys. The term that
+     * survives here is not one term: it is the best of candidate_count of them,
+     * and the maximum of a hundred candidates beats its bar by chance far more
+     * often than one candidate does. Permuting a corpus's pairings -- which
+     * removes every correspondence there is to find -- used to *raise* the
+     * number of committed rules, which is what an unpriced argmax looks like.
+     *
+     * 2*ln(candidates) is the same currency as the BIC penalty and is the
+     * standard extended-BIC shape for a large model space. It is not a
+     * substitute for the shuffled baseline, which measures the inflation this
+     * only models. */
+    double search_penalty = candidate_count > 1 ? RG_SEARCH_PENALTY_GAMMA * 2.0 * log((double)candidate_count) : 0.0;
     double best_margin = 0.0;
     int found = 0;
     size_t ci;
@@ -1743,7 +1687,7 @@ static int find_best_split(
             continue;
         }
         split_cost = observation_group_cost(search->yes, yes_count) + observation_group_cost(search->no, no_count);
-        delta_bic = -2.0 * (baseline - split_cost) + penalty;
+        delta_bic = -2.0 * (baseline - split_cost) + penalty + search_penalty;
         margin = delta_threshold - delta_bic;
         /* Two predicates can carve the same partition and so clear their bar by
          * the same amount. Requiring a later candidate to beat the incumbent by
@@ -2097,6 +2041,7 @@ static rg_status discover_context_counts(
     rg_pairwise_model *model,
     int long_range,
     int target_side,
+    const rg_feature_vocabulary *vocabulary,
     context_observation *observations,
     size_t observation_count,
     double n_total
@@ -2166,25 +2111,25 @@ static rg_status discover_context_counts(
      * either kind onto it. */
     if (status == RG_OK) {
         size_t immediate_cap =
-            sizeof(immediate_feature_inventory) / sizeof(immediate_feature_inventory[0]) +
+            2 * rg_context_feature_name_count +
             sizeof(split_positions) / sizeof(split_positions[0]) +
             3 * stress.count + 8;
         size_t long_cap =
             sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
-            sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]);
+            rg_context_feature_name_count;
         rg_context_spec empty;
         immediate_list = (split_candidate *)calloc(immediate_cap, sizeof(*immediate_list));
         if (long_range_list == 0) {
             long_range_list = (split_candidate *)calloc(long_cap, sizeof(*long_range_list));
             if (long_range_list != 0) {
-                long_range_count = long_range_candidates(long_range_list, long_cap);
+                long_range_count = long_range_candidates(vocabulary, long_range_list, long_cap);
             }
         }
         if (immediate_list == 0 || long_range_list == 0) {
             status = RG_ERR_OOM;
         } else {
             rg_context_spec_init_empty(&empty);
-            immediate_count = immediate_candidates_for(&empty, &stress, immediate_list, immediate_cap);
+            immediate_count = immediate_candidates_for(&empty, &stress, vocabulary, immediate_list, immediate_cap);
             rg_context_spec_clear_internal(&empty);
         }
     }
@@ -2299,6 +2244,7 @@ static rg_status discover_both_sides(
     size_t pair_count,
     const rg_train_options *options,
     rg_pairwise_model *model,
+    const rg_feature_vocabulary *vocabulary,
     int long_range
 ) {
     context_observation *observations[2] = {0, 0};
@@ -2316,7 +2262,7 @@ static rg_status discover_both_sides(
     }
     for (side = 0; side < 2 && status == RG_OK; side++) {
         status = discover_context_counts(ctx, pairs, pair_count, options, model,
-                                         long_range, side,
+                                         long_range, side, vocabulary,
                                          observations[side], counts[side], totals[side]);
     }
     for (side = 0; side < 2; side++) {
@@ -2333,7 +2279,8 @@ static rg_status discover_immediate_context_counts(
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
-    rg_pairwise_model *model
+    rg_pairwise_model *model,
+    const rg_feature_vocabulary *vocabulary
 ) {
     /* Both directions. A change is only visible from the side that has the
      * split: where the daughter reflects a conditioned change, the ancestor's
@@ -2342,7 +2289,7 @@ static rg_status discover_immediate_context_counts(
      * one source and there is nothing to condition. Looking from one side only
      * left half of every pair's conditioning unreachable, and which half
      * depended on which lect happened to sort first. */
-    return discover_both_sides(ctx, pairs, pair_count, options, model, 0);
+    return discover_both_sides(ctx, pairs, pair_count, options, model, vocabulary, 0);
 }
 
 /* Long-range discovery runs after cross-dimensional discovery and adds more
@@ -2352,9 +2299,10 @@ static rg_status discover_long_range_context_counts(
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
-    rg_pairwise_model *model
+    rg_pairwise_model *model,
+    const rg_feature_vocabulary *vocabulary
 ) {
-    return discover_both_sides(ctx, pairs, pair_count, options, model, 1);
+    return discover_both_sides(ctx, pairs, pair_count, options, model, vocabulary, 1);
 }
 typedef struct chunk_candidate {
     const rg_segment *source;
@@ -3874,8 +3822,11 @@ rg_status rg_train_pairwise_internal(
     int iter;
     double prev_cost = INFINITY;
     double eps;
+    rg_feature_vocabulary vocabulary;
     rg_status status;
 
+    vocabulary.contrastive = 0;
+    vocabulary.contrastive_count = 0;
     if (ctx == 0 || out == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
@@ -3926,30 +3877,44 @@ rg_status rg_train_pairwise_internal(
         return RG_ERR_CANCELLED;
     }
 
+    /* The searchable vocabulary is a property of the corpus, not of the source
+     * file, so it is derived once and every discovery stage searches the same
+     * list. Built here rather than earlier because nothing before this point
+     * uses it, and every stage from here on unwinds through RUN_STAGE, which
+     * frees it. */
+    status = rg_feature_vocabulary_build_internal(ctx, pairs, pair_count, &vocabulary);
+    if (status != RG_OK) {
+        rg_pairwise_model_free(model);
+        return status;
+    }
+
     /* Cancellation is checked between stages, where the unwind path is already
      * a plain free of the partly-built model. */
 #define RUN_STAGE(name, call)                          \
     do {                                               \
         status = (call);                               \
         if (status != RG_OK) {                         \
+            rg_feature_vocabulary_clear_internal(&vocabulary); \
             rg_pairwise_model_free(model);             \
             return status;                             \
         }                                              \
         if (rg_progress_step_internal(progress, name)) { \
+            rg_feature_vocabulary_clear_internal(&vocabulary); \
             rg_pairwise_model_free(model);             \
             return RG_ERR_CANCELLED;                   \
         }                                              \
     } while (0)
 
     RUN_STAGE("displacement aggregation", aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE("context discovery", discover_immediate_context_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("context discovery", discover_immediate_context_counts(ctx, pairs, pair_count, opts, model, &vocabulary));
     RUN_STAGE("chunk promotion", promote_chunk_rows(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("tonal aggregation", aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("cross-dimensional discovery", discover_cross_dimensional_rows(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE("long-range discovery", discover_long_range_context_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("long-range discovery", discover_long_range_context_counts(ctx, pairs, pair_count, opts, model, &vocabulary));
 
 #undef RUN_STAGE
 
+    rg_feature_vocabulary_clear_internal(&vocabulary);
     *out = model;
     return RG_OK;
 }

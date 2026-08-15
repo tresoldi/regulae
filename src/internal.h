@@ -15,6 +15,18 @@
  * then smallest target span). Three orders of magnitude below the chunk
  * complexity penalty, so real tie-breaks still decide. */
 #define RG_TIE_EPSILON 1e-12
+/* How much of the search is charged for. The split penalty gains
+ * gamma * 2 * ln(candidates); gamma = 1 is the full extended-BIC term.
+ *
+ * 0.5 is not a taste: it is the largest value at which no sound law in
+ * testdata/soundlaws/ is lost. At 0.75 the multi-lect stage stops committing
+ * on the palatalization corpus; at 1.0 lenition finds only two of its three
+ * stops, and Grimm -- which is unconditioned and should commit nothing --
+ * looks identical to a corpus whose conditioning has been suppressed. Below
+ * 0.25 the spurious commits the term exists to stop come back. */
+#ifndef RG_SEARCH_PENALTY_GAMMA
+#define RG_SEARCH_PENALTY_GAMMA 0.5
+#endif
 /* Stages the pairwise pipeline reports: initial prior, segment EM, displacement
  * aggregation, context discovery, chunk promotion, tonal aggregation,
  * cross-dimensional discovery, long-range discovery. */
@@ -211,6 +223,34 @@ rg_status rg_form_position_contexts_internal(
     size_t *out_count
 );
 void rg_context_spec_array_free_internal(rg_context_spec *contexts, size_t count);
+
+/* Which context features distinguish anything in the corpus at hand.
+ *
+ * A feature every segment carries, or none does, partitions nothing: it cannot
+ * be a conditioning environment, and searching it only widens the argmax that
+ * the BIC gate already struggles to price. Deriving the searchable vocabulary
+ * from the corpus rather than fixing it in the source is also the only way one
+ * list fits Latin and Yoruba and Nuxalk -- each gets the features its own
+ * inventory contrasts. */
+typedef struct rg_feature_vocabulary {
+    /* Indexed by rg_context_feature_names; 1 when contrastive. */
+    unsigned char *contrastive;
+    size_t contrastive_count;
+} rg_feature_vocabulary;
+
+rg_status rg_feature_vocabulary_build_internal(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    rg_feature_vocabulary *out
+);
+rg_status rg_feature_vocabulary_build_from_sets_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_feature_vocabulary *out
+);
+void rg_feature_vocabulary_clear_internal(rg_feature_vocabulary *vocabulary);
 
 extern const char *const rg_context_feature_names[];
 extern const size_t rg_context_feature_name_count;

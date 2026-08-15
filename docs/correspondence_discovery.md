@@ -131,37 +131,76 @@ for each source grapheme by phonological context.
 
 ### Feature inventory
 
-Candidates are built from `rg_context_feature_names` in `src/context.c`
-— 27 names projected out of merkmal's system — applied to the
-preceding and following segment, plus word position and stress. That
-is 52 feature candidates, 3 positions and the stress axes: about 55
-per immediate split step, and about 135 for the long-range pass, which
-also ranges over distance, existential and syllable-relative slots.
+The vocabulary a context can be stated in is `rg_context_feature_names` in
+`src/context.c` — every feature name merkmal's system reports, 65 of them.
+Which of those are *searched* is decided per corpus, by
+`rg_feature_vocabulary_build_internal`, on two tests:
 
-Two things follow, and both matter more than the list itself.
+- **Contrastive.** Some segment in the corpus carries the feature and some does
+  not. A feature nothing carries is dead weight; a feature everything carries is
+  the predicate that partitions nothing, which is a documented way to commit a
+  rule on no evidence.
+- **Distinct.** No two features that separate this corpus's inventory
+  identically both survive. merkmal's vocabulary is not orthogonal — `vowel`,
+  `vocoid` and `syllabic` coincide in most corpora, `stop` and `non-continuant`
+  almost always — and keeping every synonym widens the argmax without widening
+  what can be found, then reports the environment under whichever one the search
+  reached first. Equivalence is a fact about the corpus: features that coincide
+  in Latin come apart in a language contrasting syllabic consonants, and there
+  they are kept apart.
 
-First, the vocabulary is a **projection, and a lossy one**. Merkmal's
-`distinctive` system carries far more than 27 names over its base
-inventory, and what survives the projection is a manner-and-place
-vocabulary with a Eurocentric shape. Not present, and therefore not
-expressible as a conditioning environment: tone of any kind, rounding,
-vowel nasalisation (`nasal` here matches nasal *stops*), lateral,
-trill, tap, retroflex, ejective, implosive, click, breathy, creaky,
-ATR, pharyngealisation, syllabicity. A change conditioned by rounding
-— the organising fact of Turkic and Uralic vowel harmony, and this
-repo ships a Turkish–Azerbaijani corpus — is invisible to discovery
-however regular it is. Widening this is the open question in the
-handoff note; it cannot be done without also facing the calibration
-problem below, since a wider inventory is a wider argmax.
+The survivor of a tie is the earliest in the list, which is ordered so that the
+feature claiming *less* wins: `coronal` before `alveolar`, `labial` before
+`bilabial`. When a corpus cannot tell two environments apart, the honest report
+is the weaker one, and the linguist supplies the specificity from knowledge the
+corpus does not contain.
 
-Second, an earlier version of this section claimed the inventory was
-~14 candidates and argued that adding `{lateral, retroflex, labial}`
-would "widen the candidate space without adding discriminative power".
-The inventory has since grown to 52 and includes labial. The argument
-was never measured, and the effect it hand-waved at — that a wider
-candidate space makes a spurious partition more likely to cross BIC —
-is real, is not priced by BIC, and is what the permutation baseline
-exists to expose.
+In practice this lands at 22–31 features for the fixtures here, against a fixed
+27 before, and the difference is *which* 27.
+
+#### Why it is not a fixed list
+
+It was one until 2026-08-15: 27 names, hand-picked, by someone writing about
+Latin. It carried no rounding, no vowel nasalisation, no lateral, trill, tap or
+retroflex, no ejective, implosive or click, no breathy or creaky, no
+syllabicity, and no vowel height between close and open. Affricates received no
+manner feature at all.
+
+The cost was not subtle. `testdata/soundlaws/rounding_harmony.tsv` is a
+perfectly regular change — proto `p` answers daughter `f` before a front rounded
+vowel and stays `p` before a front unrounded one, twenty-four instances each
+side, the environments differing in rounding alone. Under the fixed list it
+produced **zero** conditioned classes. Not a weak rule or a wrong environment:
+silence, because the search had no word for the thing doing the conditioning.
+Rounding harmony organises the Turkic and Uralic vowel systems and this
+repository ships a Turkish–Azerbaijani corpus.
+
+A vocabulary that fits one family is a claim about the others.
+
+### Pricing the search, not only the parameter
+
+Widening the vocabulary widens the argmax, and BIC does not price an argmax. It
+charges for one added term against the likelihood it buys; the term that
+survives a split step is the best of *m* of them, and the maximum of a hundred
+candidates clears its bar by chance far more often than one candidate does.
+
+So the split penalty carries `γ · 2 · ln(m)` alongside it — the standard
+extended-BIC shape for a large model space, in the same currency as the BIC
+term. `γ` is `RG_SEARCH_PENALTY_GAMMA`, and 0.5 is not a taste: it is the
+largest value at which no sound law in `testdata/soundlaws/` is lost. At 0.75
+the multi-lect stage stops committing on the palatalization corpus; at 1.0
+lenition finds only two of its three stops. Below 0.25 the spurious commits the
+term exists to stop come back.
+
+What it buys, on Grassmann's law: five conditioned classes before, of which one
+was the law and four were environments that fit the same partition, against one
+class after — the law, correctly stated as *an aspirate somewhere later*.
+
+What it does **not** buy: the class count still rises on shuffled data at every
+γ tried. A uniform penalty cannot fix that, because shuffled data has more
+unconditioned mass to split and the penalty applies to both alike. The count is
+not a relatedness statistic and no gate will make it one; that is what the
+shuffled baseline above is for.
 
 ### What a committed split publishes
 
