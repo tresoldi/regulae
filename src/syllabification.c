@@ -15,6 +15,10 @@
 #define RG_SONORITY_LIQUID 4
 #define RG_SONORITY_GLIDE 5
 #define RG_SONORITY_VOWEL 6
+/* A grapheme the feature system cannot read scores mid-scale rather than
+ * failing. This is not a sonority value any segment has; it is the absence of
+ * one, and it must not be reachable from a segment merkmal *did* read -- that
+ * is how clicks and implosives came to score as nasals. */
 #define RG_SONORITY_UNKNOWN 3
 
 static int feature_present(const rg_feature_set *features, const char *name) {
@@ -61,6 +65,13 @@ static int sonority_from_features(const rg_feature_set *features) {
     if (feature_present(features, "stop") || feature_present(features, "affricate")) {
         return RG_SONORITY_STOP;
     }
+    /* Clicks and implosives are stops, and merkmal says so -- but it says it
+     * with `click` and `implosive`, which nothing above tests. They fell
+     * through to the unknown score, which is the nasal value, putting them
+     * above fricatives in exactly the languages that have them. */
+    if (feature_present(features, "click") || feature_present(features, "implosive")) {
+        return RG_SONORITY_STOP;
+    }
     return RG_SONORITY_UNKNOWN;
 }
 
@@ -68,9 +79,10 @@ static int sonority_from_features(const rg_feature_set *features) {
  * tone-only segments (empty grapheme) so callers can skip them. An unknown
  * grapheme scores neutral rather than failing, matching the Go bridge, which
  * maps an unresolved grapheme to a nil feature set. */
-static int segment_sonority(const rg_context *ctx, const rg_segment *segment) {
+static int segment_sonority(const rg_context *ctx, const rg_segment *segment, unsigned char *syllabic) {
     const rg_feature_set *features = 0;
     rg_status status;
+    *syllabic = 0;
     if (segment == 0 || segment->grapheme == 0 || segment->grapheme[0] == '\0') {
         return -1;
     }
@@ -78,20 +90,33 @@ static int segment_sonority(const rg_context *ctx, const rg_segment *segment) {
     if (status != RG_OK) {
         return RG_SONORITY_UNKNOWN;
     }
+    *syllabic = feature_present(features, "syllabic") ? 1 : 0;
     return sonority_from_features(features);
 }
 
-/* find_nuclei fills out_nuclei with the sorted nucleus positions. Any
- * vowel-sonority segment is a nucleus; a strict sonority peak at liquid or
- * above is also a nucleus (syllabic liquids). If none are found the single
+/* find_nuclei fills out_nuclei with the sorted nucleus positions. A segment
+ * marked syllabic is a nucleus outright; so is any vowel; so is a strict
+ * sonority peak at liquid or above. If none are found the single
  * highest-sonority position becomes the default nucleus, so every non-empty
- * form has at least one syllable. */
-static size_t find_nuclei(const int *scores, size_t n, size_t *out_nuclei) {
+ * form has at least one syllable, and *inferred is set to say the form had no
+ * nucleus of its own.
+ *
+ * The syllabic test is not a refinement. Without it a syllabic consonant is a
+ * nucleus only when its manner happens to reach the peak threshold, so l̩ and
+ * r̩ were nuclei and n̩, m̩ and s̩ were not -- a distinction with nothing behind
+ * it. */
+static size_t find_nuclei(const int *scores, const unsigned char *syllabic, size_t n,
+                          size_t *out_nuclei, int *inferred) {
     size_t i;
     size_t count = 0;
+    *inferred = 0;
     for (i = 0; i < n; i++) {
         int s = scores[i];
         if (s < 0) {
+            continue;
+        }
+        if (syllabic[i]) {
+            out_nuclei[count++] = i;
             continue;
         }
         if (s >= RG_SONORITY_VOWEL) {
@@ -122,6 +147,7 @@ static size_t find_nuclei(const int *scores, size_t n, size_t *out_nuclei) {
         }
         if (found) {
             out_nuclei[count++] = best;
+            *inferred = 1;
         }
     }
     return count;
@@ -161,20 +187,26 @@ rg_status rg_compute_syllable_breaks_internal(
     const rg_context *ctx,
     const rg_form *form,
     size_t **out,
-    size_t *out_count
+    size_t *out_count,
+    int *out_inferred
 ) {
     int *scores = 0;
+    unsigned char *syllabic = 0;
     size_t *nuclei = 0;
     size_t *breaks = 0;
     size_t nucleus_count;
     size_t i;
     size_t n;
+    int inferred = 0;
 
     if (ctx == 0 || form == 0 || out == 0 || out_count == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
     *out_count = 0;
+    if (out_inferred != 0) {
+        *out_inferred = 0;
+    }
 
     /* Caller-supplied breaks are the escape hatch for language-specific
      * phonotactics and are returned unchanged. */
@@ -198,20 +230,26 @@ rg_status rg_compute_syllable_breaks_internal(
     }
 
     scores = (int *)calloc(n, sizeof(*scores));
+    syllabic = (unsigned char *)calloc(n, sizeof(*syllabic));
     nuclei = (size_t *)calloc(n, sizeof(*nuclei));
-    if (scores == 0 || nuclei == 0) {
+    if (scores == 0 || syllabic == 0 || nuclei == 0) {
         free(scores);
+        free(syllabic);
         free(nuclei);
         return RG_ERR_OOM;
     }
     for (i = 0; i < n; i++) {
-        scores[i] = segment_sonority(ctx, &form->segments[i]);
+        scores[i] = segment_sonority(ctx, &form->segments[i], &syllabic[i]);
     }
-    nucleus_count = find_nuclei(scores, n, nuclei);
+    nucleus_count = find_nuclei(scores, syllabic, n, nuclei, &inferred);
+    if (out_inferred != 0) {
+        *out_inferred = inferred;
+    }
     if (nucleus_count > 1) {
         breaks = (size_t *)calloc(nucleus_count - 1, sizeof(*breaks));
         if (breaks == 0) {
             free(scores);
+            free(syllabic);
             free(nuclei);
             return RG_ERR_OOM;
         }
@@ -222,6 +260,7 @@ rg_status rg_compute_syllable_breaks_internal(
         *out_count = nucleus_count - 1;
     }
     free(scores);
+    free(syllabic);
     free(nuclei);
     return RG_OK;
 }
@@ -243,7 +282,7 @@ rg_status rg_compute_syllable_breaks(
     }
     *out = 0;
     *out_count = 0;
-    status = rg_compute_syllable_breaks_internal(ctx, form, &internal, &count);
+    status = rg_compute_syllable_breaks_internal(ctx, form, &internal, &count, 0);
     if (status != RG_OK) {
         return status;
     }

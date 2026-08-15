@@ -528,6 +528,28 @@ static void test_tsv_without_tone_column_is_untoned(void) {
     rg_corpus_free(corpus);
 }
 
+/* The design docs told users to supply their own syllable breaks where their
+ * language's phonotactics differ from the sonority default. No loader could
+ * read them until 2026-08-15, so the escape hatch was reachable only from C. */
+static void test_syllable_breaks_column(void) {
+    rg_context *ctx = 0;
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+
+    assert(rg_context_new_builtin(&ctx) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/syllable_breaks_column.tsv",
+                              0, &corpus) == RG_OK);
+    set = rg_corpus_cognate_at(corpus, 0);
+    assert(set != 0);
+    assert(set->form_count == 2);
+    assert(set->forms[0].form.syllable_break_count == 1);
+    assert(set->forms[0].form.syllable_breaks[0] == 3);
+    assert(set->forms[1].form.syllable_break_count == 1);
+    assert(set->forms[1].form.syllable_breaks[0] == 2);
+    rg_corpus_free(corpus);
+    rg_context_free(ctx);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -548,6 +570,7 @@ int main(void) {
     test_arcaverborum_morpheme_boundaries();
     test_missing_file_and_columns();
     test_corpus_from_pairs();
+    test_syllable_breaks_column();
     printf("loader tests passed\n");
     return 0;
 }

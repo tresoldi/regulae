@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 13
+#define RG_ABI_VERSION 14
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -462,6 +462,13 @@ typedef struct rg_corpus_fit {
      * correspondences left in it. */
     double null_search_margin;
     double null_search_margin_quantile;
+    /* Forms with no nucleus of their own -- no vowel and no syllabic consonant
+     * -- which were given one so the syllable predicates have something to
+     * hold of. Vowelless words are real and their analyses differ, so a
+     * syllable-conditioned rule on a corpus with many of these is resting on a
+     * guess. */
+    size_t inferred_nucleus_form_count;
+    size_t syllabified_form_count;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);
@@ -741,6 +748,10 @@ typedef struct rg_tsv_load_options {
     const char *stress_column;
     /* Morpheme boundaries as segment indices, default "breaks". */
     const char *morpheme_breaks_column;
+    /* Syllable boundaries as segment indices, default "syllables". Supplying
+     * them overrides the sonority syllabifier, which is language-agnostic by
+     * design and will be wrong wherever a language's phonotactics are not. */
+    const char *syllable_breaks_column;
 } rg_tsv_load_options;
 
 /* Wide-format TSV: one row per cognate, one column per lect, cells holding

@@ -1326,6 +1326,17 @@ static size_t immediate_candidates_for(
     return count;
 }
 
+/* Properties of a syllable rather than of its segments, so they are not in the
+ * feature vocabulary and are offered directly. A predicate true of every
+ * syllable in a corpus partitions nothing and is dropped by the split gate, so
+ * the cost of offering them where they do not apply is one gate test each. */
+static const rg_feature_constraint syllable_shape_candidates[] = {
+    {"syllable_shape", "open"},
+    {"syllable_shape", "closed"},
+    {"syllable_nucleus", "long"},
+    {"syllable_nucleus", "short"}
+};
+
 static size_t long_range_candidates(
     const rg_feature_vocabulary *vocabulary,
     split_candidate *out,
@@ -1341,6 +1352,18 @@ static size_t long_range_candidates(
                 out[count].feature = vocabulary->entries[f].feature;
                 out[count].value = vocabulary->entries[f].value;
                 count++;
+            }
+        }
+        if (strcmp(long_range_slot_names[s], "same_syllable") == 0 ||
+            strcmp(long_range_slot_names[s], "next_syllable") == 0 ||
+            strcmp(long_range_slot_names[s], "previous_syllable") == 0) {
+            for (f = 0; f < sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]); f++) {
+                if (count < capacity) {
+                    out[count].slot = long_range_slot_names[s];
+                    out[count].feature = syllable_shape_candidates[f].feature;
+                    out[count].value = syllable_shape_candidates[f].value;
+                    count++;
+                }
             }
         }
     }
@@ -2231,7 +2254,9 @@ static rg_status discover_context_counts(
             3 * stress.count + 8 + morphology.placement_count + morphology.index_count;
         size_t long_cap =
             sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
-            (vocabulary->count == 0 ? 1 : vocabulary->count);
+            (vocabulary->count == 0 ? 1 : vocabulary->count) +
+            sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
+            sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]);
         rg_context_spec empty;
         immediate_list = (split_candidate *)calloc(immediate_cap, sizeof(*immediate_list));
         if (long_range_list == 0) {

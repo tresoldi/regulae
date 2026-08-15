@@ -114,12 +114,92 @@ static void test_unknown_grapheme_does_not_fail(rg_context *ctx) {
     rg_syllable_breaks_free(breaks);
 }
 
+/* Syllable count for a word given as a space-free list of graphemes. */
+static size_t syllable_count(rg_context *ctx, const char *const *graphemes, size_t n) {
+    rg_segment segments[16];
+    rg_form form;
+    int *breaks = 0;
+    size_t break_count = 0;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        memset(&segments[i], 0, sizeof(segments[i]));
+        segments[i].grapheme = graphemes[i];
+    }
+    memset(&form, 0, sizeof(form));
+    form.lect_id = "x";
+    form.segments = segments;
+    form.segment_count = n;
+    assert(rg_compute_syllable_breaks(ctx, &form, &breaks, &break_count) == RG_OK);
+    rg_syllable_breaks_free(breaks);
+    return break_count + 1;
+}
+
+/* A syllabic consonant is a nucleus because it is marked syllabic, not because
+ * its manner happens to clear the peak threshold. Until 2026-08-15 the scale
+ * never consulted the feature, so a syllabic lateral or trill was a nucleus
+ * and a syllabic nasal or fricative was not -- a distinction with nothing
+ * behind it, and one that made a Germanic or Slavic corpus syllabify wrongly
+ * wherever it mattered. */
+static void test_syllabic_consonants_are_nuclei(rg_context *ctx) {
+    static const char *two_nasals[] = { "b", "n\xcc\xa9", "t", "m\xcc\xa9" };
+    static const char *nasal_and_fricative[] = { "s", "m\xcc\xa9", "k", "s\xcc\xa9", "t" };
+    static const char *liquid[] = { "b", "l\xcc\xa9", "t", "r\xcc\xa9" };
+
+    assert(syllable_count(ctx, two_nasals, 4) == 2);
+    assert(syllable_count(ctx, nasal_and_fricative, 5) == 2);
+    /* The two that already worked keep working. */
+    assert(syllable_count(ctx, liquid, 4) == 2);
+}
+
+/* A click is a stop and an implosive is a stop, and merkmal says so -- with
+ * the features `click` and `implosive`, which the scale did not test. They
+ * fell through to the unknown score, which is the nasal value, so in the
+ * languages that have them every click sat above every fricative in the
+ * sonority hierarchy and the onsets came out wrong. */
+static void test_clicks_and_implosives_are_stops(rg_context *ctx) {
+    /* m + click: the click is a stop, so sonority falls across the boundary
+     * and the nasal cannot be part of the following onset. */
+    static const char *click_word[] = { "k", "a", "m", "\xc7\x80", "o" };
+    static const char *implosive_word[] = { "k", "a", "m", "\xc9\x93", "o" };
+    rg_segment segments[8];
+    rg_form form;
+    int *breaks = 0;
+    size_t break_count = 0;
+    size_t i;
+
+    for (i = 0; i < 5; i++) {
+        memset(&segments[i], 0, sizeof(segments[i]));
+        segments[i].grapheme = click_word[i];
+    }
+    memset(&form, 0, sizeof(form));
+    form.lect_id = "x";
+    form.segments = segments;
+    form.segment_count = 5;
+    assert(rg_compute_syllable_breaks(ctx, &form, &breaks, &break_count) == RG_OK);
+    assert(break_count == 1);
+    /* kam|Xo, not ka|mXo: the nasal is a coda because the click is a stop. */
+    assert(breaks[0] == 3);
+    rg_syllable_breaks_free(breaks);
+
+    for (i = 0; i < 5; i++) {
+        segments[i].grapheme = implosive_word[i];
+    }
+    breaks = 0;
+    break_count = 0;
+    assert(rg_compute_syllable_breaks(ctx, &form, &breaks, &break_count) == RG_OK);
+    assert(break_count == 1);
+    assert(breaks[0] == 3);
+    rg_syllable_breaks_free(breaks);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     test_breaks_match_go_reference(ctx);
     test_supplied_breaks_are_respected(ctx);
     test_unknown_grapheme_does_not_fail(ctx);
+    test_syllabic_consonants_are_nuclei(ctx);
+    test_clicks_and_implosives_are_stops(ctx);
     rg_context_free(ctx);
     printf("syllabification tests passed\n");
     return 0;

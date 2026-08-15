@@ -347,11 +347,17 @@ rg_status rg_context_features_internal(
     const rg_feature_set **out
 );
 
+/* `out_inferred`, when not NULL, reports that the form had no nucleus of its
+ * own -- no vowel and no syllabic consonant -- and was given one so that the
+ * syllable predicates have something to hold of. Vowelless words are real
+ * (Nuxalk, Berber) and their analyses differ; making the guess silently is
+ * what was wrong with it. */
 rg_status rg_compute_syllable_breaks_internal(
     const rg_context *ctx,
     const rg_form *form,
     size_t **out,
-    size_t *out_count
+    size_t *out_count,
+    int *out_inferred
 );
 int rg_segment_posterior_internal(
     const rg_pairwise_model *model,

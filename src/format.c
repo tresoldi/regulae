@@ -437,6 +437,14 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_corpus_fit *fit = rg_multi_model_fit(model);
         builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
                         fit->cost_per_segment, (unsigned long)fit->scored_set_count);
+        if (fit->inferred_nucleus_form_count > 0) {
+            builder_appendf(&builder,
+                            "syllable nuclei:     %lu of %lu forms had none of their own\n"
+                            "  and were given one; a syllable-conditioned rule on those rests\n"
+                            "  on a guess. Supply a syllables column to decide it yourself.\n",
+                            (unsigned long)fit->inferred_nucleus_form_count,
+                            (unsigned long)fit->syllabified_form_count);
+        }
         if (fit->permutation_count > 0) {
             builder_appendf(&builder,
                             "shuffled baseline:   %.4f +/- %.4f over %lu shuffles, z = %.1f\n",

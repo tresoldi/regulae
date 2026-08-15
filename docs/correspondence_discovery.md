@@ -638,12 +638,47 @@ context discovery but operates on a different candidate set:
 ### Syllabification
 
 Syllable-structural predicates depend on syllable breaks, which are
-computed by a minimal sonority-based syllabifier
-(`regulae.syllabification`): the max-onset principle under the
-sonority sequencing principle. Language-agnostic and simple by
-design — users with language-specific phonotactics should populate
-`Form.syllable_breaks` externally, and the module respects
-pre-populated values.
+computed by a minimal sonority-based syllabifier: the max-onset
+principle under the sonority sequencing principle. Language-agnostic
+and simple by design — supply your own with a `syllables` column
+(long format) or `<lect>_syllables` (wide), and they are respected
+unchanged. Until 2026-08-15 the docs told users to do that and no
+loader could read the column.
+
+The scale is stop < fricative < nasal < liquid < glide < vowel, and it
+reads three things that matter typologically:
+
+- **A segment marked `syllabic` is a nucleus**, whatever its manner.
+  Without that test a syllabic consonant was a nucleus only when its
+  manner happened to clear the peak threshold, so `l̩` and `r̩` were and
+  `n̩`, `m̩` and `s̩` were not — a distinction with nothing behind it.
+- **Clicks and implosives are stops.** merkmal says so with the
+  features `click` and `implosive`; the scale did not test them, so
+  they fell through to the unknown score, which is the *nasal* value.
+  Every click sat above every fricative in the hierarchy, in exactly
+  the languages that have clicks.
+- **A form with no nucleus of its own** — no vowel, no syllabic
+  consonant — is still given one, because the predicates need
+  something to hold of, but the model counts it.
+  `rg_corpus_fit.inferred_nucleus_form_count` says how many forms that
+  was, and the human report prints it. Vowelless words are real and
+  their analyses differ; making the guess silently was the problem.
+
+Two properties of the syllable itself join its feature union, so they
+conjoin with segment predicates through the ordinary machinery:
+`syllable_shape` (`open`/`closed`) and `syllable_nucleus`
+(`long`/`short`). They are named for what they measure rather than for
+*heavy* and *light*, which are language-particular verdicts — CVC is
+heavy in Latin and is not in every quantity system.
+
+A caveat worth stating: in a corpus of segments, syllable shape is
+usually *also* describable segmentally, and the search often prefers
+the segmental description because it reaches it first. A vowel
+lengthening in an open syllable comes back as
+`fol[consonant:+] fol@2[vowel:+]`, which is the same partition. The
+shape predicate is a generalisation over that, not new evidence, and
+it wins only where no bounded segmental description coincides with
+it.
 
 ### Calibrated thresholds
 

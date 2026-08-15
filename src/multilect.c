@@ -3111,6 +3111,26 @@ static rg_status compute_corpus_fit(
 
     model->fit.unconditioned_class_count = model->unconditioned_class_count;
     model->fit.conditioned_class_count = model->conditioned_class_count;
+    {
+        size_t c;
+        for (c = 0; c < cognate_count; c++) {
+            size_t f;
+            for (f = 0; f < cognates[c].form_count; f++) {
+                size_t *breaks = 0;
+                size_t break_count = 0;
+                int inferred = 0;
+                if (rg_compute_syllable_breaks_internal(ctx, &cognates[c].forms[f].form,
+                                                        &breaks, &break_count, &inferred) != RG_OK) {
+                    continue;
+                }
+                free(breaks);
+                model->fit.syllabified_form_count++;
+                if (inferred) {
+                    model->fit.inferred_nucleus_form_count++;
+                }
+            }
+        }
+    }
     status = corpus_cost_per_segment(ctx, model, options, cognates, cognate_count,
                                      &model->fit.cost_per_segment, &model->fit.scored_set_count);
     if (status != RG_OK || baseline->runs == 0) {

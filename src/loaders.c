@@ -35,6 +35,8 @@ typedef struct loader_form {
     size_t segment_count;
     int *morpheme_breaks;
     size_t morpheme_break_count;
+    int *syllable_breaks;
+    size_t syllable_break_count;
 } loader_form;
 
 typedef struct loader_cognate {
@@ -605,6 +607,7 @@ static void loader_form_clear(loader_form *form) {
     }
     free(form->segments);
     free(form->morpheme_breaks);
+    free(form->syllable_breaks);
     memset(form, 0, sizeof(*form));
 }
 
@@ -765,6 +768,8 @@ static rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
             forms[f].form.segment_count = cognate->forms[f].segment_count;
             forms[f].form.morpheme_breaks = cognate->forms[f].morpheme_breaks;
             forms[f].form.morpheme_break_count = cognate->forms[f].morpheme_break_count;
+            forms[f].form.syllable_breaks = cognate->forms[f].syllable_breaks;
+            forms[f].form.syllable_break_count = cognate->forms[f].syllable_break_count;
         }
         corpus->view[kept].cognate_id = cognate->cognate_id;
         corpus->view[kept].forms = forms;
@@ -879,6 +884,7 @@ static rg_status load_wide_tsv(
     long confidence_col = -1;
     long *lect_cols = 0;
     long *break_cols = 0;
+    long *syllable_cols = 0;
     long *tone_cols = 0;
     long *stress_cols = 0;
     size_t lect_count = 0;
@@ -913,11 +919,13 @@ static rg_status load_wide_tsv(
 
     lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
     break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
+    syllable_cols = (long *)calloc(table.column_count, sizeof(*syllable_cols));
     tone_cols = (long *)calloc(table.column_count, sizeof(*tone_cols));
     stress_cols = (long *)calloc(table.column_count, sizeof(*stress_cols));
     if (lect_cols == 0 || break_cols == 0 || tone_cols == 0 || stress_cols == 0) {
         free(lect_cols);
         free(break_cols);
+        free(syllable_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -929,6 +937,7 @@ static rg_status load_wide_tsv(
             if (index < 0) {
                 free(lect_cols);
                 free(break_cols);
+                free(syllable_cols);
                 free(tone_cols);
                 free(stress_cols);
                 loader_table_clear(&table);
@@ -944,6 +953,7 @@ static rg_status load_wide_tsv(
                 continue;
             }
             if (has_suffix(table.header[c], "_breaks") ||
+                has_suffix(table.header[c], "_syllables") ||
                 has_suffix(table.header[c], "_tone") ||
                 has_suffix(table.header[c], "_stress")) {
                 continue;
@@ -954,6 +964,7 @@ static rg_status load_wide_tsv(
     if (lect_count == 0) {
         free(lect_cols);
         free(break_cols);
+        free(syllable_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -967,12 +978,15 @@ static rg_status load_wide_tsv(
         tone_cols[c] = column_index(&table, companion);
         snprintf(companion, sizeof(companion), "%s_stress", table.header[lect_cols[c]]);
         stress_cols[c] = column_index(&table, companion);
+        snprintf(companion, sizeof(companion), "%s_syllables", table.header[lect_cols[c]]);
+        syllable_cols[c] = column_index(&table, companion);
     }
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
     if (corpus == 0) {
         free(lect_cols);
         free(break_cols);
+        free(syllable_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -1027,6 +1041,9 @@ static rg_status load_wide_tsv(
             }
             if (break_cols[c] >= 0) {
                 status = parse_break_indices(cell(row, break_cols[c]), &form.morpheme_breaks, &form.morpheme_break_count);
+            }
+            if (status == RG_OK && syllable_cols[c] >= 0) {
+                status = parse_break_indices(cell(row, syllable_cols[c]), &form.syllable_breaks, &form.syllable_break_count);
                 if (status != RG_OK) {
                     loader_form_clear(&form);
                     break;
@@ -1083,6 +1100,7 @@ static rg_status load_wide_tsv(
 
     free(lect_cols);
     free(break_cols);
+    free(syllable_cols);
     free(tone_cols);
     free(stress_cols);
     loader_table_clear(&table);
@@ -1150,6 +1168,14 @@ static rg_status loader_form_from(const rg_form *src, const char *lect_id, loade
             }
         }
         out->segment_count = src->segment_count;
+    }
+    if (src->syllable_break_count > 0 && src->syllable_breaks != 0) {
+        out->syllable_breaks = (int *)calloc(src->syllable_break_count, sizeof(*out->syllable_breaks));
+        if (out->syllable_breaks == 0) {
+            return RG_ERR_OOM;
+        }
+        memcpy(out->syllable_breaks, src->syllable_breaks, src->syllable_break_count * sizeof(int));
+        out->syllable_break_count = src->syllable_break_count;
     }
     if (src->morpheme_break_count > 0 && src->morpheme_breaks != 0) {
         out->morpheme_breaks = (int *)calloc(src->morpheme_break_count, sizeof(*out->morpheme_breaks));
@@ -1249,6 +1275,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     long confidence_col = -1;
     long tone_col = -1;
     long breaks_col = -1;
+    long syllables_col = -1;
     long stress_col = -1;
     size_t r;
     rg_status status;
@@ -1305,6 +1332,8 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
      * change but not supply the boundaries that condition it. */
     breaks_col = column_index(&table, opts.morpheme_breaks_column == 0
                               ? "breaks" : opts.morpheme_breaks_column);
+    syllables_col = column_index(&table, opts.syllable_breaks_column == 0
+                                 ? "syllables" : opts.syllable_breaks_column);
     stress_col = column_index(&table, opts.stress_column);
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
@@ -1363,6 +1392,16 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         if (breaks_col >= 0) {
             status = parse_break_indices(cell(row, breaks_col), &form.morpheme_breaks,
                                          &form.morpheme_break_count);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                free(cognate_id);
+                free(lect_id);
+                break;
+            }
+        }
+        if (syllables_col >= 0) {
+            status = parse_break_indices(cell(row, syllables_col), &form.syllable_breaks,
+                                         &form.syllable_break_count);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 free(cognate_id);

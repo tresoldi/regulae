@@ -473,6 +473,8 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(fit, "unconditioned_class_count", (double)f->unconditioned_class_count);
         cJSON_AddNumberToObject(fit, "conditioned_class_count", (double)f->conditioned_class_count);
         cJSON_AddNumberToObject(fit, "permutation_count", (double)f->permutation_count);
+        cJSON_AddNumberToObject(fit, "inferred_nucleus_form_count", (double)f->inferred_nucleus_form_count);
+        cJSON_AddNumberToObject(fit, "syllabified_form_count", (double)f->syllabified_form_count);
         if (f->permutation_count > 0) {
             cJSON_AddNumberToObject(fit, "null_cost_per_segment_mean", f->null_cost_per_segment_mean);
             cJSON_AddNumberToObject(fit, "null_cost_per_segment_sd", f->null_cost_per_segment_sd);

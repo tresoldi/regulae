@@ -497,6 +497,77 @@ static void syllable_data_clear(syllable_data *data) {
     memset(data, 0, sizeof(*data));
 }
 
+/* Two properties of a syllable that its segments' features do not carry, and
+ * that quantity-sensitive changes are stated in: whether it ends in a coda,
+ * and whether its nucleus is long.
+ *
+ * They are named for what they measure rather than for "heavy" and "light",
+ * which are language-particular verdicts -- CVC counts heavy in Latin and does
+ * not in every quantity system. A reader who knows their language can read
+ * weight off the shape; the tool should not guess it for them.
+ *
+ * Appended to the syllable's own feature union, so they conjoin with the
+ * segment predicates through the machinery that is already there. */
+static rg_status append_syllable_shape(
+    const rg_feature_constraint *const *source_features,
+    const size_t *source_feature_counts,
+    size_t start,
+    size_t end,
+    const rg_feature_constraint **union_out,
+    size_t *union_count
+) {
+    rg_feature_constraint extra[2];
+    size_t extra_count = 0;
+    size_t nucleus = end;
+    size_t i;
+    rg_feature_constraint *grown;
+
+    for (i = start; i < end; i++) {
+        size_t c;
+        for (c = 0; c < source_feature_counts[i]; c++) {
+            const char *f = source_features[i][c].feature;
+            if (strcmp(f, "vowel") == 0 || strcmp(f, "syllabic") == 0) {
+                nucleus = i;
+                break;
+            }
+        }
+    }
+    extra[extra_count].feature = "syllable_shape";
+    extra[extra_count].value = (nucleus != end && nucleus + 1 == end) ? "open" : "closed";
+    extra_count++;
+    if (nucleus != end) {
+        size_t c;
+        int is_long = 0;
+        for (c = 0; c < source_feature_counts[nucleus]; c++) {
+            if (strcmp(source_features[nucleus][c].feature, "long") == 0) {
+                is_long = 1;
+            }
+        }
+        extra[extra_count].feature = "syllable_nucleus";
+        extra[extra_count].value = is_long ? "long" : "short";
+        extra_count++;
+    }
+    grown = (rg_feature_constraint *)calloc(*union_count + extra_count, sizeof(*grown));
+    if (grown == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < *union_count; i++) {
+        grown[i] = (*union_out)[i];
+    }
+    for (i = 0; i < extra_count; i++) {
+        grown[*union_count + i].feature = rg_strdup_internal(extra[i].feature);
+        grown[*union_count + i].value = rg_strdup_internal(extra[i].value);
+        if (grown[*union_count + i].feature == 0 || grown[*union_count + i].value == 0) {
+            free(grown);
+            return RG_ERR_OOM;
+        }
+    }
+    free((void *)*union_out);
+    *union_out = grown;
+    *union_count += extra_count;
+    return RG_OK;
+}
+
 static rg_status syllable_data_build(
     const rg_context *ctx,
     const rg_form *form,
@@ -522,7 +593,7 @@ static rg_status syllable_data_build(
     }
     n = form->segment_count;
 
-    status = rg_compute_syllable_breaks_internal(ctx, form, &breaks, &break_count);
+    status = rg_compute_syllable_breaks_internal(ctx, form, &breaks, &break_count, 0);
     if (status != RG_OK) {
         return status;
     }
@@ -571,6 +642,12 @@ static rg_status syllable_data_build(
             &out->syllable_features[s],
             &out->syllable_feature_counts[s]
         );
+        if (status == RG_OK) {
+            status = append_syllable_shape(source_features, source_feature_counts,
+                                           starts[s], starts[s + 1],
+                                           &out->syllable_features[s],
+                                           &out->syllable_feature_counts[s]);
+        }
         if (status != RG_OK) {
             free(starts);
             syllable_data_clear(out);
