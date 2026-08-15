@@ -535,20 +535,21 @@ void rg_context_last_error(const rg_context *ctx, const char **grapheme, const c
  * table for the same key again to reach it. One probe, and the "the entry the
  * previous call just resolved is missing" branch that followed the second one
  * goes with it: it was unreachable by invariant, and untested. */
-static rg_status feature_entry_for(
+static feature_cache_entry *feature_entry_for(
     const rg_context *ctx,
     const char *grapheme,
-    feature_cache_entry **out
+    rg_status *out_status
 ) {
     rg_feature_set *features = 0;
     size_t slot;
     rg_status status;
 
-    *out = 0;
+    *out_status = RG_OK;
     if (ctx->cache->feature_cap == 0 || (ctx->cache->feature_count + 1) * 10 >= ctx->cache->feature_cap * 7) {
         status = feature_cache_grow(ctx);
         if (status != RG_OK) {
-            return status;
+            *out_status = status;
+            return 0;
         }
     }
     slot = hash_string(grapheme, RG_FNV_OFFSET) & (ctx->cache->feature_cap - 1);
@@ -556,11 +557,11 @@ static rg_status feature_entry_for(
         if (strcmp(ctx->cache->features[slot].grapheme, grapheme) == 0) {
             if (ctx->cache->features[slot].features_state < 0) {
                 rg_context_note_unknown_grapheme_internal(ctx, grapheme);
-                return ctx->cache->features[slot].refusal;
+                *out_status = ctx->cache->features[slot].refusal;
+                return 0;
             }
             if (ctx->cache->features[slot].features_state > 0) {
-                *out = &ctx->cache->features[slot];
-                return RG_OK;
+                return &ctx->cache->features[slot];
             }
             break;
         }
@@ -571,7 +572,8 @@ static rg_status feature_entry_for(
         ctx->cache->features[slot].grapheme = rg_strdup_internal(grapheme);
         if (ctx->cache->features[slot].grapheme == 0) {
             rg_feature_set_free(features);
-            return status == RG_OK ? RG_ERR_OOM : status;
+            *out_status = status == RG_OK ? RG_ERR_OOM : status;
+            return 0;
         }
         ctx->cache->feature_count++;
     }
@@ -582,12 +584,12 @@ static rg_status feature_entry_for(
             status == RG_ERR_PARSE) {
             rg_context_note_unknown_grapheme_internal(ctx, grapheme);
         }
-        return status;
+        *out_status = status;
+        return 0;
     }
     ctx->cache->features[slot].features_state = 1;
     ctx->cache->features[slot].features = features;
-    *out = &ctx->cache->features[slot];
-    return RG_OK;
+    return &ctx->cache->features[slot];
 }
 
 rg_status rg_context_features_internal(
@@ -602,8 +604,8 @@ rg_status rg_context_features_internal(
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
-    status = feature_entry_for(ctx, grapheme, &entry);
-    if (status != RG_OK) {
+    entry = feature_entry_for(ctx, grapheme, &status);
+    if (entry == 0) {
         return status;
     }
     *out = entry->features;
@@ -779,8 +781,8 @@ rg_status rg_context_constraints_internal(
     }
     *out = 0;
     *out_count = 0;
-    status = feature_entry_for(ctx, grapheme, &entry);
-    if (status != RG_OK) {
+    entry = feature_entry_for(ctx, grapheme, &status);
+    if (entry == 0) {
         return status;
     }
     features = entry->features;
