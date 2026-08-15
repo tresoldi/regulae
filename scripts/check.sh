@@ -164,6 +164,16 @@ fi
 # the `wasm_current` test fails when it falls behind. The artifacts themselves
 # are checked by `wasm_smoke`, which trains real corpora in both builds and
 # requires byte-identical JSON.
+# The suite asserts that particular rules are found; it does not assert that
+# the published model is the one it was before, and those are very different
+# claims. A refactor that quietly changes what every corpus learns passes
+# ctest. This trains all of them and compares hashes, which takes about four
+# seconds and is the only thing here that can tell a refactor from a change.
+# The baseline is byte-identical under GCC and clang, so a difference is the
+# engine, not the compiler.
+step "learned models"
+python3 scripts/model_hashes.py || fail "the learned models moved; see above"
+
 step "generated artifacts were already current"
 dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO)"
 if [ -n "$dirty" ]; then
