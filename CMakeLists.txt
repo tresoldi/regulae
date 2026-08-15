@@ -91,6 +91,10 @@ add_library(regulae
     src/loaders.c
     src/chunk_diagnostics.c
     src/model.c
+    src/model_chunks.c
+    src/model_tables.c
+    src/model_context.c
+    src/model_crossdim.c
     src/multilect.c
     src/options.c
     src/scoring.c
