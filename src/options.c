@@ -24,7 +24,6 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     if (options == 0) {
         return;
     }
-    options->feature_system = RG_DEFAULT_FEATURE_SYSTEM;
     options->max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
     options->temperature = 1.0;
     options->concentration = 5.0;

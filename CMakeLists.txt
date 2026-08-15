@@ -267,6 +267,14 @@ if(REGULAE_BUILD_TESTS)
                 COMMAND ${Python3_EXECUTABLE}
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/guide.py" --check)
 
+            # A public field that only the copy, compare, serialise and format
+            # code ever names is decoration: the round-trip tests pass because
+            # the plumbing handles every field alike, including the ones that
+            # mean nothing. Seven such fields have been removed from this ABI.
+            add_test(NAME abi_surface
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/abi_surface.py" --check)
+
             # The example list records which corpora load, so a corpus that
             # starts or stops loading cannot silently keep its old label.
             add_test(NAME corpora_current

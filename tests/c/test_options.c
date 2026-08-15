@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 20);
+    assert(rg_abi_version() == 21);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -33,7 +33,6 @@ int main(void) {
     assert(fabs(bic.multi_lect_min_commit_scale - 0.5) < 1e-12);
 
     rg_train_options_init_defaults(&options);
-    assert(strcmp(options.feature_system, RG_DEFAULT_FEATURE_SYSTEM) == 0);
     assert(options.max_chunk_size == RG_DEFAULT_MAX_CHUNK_SIZE);
     assert(fabs(options.temperature - 1.0) < 1e-12);
     assert(fabs(options.concentration - 5.0) < 1e-12);

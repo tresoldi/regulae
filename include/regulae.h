@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 20
+#define RG_ABI_VERSION 21
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -102,8 +102,12 @@ typedef struct rg_bic_config {
     double search_penalty_gamma;
 } rg_bic_config;
 
+/* The feature system is not here. It belongs to the context -- see
+ * rg_context_use_system -- because it decides what a grapheme means before any
+ * training option is consulted. This struct carried a `feature_system` field
+ * until ABI 21 that nothing read: setting it selected nothing and reported
+ * nothing. */
 typedef struct rg_train_options {
-    const char *feature_system;
     int max_chunk_size;
     double temperature;
     double concentration;
