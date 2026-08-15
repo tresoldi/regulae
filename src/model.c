@@ -932,7 +932,9 @@ static const split_candidate immediate_feature_inventory[] = {
     {"preceding", "sonorant", "+"},
     {"following", "consonant", "+"},
     {"following", "voiced", "+"},
-    {"following", "voiceless", "+"}
+    {"following", "voiceless", "+"},
+    {"following", "aspirated", "+"},
+    {"preceding", "aspirated", "+"}
 };
 
 static const char *const split_positions[] = {"initial", "medial", "final"};
@@ -943,7 +945,7 @@ static const char *const stress_slot_names[] = {"self_stress", "preceding_stress
  * slots. */
 static const char *const long_range_feature_names[] = {
     "front", "back", "close", "open", "voiced", "voiceless", "long",
-    "nasal", "stop", "fricative", "sonorant"
+    "nasal", "stop", "fricative", "sonorant", "aspirated"
 };
 
 static const char *const long_range_slot_names[] = {
@@ -1130,7 +1132,10 @@ static size_t long_range_candidates(split_candidate *out, size_t capacity) {
 
 /* base_context extended with one more constraint. Contexts are immutable by
  * convention, so this always allocates a fresh value. */
-static rg_status context_extend(
+/* Conjoins one more predicate onto a context. The multi-lect stage needs the
+ * same operation the pairwise refinement does, and a conditioning environment
+ * built from two predicates is one context, not two rules. */
+rg_status rg_context_extend_internal(
     const rg_context_spec *base_context,
     const split_candidate *candidate,
     rg_context_spec *out
@@ -1437,21 +1442,26 @@ static int find_best_split(
     const context_observation *const *rows,
     size_t count,
     const split_candidate *candidates,
+    const rg_split_gate *gates,
     size_t candidate_count,
-    double min_obs,
-    double delta_threshold,
     double penalty,
-    double min_dominant_fraction,
     split_candidate *best_candidate,
     size_t *best_yes_count,
     size_t *best_no_count
 ) {
     double baseline = observation_group_cost(rows, count);
-    double best_delta = delta_threshold;
+    /* Each candidate is measured against its own bar, so the best split is the
+     * one that clears its bar by the most rather than the one with the lowest
+     * raw score -- otherwise the larger pool wins on volume. */
+    double best_margin = 0.0;
     int found = 0;
     size_t ci;
 
     for (ci = 0; ci < candidate_count; ci++) {
+        double min_obs = gates[ci].min_obs;
+        double delta_threshold = gates[ci].delta_threshold;
+        double min_dominant_fraction = gates[ci].min_dominant_fraction;
+        double margin;
         size_t yes_count = 0;
         size_t no_count = 0;
         size_t i;
@@ -1474,8 +1484,9 @@ static int find_best_split(
         }
         split_cost = observation_group_cost(search->yes, yes_count) + observation_group_cost(search->no, no_count);
         delta_bic = -2.0 * (baseline - split_cost) + penalty;
-        if (delta_bic < best_delta) {
-            best_delta = delta_bic;
+        margin = delta_threshold - delta_bic;
+        if (margin > best_margin) {
+            best_margin = margin;
             *best_candidate = candidates[ci];
             memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
             memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
@@ -1489,6 +1500,19 @@ static int find_best_split(
 
 /* Recursively refines an already-committed conditioned entry, looking for one
  * further conditioning axis that improves BIC. */
+/* Deepens a committed split by conjoining a second predicate within the group
+ * that satisfied the first.
+ *
+ * The candidates offered here are the union of every axis, not the immediate
+ * neighbours the enclosing stage happened to search. A conditioning
+ * environment is not obliged to be built out of one kind of predicate:
+ * Grassmann's Law is word-initial *and* followed somewhere by an aspirate, and
+ * assimilation is regularly "before X" *and* "after Y". Searching one kind at
+ * a time can state either half and never the conjunction.
+ *
+ * Candidates the base context already implies need no filtering: every row in
+ * the group satisfies them, so the split has an empty complement and its own
+ * minimum rejects it. */
 static rg_status refine_split(
     rg_pairwise_model *model,
     const char *source,
@@ -1498,7 +1522,9 @@ static rg_status refine_split(
     int depth,
     int max_depth,
     double min_obs,
-    double delta_threshold,
+    const split_candidate *candidates,
+    const rg_split_gate *gates,
+    size_t candidate_count,
     double penalty,
     const stress_inventory *stress,
     size_t observation_capacity
@@ -1507,24 +1533,23 @@ static rg_status refine_split(
     split_candidate best;
     size_t yes_count = 0;
     size_t no_count = 0;
-    size_t candidate_count;
     rg_context_spec yes_context;
     rg_status status;
 
+    (void)stress;
     if (depth >= max_depth || observation_total_weight(rows, count) < min_obs) {
         return RG_OK;
     }
-    status = split_search_init(&search, observation_capacity, 64 + 3 * stress->count);
+    status = split_search_init(&search, observation_capacity, 1);
     if (status != RG_OK) {
         return status;
     }
-    candidate_count = immediate_candidates_for(base_context, stress, search.candidates, search.capacity);
-    if (!find_best_split(&search, rows, count, search.candidates, candidate_count,
-                         min_obs, delta_threshold, penalty, 0.0, &best, &yes_count, &no_count)) {
+    if (!find_best_split(&search, rows, count, candidates, gates, candidate_count,
+                         penalty, &best, &yes_count, &no_count)) {
         split_search_clear(&search);
         return RG_OK;
     }
-    status = context_extend(base_context, &best, &yes_context);
+    status = rg_context_extend_internal(base_context, &best, &yes_context);
     if (status == RG_OK) {
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
         if (status == RG_OK) {
@@ -1537,7 +1562,9 @@ static rg_status refine_split(
                 depth + 1,
                 max_depth,
                 min_obs,
-                delta_threshold,
+                candidates,
+                gates,
+                candidate_count,
                 penalty,
                 stress,
                 observation_capacity
@@ -1558,15 +1585,16 @@ static rg_status commit_splits_for_source(
     const char *source,
     const context_observation *const *rows,
     size_t count,
-    const split_candidate *fixed_candidates,
-    size_t fixed_candidate_count,
+    const split_candidate *top_candidates,
+    const rg_split_gate *top_gates,
+    size_t top_candidate_count,
+    const split_candidate *all_candidates,
+    const rg_split_gate *all_gates,
+    size_t all_candidate_count,
     const stress_inventory *stress,
-    int use_refinement,
     int max_depth,
     double min_obs,
-    double delta_threshold,
-    double penalty,
-    double min_dominant_fraction
+    double penalty
 ) {
     split_search search;
     const context_observation **remaining;
@@ -1589,30 +1617,21 @@ static rg_status commit_splits_for_source(
         split_candidate best;
         size_t yes_count = 0;
         size_t no_count = 0;
-        const split_candidate *candidates = fixed_candidates;
-        size_t candidate_count = fixed_candidate_count;
         rg_context_spec yes_context;
         rg_context_spec empty;
 
-        if (candidates == 0) {
-            rg_context_spec_init_empty(&empty);
-            candidate_count = immediate_candidates_for(&empty, stress, search.candidates, search.capacity);
-            candidates = search.candidates;
-            rg_context_spec_clear_internal(&empty);
-        }
-        if (!find_best_split(&search, remaining, remaining_count, candidates, candidate_count,
-                             min_obs, delta_threshold, penalty, min_dominant_fraction,
-                             &best, &yes_count, &no_count)) {
+        if (!find_best_split(&search, remaining, remaining_count, top_candidates, top_gates,
+                             top_candidate_count, penalty, &best, &yes_count, &no_count)) {
             break;
         }
         rg_context_spec_init_empty(&empty);
-        status = context_extend(&empty, &best, &yes_context);
+        status = rg_context_extend_internal(&empty, &best, &yes_context);
         rg_context_spec_clear_internal(&empty);
         if (status != RG_OK) {
             break;
         }
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
-        if (status == RG_OK && use_refinement) {
+        if (status == RG_OK) {
             status = refine_split(
                 model,
                 source,
@@ -1622,7 +1641,9 @@ static rg_status commit_splits_for_source(
                 1,
                 max_depth,
                 min_obs,
-                delta_threshold,
+                all_candidates,
+                all_gates,
+                all_candidate_count,
                 penalty,
                 stress,
                 count
@@ -1763,34 +1784,41 @@ static rg_status discover_context_counts(
     double delta_threshold;
     double dominant_fraction = 0.0;
     int max_depth = 3;
+    split_candidate *immediate_list = 0;
+    size_t immediate_count = 0;
+    rg_split_gate *immediate_gates = 0;
+    rg_split_gate *long_gates = 0;
+    split_candidate *all_list = 0;
+    rg_split_gate *all_gates = 0;
+    size_t all_count = 0;
+    double immediate_min_obs = 2.0;
+    double immediate_delta = -1.0;
+    double long_min_obs = 5.0;
+    double long_delta = -5.0;
+    double long_dominant = 0.6;
 
     if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     memset(&stress, 0, sizeof(stress));
-    if (long_range) {
-        min_obs = 5.0;
-        delta_threshold = -5.0;
-        dominant_fraction = 0.6;
-    } else {
-        min_obs = 2.0;
-        delta_threshold = -1.0;
-    }
     if (options != 0) {
         max_depth = options->bic.max_split_depth > 0 ? options->bic.max_split_depth : 3;
-        if (long_range) {
-            if (options->bic.long_range_min_split_observations > 0) {
-                min_obs = (double)options->bic.long_range_min_split_observations;
-            }
-            delta_threshold = options->bic.long_range_delta_bic_threshold;
-            dominant_fraction = options->bic.long_range_min_dominant_fraction;
-        } else {
-            if (options->bic.min_split_observations > 0) {
-                min_obs = (double)options->bic.min_split_observations;
-            }
-            delta_threshold = options->bic.delta_bic_threshold;
+        if (options->bic.min_split_observations > 0) {
+            immediate_min_obs = (double)options->bic.min_split_observations;
         }
+        immediate_delta = options->bic.delta_bic_threshold;
+        if (options->bic.long_range_min_split_observations > 0) {
+            long_min_obs = (double)options->bic.long_range_min_split_observations;
+        }
+        long_delta = options->bic.long_range_delta_bic_threshold;
+        long_dominant = options->bic.long_range_min_dominant_fraction;
     }
+    min_obs = long_range ? long_min_obs : immediate_min_obs;
+    delta_threshold = long_range ? long_delta : immediate_delta;
+    dominant_fraction = long_range ? long_dominant : 0.0;
+    (void)min_obs;
+    (void)delta_threshold;
+    (void)dominant_fraction;
 
     status = flatten_context_observations(
         ctx, pairs, pair_count, options, model, long_range ? 0 : 1,
@@ -1810,20 +1838,58 @@ static rg_status discover_context_counts(
             status = collect_observed_stress(&stress, &observations[i].context);
         }
     }
-    if (long_range && status == RG_OK) {
-        long_range_list = (split_candidate *)calloc(
+    /* Both lists are built whatever this stage leads with: the stage decides
+     * which kind of predicate opens a split, and refinement may then conjoin
+     * either kind onto it. */
+    if (status == RG_OK) {
+        size_t immediate_cap =
+            sizeof(immediate_feature_inventory) / sizeof(immediate_feature_inventory[0]) +
+            sizeof(split_positions) / sizeof(split_positions[0]) +
+            3 * stress.count + 8;
+        size_t long_cap =
             sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
-                sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]),
-            sizeof(*long_range_list)
-        );
+            sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0]);
+        rg_context_spec empty;
+        immediate_list = (split_candidate *)calloc(immediate_cap, sizeof(*immediate_list));
         if (long_range_list == 0) {
+            long_range_list = (split_candidate *)calloc(long_cap, sizeof(*long_range_list));
+            if (long_range_list != 0) {
+                long_range_count = long_range_candidates(long_range_list, long_cap);
+            }
+        }
+        if (immediate_list == 0 || long_range_list == 0) {
             status = RG_ERR_OOM;
         } else {
-            long_range_count = long_range_candidates(
-                long_range_list,
-                sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
-                    sizeof(long_range_feature_names) / sizeof(long_range_feature_names[0])
-            );
+            rg_context_spec_init_empty(&empty);
+            immediate_count = immediate_candidates_for(&empty, &stress, immediate_list, immediate_cap);
+            rg_context_spec_clear_internal(&empty);
+        }
+    }
+    if (status == RG_OK) {
+        size_t total = immediate_count + long_range_count;
+        size_t k;
+        all_list = (split_candidate *)calloc(total == 0 ? 1 : total, sizeof(*all_list));
+        all_gates = (rg_split_gate *)calloc(total == 0 ? 1 : total, sizeof(*all_gates));
+        immediate_gates = (rg_split_gate *)calloc(immediate_count == 0 ? 1 : immediate_count, sizeof(*immediate_gates));
+        long_gates = (rg_split_gate *)calloc(long_range_count == 0 ? 1 : long_range_count, sizeof(*long_gates));
+        if (all_list == 0 || all_gates == 0 || immediate_gates == 0 || long_gates == 0) {
+            status = RG_ERR_OOM;
+        } else {
+            for (k = 0; k < immediate_count; k++) {
+                immediate_gates[k].min_obs = immediate_min_obs;
+                immediate_gates[k].delta_threshold = immediate_delta;
+                immediate_gates[k].min_dominant_fraction = 0.0;
+                all_list[k] = immediate_list[k];
+                all_gates[k] = immediate_gates[k];
+            }
+            for (k = 0; k < long_range_count; k++) {
+                long_gates[k].min_obs = long_min_obs;
+                long_gates[k].delta_threshold = long_delta;
+                long_gates[k].min_dominant_fraction = long_dominant;
+                all_list[immediate_count + k] = long_range_list[k];
+                all_gates[immediate_count + k] = long_gates[k];
+            }
+            all_count = total;
         }
     }
     rows = (const context_observation **)calloc(observation_count, sizeof(*rows));
@@ -1867,15 +1933,16 @@ static rg_status discover_context_counts(
             sources[i],
             rows,
             row_count,
-            long_range ? long_range_list : 0,
-            long_range_count,
+            long_range ? long_range_list : immediate_list,
+            long_range ? long_gates : immediate_gates,
+            long_range ? long_range_count : immediate_count,
+            all_list,
+            all_gates,
+            all_count,
             &stress,
-            long_range ? 0 : 1,
             max_depth,
-            min_obs,
-            delta_threshold,
-            log(n_total),
-            dominant_fraction
+            long_range ? long_min_obs : immediate_min_obs,
+            log(n_total)
         );
     }
 
@@ -1886,6 +1953,11 @@ static rg_status discover_context_counts(
     free(sources);
     free(rows);
     free(long_range_list);
+    free(immediate_list);
+    free(immediate_gates);
+    free(long_gates);
+    free(all_list);
+    free(all_gates);
     stress_inventory_clear(&stress);
     if (status == RG_OK && model->conditioned_segment_count_count > 1) {
         qsort(model->conditioned_segment_counts, model->conditioned_segment_count_count,

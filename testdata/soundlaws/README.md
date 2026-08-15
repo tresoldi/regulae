@@ -66,37 +66,29 @@ Latin voiceless stops voice between vowels (*vīta* → *vida*, *amīcu* →
 *amigo*). The contrast set is the same stops after a consonant, where they stay
 voiceless (*campu* → *campo*, *altu* → *alto*).
 
-### `grassmann.tsv` — Grassmann's Law, and two limits it documents
+### `grassmann.tsv` — Grassmann's Law
 
-Of two aspirates in a word, the first loses its aspiration. The conditioning
-segment is never adjacent and never at a fixed distance, so only an existential
-predicate can express it.
+Of two aspirates in a word, the first loses its aspiration. The hardest shape
+here, and the one that took three separate capabilities to state:
 
-This fixture currently **fails to recover the environment**, and is kept for
-that reason. The test asserts only what is true today — that the
-correspondence is found — with a comment saying what would have to change for
-it to assert more. Two limits stand in the way, both written up in
-`docs/c_conversion_roadmap.md`: conditioning is discovered from the
-alphabetically first lect of a pair, and a change is only visible from the side
-that has the split; and existential predicates are never tried as a refinement
-of a positional one, so "word-initial *and* an aspirate somewhere after" cannot
-be stated.
+    greek t ~ pie tʰ   /  @initial ∧ somewhere-following[aspirated:+]
 
-A fixture that documents a limit is worth more than one that avoids it. This is
-the corpus to run after changing anything in discovery.
+An existential predicate, because the conditioning aspirate is neither adjacent
+nor at a fixed distance. The ability to conjoin one onto a positional split,
+because word-initial alone separates the aspirates that *can* dissimilate from
+those that cannot and then has nothing more to say. And aspiration in the
+conditioning vocabulary, because otherwise there is no term for the thing doing
+the work.
 
-### `verner.tsv` — Verner's Law
+Any two of the three give a *wrong* answer rather than no answer, which is why
+the corpus carries words whose only later stop is unaspirated — `tʰekʰo` beside
+`tʰeko`. Without them, "a stop somewhere after" predicts the change perfectly
+and aspiration is never tested. With them, a search that cannot see aspiration
+commits both outcomes under one environment: nine words that keep the aspirate
+and six that lose it, all filed under `@initial ∧ somewhere-fol[stop:+]`.
 
-Proto-Germanic voiceless fricatives voice unless the accent fell on the
-immediately preceding syllable. Each stem appears twice, in the two accent
-placements, so the fricative is the only thing that can vary and the accent is
-the only thing that can explain it.
-
-This is the canonical stress-conditioned change, and until 2026-08-15 it was
-not expressible: the model has carried a stress field and stress split
-candidates since the port, and no loader ever filled the field, so the whole
-apparatus was reachable only from C. It is found now, in the right terms —
-`θ ~ θ / pre-stress[primary]` and `s ~ z / fol-stress[primary]`.
+This fixture documented a limit for a day and now documents a capability. The
+paragraph above is kept because the shape of the failure is the useful part.
 
 ## The graded ladder — `graded_*.tsv`
 
@@ -113,7 +105,7 @@ where the ceiling is:
 | 1 | adjacent segment | yes, `fol[front:+]` |
 | 2 | word position | yes, though by a correlate rather than the position predicate |
 | 3 | stress on the preceding vowel | yes, `pre-stress[stress:primary]` |
-| 4 | two predicates at once | **partly** — one of the two, so the change is under-described |
+| 4 | two predicates at once | yes, `pre[voiced:+] ∧ fol[front:+]` |
 | 5 | a segment two places back | yes, `prev-syl[nasal:+]` |
 | 6 | a segment somewhere later | yes, `somewhere-fol[nasal:+]` |
 
@@ -125,9 +117,16 @@ commonest conditioned changes there is, and it was inexpressible. Completing
 the candidate tables changed nothing on the real corpora, which is the expected
 result: the new predicates only win where manner genuinely conditions.
 
-Rung 4 is the standing limit. The search is greedy and commits one predicate at
-a time; refinement continues within the group that satisfied it, but on this
-corpus it does not reach the second half of the conjunction.
+Rung 4 was the standing limit until 2026-08-15. The multi-lect stage committed
+a single-predicate context and moved on, so a change conditioned by two came out
+as one predicate with contradictory outcomes under it. It refines now, and the
+broader environment stays as the fallback: `f ~ p` under both predicates, `p ~ p`
+under the first alone. That is a decision list, not a contradiction — the
+narrower rule wins where it applies.
+
+What remains is that the ladder tests one predicate *kind* per rung. A rung
+combining stress with distance, or three predicates at once, would say more
+about the ceiling than rung 4 now does.
 
 The forms are nonsense words on purpose. A rung tests one property of the
 search, and real lexical material brings correlations with it — real words that

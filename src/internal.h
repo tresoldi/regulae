@@ -161,9 +161,30 @@ typedef struct rg_split_candidate {
     const char *value;
 } rg_split_candidate;
 
+/* What a candidate must clear before its split can be committed.
+ *
+ * The bar belongs on the candidate rather than on the search because the two
+ * kinds of predicate do not deserve the same one. There are a handful of
+ * immediate neighbours and around a hundred long-range and existential axes,
+ * and the more candidates a search considers the likelier one of them fits an
+ * outcome by chance -- so the same evidence has to buy less from the larger
+ * pool. Carrying the bar per candidate is what lets a single search weigh both
+ * kinds at once, which a rule conditioned by position *and* by something at a
+ * distance requires and two separate passes can never express. */
+typedef struct rg_split_gate {
+    double min_obs;
+    double delta_threshold;
+    double min_dominant_fraction;
+} rg_split_gate;
+
 int rg_predicate_holds_internal(
     const rg_context_spec *context,
     const rg_split_candidate *candidate
+);
+rg_status rg_context_extend_internal(
+    const rg_context_spec *base_context,
+    const rg_split_candidate *candidate,
+    rg_context_spec *out
 );
 rg_status rg_context_from_candidate_internal(
     const rg_split_candidate *candidate,

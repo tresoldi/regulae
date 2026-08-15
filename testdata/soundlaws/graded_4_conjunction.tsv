@@ -1,81 +1,81 @@
 cognate_id	lect_id	segments
-w00	proto	k a p e p a
-w00	daughter	k a f e p a
-w01	proto	k a p i p a
-w01	daughter	k a f i p a
-w02	proto	k a p o p a
-w02	daughter	k a p o p a
-w03	proto	k a p u p a
-w03	daughter	k a p u p a
-w04	proto	k e p a p e
-w04	daughter	k e p a p e
-w05	proto	k e p i p e
-w05	daughter	k e f i p e
-w06	proto	k e p o p e
-w06	daughter	k e p o p e
-w07	proto	k e p u p e
-w07	daughter	k e p u p e
-w08	proto	k i p a p i
-w08	daughter	k i p a p i
-w09	proto	k i p e p i
-w09	daughter	k i f e p i
-w10	proto	k i p o p i
-w10	daughter	k i p o p i
-w11	proto	k i p u p i
-w11	daughter	k i p u p i
-w12	proto	k o p a p o
-w12	daughter	k o p a p o
-w13	proto	k o p e p o
-w13	daughter	k o f e p o
-w14	proto	k o p i p o
-w14	daughter	k o f i p o
-w15	proto	k o p u p o
-w15	daughter	k o p u p o
-w16	proto	k u p a p u
-w16	daughter	k u p a p u
-w17	proto	k u p e p u
-w17	daughter	k u f e p u
-w18	proto	k u p i p u
-w18	daughter	k u f i p u
-w19	proto	k u p o p u
-w19	daughter	k u p o p u
-w20	proto	t a p e p a
-w20	daughter	t a f e p a
-w21	proto	t a p i p a
-w21	daughter	t a f i p a
-w22	proto	t a p o p a
-w22	daughter	t a p o p a
-w23	proto	t a p u p a
-w23	daughter	t a p u p a
-w24	proto	t e p a p e
-w24	daughter	t e p a p e
-w25	proto	t e p i p e
-w25	daughter	t e f i p e
-w26	proto	t e p o p e
-w26	daughter	t e p o p e
-w27	proto	t e p u p e
-w27	daughter	t e p u p e
-w28	proto	t i p a p i
-w28	daughter	t i p a p i
-w29	proto	t i p e p i
-w29	daughter	t i f e p i
-w30	proto	t i p o p i
-w30	daughter	t i p o p i
-w31	proto	t i p u p i
-w31	daughter	t i p u p i
-w32	proto	t o p a p o
-w32	daughter	t o p a p o
-w33	proto	t o p e p o
-w33	daughter	t o f e p o
-w34	proto	t o p i p o
-w34	daughter	t o f i p o
-w35	proto	t o p u p o
-w35	daughter	t o p u p o
-w36	proto	t u p a p u
-w36	daughter	t u p a p u
-w37	proto	t u p e p u
-w37	daughter	t u f e p u
-w38	proto	t u p i p u
-w38	daughter	t u f i p u
-w39	proto	t u p o p u
-w39	daughter	t u p o p u
+w00	proto	k p e a
+w00	daughter	k p e a
+w01	proto	n p i a
+w01	daughter	n f i a
+w02	proto	k p o a
+w02	daughter	k p o a
+w03	proto	n p e a
+w03	daughter	n f e a
+w04	proto	k p e e
+w04	daughter	k p e e
+w05	proto	k p i e
+w05	daughter	k p i e
+w06	proto	n p e e
+w06	daughter	n f e e
+w07	proto	k p e e
+w07	daughter	k p e e
+w08	proto	n p o i
+w08	daughter	n p o i
+w09	proto	k p e i
+w09	daughter	k p e i
+w10	proto	k p e i
+w10	daughter	k p e i
+w11	proto	n p o i
+w11	daughter	n p o i
+w12	proto	k p o o
+w12	daughter	k p o o
+w13	proto	n p e o
+w13	daughter	n f e o
+w14	proto	k p i o
+w14	daughter	k p i o
+w15	proto	k p o o
+w15	daughter	k p o o
+w16	proto	n p e u
+w16	daughter	n f e u
+w17	proto	k p e u
+w17	daughter	k p e u
+w18	proto	n p i u
+w18	daughter	n f i u
+w19	proto	k p o u
+w19	daughter	k p o u
+w20	proto	k p e a
+w20	daughter	k p e a
+w21	proto	n p i a
+w21	daughter	n f i a
+w22	proto	k p o a
+w22	daughter	k p o a
+w23	proto	n p e a
+w23	daughter	n f e a
+w24	proto	k p e e
+w24	daughter	k p e e
+w25	proto	k p i e
+w25	daughter	k p i e
+w26	proto	n p e e
+w26	daughter	n f e e
+w27	proto	k p e e
+w27	daughter	k p e e
+w28	proto	n p o i
+w28	daughter	n p o i
+w29	proto	k p e i
+w29	daughter	k p e i
+w30	proto	k p e i
+w30	daughter	k p e i
+w31	proto	n p o i
+w31	daughter	n p o i
+w32	proto	k p o o
+w32	daughter	k p o o
+w33	proto	n p e o
+w33	daughter	n f e o
+w34	proto	k p i o
+w34	daughter	k p i o
+w35	proto	k p o o
+w35	daughter	k p o o
+w36	proto	n p e u
+w36	daughter	n f e u
+w37	proto	k p e u
+w37	daughter	k p e u
+w38	proto	n p i u
+w38	daughter	n f i u
+w39	proto	k p o u
+w39	daughter	k p o u

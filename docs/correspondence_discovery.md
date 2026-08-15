@@ -229,6 +229,24 @@ honest than filtering it afterwards by name.
 `_CROSS_DIM_MAX_ITERATIONS` bounds the loop. Typical corpora exit after one or
 two rounds, when nothing left unexplained passes.
 
+### One search, two bars
+
+Immediate neighbours and long-range axes are searched by separate stages, and
+that stays: which kind of predicate *opens* a split is a linguistic decision,
+and the pipeline's stage order is load-bearing. But once a split is committed,
+refinement within it considers every axis, because a conditioning environment is
+not obliged to be built out of one kind of predicate. Grassmann's Law is
+word-initial *and* followed somewhere by an aspirate; assimilation is regularly
+"before X" *and* "after Y".
+
+Each candidate carries its own bar — minimum observations, ΔBIC threshold,
+dominance — rather than the search carrying one. There are a handful of
+immediate neighbours and around a hundred long-range and existential axes, and
+the more candidates a search considers the likelier one of them fits an outcome
+by chance, so the same evidence has to buy less from the larger pool. The best
+split is then the candidate that clears *its own* bar by the most, not the one
+with the lowest raw score, which would let the larger pool win on volume alone.
+
 ### Support floors
 
 - `_CROSS_DIM_MIN_RULE_COUNT = 3` — minimum absolute support, on each side of

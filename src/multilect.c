@@ -476,7 +476,8 @@ static const char *const multi_long_range_features[] = {
     "nasal",
     "stop",
     "fricative",
-    "sonorant"
+    "sonorant",
+    "aspirated"
 };
 
 static const char *const multi_stress_slots[] = {
@@ -552,6 +553,11 @@ typedef struct discovery_state {
     size_t immediate_count;
     rg_split_candidate *long_range;
     size_t long_range_count;
+    /* Both pools in one array, for refinement: a narrower environment may be
+     * built from either kind of predicate whatever the enclosing pass led
+     * with. */
+    rg_split_candidate *all;
+    size_t all_count;
 } discovery_state;
 
 static void discovery_state_clear(discovery_state *state) {
@@ -581,6 +587,7 @@ static void discovery_state_clear(discovery_state *state) {
     string_array_clear(state->stress_values, state->stress_count);
     free(state->immediate);
     free(state->long_range);
+    free(state->all);
     memset(state, 0, sizeof(*state));
 }
 
@@ -830,6 +837,19 @@ static rg_status build_candidate_lists(discovery_state *state) {
         }
     }
     state->long_range_count = n;
+
+    state->all = (rg_split_candidate *)calloc(
+        state->immediate_count + state->long_range_count + 1, sizeof(*state->all));
+    if (state->all == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < state->immediate_count; i++) {
+        state->all[i] = state->immediate[i];
+    }
+    for (i = 0; i < state->long_range_count; i++) {
+        state->all[state->immediate_count + i] = state->long_range[i];
+    }
+    state->all_count = state->immediate_count + state->long_range_count;
     return RG_OK;
 }
 
@@ -1064,22 +1084,144 @@ static rg_status emit_sister_classes(
 /* Greedy BIC-gated split loop over one pivot bucket. The immediate and
  * long-range passes differ only in candidate inventory, thresholds, the
  * small-sample penalty, and the dominance filter. */
+/* Finds the best split of a group, weighing every candidate against its own
+ * bar. Returns 0 when nothing clears one. */
+static int pivot_best_split(
+    discovery_state *state,
+    const pivot_obs *rows,
+    size_t count,
+    const rg_split_candidate *candidates,
+    const rg_split_gate *gates,
+    size_t candidate_count,
+    double penalty,
+    pivot_obs *yes,
+    pivot_obs *no,
+    pivot_obs *best_yes,
+    pivot_obs *best_no,
+    size_t *best_yes_count,
+    size_t *best_no_count,
+    size_t *best_candidate
+) {
+    double baseline = group_cost(state, rows, count);
+    double best_margin = 0.0;
+    int found = 0;
+    size_t ci;
+
+    for (ci = 0; ci < candidate_count; ci++) {
+        size_t yes_count = 0;
+        size_t no_count = 0;
+        double split_cost;
+        double delta_bic;
+        double margin;
+        size_t i;
+        for (i = 0; i < count; i++) {
+            if (rg_predicate_holds_internal(rows[i].context, &candidates[ci])) {
+                yes[yes_count++] = rows[i];
+            } else {
+                no[no_count++] = rows[i];
+            }
+        }
+        if (observation_weight(yes, yes_count) < gates[ci].min_obs ||
+            observation_weight(no, no_count) < gates[ci].min_obs) {
+            continue;
+        }
+        if (gates[ci].min_dominant_fraction > 0.0 &&
+            dominant_fraction(state, yes, yes_count) < gates[ci].min_dominant_fraction) {
+            continue;
+        }
+        split_cost = group_cost(state, yes, yes_count) + group_cost(state, no, no_count);
+        delta_bic = -2.0 * (baseline - split_cost) + penalty;
+        margin = gates[ci].delta_threshold - delta_bic;
+        if (margin > best_margin) {
+            best_margin = margin;
+            *best_candidate = ci;
+            memcpy(best_yes, yes, yes_count * sizeof(*yes));
+            memcpy(best_no, no, no_count * sizeof(*no));
+            *best_yes_count = yes_count;
+            *best_no_count = no_count;
+            found = 1;
+        }
+    }
+    return found;
+}
+
+/* Conjoins a second predicate within a committed group, and emits the narrower
+ * classes it separates. Without this the stage can only ever say one thing
+ * about an environment, and a change conditioned by two -- preceded by a nasal
+ * *and* before a front vowel, which is what assimilation usually looks like --
+ * comes out as a single predicate with contradictory outcomes under it. */
+static rg_status refine_pivot_split(
+    discovery_state *state,
+    const pivot_bucket *bucket,
+    const rg_context_spec *base_context,
+    const pivot_obs *rows,
+    size_t count,
+    int depth,
+    int max_depth,
+    const rg_split_gate *gates,
+    double penalty,
+    double min_commit,
+    double n_total
+) {
+    pivot_obs *yes;
+    pivot_obs *no;
+    pivot_obs *best_yes;
+    pivot_obs *best_no;
+    size_t best_yes_count = 0;
+    size_t best_no_count = 0;
+    size_t best_candidate = 0;
+    rg_status status = RG_OK;
+
+    if (depth >= max_depth || count == 0) {
+        return RG_OK;
+    }
+    yes = (pivot_obs *)calloc(count, sizeof(*yes));
+    no = (pivot_obs *)calloc(count, sizeof(*no));
+    best_yes = (pivot_obs *)calloc(count, sizeof(*best_yes));
+    best_no = (pivot_obs *)calloc(count, sizeof(*best_no));
+    if (yes == 0 || no == 0 || best_yes == 0 || best_no == 0) {
+        free(yes); free(no); free(best_yes); free(best_no);
+        return RG_ERR_OOM;
+    }
+    if (pivot_best_split(state, rows, count, state->all, gates, state->all_count,
+                         penalty, yes, no, best_yes, best_no,
+                         &best_yes_count, &best_no_count, &best_candidate)) {
+        rg_context_spec narrowed;
+        status = rg_context_extend_internal(base_context, &state->all[best_candidate], &narrowed);
+        if (status == RG_OK) {
+            status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
+                                         &narrowed, best_yes, best_yes_count,
+                                         min_commit, n_total);
+            if (status == RG_OK) {
+                status = refine_pivot_split(state, bucket, &narrowed, best_yes,
+                                            best_yes_count, depth + 1, max_depth,
+                                            gates, penalty, min_commit, n_total);
+            }
+            rg_context_spec_clear_internal(&narrowed);
+        }
+    }
+    free(yes); free(no); free(best_yes); free(best_no);
+    return status;
+}
+
 static rg_status commit_splits_for_pivot(
     discovery_state *state,
     const pivot_bucket *bucket,
     const rg_split_candidate *candidates,
+    const rg_split_gate *gates,
     size_t candidate_count,
+    const rg_split_gate *all_gates,
     double min_obs,
     int max_depth,
-    double delta_threshold,
     double penalty,
     double min_commit,
-    double n_total,
-    double min_dominant_fraction
+    double n_total
 ) {
     pivot_obs *remaining;
     pivot_obs *yes;
     pivot_obs *no;
+    pivot_obs *best_yes;
+    pivot_obs *best_no;
     size_t remaining_count = bucket->obs_count;
     int committed_count = 0;
     rg_status status = RG_OK;
@@ -1095,61 +1237,21 @@ static rg_status commit_splits_for_pivot(
     }
     memcpy(remaining, bucket->obs, bucket->obs_count * sizeof(*remaining));
 
+    best_yes = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_yes));
+    best_no = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_no));
+    if (best_yes == 0 || best_no == 0) {
+        free(remaining); free(yes); free(no); free(best_yes); free(best_no);
+        return RG_ERR_OOM;
+    }
+
     while (committed_count < max_depth * 4 && observation_weight(remaining, remaining_count) >= min_obs) {
-        double baseline = group_cost(state, remaining, remaining_count);
-        double best_delta = delta_threshold;
-        size_t best_candidate = candidate_count;
+        size_t best_candidate = 0;
         size_t best_yes_count = 0;
         size_t best_no_count = 0;
-        pivot_obs *best_yes = 0;
-        pivot_obs *best_no = 0;
-        size_t ci;
 
-        for (ci = 0; ci < candidate_count; ci++) {
-            size_t yes_count = 0;
-            size_t no_count = 0;
-            double split_cost;
-            double delta_bic;
-            size_t i;
-            for (i = 0; i < remaining_count; i++) {
-                if (rg_predicate_holds_internal(remaining[i].context, &candidates[ci])) {
-                    yes[yes_count++] = remaining[i];
-                } else {
-                    no[no_count++] = remaining[i];
-                }
-            }
-            if (observation_weight(yes, yes_count) < min_obs || observation_weight(no, no_count) < min_obs) {
-                continue;
-            }
-            if (min_dominant_fraction > 0.0 && dominant_fraction(state, yes, yes_count) < min_dominant_fraction) {
-                continue;
-            }
-            split_cost = group_cost(state, yes, yes_count) + group_cost(state, no, no_count);
-            delta_bic = -2.0 * (baseline - split_cost) + penalty;
-            if (delta_bic < best_delta) {
-                if (best_yes == 0) {
-                    best_yes = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_yes));
-                    best_no = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_no));
-                    if (best_yes == 0 || best_no == 0) {
-                        free(best_yes);
-                        free(best_no);
-                        free(remaining);
-                        free(yes);
-                        free(no);
-                        return RG_ERR_OOM;
-                    }
-                }
-                best_delta = delta_bic;
-                best_candidate = ci;
-                memcpy(best_yes, yes, yes_count * sizeof(*yes));
-                memcpy(best_no, no, no_count * sizeof(*no));
-                best_yes_count = yes_count;
-                best_no_count = no_count;
-            }
-        }
-        if (best_candidate == candidate_count) {
-            free(best_yes);
-            free(best_no);
+        if (!pivot_best_split(state, remaining, remaining_count, candidates, gates,
+                              candidate_count, penalty, yes, no, best_yes, best_no,
+                              &best_yes_count, &best_no_count, &best_candidate)) {
             break;
         }
         {
@@ -1166,18 +1268,26 @@ static rg_status commit_splits_for_pivot(
                     min_commit,
                     n_total
                 );
+                /* The group that satisfied this predicate may still be mixed;
+                 * a second predicate within it is a narrower environment, not
+                 * a competing rule. */
+                if (status == RG_OK) {
+                    status = refine_pivot_split(state, bucket, &yes_context, best_yes,
+                                                best_yes_count, 1, max_depth, all_gates,
+                                                penalty, min_commit, n_total);
+                }
                 rg_context_spec_clear_internal(&yes_context);
             }
         }
         memcpy(remaining, best_no, best_no_count * sizeof(*remaining));
         remaining_count = best_no_count;
-        free(best_yes);
-        free(best_no);
         if (status != RG_OK) {
             break;
         }
         committed_count++;
     }
+    free(best_yes);
+    free(best_no);
     free(remaining);
     free(yes);
     free(no);
@@ -1460,6 +1570,9 @@ static rg_status multi_lect_context_discovery(
     size_t observation_count
 ) {
     discovery_state state;
+    rg_split_gate *immediate_gates = 0;
+    rg_split_gate *long_gates = 0;
+    rg_split_gate *all_gates = 0;
     rg_context_spec **form_contexts = 0;
     size_t *form_context_counts = 0;
     size_t cache_size = cognate_count * model->lect_count;
@@ -1549,6 +1662,31 @@ static rg_status multi_lect_context_discovery(
     if (status == RG_OK) {
         status = build_candidate_lists(&state);
     }
+    /* One bar per candidate: the immediate axes are few and cheap to trust,
+     * the long-range ones many and easy to fit by chance, and refinement has
+     * to weigh both at once. */
+    if (status == RG_OK) {
+        size_t k;
+        immediate_gates = (rg_split_gate *)calloc(state.immediate_count + 1, sizeof(*immediate_gates));
+        long_gates = (rg_split_gate *)calloc(state.long_range_count + 1, sizeof(*long_gates));
+        all_gates = (rg_split_gate *)calloc(state.all_count + 1, sizeof(*all_gates));
+        if (immediate_gates == 0 || long_gates == 0 || all_gates == 0) {
+            status = RG_ERR_OOM;
+        } else {
+            for (k = 0; k < state.immediate_count; k++) {
+                immediate_gates[k].min_obs = (double)options->bic.min_split_observations;
+                immediate_gates[k].delta_threshold = options->bic.delta_bic_threshold;
+                immediate_gates[k].min_dominant_fraction = 0.0;
+                all_gates[k] = immediate_gates[k];
+            }
+            for (k = 0; k < state.long_range_count; k++) {
+                long_gates[k].min_obs = (double)options->bic.long_range_min_split_observations;
+                long_gates[k].delta_threshold = options->bic.long_range_delta_bic_threshold;
+                long_gates[k].min_dominant_fraction = options->bic.long_range_min_dominant_fraction;
+                all_gates[state.immediate_count + k] = long_gates[k];
+            }
+        }
+    }
 
     /* Pivot buckets are processed in ascending (lect, grapheme) order so that
      * the cross-pivot merge below resolves ties deterministically. */
@@ -1610,14 +1748,14 @@ static rg_status multi_lect_context_discovery(
                 &state,
                 bucket,
                 state.immediate,
+                immediate_gates,
                 state.immediate_count,
+                all_gates,
                 (double)options->bic.min_split_observations,
                 options->bic.max_split_depth,
-                options->bic.delta_bic_threshold,
                 penalty,
                 min_commit,
-                n_total,
-                0.0
+                n_total
             );
         }
         if (status != RG_OK) {
@@ -1632,14 +1770,14 @@ static rg_status multi_lect_context_discovery(
                 &state,
                 bucket,
                 state.long_range,
+                long_gates,
                 state.long_range_count,
+                all_gates,
                 (double)options->bic.long_range_min_split_observations,
                 options->bic.max_split_depth,
-                options->bic.long_range_delta_bic_threshold,
                 log(n_total),
                 long_min_commit,
-                n_total,
-                options->bic.long_range_min_dominant_fraction
+                n_total
             );
         }
     }
@@ -1699,6 +1837,9 @@ static rg_status multi_lect_context_discovery(
     free(form_contexts);
     free(form_context_counts);
     discovery_state_clear(&state);
+    free(immediate_gates);
+    free(long_gates);
+    free(all_gates);
     return status;
 }
 

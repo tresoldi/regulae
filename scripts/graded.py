@@ -78,16 +78,22 @@ build("graded_3_stress",
                          else f"{o} {v1} p {STRESS}{v2}",
                          f"{o} {v1} {'f' if hash((o, v1, v2)) % 2 == 0 else 'p'} {v2}"))
 
-# 4. Two predicates at once: between vowels *and* before a front vowel.
-#    Neither half predicts the change on its own -- the corpus contains
-#    intervocalic /p/ before back vowels, and word-initial /p/ before front
-#    ones -- so a single-predicate answer is available and wrong.
+# 4. Two predicates at once: preceded by a nasal *and* followed by a front
+#    vowel. All four combinations are present, so neither half predicts the
+#    change on its own and a single-predicate answer is available and wrong.
+#    An earlier draft asked for "intervocalic and before a front vowel" on a
+#    corpus where every /p/ was intervocalic, which is one predicate wearing
+#    two names.
 def conjunction(o, v1, v2):
-    proto = f"{o} {v1} p {v2} p {v1}"          # medial p, then another
-    inter_front = v2 in FRONT
-    daughter = f"{o} {v1} {'f' if inter_front else 'p'} {v2} p {v1}"
+    index = VOWELS.index(v1) + VOWELS.index(v2)
+    onset = "n" if index % 2 == 0 else "k"
+    follower = v2 if v2 in FRONT else ("e" if index % 4 < 2 else "o")
+    applies = onset == "n" and follower in FRONT
+    proto = f"{onset} p {follower} {v1}"
+    daughter = f"{onset} {'f' if applies else 'p'} {follower} {v1}"
     return proto, daughter
 build("graded_4_conjunction", conjunction)
+
 
 # 5. Distance two: conditioned by the segment two places back. The adjacent
 #    segment is always the same vowel, so it carries no information, and the

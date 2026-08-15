@@ -16,6 +16,7 @@
  * they are emitted. Alphabetical, so a union over a span comes out sorted
  * without a sort step. */
 const char *const rg_context_feature_names[] = {
+    "aspirated",
     "back",
     "close",
     "consonant",

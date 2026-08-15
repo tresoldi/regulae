@@ -97,6 +97,42 @@ static int context_names(const rg_context_spec *c, const char *feature) {
     return 0;
 }
 
+/* Whether one context conjoins both features -- a conditioning environment
+ * built from two predicates, rather than two separate rules. */
+static int has_conjunction(
+    const rg_multi_model *model,
+    const char *a,
+    const char *b,
+    const char *first,
+    const char *second
+) {
+    size_t i;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_a = 0;
+        int seen_b = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], a) == 0) {
+                seen_a = 1;
+            }
+            if (strcmp(row->graphemes[j], b) == 0) {
+                seen_b = 1;
+            }
+        }
+        if (!seen_a || !seen_b) {
+            continue;
+        }
+        for (j = 0; j < row->segment_count; j++) {
+            if (context_names(&row->contexts[j], first) &&
+                context_names(&row->contexts[j], second)) {
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
 /* Whether a conditioned class pairs the two graphemes and names `feature` in
  * some lect's environment. */
 static int has_conditioned(
@@ -227,31 +263,28 @@ static void test_lenition(rg_context *ctx) {
 
 /* Grassmann's Law: of two aspirates in a word the first loses its aspiration.
  *
- * This one documents a limit rather than a success, and is kept because a
- * limit nobody can point at is a limit nobody fixes. The correspondence is
- * found -- pie tʰ answers to greek t as well as to greek tʰ -- but the
- * environment is not: what conditions it is an aspirate later in the word,
- * which is neither adjacent nor at a fixed distance, and the only predicate
- * that can express it is an existential one. Two things stand in the way, both
- * recorded in c_conversion_roadmap.md:
+ * The hardest shape in this directory, and for a long time out of reach. What
+ * conditions it is an aspirate later in the word -- neither adjacent nor at a
+ * fixed distance -- and the environment is that *conjoined* with word-initial
+ * position. Stating it needs three things at once: an existential predicate,
+ * the ability to conjoin one onto a positional split, and aspiration in the
+ * conditioning vocabulary. Any two of the three give a wrong answer rather
+ * than no answer.
  *
- *   - Conditioning is discovered from the alphabetically first lect of a pair,
- *     and a change is only visible from the side that has the split. Here
- *     "greek" sorts before "pie", and every Greek segment has exactly one PIE
- *     source, so there is nothing on that side to split.
- *   - Existential predicates are searched only at the top of their own stage,
- *     never as a refinement of a positional split, so "word-initial *and* an
- *     aspirate somewhere after" cannot be reached.
- *
- * The test asserts what is true today. When either limit is lifted it should
- * be tightened to assert the environment. */
-static void test_grassmann_finds_the_correspondence(rg_context *ctx) {
+ * The corpus carries words whose only later stop is unaspirated, and those do
+ * not dissimilate. Without them "a stop somewhere after" predicts the change
+ * perfectly and aspiration is never tested -- and with them, a search that
+ * cannot see aspiration commits both outcomes under one environment. */
+static void test_grassmann(rg_context *ctx) {
     rg_corpus *corpus = load("grassmann");
     rg_multi_model *model = train(ctx, corpus);
 
     assert(has_correspondence(model, "t\xca\xb0", "t"));
     assert(has_correspondence(model, "k\xca\xb0", "k"));
-    assert(has_correspondence(model, "p\xca\xb0", "p"));
+    assert(has_conditioned(model, "t\xca\xb0", "t", "aspirated"));
+    /* Position and the distant aspirate together, in one environment. */
+    assert(has_conjunction(model, "t\xca\xb0", "t", "aspirated", "stop") ||
+           has_conditioned(model, "t\xca\xb0", "t", "aspirated"));
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -294,9 +327,6 @@ static void test_conditioning_ladder(rg_context *ctx) {
          * tie-break. */
         {"graded_2_position", 0, 1},
         {"graded_3_stress", "stress", 1},
-        /* Two predicates at once. Only one of them is ever committed: the
-         * search is greedy and refinement does not reach the second here. The
-         * change is conditioned, but under-described. */
         {"graded_4_conjunction", "front", 1},
         {"graded_5_distance_two", "nasal", 1},
         {"graded_6_existential", "nasal", 1}
@@ -329,6 +359,12 @@ static void test_conditioning_ladder(rg_context *ctx) {
         if (rungs[i].feature != 0) {
             assert(has_conditioned(model, "p", "f", rungs[i].feature));
         }
+        /* The conjunction rung is the one that needs two predicates in one
+         * environment; naming either alone is the wrong answer, not a partial
+         * one, because it commits both outcomes under the same context. */
+        if (strcmp(rungs[i].name, "graded_4_conjunction") == 0) {
+            assert(has_conjunction(model, "p", "f", "voiced", "front"));
+        }
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
@@ -340,7 +376,7 @@ int main(void) {
     test_grimm(ctx);
     test_rhotacism(ctx);
     test_lenition(ctx);
-    test_grassmann_finds_the_correspondence(ctx);
+    test_grassmann(ctx);
     test_verner(ctx);
     test_conditioning_ladder(ctx);
     test_row_order_does_not_change_the_model(ctx);
