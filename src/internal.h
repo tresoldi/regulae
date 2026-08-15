@@ -116,6 +116,7 @@ struct rg_multi_model {
     rg_multi_cross_dimensional_owned *cross_dimensional_rows;
     size_t cross_dimensional_count;
     size_t unpaired_set_count;
+    rg_corpus_fit fit;
 };
 
 /* Class ids realised at a given position pair, for a link of an alignment

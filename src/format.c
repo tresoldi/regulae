@@ -420,7 +420,28 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     builder_appendf(&builder, "pairwise models:     %lu\n", (unsigned long)rg_multi_model_pair_model_count(model));
     builder_appendf(&builder, "unconditioned cls:   %lu\n", (unsigned long)rg_multi_model_unconditioned_class_count(model));
     builder_appendf(&builder, "conditioned cls:     %lu\n", (unsigned long)rg_multi_model_conditioned_class_count(model));
-    builder_appendf(&builder, "cross-dimensional:   %lu\n\n", (unsigned long)rg_multi_model_cross_dimensional_row_count(model));
+    builder_appendf(&builder, "cross-dimensional:   %lu\n", (unsigned long)rg_multi_model_cross_dimensional_row_count(model));
+    {
+        const rg_corpus_fit *fit = rg_multi_model_fit(model);
+        builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
+                        fit->cost_per_segment, (unsigned long)fit->scored_set_count);
+        if (fit->permutation_count > 0) {
+            builder_appendf(&builder,
+                            "shuffled baseline:   %.4f +/- %.4f over %lu shuffles, z = %.1f\n",
+                            fit->null_cost_per_segment_mean, fit->null_cost_per_segment_sd,
+                            (unsigned long)fit->permutation_count, fit->cost_per_segment_z);
+            builder_appendf(&builder,
+                            "  the same shuffles give %.1f unconditioned and %.1f conditioned classes\n",
+                            fit->null_unconditioned_class_mean, fit->null_conditioned_class_mean);
+        } else {
+            builder_append(&builder,
+                           "shuffled baseline:   not run (--permutations <n>)\n"
+                           "  Class counts are not evidence of relatedness: shuffling the pairings\n"
+                           "  in a corpus removes every correspondence and raises them. cost/segment\n"
+                           "  is the number that falls, and the baseline is what makes it readable.\n");
+        }
+        builder_append(&builder, "\n");
+    }
 
     total = rg_multi_model_unconditioned_class_count(model);
     builder_appendf(&builder, "--- Top %d unconditioned classes ---\n", opts.top_classes);

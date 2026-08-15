@@ -36,6 +36,8 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     rg_bic_config_init_defaults(&options->bic);
     options->bootstrap_n = 0;
     options->bootstrap_seed = 0;
+    options->permutation_count = 0;
+    options->permutation_seed = 20260815;
     options->progress = 0;
     options->progress_user_data = 0;
 }

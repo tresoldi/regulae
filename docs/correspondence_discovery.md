@@ -131,20 +131,37 @@ for each source grapheme by phonological context.
 
 ### Feature inventory
 
-The candidate feature set is small and linguistically motivated:
+Candidates are built from `rg_context_feature_names` in `src/context.c`
+— 27 names projected out of merkmal's system — applied to the
+preceding and following segment, plus word position and stress. That
+is 52 feature candidates, 3 positions and the stress axes: about 55
+per immediate split step, and about 135 for the long-range pass, which
+also ranges over distance, existential and syllable-relative slots.
 
-```
-following: vowel+, front+, back+, close+, open+
-preceding: vowel+, front+, back+, voiced+, voiceless+, consonant+
-position:  initial, medial, final
-```
+Two things follow, and both matter more than the list itself.
 
-About 14 candidates per split step. This is not laziness — it is a
-calibrated design decision. Adding more features (e.g.,
-`{lateral, retroflex, labial}`) would widen the candidate space
-without adding discriminative power on the corpora tested, while
-increasing the chance that a random feature partition crosses BIC by
-chance.
+First, the vocabulary is a **projection, and a lossy one**. Merkmal's
+`distinctive` system carries far more than 27 names over its base
+inventory, and what survives the projection is a manner-and-place
+vocabulary with a Eurocentric shape. Not present, and therefore not
+expressible as a conditioning environment: tone of any kind, rounding,
+vowel nasalisation (`nasal` here matches nasal *stops*), lateral,
+trill, tap, retroflex, ejective, implosive, click, breathy, creaky,
+ATR, pharyngealisation, syllabicity. A change conditioned by rounding
+— the organising fact of Turkic and Uralic vowel harmony, and this
+repo ships a Turkish–Azerbaijani corpus — is invisible to discovery
+however regular it is. Widening this is the open question in the
+handoff note; it cannot be done without also facing the calibration
+problem below, since a wider inventory is a wider argmax.
+
+Second, an earlier version of this section claimed the inventory was
+~14 candidates and argued that adding `{lateral, retroflex, labial}`
+would "widen the candidate space without adding discriminative power".
+The inventory has since grown to 52 and includes labial. The argument
+was never measured, and the effect it hand-waved at — that a wider
+candidate space makes a spurious partition more likely to cross BIC —
+is real, is not priced by BIC, and is what the permutation baseline
+exists to expose.
 
 ### Why BIC, not mutual information or chi-square
 
@@ -318,6 +335,48 @@ with the lowest raw score, which would let the larger pool win on volume alone.
   discards exactly the conditioned splits this stage exists to find. It remains
   available for suppressing weak rules in a report.
 
+## Reading a model against its own noise
+
+Nothing in a model says whether the corpus had any signal in it. Class counts
+do not: they rise when the signal is removed. So every trained model carries a
+fit summary (`rg_multi_model_fit`, printed by `train --human`, exported as
+`fit` in `--json`):
+
+- `cost_per_segment` — the mean alignment cost per segment over every cognate
+  set the model can score, the same quantity `rg_find_cognate_outliers`
+  z-scores across sets. This is the number that behaves: strongly negative on
+  real cognates, near zero on shuffled ones.
+- The shuffled baseline, when `permutation_count > 0`. Each run rebuilds the
+  corpus with every lect's wordlist intact, every set's size and lect
+  membership intact, and only the pairing permuted — Fisher–Yates per lect, so
+  no set can end up with two forms of one lect — then trains on it. The
+  reported `cost_per_segment_z` is how many baseline standard deviations the
+  real corpus sits below its own noise.
+
+The baseline is off by default because each shuffle costs a full training run.
+Ten shuffles of a 97-set two-lect corpus take about six seconds. It is seeded
+from `permutation_seed` and is exactly reproducible: a fit statistic a reader
+cannot recompute is not a statistic.
+
+What the numbers look like, at ten shuffles:
+
+| corpus | cost/segment | baseline | z | classes (real → shuffled) |
+| --- | --- | --- | --- | --- |
+| `rhotacism` | −1.82 | −0.58 | −14.8 | 20/3 → 58/12 |
+| `grimm` | −1.50 | −0.50 | −13.3 | 35/7 → 63/11 |
+| `verner` | −1.83 | −0.89 | −17.9 | 23/5 → 79/23 |
+| `latin_spanish` | −1.93 | −0.58 | −28.2 | 62/25 → 134/41 |
+| unrelated pseudo-words | −0.19 | −0.28 | **+1.9** | 78/34 → 75/34 |
+
+The last row is the point. Thirty-four conditioned classes, each printed with a
+stated environment, from data with no relationship in it — and the fit
+statistic says so plainly while the counts do not.
+
+This is a corpus-level statement, not a per-rule one. It answers "is there
+anything here", which is the question that has to be answered first. It does
+not certify any individual environment, and a rule's own evidence — its count,
+its contrast, its interval — remains the reader's business.
+
 ### What the original design had and this does not
 
 The Python implementation ranked candidates by residual mutual information
@@ -326,8 +385,23 @@ before the BIC loop saw them, supported joint predictors (`src_feature_2`), and
 ran a post-commit pass to collapse dual positional framings of one rule. None
 of that is ported.
 
-The permutation null and the BIC gate answer the same question by different
-means, and the loop above keeps the cheaper one. Dual-framing dedup is
+The claim that "the permutation null and the BIC gate answer the same question
+by different means, and the loop above keeps the cheaper one" stood here until
+2026-08-15 and was wrong. They answer different questions. BIC prices
+*parameters*: one added term against the likelihood it buys. The permutation
+null prices the *search* — and the search is large, since `find_best_split`
+takes the argmax over ~55 immediate or 135 long-range candidates, greedily,
+recursively. A gate that charges for one parameter while the argmax ranges over
+a hundred is not measuring what it appears to measure.
+
+Measured: permuting a corpus's pairings — every wordlist intact, only which
+form answers to which destroyed — *raises* the class counts on every corpus
+tried. Latin–Spanish goes from 62 unconditioned and 25 conditioned to about 133
+and 41; Proto-Polynesian–Hawaiian from 23 and 7 to about 75 and 34. A corpus of
+unrelated pseudo-words yields 78 and 34 with no relationship in it at all.
+
+The null is back, as a calibration layer rather than a candidate filter — see
+"Reading a model against its own noise" below. Dual-framing dedup is
 unnecessary here: the second framing of a committed rule has no unexplained
 evidence left to justify it. Joint predictors are a real gap, tracked in
 `c_conversion_roadmap.md` — `rg_cross_dimensional_row` cannot represent a rule

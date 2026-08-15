@@ -133,6 +133,42 @@ lects. The lect count is shown per class for that reason.
 This example is in the long format rather than the wide one, with a row per
 lect and pre-segmented forms. Both formats reach the same place.
 
+## Is there anything here at all?
+
+Ask this before reading a single correspondence, because the model will produce
+some either way.
+
+A trained model reports `cost/segment`: how well, on average, the corpus aligns
+under the model it produced. On its own the number means little — its scale
+depends on the corpus. So compare it against the same corpus with the answer
+taken out. `--permutations 20` retrains twenty times on a version of your data
+where every wordlist is intact and every cognate set is the same size, but
+which form pairs with which has been shuffled. There are no correspondences
+left in that. Whatever the model finds is what the method finds in nothing:
+
+```
+cost/segment:        -1.8164 over 31 sets
+shuffled baseline:   -0.5791 +/- 0.0837 over 10 shuffles, z = -14.8
+  the same shuffles give 58.1 unconditioned and 11.9 conditioned classes
+```
+
+Two things to read here. The corpus aligns about fifteen standard deviations
+better than its own noise: there is a relationship, and it is not close. And
+the shuffled data produced **more** classes than the real data — 58 against 20,
+12 against 3.
+
+That second line is the one to take to heart. **The number of classes is not
+evidence of relatedness.** Search over a large inventory of possible
+environments will always find some that fit, and it finds more of them in noise
+than in signal, because noise has no structure to constrain the search. A run
+on two genuinely unrelated wordlists will report dozens of correspondences with
+stated environments, formatted exactly like the ones above. The fit statistic
+is what tells them apart, and it costs one training run per shuffle.
+
+This is a statement about the corpus, not about any one rule. It answers
+"is there a relationship here", which has to be answered first. It does not
+tell you that a particular environment is real.
+
 ## Confidence and outliers
 
 Not every cognate set deserves equal weight. A confidence column carries that:

@@ -65,6 +65,15 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   enumeration order, which the exchange does not preserve — on a
   corpus small enough for a tie to decide an alignment, the two
   directions can still differ.
+- **No claim of relatedness.** A trained model is a description of
+  whatever correspondences the search found, not evidence that the
+  lects are related. The class counts in particular are not that
+  evidence and move against it: shuffling a corpus's pairings removes
+  every correspondence and raises the counts. `rg_multi_model_fit`
+  carries the statistic that does discriminate, and
+  `permutation_count` calibrates it against the same corpus shuffled.
+  A consumer presenting regulae output as a relatedness finding
+  without it is presenting the wrong number.
 - **No time.** Lects are referred to by string IDs; there are no
   dates, epochs, or temporal orderings anywhere in the output.
 - **No proto-forms.** A `MultiLectCorrespondenceClass` names

@@ -1,5 +1,7 @@
 #include "internal.h"
 
+#include <stdint.h>
+
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
@@ -2484,6 +2486,14 @@ static rg_status aggregate_position_classes(
     return RG_OK;
 }
 
+static rg_status compute_corpus_fit(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    rg_multi_model *model
+);
+
 rg_status rg_train_model(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
@@ -2620,12 +2630,19 @@ rg_status rg_train_model(
         status = RG_ERR_CANCELLED;
     }
     reconciled_observations_free(observations, observation_count);
+    if (status == RG_OK) {
+        status = compute_corpus_fit(ctx, cognates, cognate_count, options, model);
+    }
     if (status != RG_OK) {
         rg_multi_model_free(model);
         return status;
     }
     *out = model;
     return RG_OK;
+}
+
+const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model) {
+    return model == 0 ? 0 : &model->fit;
 }
 
 size_t rg_multi_model_lect_count(const rg_multi_model *model) {
@@ -2698,6 +2715,288 @@ void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
     free(rows);
 }
 
+/* Mean alignment cost per segment for one cognate set, over every lect pair in
+ * it that has a trained model. This is the corpus's goodness of fit read one
+ * set at a time: the outlier diagnostic z-scores it across sets, and the fit
+ * summary averages it. */
+static rg_status score_cognate_set(
+    const rg_context *ctx,
+    const rg_multi_model *model,
+    const rg_train_options *options,
+    const rg_cognate_set *set,
+    int max_chunk_size,
+    double *out_cost,
+    int *out_pair_count
+);
+
+/* xorshift64*, seeded from the options. The baseline has to be reproducible:
+ * a fit statistic a user cannot recompute is not a statistic. */
+static uint64_t permutation_next(uint64_t *state) {
+    uint64_t x = *state;
+    x ^= x >> 12;
+    x ^= x << 25;
+    x ^= x >> 27;
+    *state = x;
+    return x * 2685821657736338717ULL;
+}
+
+/* Mean cost per segment over every cognate set the model can score. */
+static rg_status corpus_cost_per_segment(
+    const rg_context *ctx,
+    const rg_multi_model *model,
+    const rg_train_options *options,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    double *out_mean,
+    size_t *out_scored
+) {
+    size_t c;
+    size_t scored = 0;
+    double total = 0.0;
+    int max_chunk_size = options != 0 && options->max_chunk_size > 0
+        ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
+
+    *out_mean = 0.0;
+    *out_scored = 0;
+    for (c = 0; c < cognate_count; c++) {
+        double cost = 0.0;
+        int pair_count = 0;
+        rg_status status = score_cognate_set(ctx, model, options, &cognates[c], max_chunk_size, &cost, &pair_count);
+        if (status != RG_OK) {
+            return status;
+        }
+        if (pair_count > 0) {
+            total += cost;
+            scored++;
+        }
+    }
+    if (scored > 0) {
+        *out_mean = total / (double)scored;
+    }
+    *out_scored = scored;
+    return RG_OK;
+}
+
+/* Rebuilds the corpus with the correspondences taken out of it and nothing
+ * else changed: every lect keeps its whole wordlist, every set keeps its size
+ * and its lect membership, and only which form answers to which is permuted.
+ * Whatever the model finds in this is what the method finds in no data. */
+static rg_status permute_cognate_sets(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const char *const *lect_ids,
+    size_t lect_count,
+    uint64_t *rng,
+    rg_cognate_set *out_sets,
+    rg_cognate_form *out_forms,
+    size_t *slots
+) {
+    size_t c;
+    size_t f;
+    size_t used = 0;
+    size_t l;
+
+    for (c = 0; c < cognate_count; c++) {
+        out_sets[c] = cognates[c];
+        out_sets[c].forms = out_forms + used;
+        for (f = 0; f < cognates[c].form_count; f++) {
+            out_forms[used + f] = cognates[c].forms[f];
+        }
+        used += cognates[c].form_count;
+    }
+    /* One lect at a time, so a set never ends up with two forms of the same
+     * lect or loses one. Fisher-Yates over that lect's slots. */
+    for (l = 0; l < lect_count; l++) {
+        size_t slot_count = 0;
+        size_t i;
+        used = 0;
+        for (c = 0; c < cognate_count; c++) {
+            for (f = 0; f < cognates[c].form_count; f++) {
+                if (strcmp(out_forms[used + f].lect_id, lect_ids[l]) == 0) {
+                    slots[slot_count++] = used + f;
+                }
+            }
+            used += cognates[c].form_count;
+        }
+        for (i = slot_count; i > 1; i--) {
+            size_t j = (size_t)(permutation_next(rng) % (uint64_t)(unsigned long)i);
+            rg_form swap = out_forms[slots[i - 1]].form;
+            out_forms[slots[i - 1]].form = out_forms[slots[j]].form;
+            out_forms[slots[j]].form = swap;
+        }
+    }
+    return RG_OK;
+}
+
+/* Fills in the model's fit summary, and, when asked, the shuffled baseline it
+ * has to be read against. Each baseline run is a full training pass, so the
+ * caller pays for it explicitly. */
+static rg_status compute_corpus_fit(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    rg_multi_model *model
+) {
+    rg_status status;
+    size_t n = options->permutation_count > 0 ? (size_t)options->permutation_count : 0;
+    size_t total_forms = 0;
+    size_t max_lect_slots = 0;
+    size_t c;
+
+    model->fit.unconditioned_class_count = model->unconditioned_class_count;
+    model->fit.conditioned_class_count = model->conditioned_class_count;
+    status = corpus_cost_per_segment(ctx, model, options, cognates, cognate_count,
+                                     &model->fit.cost_per_segment, &model->fit.scored_set_count);
+    if (status != RG_OK || n == 0) {
+        return status;
+    }
+    for (c = 0; c < cognate_count; c++) {
+        total_forms += cognates[c].form_count;
+    }
+    max_lect_slots = total_forms;
+    {
+        rg_cognate_set *sets = (rg_cognate_set *)calloc(cognate_count == 0 ? 1 : cognate_count, sizeof(*sets));
+        rg_cognate_form *forms = (rg_cognate_form *)calloc(total_forms == 0 ? 1 : total_forms, sizeof(*forms));
+        size_t *slots = (size_t *)calloc(max_lect_slots == 0 ? 1 : max_lect_slots, sizeof(*slots));
+        double *costs = (double *)calloc(n, sizeof(*costs));
+        rg_train_options nested = *options;
+        uint64_t rng = (uint64_t)(unsigned int)options->permutation_seed * 6364136223846793005ULL
+            + 1442695040888963407ULL;
+        double uncond = 0.0;
+        double cond = 0.0;
+        double mean = 0.0;
+        size_t completed = 0;
+        size_t i;
+
+        if (sets == 0 || forms == 0 || slots == 0 || costs == 0) {
+            free(sets); free(forms); free(slots); free(costs);
+            return RG_ERR_OOM;
+        }
+        /* The baseline runs must not recurse, and their progress is not the
+         * caller's training run. */
+        nested.permutation_count = 0;
+        nested.progress = 0;
+        nested.progress_user_data = 0;
+        status = RG_OK;
+        for (i = 0; i < n && status == RG_OK; i++) {
+            rg_multi_model *shuffled = 0;
+            double cost = 0.0;
+            size_t scored = 0;
+            status = permute_cognate_sets(cognates, cognate_count,
+                                          (const char *const *)model->lect_ids, model->lect_count,
+                                          &rng, sets, forms, slots);
+            if (status != RG_OK) {
+                break;
+            }
+            status = rg_train_model(ctx, sets, cognate_count, &nested, &shuffled);
+            if (status != RG_OK) {
+                break;
+            }
+            status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count, &cost, &scored);
+            if (status == RG_OK && scored > 0) {
+                costs[completed] = cost;
+                uncond += (double)shuffled->unconditioned_class_count;
+                cond += (double)shuffled->conditioned_class_count;
+                completed++;
+            }
+            rg_multi_model_free(shuffled);
+        }
+        if (status == RG_OK && completed > 0) {
+            double variance = 0.0;
+            for (i = 0; i < completed; i++) {
+                mean += costs[i];
+            }
+            mean /= (double)completed;
+            for (i = 0; i < completed; i++) {
+                double d = costs[i] - mean;
+                variance += d * d;
+            }
+            /* Sample standard deviation; a single run has no spread to report. */
+            variance = completed > 1 ? variance / (double)(completed - 1) : 0.0;
+            model->fit.permutation_count = completed;
+            model->fit.null_cost_per_segment_mean = mean;
+            model->fit.null_cost_per_segment_sd = sqrt(variance);
+            model->fit.null_unconditioned_class_mean = uncond / (double)completed;
+            model->fit.null_conditioned_class_mean = cond / (double)completed;
+            if (model->fit.null_cost_per_segment_sd > 0.0) {
+                model->fit.cost_per_segment_z =
+                    (model->fit.cost_per_segment - mean) / model->fit.null_cost_per_segment_sd;
+            }
+        }
+        free(sets); free(forms); free(slots); free(costs);
+    }
+    return status;
+}
+
+static rg_status score_cognate_set(
+    const rg_context *ctx,
+    const rg_multi_model *model,
+    const rg_train_options *options,
+    const rg_cognate_set *set,
+    int max_chunk_size,
+    double *out_cost,
+    int *out_pair_count
+) {
+    const rg_form **forms;
+    size_t *order = 0;
+    size_t order_count = 0;
+    size_t i;
+    double total = 0.0;
+    int pair_count = 0;
+    rg_status status = RG_OK;
+
+    *out_cost = 0.0;
+    *out_pair_count = 0;
+    forms = (const rg_form **)calloc(model->lect_count == 0 ? 1 : model->lect_count, sizeof(*forms));
+    if (forms == 0) {
+        return RG_ERR_OOM;
+    }
+    /* Lect pairs are walked in ascending lect-id order, which fixes the
+     * alignment direction each pair is scored in. */
+    if (present_lects_sorted(set, model, forms, &order, &order_count) != RG_OK) {
+        free(forms);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < order_count && status == RG_OK; i++) {
+        const rg_form *form_i = forms[order[i]];
+        size_t j;
+        for (j = i + 1; j < order_count; j++) {
+            const rg_pairwise_model *pair_model;
+            const rg_form *form_j = forms[order[j]];
+            rg_alignment *alignment = 0;
+            double cost = 0.0;
+            double denom;
+            pair_model = pair_model_for(model, model->lect_ids[order[i]], model->lect_ids[order[j]]);
+            if (pair_model == 0) {
+                continue;
+            }
+            status = rg_align_forms_with_model(ctx, pair_model, options, form_i, form_j, max_chunk_size, &alignment);
+            if (status != RG_OK) {
+                break;
+            }
+            status = rg_alignment_cost_with_model(ctx, pair_model, options, alignment, &cost);
+            rg_alignment_free(alignment);
+            if (status != RG_OK) {
+                break;
+            }
+            denom = ((double)form_i->segment_count + (double)form_j->segment_count) / 2.0;
+            if (denom > 0.0) {
+                total += cost / denom;
+                pair_count++;
+            }
+        }
+    }
+    free(forms);
+    free(order);
+    if (status != RG_OK) {
+        return status;
+    }
+    *out_cost = pair_count > 0 ? total / (double)pair_count : 0.0;
+    *out_pair_count = pair_count;
+    return RG_OK;
+}
+
 rg_status rg_find_cognate_outliers(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
@@ -2729,78 +3028,17 @@ rg_status rg_find_cognate_outliers(
         return RG_ERR_INVALID_ARGUMENT;
     }
     for (c = 0; c < cognate_count; c++) {
-        double total = 0.0;
+        double cost = 0.0;
         int pair_count = 0;
-        const rg_form **forms = 0;
-        size_t *order = 0;
-        size_t order_count = 0;
-        size_t i;
-        forms = (const rg_form **)calloc(model->lect_count == 0 ? 1 : model->lect_count, sizeof(*forms));
-        if (forms == 0) {
+        rg_status status = score_cognate_set(ctx, model, options, &cognates[c], max_chunk_size, &cost, &pair_count);
+        if (status != RG_OK) {
             size_t n;
             for (n = 0; n < work_count; n++) {
                 free(work[n].cognate_id);
             }
             free(work);
-            return RG_ERR_OOM;
+            return status;
         }
-        /* Lect pairs are walked in ascending lect-id order, which fixes the
-         * alignment direction each pair is scored in. */
-        if (present_lects_sorted(&cognates[c], model, forms, &order, &order_count) != RG_OK) {
-            size_t n;
-            free(forms);
-            for (n = 0; n < work_count; n++) {
-                free(work[n].cognate_id);
-            }
-            free(work);
-            return RG_ERR_OOM;
-        }
-        for (i = 0; i < order_count; i++) {
-            size_t j;
-            const rg_form *form_i = forms[order[i]];
-            for (j = i + 1; j < order_count; j++) {
-                const rg_form *form_j = forms[order[j]];
-                const rg_pairwise_model *pair_model;
-                rg_alignment *alignment = 0;
-                double cost = 0.0;
-                double denom;
-                rg_status status;
-                pair_model = pair_model_for(model, model->lect_ids[order[i]], model->lect_ids[order[j]]);
-                if (pair_model == 0) {
-                    continue;
-                }
-                status = rg_align_forms_with_model(ctx, pair_model, options, form_i, form_j, max_chunk_size, &alignment);
-                if (status != RG_OK) {
-                    size_t n;
-                    free(forms);
-                    free(order);
-                    for (n = 0; n < work_count; n++) {
-                        free(work[n].cognate_id);
-                    }
-                    free(work);
-                    return status;
-                }
-                status = rg_alignment_cost_with_model(ctx, pair_model, options, alignment, &cost);
-                rg_alignment_free(alignment);
-                if (status != RG_OK) {
-                    size_t n;
-                    free(forms);
-                    free(order);
-                    for (n = 0; n < work_count; n++) {
-                        free(work[n].cognate_id);
-                    }
-                    free(work);
-                    return status;
-                }
-                denom = ((double)form_i->segment_count + (double)form_j->segment_count) / 2.0;
-                if (denom > 0.0) {
-                    total += cost / denom;
-                    pair_count++;
-                }
-            }
-        }
-        free(forms);
-        free(order);
         if (pair_count > 0) {
             outlier_work_row *next;
             if (work_count == work_cap) {
@@ -2828,8 +3066,8 @@ rg_status rg_find_cognate_outliers(
                 return RG_ERR_OOM;
             }
             work[work_count].pair_count = pair_count;
-            work[work_count].cost_per_segment = total / (double)pair_count;
-            mean += work[work_count].cost_per_segment;
+            work[work_count].cost_per_segment = cost;
+            mean += cost;
             work_count++;
         }
     }

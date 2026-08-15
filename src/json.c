@@ -429,6 +429,28 @@ char *rg_json_from_multi_model_internal(
     }
     cJSON_AddItemToObject(root, "lects", lects);
 
+    {
+        const rg_corpus_fit *f = rg_multi_model_fit(model);
+        cJSON *fit = cJSON_CreateObject();
+        if (fit == 0) {
+            cJSON_Delete(root);
+            return 0;
+        }
+        cJSON_AddItemToObject(root, "fit", fit);
+        cJSON_AddNumberToObject(fit, "cost_per_segment", f->cost_per_segment);
+        cJSON_AddNumberToObject(fit, "scored_set_count", (double)f->scored_set_count);
+        cJSON_AddNumberToObject(fit, "unconditioned_class_count", (double)f->unconditioned_class_count);
+        cJSON_AddNumberToObject(fit, "conditioned_class_count", (double)f->conditioned_class_count);
+        cJSON_AddNumberToObject(fit, "permutation_count", (double)f->permutation_count);
+        if (f->permutation_count > 0) {
+            cJSON_AddNumberToObject(fit, "null_cost_per_segment_mean", f->null_cost_per_segment_mean);
+            cJSON_AddNumberToObject(fit, "null_cost_per_segment_sd", f->null_cost_per_segment_sd);
+            cJSON_AddNumberToObject(fit, "cost_per_segment_z", f->cost_per_segment_z);
+            cJSON_AddNumberToObject(fit, "null_unconditioned_class_mean", f->null_unconditioned_class_mean);
+            cJSON_AddNumberToObject(fit, "null_conditioned_class_mean", f->null_conditioned_class_mean);
+        }
+    }
+
     classes = cJSON_CreateObject();
     if (classes == 0) {
         cJSON_Delete(root);

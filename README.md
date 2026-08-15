@@ -70,6 +70,13 @@ carrying:
   N lects in one row.
 - **Non-cognate outlier diagnostics** via
   `rg_find_cognate_outliers`.
+- **A fit statistic, and a baseline to read it against.** Every model
+  carries `rg_multi_model_fit`: the mean alignment cost per segment,
+  and — with `--permutations <n>` — the same statistic over trainings
+  on a corpus whose pairings have been shuffled. This is the only
+  thing in the output that answers "is there a relationship here at
+  all". The class counts do not: shuffling removes every
+  correspondence there is to find and the counts go **up**.
 - **Determinism.** Same input, same output across runs and
   processes.
 
@@ -96,6 +103,7 @@ Sanitizer builds use `-DREGULAE_ENABLE_SANITIZER=address` (or
 ```sh
 regulae train <corpus.tsv>              # machine-readable model summary
 regulae train --human <corpus.tsv>      # readable report
+regulae train --permutations 20 <corpus.tsv>   # calibrate against shuffled data
 regulae train --pairwise <corpus.tsv>   # per-pair learned tables
 regulae align <corpus.tsv>              # alignments, prior-only
 regulae align --model <corpus.tsv>      # alignments under the trained model

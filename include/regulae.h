@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 8
+#define RG_ABI_VERSION 9
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -105,6 +105,11 @@ typedef struct rg_train_options {
     rg_bic_config bic;
     int bootstrap_n;
     int bootstrap_seed;
+    /* Shuffled-baseline runs for the fit summary. Each one is a full training
+     * run on a corpus whose pairings have been permuted, so this multiplies
+     * training time; 0 (the default) skips it. */
+    int permutation_count;
+    int permutation_seed;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -365,6 +370,36 @@ typedef struct rg_cognate_outlier_row {
     double cost_per_segment;
     double z_score;
 } rg_cognate_outlier_row;
+
+/* How well the model fits the corpus it was trained on, and what the same
+ * training does to data with the correspondences taken out of it.
+ *
+ * The class counts are not a measure of relatedness. They rise when the signal
+ * is removed: a corpus whose pairings have been shuffled has no correspondences
+ * left to find, and greedy splitting over a large candidate inventory finds
+ * more environments in it, not fewer. `cost_per_segment` is the number that
+ * separates the two -- it is strongly negative on real cognates and near zero
+ * on shuffled ones -- and the permutation baseline is what makes it readable,
+ * since its scale depends on the corpus.
+ *
+ * The baseline is off by default because it costs one full training run per
+ * shuffle. `permutation_count == 0` means it was not run and every `null_`
+ * field is zero. */
+typedef struct rg_corpus_fit {
+    double cost_per_segment;
+    size_t scored_set_count;
+    size_t unconditioned_class_count;
+    size_t conditioned_class_count;
+    size_t permutation_count;
+    double null_cost_per_segment_mean;
+    double null_cost_per_segment_sd;
+    /* Standard deviations between the observed fit and the shuffled baseline.
+     * Strongly negative means the corpus aligns far better than chance. Zero
+     * when no baseline was run, or when the baseline had no spread. */
+    double cost_per_segment_z;
+    double null_unconditioned_class_mean;
+    double null_conditioned_class_mean;
+} rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);
 RG_API int rg_version_major(void);
@@ -805,6 +840,8 @@ RG_API size_t rg_multi_model_lect_count(const rg_multi_model *model);
  * wordlist has some. Worth reading as a proportion of the corpus, because a
  * high one means the lect sample, not the method, is deciding the result. */
 RG_API size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model);
+/* Borrowed; valid while the model lives. Never NULL for a trained model. */
+RG_API const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model);
 RG_API const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index);
 RG_API size_t rg_multi_model_pair_model_count(const rg_multi_model *model);
 RG_API const rg_multi_pair_model_row *rg_multi_model_pair_model_at(

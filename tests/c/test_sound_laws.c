@@ -216,6 +216,76 @@ static void test_rhotacism(rg_context *ctx) {
  * alphabetically had those stages align each pair in the opposite direction
  * from the one its model was trained in. Reading a model of P(b|a) as P(a|b)
  * misses nearly every lookup and falls back to the untrained prior. */
+/* The class counts are not a measure of relatedness, and a reader who takes
+ * them for one will be badly misled: shuffling a corpus's pairings removes
+ * every correspondence there is to find and the counts go *up*, because greedy
+ * splitting over a large candidate inventory finds more environments in noise
+ * than in signal. That is the failure mode that ended mass comparison's
+ * credibility, and a BIC label on it does not change what it is.
+ *
+ * The fit statistic is what separates the two, and it has to be read against
+ * the shuffled baseline because its scale depends on the corpus. This asserts
+ * both halves: a real sound law fits far better than its own shuffles, and the
+ * shuffles nonetheless yield at least as many classes. */
+static void test_class_counts_are_not_evidence_but_the_fit_is(rg_context *ctx) {
+    static const char *fixtures[] = { "rhotacism", "grimm", "verner" };
+    size_t f;
+    for (f = 0; f < sizeof(fixtures) / sizeof(fixtures[0]); f++) {
+        rg_corpus *corpus = load(fixtures[f]);
+        rg_train_options options;
+        rg_multi_model *model = 0;
+        const rg_corpus_fit *fit;
+
+        rg_train_options_init_defaults(&options);
+        options.permutation_count = 5;
+        assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                              rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+        fit = rg_multi_model_fit(model);
+        assert(fit != 0);
+        assert(fit->permutation_count == 5);
+        assert(fit->scored_set_count > 0);
+        /* The corpus aligns far better than its own shuffles. */
+        assert(fit->cost_per_segment < fit->null_cost_per_segment_mean);
+        assert(fit->cost_per_segment_z < -5.0);
+        /* And the counts a reader would have taken for evidence do not fall. */
+        assert(fit->null_conditioned_class_mean >= (double)fit->conditioned_class_count);
+        assert(fit->null_unconditioned_class_mean >= (double)fit->unconditioned_class_count);
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
+/* The baseline is only usable if a reader can recompute it. */
+static void test_the_shuffled_baseline_is_reproducible(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_train_options options;
+    rg_multi_model *a = 0;
+    rg_multi_model *b = 0;
+
+    rg_train_options_init_defaults(&options);
+    options.permutation_count = 4;
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &a) == RG_OK);
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &b) == RG_OK);
+    assert(rg_multi_model_fit(a)->null_cost_per_segment_mean ==
+           rg_multi_model_fit(b)->null_cost_per_segment_mean);
+    assert(rg_multi_model_fit(a)->cost_per_segment_z ==
+           rg_multi_model_fit(b)->cost_per_segment_z);
+    /* A different seed is a different baseline, or the shuffling is not doing
+     * anything. */
+    options.permutation_seed += 1;
+    rg_multi_model_free(b);
+    b = 0;
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &b) == RG_OK);
+    assert(rg_multi_model_fit(a)->null_cost_per_segment_mean !=
+           rg_multi_model_fit(b)->null_cost_per_segment_mean);
+    rg_multi_model_free(a);
+    rg_multi_model_free(b);
+    rg_corpus_free(corpus);
+}
+
 /* Which lect a corpus names first is a fact about the file, not about the
  * languages. Training the same cognate sets with the two lects exchanged has to
  * produce the same analysis read backwards.
@@ -561,6 +631,8 @@ int main(void) {
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
+    test_class_counts_are_not_evidence_but_the_fit_is(ctx);
+    test_the_shuffled_baseline_is_reproducible(ctx);
     test_the_analysis_does_not_depend_on_which_lect_is_named_first(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);

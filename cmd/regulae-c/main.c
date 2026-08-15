@@ -34,6 +34,11 @@ static int usage(void) {
     printf("  --human                            human-readable model summary\n");
     printf("  --json                             machine-readable model, with\n");
     printf("                                     alignments and outliers\n");
+    printf("  --permutations <n>                 calibrate the fit against <n>\n");
+    printf("                                     trainings on shuffled pairings.\n");
+    printf("                                     Costs one training run each,\n");
+    printf("                                     and is the only way to read\n");
+    printf("                                     whether the corpus has signal\n");
     return 0;
 }
 
@@ -540,7 +545,7 @@ static int command_check(const char *path, const char *format) {
     return count == 0 ? 0 : 1;
 }
 
-static int command_train(const char *path, const char *format, int pairwise, int human, int json) {
+static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations) {
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -558,6 +563,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
         return 1;
     }
     rg_train_options_init_defaults(&options);
+    options.permutation_count = permutations;
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
         report_failure(ctx, "training", status);
@@ -819,6 +825,7 @@ int main(int argc, char **argv) {
     int pairwise = 0;
     int human = 0;
     int json = 0;
+    int permutations = 0;
     int i;
 
     if (argc < 2 || strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -833,6 +840,8 @@ int main(int argc, char **argv) {
             format = argv[++i];
         } else if (strcmp(argv[i], "--top-k") == 0 && i + 1 < argc) {
             top_k = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--permutations") == 0 && i + 1 < argc) {
+            permutations = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--json") == 0) {
             json = 1;
         } else if (strcmp(argv[i], "--human") == 0) {
@@ -857,7 +866,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (strcmp(argv[1], "train") == 0) {
-        return command_train(path, format, pairwise, human, json);
+        return command_train(path, format, pairwise, human, json, permutations);
     }
     if (strcmp(argv[1], "outliers") == 0) {
         return command_outliers(path, format, top_k);
