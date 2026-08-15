@@ -96,6 +96,10 @@ add_library(regulae
     src/model_context.c
     src/model_crossdim.c
     src/multilect.c
+    src/multilect_classes.c
+    src/multilect_fit.c
+    src/multilect_pairs.c
+    src/multilect_reconcile.c
     src/options.c
     src/scoring.c
     src/search.c
