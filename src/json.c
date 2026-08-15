@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "environment.h"
 
 #include "cJSON.h"
 
@@ -84,46 +85,32 @@ static cJSON *json_context(const rg_context_spec *context) {
     if (context == 0) {
         return out;
     }
-    if (context->position != 0 && context->position[0] != '\0') {
-        cJSON_AddStringToObject(out, "position", context->position);
+#define STRING_SLOT(name)                                                        \
+    if (context->name != 0 && context->name[0] != '\0') {                        \
+        cJSON_AddStringToObject(out, #name, context->name);                      \
     }
-    if (context->morpheme_index != 0 && context->morpheme_index[0] != '\0') {
-        cJSON_AddStringToObject(out, "morpheme_index", context->morpheme_index);
-    }
-    if (context->morphological != 0 && context->morphological[0] != '\0') {
-        cJSON_AddStringToObject(out, "morphological", context->morphological);
-    }
+    RG_ENV_STRING_SLOTS(STRING_SLOT)
+#undef STRING_SLOT
 
-#define SLOT(name, field)                                                        \
-    if (context->field##_count > 0) {                                            \
-        cJSON_AddItemToObject(out, name,                                         \
-                              json_constraints(context->field, context->field##_count)); \
+    /* Every feature slot, then every distance slot, both in the slot list's
+     * order. The key is the field's own name, so a slot added to the list
+     * serialises itself. */
+#define SLOT(name, label)                                                        \
+    if (context->name##_count > 0) {                                             \
+        cJSON_AddItemToObject(out, #name,                                        \
+                              json_constraints(context->name, context->name##_count)); \
     }
-
-    SLOT("preceding", preceding)
-    SLOT("following", following)
-    SLOT("somewhere_preceding", somewhere_preceding)
-    SLOT("somewhere_following", somewhere_following)
-    SLOT("same_syllable", same_syllable)
-    SLOT("next_syllable", next_syllable)
-    SLOT("previous_syllable", previous_syllable)
-    SLOT("self", self)
-    SLOT("self_stress", self_stress)
-    SLOT("preceding_stress", preceding_stress)
-    SLOT("following_stress", following_stress)
-
+    RG_ENV_FEATURE_SLOTS(SLOT)
 #undef SLOT
 
-    if (context->preceding_at_distance_count > 0) {
-        cJSON_AddItemToObject(out, "preceding_at_distance",
-                              json_distance_constraints(context->preceding_at_distance,
-                                                        context->preceding_at_distance_count));
+#define DISTANCE_SLOT(name, label)                                               \
+    if (context->name##_count > 0) {                                             \
+        cJSON_AddItemToObject(out, #name,                                        \
+                              json_distance_constraints(context->name, context->name##_count)); \
     }
-    if (context->following_at_distance_count > 0) {
-        cJSON_AddItemToObject(out, "following_at_distance",
-                              json_distance_constraints(context->following_at_distance,
-                                                        context->following_at_distance_count));
-    }
+    RG_ENV_DISTANCE_SLOTS(DISTANCE_SLOT)
+#undef DISTANCE_SLOT
+
     return out;
 }
 

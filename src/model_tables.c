@@ -1,4 +1,5 @@
 #include "model_internal.h"
+#include "environment.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -177,136 +178,6 @@ int count_row_cmp(const void *a, const void *b) {
     return strcmp(ra->target, rb->target);
 }
 
-static int nullable_strcmp(const char *a, const char *b) {
-    return strcmp(a == 0 ? "" : a, b == 0 ? "" : b);
-}
-
-static int constraint_list_cmp(
-    const rg_feature_constraint *a, size_t a_count,
-    const rg_feature_constraint *b, size_t b_count
-) {
-    size_t i;
-    if (a_count != b_count) {
-        return a_count < b_count ? -1 : 1;
-    }
-    for (i = 0; i < a_count; i++) {
-        int c = nullable_strcmp(a[i].feature, b[i].feature);
-        if (c != 0) {
-            return c;
-        }
-        c = nullable_strcmp(a[i].value, b[i].value);
-        if (c != 0) {
-            return c;
-        }
-    }
-    return 0;
-}
-
-static int distance_list_cmp(
-    const rg_distance_constraint *a, size_t a_count,
-    const rg_distance_constraint *b, size_t b_count
-) {
-    size_t i;
-    if (a_count != b_count) {
-        return a_count < b_count ? -1 : 1;
-    }
-    for (i = 0; i < a_count; i++) {
-        int c;
-        if (a[i].offset != b[i].offset) {
-            return a[i].offset < b[i].offset ? -1 : 1;
-        }
-        c = nullable_strcmp(a[i].constraint.feature, b[i].constraint.feature);
-        if (c != 0) {
-            return c;
-        }
-        c = nullable_strcmp(a[i].constraint.value, b[i].constraint.value);
-        if (c != 0) {
-            return c;
-        }
-    }
-    return 0;
-}
-
-/* A total order over everything a context can express. Ordering on a summary of
- * the environment -- position and constraint count -- leaves rows that differ
- * only in which constraint they carry comparing equal, and qsort is free to
- * return them in either order. It did: the same corpus published the same rows
- * in a different order under the native and the WebAssembly build, which moved
- * every class id downstream. */
-static int context_spec_cmp(const rg_context_spec *a, const rg_context_spec *b) {
-    int c = nullable_strcmp(a->position, b->position);
-    if (c != 0) {
-        return c;
-    }
-    c = nullable_strcmp(a->morphological, b->morphological);
-    if (c != 0) {
-        return c;
-    }
-    c = nullable_strcmp(a->morpheme_index, b->morpheme_index);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->preceding, a->preceding_count, b->preceding, b->preceding_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->following, a->following_count, b->following, b->following_count);
-    if (c != 0) {
-        return c;
-    }
-    c = distance_list_cmp(a->preceding_at_distance, a->preceding_at_distance_count,
-                          b->preceding_at_distance, b->preceding_at_distance_count);
-    if (c != 0) {
-        return c;
-    }
-    c = distance_list_cmp(a->following_at_distance, a->following_at_distance_count,
-                          b->following_at_distance, b->following_at_distance_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->somewhere_preceding, a->somewhere_preceding_count,
-                            b->somewhere_preceding, b->somewhere_preceding_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->somewhere_following, a->somewhere_following_count,
-                            b->somewhere_following, b->somewhere_following_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->same_syllable, a->same_syllable_count,
-                            b->same_syllable, b->same_syllable_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->next_syllable, a->next_syllable_count,
-                            b->next_syllable, b->next_syllable_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->previous_syllable, a->previous_syllable_count,
-                            b->previous_syllable, b->previous_syllable_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->self, a->self_count, b->self, b->self_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->self_stress, a->self_stress_count,
-                            b->self_stress, b->self_stress_count);
-    if (c != 0) {
-        return c;
-    }
-    c = constraint_list_cmp(a->preceding_stress, a->preceding_stress_count,
-                            b->preceding_stress, b->preceding_stress_count);
-    if (c != 0) {
-        return c;
-    }
-    return constraint_list_cmp(a->following_stress, a->following_stress_count,
-                               b->following_stress, b->following_stress_count);
-}
-
 int conditioned_count_row_cmp(const void *a, const void *b) {
     const rg_conditioned_segment_count_row *ra = (const rg_conditioned_segment_count_row *)a;
     const rg_conditioned_segment_count_row *rb = (const rg_conditioned_segment_count_row *)b;
@@ -325,7 +196,7 @@ int conditioned_count_row_cmp(const void *a, const void *b) {
     if (c != 0) {
         return c;
     }
-    return context_spec_cmp(&ra->context, &rb->context);
+    return rg_context_spec_compare_internal(&ra->context, &rb->context);
 }
 
 static int segment_equal(const rg_segment *a, const rg_segment *b) {

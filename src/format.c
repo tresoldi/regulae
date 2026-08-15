@@ -1,4 +1,5 @@
 #include "internal.h"
+#include "environment.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -160,31 +161,23 @@ static void append_context(string_builder *builder, const rg_context_spec *conte
     if (context->morphological != 0 && context->morphological[0] != '\0') {
         builder_appendf(builder, " morph=%s", context->morphological);
     }
-    append_constraint_bracket(builder, "pre", context->preceding, context->preceding_count);
-    append_constraint_bracket(builder, "fol", context->following, context->following_count);
-    append_constraint_bracket(builder, "somewhere-pre", context->somewhere_preceding, context->somewhere_preceding_count);
-    append_constraint_bracket(builder, "somewhere-fol", context->somewhere_following, context->somewhere_following_count);
-    append_constraint_bracket(builder, "same-syl", context->same_syllable, context->same_syllable_count);
-    append_constraint_bracket(builder, "next-syl", context->next_syllable, context->next_syllable_count);
-    append_constraint_bracket(builder, "prev-syl", context->previous_syllable, context->previous_syllable_count);
-    append_constraint_bracket(builder, "self", context->self, context->self_count);
-    append_constraint_bracket(builder, "self-stress", context->self_stress, context->self_stress_count);
-    append_constraint_bracket(builder, "pre-stress", context->preceding_stress, context->preceding_stress_count);
-    append_constraint_bracket(builder, "fol-stress", context->following_stress, context->following_stress_count);
+    /* Every feature slot, then every distance slot, each under the short label
+     * the slot list carries. */
+#define SLOT(name, label) \
+    append_constraint_bracket(builder, label, context->name, context->name##_count);
+    RG_ENV_FEATURE_SLOTS(SLOT)
+#undef SLOT
     {
         size_t i;
-        for (i = 0; i < context->preceding_at_distance_count; i++) {
-            builder_appendf(builder, " pre@%d[%s:%s]",
-                            context->preceding_at_distance[i].offset,
-                            context->preceding_at_distance[i].constraint.feature,
-                            context->preceding_at_distance[i].constraint.value);
+#define DISTANCE_SLOT(name, label)                                  \
+        for (i = 0; i < context->name##_count; i++) {               \
+            builder_appendf(builder, " " label "%d[%s:%s]",         \
+                            context->name[i].offset,                \
+                            context->name[i].constraint.feature,    \
+                            context->name[i].constraint.value);     \
         }
-        for (i = 0; i < context->following_at_distance_count; i++) {
-            builder_appendf(builder, " fol@%d[%s:%s]",
-                            context->following_at_distance[i].offset,
-                            context->following_at_distance[i].constraint.feature,
-                            context->following_at_distance[i].constraint.value);
-        }
+        RG_ENV_DISTANCE_SLOTS(DISTANCE_SLOT)
+#undef DISTANCE_SLOT
     }
 }
 

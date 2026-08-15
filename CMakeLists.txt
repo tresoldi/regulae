@@ -85,6 +85,7 @@ endif()
 add_library(regulae
     third_party/cjson/cJSON.c
     src/context.c
+    src/environment.c
     src/memory.c
     src/format.c
     src/json.c
