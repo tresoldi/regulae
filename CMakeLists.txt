@@ -116,6 +116,7 @@ add_library(regulae
     src/search_context.c
     src/search_cost.c
     src/syllabification.c
+    src/vocabulary.c
     src/types.c
     src/uncertainty.c
     src/version.c
