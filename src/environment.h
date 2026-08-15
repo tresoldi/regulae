@@ -27,7 +27,7 @@
  */
 
 /* Nothing, for a consumer that wants only one kind of slot. */
-#define RG_ENV_SLOT_SKIP(name, label)
+#define RG_ENV_SLOT_SKIP(name, label, key)
 
 /* The constraint slots, in the order that *is* the total order over
  * environments -- `rg_context_spec_compare_internal` walks them in exactly this
@@ -36,23 +36,26 @@
  * class id downstream. It is not a stylistic choice.
  *
  * F is applied to the feature-constraint slots and D to the distance-constraint
- * ones; pass the same macro twice to treat them alike. The label is the short
- * form the human report prints; the field name serialises itself.
+ * ones; pass the same macro twice to treat them alike. Each slot carries two
+ * names besides its field: the short form the human report prints, and the key
+ * the machine-readable summary uses. Both renderings are contracts and neither
+ * is the field name, so both live on the slot rather than in a second list that
+ * could fall out of step with this one.
  */
-#define RG_ENV_SLOTS(F, D)                              \
-    F(preceding,             "pre")                     \
-    F(following,             "fol")                     \
-    D(preceding_at_distance, "pre@")                    \
-    D(following_at_distance, "fol@")                    \
-    F(somewhere_preceding,   "somewhere-pre")           \
-    F(somewhere_following,   "somewhere-fol")           \
-    F(same_syllable,         "same-syl")                \
-    F(next_syllable,         "next-syl")                \
-    F(previous_syllable,     "prev-syl")                \
-    F(self,                  "self")                    \
-    F(self_stress,           "self-stress")             \
-    F(preceding_stress,      "pre-stress")              \
-    F(following_stress,      "fol-stress")
+#define RG_ENV_SLOTS(F, D)                                          \
+    F(preceding,             "pre",           "pre")                \
+    F(following,             "fol",           "fol")                \
+    D(preceding_at_distance, "pre@",          "preat")              \
+    D(following_at_distance, "fol@",          "folat")              \
+    F(somewhere_preceding,   "somewhere-pre", "swpre")              \
+    F(somewhere_following,   "somewhere-fol", "swfol")              \
+    F(same_syllable,         "same-syl",      "samesyl")            \
+    F(next_syllable,         "next-syl",      "nextsyl")            \
+    F(previous_syllable,     "prev-syl",      "prevsyl")            \
+    F(self,                  "self",          "self")               \
+    F(self_stress,           "self-stress",   "selfstress")         \
+    F(preceding_stress,      "pre-stress",    "prestress")          \
+    F(following_stress,      "fol-stress",    "folstress")
 
 /* The feature slots alone, and the distance slots alone, both in the order
  * above. The reports emit every feature slot and then every distance slot,
@@ -68,10 +71,10 @@
  * position, morphological, morpheme_index, and it says so where it writes them
  * out. Two orders over three fields is not worth a second macro, and the total
  * order is worth seeing spelled out at the place it is decided. */
-#define RG_ENV_STRING_SLOTS(X)  \
-    X(position)                 \
-    X(morpheme_index)           \
-    X(morphological)
+#define RG_ENV_STRING_SLOTS(X)          \
+    X(position,        "pos")           \
+    X(morpheme_index,  "morphidx")      \
+    X(morphological,   "morph")
 
 /* A total order over everything an environment can express.
  *

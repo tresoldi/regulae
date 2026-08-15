@@ -997,6 +997,16 @@ RG_API char *rg_format_pairwise_model(
     const rg_pairwise_model *model,
     const rg_format_model_options *options
 );
+/* The machine-readable summary the CLI prints by default: one tab-separated
+ * line per class and per cross-dimensional rule, environments rendered with
+ * sorted constraint lists so the same environment always spells the same. A
+ * stable contract; caller frees with rg_string_free. */
+RG_API char *rg_format_multi_model_summary(const rg_multi_model *model);
+
+/* The per-pair learned tables, tab-separated. Caller frees with
+ * rg_string_free. */
+RG_API char *rg_format_pairwise_tables(const rg_multi_model *model);
+
 RG_API char *rg_format_multi_model(
     const rg_multi_model *model,
     const rg_format_model_options *options

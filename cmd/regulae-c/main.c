@@ -11,6 +11,15 @@
 
 #define MAX_PARTS 64
 
+static char *dup_string(const char *value) {
+    size_t length = strlen(value) + 1;
+    char *copy = (char *)malloc(length);
+    if (copy != 0) {
+        memcpy(copy, value, length);
+    }
+    return copy;
+}
+
 static int usage(void) {
     printf("Usage: regulae <command> [options]\n");
     printf("\n");
@@ -46,249 +55,12 @@ static int usage(void) {
 }
 
 /* strdup is not in C99, and the CLI is built with -std=c99. */
-static char *dup_string(const char *value) {
-    size_t n = strlen(value);
-    char *out = (char *)malloc(n + 1);
-    if (out != 0) {
-        memcpy(out, value, n + 1);
-    }
-    return out;
-}
-
-static int string_cmp(const void *a, const void *b) {
-    return strcmp(*(const char *const *)a, *(const char *const *)b);
-}
-
-/* Appends "feature:value" for every constraint, sorted, joined by ';'. */
-static void append_constraints(
-    char *buffer,
-    size_t size,
-    const rg_feature_constraint *items,
-    size_t count
-) {
-    char *parts[MAX_PARTS];
-    size_t i;
-    size_t used = 0;
-    size_t offset = 0;
-
-    buffer[0] = '\0';
-    for (i = 0; i < count && used < MAX_PARTS; i++) {
-        char part[128];
-        snprintf(part, sizeof(part), "%s:%s",
-                 items[i].feature == 0 ? "" : items[i].feature,
-                 items[i].value == 0 ? "" : items[i].value);
-        parts[used] = dup_string(part);
-        if (parts[used] == 0) {
-            break;
-        }
-        used++;
-    }
-    qsort(parts, used, sizeof(*parts), string_cmp);
-    for (i = 0; i < used; i++) {
-        int written = snprintf(buffer + offset, size - offset, "%s%s", i > 0 ? ";" : "", parts[i]);
-        if (written > 0 && (size_t)written < size - offset) {
-            offset += (size_t)written;
-        }
-        free(parts[i]);
-    }
-}
-
-static void append_distances(
-    char *buffer,
-    size_t size,
-    const rg_distance_constraint *items,
-    size_t count
-) {
-    char *parts[MAX_PARTS];
-    size_t i;
-    size_t used = 0;
-    size_t offset = 0;
-
-    buffer[0] = '\0';
-    for (i = 0; i < count && used < MAX_PARTS; i++) {
-        char part[160];
-        snprintf(part, sizeof(part), "%d@%s:%s",
-                 items[i].offset,
-                 items[i].constraint.feature == 0 ? "" : items[i].constraint.feature,
-                 items[i].constraint.value == 0 ? "" : items[i].constraint.value);
-        parts[used] = dup_string(part);
-        if (parts[used] == 0) {
-            break;
-        }
-        used++;
-    }
-    qsort(parts, used, sizeof(*parts), string_cmp);
-    for (i = 0; i < used; i++) {
-        int written = snprintf(buffer + offset, size - offset, "%s%s", i > 0 ? ";" : "", parts[i]);
-        if (written > 0 && (size_t)written < size - offset) {
-            offset += (size_t)written;
-        }
-        free(parts[i]);
-    }
-}
-
-/* Canonical rendering of a context: fixed slot order, sorted constraint lists,
- * empty slots omitted. Must stay byte-identical to the Go dumper's contextKey. */
-static void context_key(const rg_context_spec *context, char *out, size_t size) {
-    char slot[1024];
-    size_t offset = 0;
-    int first = 1;
-
-    out[0] = '\0';
-    if (context == 0) {
-        snprintf(out, size, "-");
-        return;
-    }
-
-#define EMIT(name, text)                                                                  \
-    do {                                                                                  \
-        if ((text)[0] != '\0') {                                                          \
-            int written = snprintf(out + offset, size - offset, "%s%s=%s",                \
-                                   first ? "" : ",", (name), (text));                     \
-            if (written > 0 && (size_t)written < size - offset) {                         \
-                offset += (size_t)written;                                                \
-            }                                                                             \
-            first = 0;                                                                    \
-        }                                                                                 \
-    } while (0)
-
-    EMIT("pos", context->position == 0 ? "" : context->position);
-    EMIT("morph", context->morphological == 0 ? "" : context->morphological);
-    append_constraints(slot, sizeof(slot), context->preceding, context->preceding_count);
-    EMIT("pre", slot);
-    append_constraints(slot, sizeof(slot), context->following, context->following_count);
-    EMIT("fol", slot);
-    append_distances(slot, sizeof(slot), context->preceding_at_distance, context->preceding_at_distance_count);
-    EMIT("preat", slot);
-    append_distances(slot, sizeof(slot), context->following_at_distance, context->following_at_distance_count);
-    EMIT("folat", slot);
-    append_constraints(slot, sizeof(slot), context->somewhere_preceding, context->somewhere_preceding_count);
-    EMIT("swpre", slot);
-    append_constraints(slot, sizeof(slot), context->somewhere_following, context->somewhere_following_count);
-    EMIT("swfol", slot);
-    append_constraints(slot, sizeof(slot), context->same_syllable, context->same_syllable_count);
-    EMIT("samesyl", slot);
-    append_constraints(slot, sizeof(slot), context->next_syllable, context->next_syllable_count);
-    EMIT("nextsyl", slot);
-    append_constraints(slot, sizeof(slot), context->previous_syllable, context->previous_syllable_count);
-    EMIT("prevsyl", slot);
-    append_constraints(slot, sizeof(slot), context->self_stress, context->self_stress_count);
-    EMIT("selfstress", slot);
-    append_constraints(slot, sizeof(slot), context->preceding_stress, context->preceding_stress_count);
-    EMIT("prestress", slot);
-    append_constraints(slot, sizeof(slot), context->following_stress, context->following_stress_count);
-    EMIT("folstress", slot);
-
-#undef EMIT
-
-    if (first) {
-        snprintf(out, size, "-");
-    }
-}
-
-static void print_class(const rg_multi_class_row *class_row, const char *label, int with_contexts) {
-    size_t i;
-    printf("%s\t%d\t", label, class_row->class_id);
-    for (i = 0; i < class_row->segment_count; i++) {
-        printf("%s%s:%s", i > 0 ? "|" : "", class_row->lect_ids[i], class_row->graphemes[i]);
-    }
-    printf("\t%.6f\t%.6f\t", class_row->count, class_row->confidence);
-    if (with_contexts) {
-        for (i = 0; i < class_row->segment_count; i++) {
-            char key[2048];
-            context_key(class_row->contexts == 0 ? 0 : &class_row->contexts[i], key, sizeof(key));
-            printf("%s%s=%s", i > 0 ? "|" : "", class_row->lect_ids[i], key);
-        }
-    } else {
-        for (i = 0; i < class_row->supporting_cognate_count; i++) {
-            printf("%s%s", i > 0 ? "," : "", class_row->supporting_cognates[i]);
-        }
-    }
-    printf("\n");
-}
-
-static void print_summary(const rg_multi_model *model) {
-    size_t i;
-    printf("LECTS\t");
-    for (i = 0; i < rg_multi_model_lect_count(model); i++) {
-        printf("%s%s", i > 0 ? " " : "", rg_multi_model_lect_at(model, i));
-    }
-    printf("\n");
-    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        print_class(rg_multi_model_unconditioned_class_at(model, i), "UNCOND", 0);
-    }
-    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        print_class(rg_multi_model_conditioned_class_at(model, i), "COND", 1);
-    }
-    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
-        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        char environment[2048];
-        context_key(&row->rule.source_environment, environment, sizeof(environment));
-        printf("XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
-               row->source_lect, row->target_lect, environment,
-               row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset,
-               row->rule.count, row->rule.source_count, row->rule.confidence,
-               row->rule.contrast_count, row->rule.contrast_source_count, row->rule.contrast_confidence,
-               row->rule.evidence.delta_bic);
-    }
-}
-
 static rg_status load_corpus(
     const char *path,
     const char *format,
     rg_corpus **out,
     rg_load_diagnosis *diagnosis
 );
-
-/* Dumps the per-pair learned tables, one row per line, for diffing. */
-static void print_pairwise(const rg_multi_model *model) {
-    size_t p;
-    for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
-        const rg_multi_pair_model_row *row = rg_multi_model_pair_model_at(model, p);
-        const rg_pairwise_model *pm = row->model;
-        size_t i;
-        size_t k;
-        for (i = 0; i < rg_pairwise_model_segment_count_row_count(pm); i++) {
-            const rg_segment_count_row *seg = rg_pairwise_model_segment_count_row_at(pm, i);
-            printf("SEG\t%s>%s\t%s\t%s\t-\t%.6f\t[%.4f,%.4f]\t%s\n", row->lect_a, row->lect_b,
-                   seg->source, seg->target, seg->count,
-                   seg->uncertainty.lower, seg->uncertainty.upper,
-                   rg_uncertainty_method_string(seg->uncertainty.method));
-        }
-        for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pm); i++) {
-            const rg_conditioned_segment_count_row *seg = rg_pairwise_model_conditioned_segment_count_row_at(pm, i);
-            char key[2048];
-            context_key(&seg->context, key, sizeof(key));
-            /* Which form's environment the rule names. Two rows can carry the
-             * same context and mean different things: one says the source
-             * looked like that, the other the target. */
-            printf("SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\t[%.4f,%.4f]\t%s%s\n", row->lect_a, row->lect_b,
-                   seg->source, seg->target,
-                   seg->context_is_target ? "@target " : "", key, seg->count,
-                   seg->uncertainty.lower, seg->uncertainty.upper,
-                   rg_uncertainty_method_string(seg->uncertainty.method),
-                   seg->uncertainty.post_selection ? "/post-selection" : "");
-        }
-        for (i = 0; i < rg_pairwise_model_chunk_row_count(pm); i++) {
-            const rg_chunk_row *chunk = rg_pairwise_model_chunk_row_at(pm, i);
-            printf("CHUNK\t%s>%s\t", row->lect_a, row->lect_b);
-            for (k = 0; k < chunk->source_count; k++) {
-                printf("%s", chunk->source[k].grapheme);
-            }
-            printf("\t");
-            for (k = 0; k < chunk->target_count; k++) {
-                printf("%s", chunk->target[k].grapheme);
-            }
-            printf("\t%.6f\t%.6f\t%s\n", chunk->cost, chunk->count,
-                   chunk->reordering ? "reordering" : "-");
-        }
-        for (i = 0; i < rg_pairwise_model_tonal_count_row_count(pm); i++) {
-            const rg_tonal_count_row *tone = rg_pairwise_model_tonal_count_row_at(pm, i);
-            printf("TONE\t%s>%s\t%s>%s\t%.6f\n", row->lect_a, row->lect_b,
-                   tone->source_tone, tone->target_tone, tone->count);
-        }
-    }
-}
 
 static rg_status load_corpus_with_context(
     const rg_context *ctx,
@@ -642,10 +414,17 @@ static int command_train(const char *path, const char *format, int pairwise, int
             fputs(text, stdout);
             rg_string_free(text);
         }
-    } else if (pairwise) {
-        print_pairwise(model);
     } else {
-        print_summary(model);
+        char *text = pairwise ? rg_format_pairwise_tables(model)
+                              : rg_format_multi_model_summary(model);
+        if (text == 0) {
+            rg_multi_model_free(model);
+            rg_corpus_free(corpus);
+            rg_context_free(ctx);
+            return fail("rendering summary", RG_ERR_OOM);
+        }
+        fputs(text, stdout);
+        rg_string_free(text);
     }
     rg_multi_model_free(model);
     rg_corpus_free(corpus);

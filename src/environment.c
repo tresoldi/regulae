@@ -97,11 +97,11 @@ size_t rg_context_spec_constraint_count(const rg_context_spec *context) {
     if (context == 0) {
         return 0;
     }
-#define COUNT_STRING(name) \
+#define COUNT_STRING(name, key) \
     if (!string_absent(context->name)) { count++; }
     RG_ENV_STRING_SLOTS(COUNT_STRING)
 #undef COUNT_STRING
-#define COUNT_SLOT(name, label) count += context->name##_count;
+#define COUNT_SLOT(name, label, key) count += context->name##_count;
     RG_ENV_SLOTS(COUNT_SLOT, COUNT_SLOT)
 #undef COUNT_SLOT
     return count;
@@ -116,18 +116,18 @@ rg_status rg_context_spec_is_subset(
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
-#define SUBSET_STRING(name)                                                     \
+#define SUBSET_STRING(name, key)                                                     \
     if (!string_absent(subset->name) && !string_equal(subset->name, other->name)) { \
         return RG_OK;                                                           \
     }
     RG_ENV_STRING_SLOTS(SUBSET_STRING)
 #undef SUBSET_STRING
-#define SUBSET_FEATURES(name, label)                                            \
+#define SUBSET_FEATURES(name, label, key)                                            \
     if (!feature_slice_is_subset(subset->name, subset->name##_count,            \
                                  other->name, other->name##_count)) {           \
         return RG_OK;                                                           \
     }
-#define SUBSET_DISTANCES(name, label)                                           \
+#define SUBSET_DISTANCES(name, label, key)                                           \
     if (!distance_slice_is_subset(subset->name, subset->name##_count,           \
                                   other->name, other->name##_count)) {          \
         return RG_OK;                                                           \
@@ -205,12 +205,12 @@ int rg_context_spec_compare_internal(const rg_context_spec *a, const rg_context_
     if (c != 0) {
         return c;
     }
-#define CMP_FEATURES(name, label)                                               \
+#define CMP_FEATURES(name, label, key)                                               \
     c = constraint_list_cmp(a->name, a->name##_count, b->name, b->name##_count); \
     if (c != 0) {                                                               \
         return c;                                                               \
     }
-#define CMP_DISTANCES(name, label)                                              \
+#define CMP_DISTANCES(name, label, key)                                              \
     c = distance_list_cmp(a->name, a->name##_count, b->name, b->name##_count);  \
     if (c != 0) {                                                               \
         return c;                                                               \
@@ -260,7 +260,7 @@ rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_s
         return RG_ERR_INVALID_ARGUMENT;
     }
     rg_context_spec_init_empty(out);
-#define COPY_STRING(name)                                                       \
+#define COPY_STRING(name, key)                                                       \
     if (src->name != 0) {                                                       \
         out->name = rg_strdup_internal(src->name);                              \
         if (out->name == 0) {                                                   \
@@ -270,14 +270,14 @@ rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_s
     }
     RG_ENV_STRING_SLOTS(COPY_STRING)
 #undef COPY_STRING
-#define COPY_FEATURES(name, label)                                              \
+#define COPY_FEATURES(name, label, key)                                              \
     status = rg_feature_constraint_array_copy_internal(src->name, src->name##_count, &out->name); \
     if (status != RG_OK) {                                                      \
         rg_context_spec_clear_internal(out);                                    \
         return status;                                                          \
     }                                                                           \
     out->name##_count = src->name##_count;
-#define COPY_DISTANCES(name, label)                                             \
+#define COPY_DISTANCES(name, label, key)                                             \
     status = distance_constraint_array_copy(src->name, src->name##_count, &out->name); \
     if (status != RG_OK) {                                                      \
         rg_context_spec_clear_internal(out);                                    \
@@ -294,12 +294,12 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
     if (context == 0) {
         return;
     }
-#define CLEAR_STRING(name) rg_free_owned_internal(context->name);
+#define CLEAR_STRING(name, key) rg_free_owned_internal(context->name);
     RG_ENV_STRING_SLOTS(CLEAR_STRING)
 #undef CLEAR_STRING
-#define CLEAR_FEATURES(name, label) \
+#define CLEAR_FEATURES(name, label, key) \
     rg_feature_constraint_array_clear_internal(context->name, context->name##_count);
-#define CLEAR_DISTANCES(name, label) \
+#define CLEAR_DISTANCES(name, label, key) \
     rg_distance_constraint_array_clear_internal(context->name, context->name##_count);
     RG_ENV_SLOTS(CLEAR_FEATURES, CLEAR_DISTANCES)
 #undef CLEAR_FEATURES
@@ -386,13 +386,13 @@ int rg_predicate_holds_internal(const rg_context_spec *context, const rg_split_c
     size_t count;
     int offset;
     int is_preceding;
-#define HOLDS_STRING(name)                                                      \
+#define HOLDS_STRING(name, key)                                                      \
     if (strcmp(candidate->slot, #name) == 0) {                                  \
         return context->name != 0 && strcmp(context->name, candidate->feature) == 0; \
     }
     RG_ENV_STRING_SLOTS(HOLDS_STRING)
 #undef HOLDS_STRING
-#define HOLDS_FEATURES(name, label)                                             \
+#define HOLDS_FEATURES(name, label, key)                                             \
     if (strcmp(candidate->slot, #name) == 0) {                                  \
         return context_has_constraint(context->name, context->name##_count,     \
                                       candidate->feature, candidate->value);    \
@@ -437,7 +437,7 @@ rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate
     rg_status status;
 
     rg_context_spec_init_empty(out);
-#define FROM_STRING(name)                                                       \
+#define FROM_STRING(name, key)                                                       \
     if (strcmp(candidate->slot, #name) == 0) {                                  \
         out->name = rg_strdup_internal(candidate->feature);                     \
         return out->name == 0 ? RG_ERR_OOM : RG_OK;                             \
@@ -446,7 +446,7 @@ rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate
 #undef FROM_STRING
     constraint.feature = candidate->feature;
     constraint.value = candidate->value;
-#define FROM_FEATURES(name, label)                                              \
+#define FROM_FEATURES(name, label, key)                                              \
     if (strcmp(candidate->slot, #name) == 0) {                                  \
         status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->name); \
         if (status == RG_OK) {                                                  \
@@ -489,7 +489,7 @@ rg_status rg_context_extend_internal(
     }
     /* A string slot is replaced rather than conjoined: a position is one
      * position. */
-#define EXTEND_STRING(name)                                                     \
+#define EXTEND_STRING(name, key)                                                     \
     if (strcmp(candidate->slot, #name) == 0) {                                  \
         rg_free_owned_internal(out->name);                                      \
         out->name = rg_strdup_internal(candidate->feature);                     \
@@ -503,7 +503,7 @@ rg_status rg_context_extend_internal(
 #undef EXTEND_STRING
     addition.feature = candidate->feature;
     addition.value = candidate->value;
-#define PICK(name, label)                                     \
+#define PICK(name, label, key)                                     \
     if (strcmp(candidate->slot, #name) == 0) {                \
         slot = &out->name;                                    \
         slot_count = &out->name##_count;                      \

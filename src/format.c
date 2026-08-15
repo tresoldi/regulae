@@ -163,13 +163,13 @@ static void append_context(string_builder *builder, const rg_context_spec *conte
     }
     /* Every feature slot, then every distance slot, each under the short label
      * the slot list carries. */
-#define SLOT(name, label) \
+#define SLOT(name, label, key) \
     append_constraint_bracket(builder, label, context->name, context->name##_count);
     RG_ENV_FEATURE_SLOTS(SLOT)
 #undef SLOT
     {
         size_t i;
-#define DISTANCE_SLOT(name, label)                                  \
+#define DISTANCE_SLOT(name, label, key)                                  \
         for (i = 0; i < context->name##_count; i++) {               \
             builder_appendf(builder, " " label "%d[%s:%s]",         \
                             context->name[i].offset,                \
@@ -220,6 +220,45 @@ char *rg_format_alignment(const rg_alignment *alignment) {
         builder_append(&builder, "  (no links)\n");
     }
     return builder_finish(&builder);
+}
+
+/* The indices of `count` rows in the order discovery settled them.
+ *
+ * Insertion sort, so rows committed by one decision keep the order the table
+ * publishes them in; qsort is not stable and would hand that to the
+ * implementation. Written out twice here, once per table, until the rows had a
+ * named evidence field to reach it through.
+ *
+ * Returns 0 on allocation failure, which the caller treats as "publish in table
+ * order" rather than as a reason to fail a report. */
+static size_t *decision_order_of(
+    size_t count,
+    int (*decision_index_of)(const void *rows, size_t index),
+    const void *rows
+) {
+    size_t *order = (size_t *)calloc(count == 0 ? 1 : count, sizeof(*order));
+    size_t i;
+    if (order == 0) {
+        return 0;
+    }
+    for (i = 0; i < count; i++) {
+        size_t insert_at = i;
+        int here = decision_index_of(rows, i);
+        while (insert_at > 0 && decision_index_of(rows, order[insert_at - 1]) > here) {
+            order[insert_at] = order[insert_at - 1];
+            insert_at--;
+        }
+        order[insert_at] = i;
+    }
+    return order;
+}
+
+static int conditioned_class_decision_index(const void *rows, size_t index) {
+    return rg_multi_model_conditioned_class_at((const rg_multi_model *)rows, index)->evidence.decision_index;
+}
+
+static int multi_cross_dimensional_decision_index(const void *rows, size_t index) {
+    return rg_multi_model_cross_dimensional_row_at((const rg_multi_model *)rows, index)->rule.evidence.decision_index;
 }
 
 void rg_format_model_options_init_defaults(rg_format_model_options *options) {
@@ -487,24 +526,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
 
     total = rg_multi_model_conditioned_class_count(model);
-    decision_order = (size_t *)calloc(total == 0 ? 1 : total, sizeof(*decision_order));
+    decision_order = decision_order_of(total, conditioned_class_decision_index, model);
     if (decision_order == 0) {
         free(builder_finish(&builder));
         return 0;
-    }
-    for (i = 0; i < total; i++) {
-        size_t insert_at = i;
-        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
-        while (insert_at > 0) {
-            const rg_multi_class_row *prior =
-                rg_multi_model_conditioned_class_at(model, decision_order[insert_at - 1]);
-            if (prior->evidence.decision_index <= row->evidence.decision_index) {
-                break;
-            }
-            decision_order[insert_at] = decision_order[insert_at - 1];
-            insert_at--;
-        }
-        decision_order[insert_at] = i;
     }
     /* In the order they were decided, not by size. Discovery is greedy and each
      * rule is committed against what the earlier ones left unexplained, so this
@@ -546,24 +571,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     if (total == 0) {
         builder_append(&builder, "  (none)\n");
     }
-    decision_order = (size_t *)calloc(total == 0 ? 1 : total, sizeof(*decision_order));
+    decision_order = decision_order_of(total, multi_cross_dimensional_decision_index, model);
     if (decision_order == 0) {
         free(builder_finish(&builder));
         return 0;
-    }
-    for (i = 0; i < total; i++) {
-        size_t insert_at = i;
-        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        while (insert_at > 0) {
-            const rg_multi_cross_dimensional_row *prior =
-                rg_multi_model_cross_dimensional_row_at(model, decision_order[insert_at - 1]);
-            if (prior->rule.evidence.decision_index <= row->rule.evidence.decision_index) {
-                break;
-            }
-            decision_order[insert_at] = decision_order[insert_at - 1];
-            insert_at--;
-        }
-        decision_order[insert_at] = i;
     }
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row =
@@ -640,6 +651,258 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
     }
     if (shown == 0) {
         builder_append(&builder, "  (none)\n");
+    }
+    return builder_finish(&builder);
+}
+
+/* ---- The machine-readable summary -------------------------------------
+ *
+ * The CLI's default output, and a stable contract: one tab-separated line per
+ * class and per cross-dimensional rule. It lived in cmd/regulae-c/main.c, which
+ * made the CLI a fourth renderer of the same tables alongside this file's human
+ * format, json.c and the CLI's own --pairwise dump -- and it had drifted. Its
+ * environment key enumerated thirteen of the eighteen slots and omitted `self`
+ * and `morpheme_index`, so two environments differing only there rendered to
+ * the same key, in a format meant to be parsed.
+ *
+ * The key is not `append_context`'s rendering: it sorts each constraint list and
+ * joins with ';' so the same environment always spells the same, which a
+ * machine reader needs and a human one does not. Two renderings, one slot list.
+ */
+
+#define RG_SUMMARY_MAX_PARTS 32
+
+static int summary_part_cmp(const void *a, const void *b) {
+    return strcmp(*(const char *const *)a, *(const char *const *)b);
+}
+
+static void summary_join_sorted(char *buffer, size_t size, char **parts, size_t used) {
+    size_t offset = 0;
+    size_t i;
+    qsort(parts, used, sizeof(*parts), summary_part_cmp);
+    for (i = 0; i < used; i++) {
+        int written = snprintf(buffer + offset, size - offset, "%s%s", i > 0 ? ";" : "", parts[i]);
+        if (written > 0 && (size_t)written < size - offset) {
+            offset += (size_t)written;
+        }
+        free(parts[i]);
+    }
+}
+
+static void summary_constraints(
+    char *buffer,
+    size_t size,
+    const rg_feature_constraint *items,
+    size_t count
+) {
+    char *parts[RG_SUMMARY_MAX_PARTS];
+    size_t i;
+    size_t used = 0;
+    buffer[0] = '\0';
+    for (i = 0; i < count && used < RG_SUMMARY_MAX_PARTS; i++) {
+        char part[128];
+        snprintf(part, sizeof(part), "%s:%s",
+                 items[i].feature == 0 ? "" : items[i].feature,
+                 items[i].value == 0 ? "" : items[i].value);
+        parts[used] = rg_strdup_internal(part);
+        if (parts[used] == 0) {
+            break;
+        }
+        used++;
+    }
+    summary_join_sorted(buffer, size, parts, used);
+}
+
+static void summary_distances(
+    char *buffer,
+    size_t size,
+    const rg_distance_constraint *items,
+    size_t count
+) {
+    char *parts[RG_SUMMARY_MAX_PARTS];
+    size_t i;
+    size_t used = 0;
+    buffer[0] = '\0';
+    for (i = 0; i < count && used < RG_SUMMARY_MAX_PARTS; i++) {
+        char part[160];
+        snprintf(part, sizeof(part), "%d@%s:%s",
+                 items[i].offset,
+                 items[i].constraint.feature == 0 ? "" : items[i].constraint.feature,
+                 items[i].constraint.value == 0 ? "" : items[i].constraint.value);
+        parts[used] = rg_strdup_internal(part);
+        if (parts[used] == 0) {
+            break;
+        }
+        used++;
+    }
+    summary_join_sorted(buffer, size, parts, used);
+}
+
+/* Canonical rendering of an environment: slot-list order, sorted constraint
+ * lists, empty slots omitted. */
+static void summary_context_key(const rg_context_spec *context, char *out, size_t size) {
+    char slot[1024];
+    size_t offset = 0;
+    int first = 1;
+
+    out[0] = '\0';
+    if (context == 0) {
+        snprintf(out, size, "-");
+        return;
+    }
+
+#define EMIT(name, text)                                                                  \
+    do {                                                                                  \
+        if ((text)[0] != '\0') {                                                          \
+            int written = snprintf(out + offset, size - offset, "%s%s=%s",                \
+                                   first ? "" : ",", (name), (text));                     \
+            if (written > 0 && (size_t)written < size - offset) {                         \
+                offset += (size_t)written;                                                \
+            }                                                                             \
+            first = 0;                                                                    \
+        }                                                                                 \
+    } while (0)
+
+#define STRING_SLOT(name, key) EMIT(key, context->name == 0 ? "" : context->name);
+    RG_ENV_STRING_SLOTS(STRING_SLOT)
+#undef STRING_SLOT
+
+#define FEATURE_SLOT(name, label, key)                                          \
+    summary_constraints(slot, sizeof(slot), context->name, context->name##_count); \
+    EMIT(key, slot);
+#define DISTANCE_SLOT(name, label, key)                                         \
+    summary_distances(slot, sizeof(slot), context->name, context->name##_count); \
+    EMIT(key, slot);
+    RG_ENV_SLOTS(FEATURE_SLOT, DISTANCE_SLOT)
+#undef FEATURE_SLOT
+#undef DISTANCE_SLOT
+
+#undef EMIT
+
+    if (first) {
+        snprintf(out, size, "-");
+    }
+}
+
+static void summary_class(
+    string_builder *builder,
+    const rg_multi_class_row *class_row,
+    const char *label,
+    int with_contexts
+) {
+    size_t i;
+    builder_appendf(builder, "%s\t%d\t", label, class_row->class_id);
+    for (i = 0; i < class_row->segment_count; i++) {
+        builder_appendf(builder, "%s%s:%s", i > 0 ? "|" : "",
+                        class_row->lect_ids[i], class_row->graphemes[i]);
+    }
+    builder_appendf(builder, "\t%.6f\t%.6f\t", class_row->count, class_row->confidence);
+    if (with_contexts) {
+        for (i = 0; i < class_row->segment_count; i++) {
+            char key[2048];
+            summary_context_key(class_row->contexts == 0 ? 0 : &class_row->contexts[i],
+                                key, sizeof(key));
+            builder_appendf(builder, "%s%s=%s", i > 0 ? "|" : "", class_row->lect_ids[i], key);
+        }
+    } else {
+        for (i = 0; i < class_row->supporting_cognate_count; i++) {
+            builder_appendf(builder, "%s%s", i > 0 ? "," : "", class_row->supporting_cognates[i]);
+        }
+    }
+    builder_append(builder, "\n");
+}
+
+char *rg_format_multi_model_summary(const rg_multi_model *model) {
+    string_builder builder;
+    size_t i;
+
+    if (model == 0) {
+        return 0;
+    }
+    builder_init(&builder);
+    builder_append(&builder, "LECTS\t");
+    for (i = 0; i < rg_multi_model_lect_count(model); i++) {
+        builder_appendf(&builder, "%s%s", i > 0 ? " " : "", rg_multi_model_lect_at(model, i));
+    }
+    builder_append(&builder, "\n");
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        summary_class(&builder, rg_multi_model_unconditioned_class_at(model, i), "UNCOND", 0);
+    }
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        summary_class(&builder, rg_multi_model_conditioned_class_at(model, i), "COND", 1);
+    }
+    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
+        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
+        char environment[2048];
+        summary_context_key(&row->rule.source_environment, environment, sizeof(environment));
+        builder_appendf(&builder,
+                        "XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
+                        row->source_lect, row->target_lect, environment,
+                        row->rule.target_dimension, row->rule.target_value,
+                        row->rule.target_position_offset,
+                        row->rule.count, row->rule.source_count, row->rule.confidence,
+                        row->rule.contrast_count, row->rule.contrast_source_count,
+                        row->rule.contrast_confidence,
+                        row->rule.evidence.delta_bic);
+    }
+    return builder_finish(&builder);
+}
+
+char *rg_format_pairwise_tables(const rg_multi_model *model) {
+    string_builder builder;
+    size_t p;
+
+    if (model == 0) {
+        return 0;
+    }
+    builder_init(&builder);
+    for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
+        const rg_multi_pair_model_row *row = rg_multi_model_pair_model_at(model, p);
+        const rg_pairwise_model *pm = row->model;
+        size_t i;
+        size_t k;
+        for (i = 0; i < rg_pairwise_model_segment_count_row_count(pm); i++) {
+            const rg_segment_count_row *seg = rg_pairwise_model_segment_count_row_at(pm, i);
+            builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t-\t%.6f\t[%.4f,%.4f]\t%s\n",
+                            row->lect_a, row->lect_b,
+                            seg->source, seg->target, seg->count,
+                            seg->uncertainty.lower, seg->uncertainty.upper,
+                            rg_uncertainty_method_string(seg->uncertainty.method));
+        }
+        for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pm); i++) {
+            const rg_conditioned_segment_count_row *seg =
+                rg_pairwise_model_conditioned_segment_count_row_at(pm, i);
+            char key[2048];
+            summary_context_key(&seg->context, key, sizeof(key));
+            /* Which form's environment the rule names. Two rows can carry the
+             * same context and mean different things: one says the source
+             * looked like that, the other the target. */
+            builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\t[%.4f,%.4f]\t%s%s\n",
+                            row->lect_a, row->lect_b,
+                            seg->source, seg->target,
+                            seg->context_is_target ? "@target " : "", key, seg->count,
+                            seg->uncertainty.lower, seg->uncertainty.upper,
+                            rg_uncertainty_method_string(seg->uncertainty.method),
+                            seg->uncertainty.post_selection ? "/post-selection" : "");
+        }
+        for (i = 0; i < rg_pairwise_model_chunk_row_count(pm); i++) {
+            const rg_chunk_row *chunk = rg_pairwise_model_chunk_row_at(pm, i);
+            builder_appendf(&builder, "CHUNK\t%s>%s\t", row->lect_a, row->lect_b);
+            for (k = 0; k < chunk->source_count; k++) {
+                builder_append(&builder, chunk->source[k].grapheme);
+            }
+            builder_append(&builder, "\t");
+            for (k = 0; k < chunk->target_count; k++) {
+                builder_append(&builder, chunk->target[k].grapheme);
+            }
+            builder_appendf(&builder, "\t%.6f\t%.6f\t%s\n", chunk->cost, chunk->count,
+                            chunk->reordering ? "reordering" : "-");
+        }
+        for (i = 0; i < rg_pairwise_model_tonal_count_row_count(pm); i++) {
+            const rg_tonal_count_row *tone = rg_pairwise_model_tonal_count_row_at(pm, i);
+            builder_appendf(&builder, "TONE\t%s>%s\t%s>%s\t%.6f\n", row->lect_a, row->lect_b,
+                            tone->source_tone, tone->target_tone, tone->count);
+        }
     }
     return builder_finish(&builder);
 }

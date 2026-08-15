@@ -85,7 +85,7 @@ static cJSON *json_context(const rg_context_spec *context) {
     if (context == 0) {
         return out;
     }
-#define STRING_SLOT(name)                                                        \
+#define STRING_SLOT(name, key)                                                        \
     if (context->name != 0 && context->name[0] != '\0') {                        \
         cJSON_AddStringToObject(out, #name, context->name);                      \
     }
@@ -95,7 +95,7 @@ static cJSON *json_context(const rg_context_spec *context) {
     /* Every feature slot, then every distance slot, both in the slot list's
      * order. The key is the field's own name, so a slot added to the list
      * serialises itself. */
-#define SLOT(name, label)                                                        \
+#define SLOT(name, label, key)                                                        \
     if (context->name##_count > 0) {                                             \
         cJSON_AddItemToObject(out, #name,                                        \
                               json_constraints(context->name, context->name##_count)); \
@@ -103,7 +103,7 @@ static cJSON *json_context(const rg_context_spec *context) {
     RG_ENV_FEATURE_SLOTS(SLOT)
 #undef SLOT
 
-#define DISTANCE_SLOT(name, label)                                               \
+#define DISTANCE_SLOT(name, label, key)                                               \
     if (context->name##_count > 0) {                                             \
         cJSON_AddItemToObject(out, #name,                                        \
                               json_distance_constraints(context->name, context->name##_count)); \
