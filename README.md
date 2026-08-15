@@ -137,6 +137,14 @@ regulae outliers --top-k 10 <corpus.tsv>
 `breaks` (morpheme boundaries) and `syllables`; a cognate set
 takes the lowest confidence any of its rows reports.
 
+Tone, stress and length can each be given per segment — `tone`,
+`stress` and `length` columns in the long format, `<lect>_tone`,
+`<lect>_stress` and `<lect>_length` in the wide. Length written
+into the grapheme as `aː` is a different claim: merkmal reads
+that as its own segment with the `long` feature, which is right
+where length is contrastive. The column says the vowel *has* a
+length, which is what a lengthening changes.
+
 A lect may appear twice in one cognate set. That is a doublet —
 two reflexes of one etymon — and it is 3.2% of cognate-set
 members across the Lexibank datasets with expert judgements.

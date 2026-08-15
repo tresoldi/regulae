@@ -524,11 +524,22 @@ static rg_status lift_stress_mark(rg_segment *segment) {
     return segment->stress == 0 ? RG_ERR_OOM : RG_OK;
 }
 
+/* Which per-segment dimension a companion column carries. Length is the one
+ * that arrived last: a corpus can also write it into the grapheme as `aː`,
+ * which merkmal reads as its own segment with the `long` feature, and that is
+ * the right shape where length is contrastive. The dimension is for corpora
+ * that treat it as something happening *to* a vowel -- compensatory
+ * lengthening -- where making the long vowel a different segment from the
+ * short one splits every correspondence it takes part in. */
+#define RG_DIMENSION_TONE 0
+#define RG_DIMENSION_STRESS 1
+#define RG_DIMENSION_LENGTH 2
+
 static rg_status attach_dimension(
     const char *raw,
     rg_segment *segments,
     size_t segment_count,
-    int stress
+    int dimension
 ) {
     const char *p = raw == 0 ? "" : raw;
     size_t index = 0;
@@ -555,7 +566,9 @@ static rg_status attach_dimension(
         }
         {
             char *value = (char *)malloc(length + 1);
-            const char **slot = stress ? &segments[index].stress : &segments[index].tone;
+            const char **slot = dimension == RG_DIMENSION_STRESS ? &segments[index].stress
+                : (dimension == RG_DIMENSION_LENGTH ? &segments[index].length
+                                                    : &segments[index].tone);
             if (value == 0) {
                 return RG_ERR_OOM;
             }
@@ -1008,6 +1021,7 @@ static rg_status load_wide_tsv(
     long *lect_cols = 0;
     long *break_cols = 0;
     long *syllable_cols = 0;
+    long *length_cols = 0;
     long *tone_cols = 0;
     long *stress_cols = 0;
     size_t lect_count = 0;
@@ -1044,12 +1058,14 @@ static rg_status load_wide_tsv(
     lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
     break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
     syllable_cols = (long *)calloc(table.column_count, sizeof(*syllable_cols));
+    length_cols = (long *)calloc(table.column_count, sizeof(*length_cols));
     tone_cols = (long *)calloc(table.column_count, sizeof(*tone_cols));
     stress_cols = (long *)calloc(table.column_count, sizeof(*stress_cols));
     if (lect_cols == 0 || break_cols == 0 || tone_cols == 0 || stress_cols == 0) {
         free(lect_cols);
         free(break_cols);
         free(syllable_cols);
+        free(length_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -1062,6 +1078,7 @@ static rg_status load_wide_tsv(
                 free(lect_cols);
                 free(break_cols);
                 free(syllable_cols);
+                free(length_cols);
                 free(tone_cols);
                 free(stress_cols);
                 loader_table_clear(&table);
@@ -1079,7 +1096,8 @@ static rg_status load_wide_tsv(
             if (has_suffix(table.header[c], "_breaks") ||
                 has_suffix(table.header[c], "_syllables") ||
                 has_suffix(table.header[c], "_tone") ||
-                has_suffix(table.header[c], "_stress")) {
+                has_suffix(table.header[c], "_stress") ||
+                has_suffix(table.header[c], "_length")) {
                 continue;
             }
             lect_cols[lect_count++] = (long)c;
@@ -1089,6 +1107,7 @@ static rg_status load_wide_tsv(
         free(lect_cols);
         free(break_cols);
         free(syllable_cols);
+        free(length_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -1104,6 +1123,8 @@ static rg_status load_wide_tsv(
         stress_cols[c] = column_index(&table, companion);
         snprintf(companion, sizeof(companion), "%s_syllables", table.header[lect_cols[c]]);
         syllable_cols[c] = column_index(&table, companion);
+        snprintf(companion, sizeof(companion), "%s_length", table.header[lect_cols[c]]);
+        length_cols[c] = column_index(&table, companion);
     }
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
@@ -1111,6 +1132,7 @@ static rg_status load_wide_tsv(
         free(lect_cols);
         free(break_cols);
         free(syllable_cols);
+        free(length_cols);
         free(tone_cols);
         free(stress_cols);
         loader_table_clear(&table);
@@ -1162,6 +1184,10 @@ static rg_status load_wide_tsv(
             if (break_cols[c] >= 0) {
                 status = parse_break_indices(cell(row, break_cols[c]), &form.morpheme_breaks, &form.morpheme_break_count);
             }
+            if (status == RG_OK && length_cols[c] >= 0) {
+                status = attach_dimension(cell(row, length_cols[c]), form.segments,
+                                          form.segment_count, RG_DIMENSION_LENGTH);
+            }
             if (status == RG_OK && syllable_cols[c] >= 0) {
                 status = parse_break_indices(cell(row, syllable_cols[c]), &form.syllable_breaks, &form.syllable_break_count);
                 if (status != RG_OK) {
@@ -1170,14 +1196,14 @@ static rg_status load_wide_tsv(
                 }
             }
             if (tone_cols[c] >= 0) {
-                status = attach_dimension(cell(row, tone_cols[c]), form.segments, form.segment_count, 0);
+                status = attach_dimension(cell(row, tone_cols[c]), form.segments, form.segment_count, RG_DIMENSION_TONE);
                 if (status != RG_OK) {
                     loader_form_clear(&form);
                     break;
                 }
             }
             if (stress_cols[c] >= 0) {
-                status = attach_dimension(cell(row, stress_cols[c]), form.segments, form.segment_count, 1);
+                status = attach_dimension(cell(row, stress_cols[c]), form.segments, form.segment_count, RG_DIMENSION_STRESS);
                 if (status != RG_OK) {
                     loader_form_clear(&form);
                     break;
@@ -1221,6 +1247,7 @@ static rg_status load_wide_tsv(
     free(lect_cols);
     free(break_cols);
     free(syllable_cols);
+    free(length_cols);
     free(tone_cols);
     free(stress_cols);
     loader_table_clear(&table);
@@ -1396,6 +1423,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     long tone_col = -1;
     long breaks_col = -1;
     long syllables_col = -1;
+    long length_col = -1;
     long stress_col = -1;
     size_t r;
     rg_status status;
@@ -1458,6 +1486,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
                               ? "breaks" : opts.morpheme_breaks_column);
     syllables_col = column_index(&table, opts.syllable_breaks_column == 0
                                  ? "syllables" : opts.syllable_breaks_column);
+    length_col = column_index(&table, opts.length_column == 0 ? "length" : opts.length_column);
     stress_col = column_index(&table, opts.stress_column);
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
@@ -1498,14 +1527,14 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
             continue;
         }
         if (stress_col >= 0) {
-            status = attach_dimension(cell(row, stress_col), form.segments, form.segment_count, 1);
+            status = attach_dimension(cell(row, stress_col), form.segments, form.segment_count, RG_DIMENSION_STRESS);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 break;
             }
         }
         if (tone_col >= 0) {
-            status = attach_dimension(cell(row, tone_col), form.segments, form.segment_count, 0);
+            status = attach_dimension(cell(row, tone_col), form.segments, form.segment_count, RG_DIMENSION_TONE);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 free(cognate_id);
@@ -1516,6 +1545,16 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         if (breaks_col >= 0) {
             status = parse_break_indices(cell(row, breaks_col), &form.morpheme_breaks,
                                          &form.morpheme_break_count);
+            if (status != RG_OK) {
+                loader_form_clear(&form);
+                free(cognate_id);
+                free(lect_id);
+                break;
+            }
+        }
+        if (length_col >= 0) {
+            status = attach_dimension(cell(row, length_col), form.segments, form.segment_count,
+                                      RG_DIMENSION_LENGTH);
             if (status != RG_OK) {
                 loader_form_clear(&form);
                 free(cognate_id);

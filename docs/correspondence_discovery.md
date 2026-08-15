@@ -317,8 +317,17 @@ Three rules keep the output readable, each of which was a real failure first:
 **The target dimension is not only tone.** The scorer has handled stress and
 length as targets since the port and this stage proposed neither, so
 compensatory lengthening and stress shifts were unreachable however regular.
-All three are searched now. One gap remains: no loader populates
-`rg_segment.length`, so a length-target rule cannot be reached from a file.
+All three are searched now, and all three are suppliable: `tone`, `stress` and
+`length` columns in the long format, `<lect>_tone`, `<lect>_stress` and
+`<lect>_length` in the wide.
+
+Length is the one with two spellings, and they mean different things. Written
+into the grapheme as `aː`, merkmal reads it as its own segment carrying the
+`long` feature — the right shape where length is contrastive, and what the
+syllable predicates use. Written in the `length` column it is a dimension of
+the vowel, which is what a *lengthening* is: `p a t a` answering `p a t a` with
+the vowel long is one correspondence and a rule about it, where `a` answering
+`aː` is two different vowels and no rule at all.
 
 ### Morphological environments
 

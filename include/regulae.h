@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 17
+#define RG_ABI_VERSION 18
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -767,6 +767,13 @@ typedef struct rg_tsv_load_options {
     const char *stress_column;
     /* Morpheme boundaries as segment indices, default "breaks". */
     const char *morpheme_breaks_column;
+    /* Per-segment length values, default "length". A corpus may instead write
+     * length into the grapheme as `aː`, which merkmal reads as its own segment
+     * carrying the `long` feature; that is the right shape where length is
+     * contrastive. This column is for treating it as a dimension -- something
+     * that happens to a vowel -- so a lengthening can be found as a rule
+     * rather than as a correspondence between two different vowels. */
+    const char *length_column;
     /* Syllable boundaries as segment indices, default "syllables". Supplying
      * them overrides the sonority syllabifier, which is language-agnostic by
      * design and will be wrong wherever a language's phonotactics are not. */

@@ -201,8 +201,10 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
 /* The target dimension is not only tone. The scorer has handled stress and
  * length as targets since the port; this stage proposed neither until
  * 2026-08-15, so compensatory lengthening and stress shifts were unreachable
- * however regular they were. */
-static void test_cross_dimensional_stress_target(rg_context *ctx) {
+ * however regular they were -- and no loader populated rg_segment.length at
+ * all, so the length dimension could not be supplied even by hand. */
+static void test_cross_dimensional_dimension_target(rg_context *ctx, const char *corpus_path,
+                                                    const char *dimension) {
     rg_corpus *corpus = 0;
     rg_form_pair *views;
     rg_pairwise_model *model = 0;
@@ -211,8 +213,7 @@ static void test_cross_dimensional_stress_target(rg_context *ctx) {
     size_t i;
     int found = 0;
 
-    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/stress_dimension_target.tsv",
-                              0, &corpus) == RG_OK);
+    assert(rg_corpus_load_tsv(corpus_path, 0, &corpus) == RG_OK);
     count = rg_corpus_cognate_count(corpus);
     views = (rg_form_pair *)calloc(count, sizeof(*views));
     assert(views != 0);
@@ -226,9 +227,9 @@ static void test_cross_dimensional_stress_target(rg_context *ctx) {
     assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        if (strcmp(row->target_dimension, "stress") == 0 &&
-            row->source_environment.preceding_count == 1 &&
-            strcmp(row->source_environment.preceding[0].feature, "voiced") == 0) {
+        if (strcmp(row->target_dimension, dimension) == 0 &&
+            (row->source_environment.preceding_count == 1 ||
+             row->source_environment.following_count == 1)) {
             assert(row->confidence == 1.0);
             found = 1;
         }
@@ -589,7 +590,10 @@ int main(void) {
     assert(rg_align_forms_with_model(ctx, 0, &options, &pairs[0].source, &pairs[0].target, 0, &learned_alignment) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_train_pairwise(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
     test_joint_cross_dimensional_rule(ctx);
-    test_cross_dimensional_stress_target(ctx);
+    test_cross_dimensional_dimension_target(
+        ctx, REGULAE_SOURCE_DIR "/testdata/corpora/stress_dimension_target.tsv", "stress");
+    test_cross_dimensional_dimension_target(
+        ctx, REGULAE_SOURCE_DIR "/testdata/corpora/length_dimension_target.tsv", "length");
     test_uninformative_environments_commit_nothing(ctx);
     rg_context_free(ctx);
     return 0;
