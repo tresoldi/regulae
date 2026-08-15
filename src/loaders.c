@@ -55,6 +55,8 @@ struct rg_corpus {
     size_t cap;
     rg_cognate_set *view;
     size_t view_count;
+    size_t doublet_set_count;
+    size_t doublet_expansion_count;
     rg_cognate_form **view_forms;
     size_t view_form_group_count;
 };
@@ -695,15 +697,6 @@ static loader_cognate *corpus_ensure_cognate(rg_corpus *corpus, const char *cogn
     return &corpus->cognates[corpus->count - 1];
 }
 
-static loader_form *cognate_find_form(loader_cognate *cognate, const char *lect_id) {
-    size_t i;
-    for (i = 0; i < cognate->form_count; i++) {
-        if (strcmp(cognate->forms[i].lect_id, lect_id) == 0) {
-            return &cognate->forms[i];
-        }
-    }
-    return 0;
-}
 
 static rg_status cognate_append_form(loader_cognate *cognate, loader_form *form) {
     if (cognate->form_count == cognate->form_cap) {
@@ -732,15 +725,82 @@ static int string_list_contains(const char *const *items, size_t count, const ch
 
 /* Publishes borrowed rg_cognate_set views over the accumulated data, dropping
  * cognate sets with fewer than min_lects forms. */
+/* How many ways one cognate may be expanded. A doublet in one lect gives two,
+ * doublets in two lects give four; beyond this the corpus is saying something
+ * the split cannot usefully represent, and the extras are dropped and counted
+ * rather than multiplied out. */
+#define RG_MAX_DOUBLET_EXPANSION 8
+
+/* The distinct lects of a cognate, in first-seen order, with the forms each
+ * one contributes. */
+typedef struct lect_group {
+    const char *lect_id;
+    size_t form_indices[RG_MAX_DOUBLET_EXPANSION];
+    size_t form_count;
+} lect_group;
+
+static size_t group_forms_by_lect(const loader_cognate *cognate, lect_group *groups, size_t cap) {
+    size_t count = 0;
+    size_t f;
+    for (f = 0; f < cognate->form_count; f++) {
+        size_t g;
+        int placed = 0;
+        for (g = 0; g < count; g++) {
+            if (strcmp(groups[g].lect_id, cognate->forms[f].lect_id) == 0) {
+                if (groups[g].form_count < RG_MAX_DOUBLET_EXPANSION) {
+                    groups[g].form_indices[groups[g].form_count++] = f;
+                }
+                placed = 1;
+                break;
+            }
+        }
+        if (!placed && count < cap) {
+            groups[count].lect_id = cognate->forms[f].lect_id;
+            groups[count].form_indices[0] = f;
+            groups[count].form_count = 1;
+            count++;
+        }
+    }
+    return count;
+}
+
+/* Publishes the loader's cognates as the corpus view, expanding doublets.
+ *
+ * A lect with two reflexes in one cognate set is a doublet, and it is a fact
+ * about the language rather than an error in the file -- 3.2% of cognate-set
+ * members across the Lexibank datasets with expert judgements, and near 10% in
+ * some Austronesian ones. Keeping the first invents a correspondence by
+ * picking one arbitrarily; refusing the set throws the evidence away. So the
+ * set becomes one set per combination of reflexes, each carrying its share of
+ * the original confidence, and both reflexes are counted once between them.
+ *
+ * Every loader publishes through here, which is the point: this was four
+ * different undocumented behaviours -- hard error, keep-first, skip, and a
+ * silent drop in the API -- for one situation. */
 static rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
     size_t kept = 0;
     size_t i;
 
     for (i = 0; i < corpus->count; i++) {
-        if (min_lects > 0 && corpus->cognates[i].form_count < (size_t)min_lects) {
+        lect_group groups[64];
+        size_t group_count;
+        size_t combinations = 1;
+        size_t g;
+        if (corpus->cognates[i].form_count == 0) {
             continue;
         }
-        kept++;
+        group_count = group_forms_by_lect(&corpus->cognates[i], groups, 64);
+        if (min_lects > 0 && group_count < (size_t)min_lects) {
+            continue;
+        }
+        for (g = 0; g < group_count; g++) {
+            combinations *= groups[g].form_count;
+            if (combinations >= RG_MAX_DOUBLET_EXPANSION) {
+                combinations = RG_MAX_DOUBLET_EXPANSION;
+                break;
+            }
+        }
+        kept += combinations;
     }
     corpus->view = (rg_cognate_set *)calloc(kept == 0 ? 1 : kept, sizeof(*corpus->view));
     corpus->view_forms = (rg_cognate_form **)calloc(kept == 0 ? 1 : kept, sizeof(*corpus->view_forms));
@@ -751,34 +811,97 @@ static rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
     kept = 0;
     for (i = 0; i < corpus->count; i++) {
         loader_cognate *cognate = &corpus->cognates[i];
-        rg_cognate_form *forms;
-        size_t f;
-        if (min_lects > 0 && cognate->form_count < (size_t)min_lects) {
+        lect_group groups[64];
+        size_t group_count;
+        size_t combinations = 1;
+        size_t g;
+        size_t combo;
+        if (cognate->form_count == 0) {
             continue;
         }
-        forms = (rg_cognate_form *)calloc(cognate->form_count == 0 ? 1 : cognate->form_count, sizeof(*forms));
-        if (forms == 0) {
-            return RG_ERR_OOM;
+        group_count = group_forms_by_lect(cognate, groups, 64);
+        if (min_lects > 0 && group_count < (size_t)min_lects) {
+            continue;
         }
-        corpus->view_forms[kept] = forms;
-        for (f = 0; f < cognate->form_count; f++) {
-            forms[f].lect_id = cognate->forms[f].lect_id;
-            forms[f].form.lect_id = cognate->forms[f].lect_id;
-            forms[f].form.segments = cognate->forms[f].segments;
-            forms[f].form.segment_count = cognate->forms[f].segment_count;
-            forms[f].form.morpheme_breaks = cognate->forms[f].morpheme_breaks;
-            forms[f].form.morpheme_break_count = cognate->forms[f].morpheme_break_count;
-            forms[f].form.syllable_breaks = cognate->forms[f].syllable_breaks;
-            forms[f].form.syllable_break_count = cognate->forms[f].syllable_break_count;
+        for (g = 0; g < group_count; g++) {
+            combinations *= groups[g].form_count;
+            if (combinations >= RG_MAX_DOUBLET_EXPANSION) {
+                combinations = RG_MAX_DOUBLET_EXPANSION;
+                break;
+            }
         }
-        corpus->view[kept].cognate_id = cognate->cognate_id;
-        corpus->view[kept].forms = forms;
-        corpus->view[kept].form_count = cognate->form_count;
-        corpus->view[kept].confidence = cognate->confidence;
-        kept++;
+        if (combinations > 1) {
+            corpus->doublet_set_count++;
+            corpus->doublet_expansion_count += combinations - 1;
+        }
+        for (combo = 0; combo < combinations; combo++) {
+            rg_cognate_form *forms = (rg_cognate_form *)calloc(group_count == 0 ? 1 : group_count, sizeof(*forms));
+            size_t remainder = combo;
+            if (forms == 0) {
+                return RG_ERR_OOM;
+            }
+            corpus->view_forms[kept] = forms;
+            for (g = 0; g < group_count; g++) {
+                size_t pick = groups[g].form_count > 1 ? remainder % groups[g].form_count : 0;
+                const loader_form *source = &cognate->forms[groups[g].form_indices[pick]];
+                if (groups[g].form_count > 1) {
+                    remainder /= groups[g].form_count;
+                }
+                forms[g].lect_id = source->lect_id;
+                forms[g].form.lect_id = source->lect_id;
+                forms[g].form.segments = source->segments;
+                forms[g].form.segment_count = source->segment_count;
+                forms[g].form.morpheme_breaks = source->morpheme_breaks;
+                forms[g].form.morpheme_break_count = source->morpheme_break_count;
+                forms[g].form.syllable_breaks = source->syllable_breaks;
+                forms[g].form.syllable_break_count = source->syllable_break_count;
+            }
+            corpus->view[kept].cognate_id = cognate->cognate_id;
+            corpus->view[kept].forms = forms;
+            corpus->view[kept].form_count = group_count;
+            /* Each reading carries its share, so a doublet is not two votes. */
+            corpus->view[kept].confidence = cognate->confidence / (double)combinations;
+            kept++;
+        }
     }
     corpus->view_count = kept;
     return RG_OK;
+}
+
+size_t rg_corpus_doublet_set_count(const rg_corpus *corpus) {
+    return corpus == 0 ? 0 : corpus->doublet_set_count;
+}
+
+size_t rg_corpus_doublet_expansion_count(const rg_corpus *corpus) {
+    return corpus == 0 ? 0 : corpus->doublet_expansion_count;
+}
+
+/* Process-wide, in the style of rg_context_last_error but without a handle to
+ * hang it on: a load that fails returns no corpus. Not thread-safe, and
+ * documented as such; loading is a startup operation. */
+static char loader_error_message[256];
+static size_t loader_error_line;
+static int loader_error_set;
+
+static void loader_fail(size_t line, const char *message) {
+    size_t i = 0;
+    loader_error_line = line;
+    while (message[i] != '\0' && i + 1 < sizeof(loader_error_message)) {
+        loader_error_message[i] = message[i];
+        i++;
+    }
+    loader_error_message[i] = '\0';
+    loader_error_set = 1;
+}
+
+const char *rg_loader_last_error(size_t *line) {
+    if (!loader_error_set) {
+        return 0;
+    }
+    if (line != 0) {
+        *line = loader_error_line;
+    }
+    return loader_error_message;
 }
 
 void rg_corpus_free(rg_corpus *corpus) {
@@ -912,6 +1035,7 @@ static rg_status load_wide_tsv(
      * in this repository is written. */
     id_col = opts.cognate_id_column == 0 ? 0 : column_index(&table, opts.cognate_id_column);
     if (id_col < 0) {
+        loader_fail(1, "no gloss column: the wide format needs one identifier column then one column per lect");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1022,10 +1146,6 @@ static rg_status load_wide_tsv(
                 break;
             }
             if (word[0] == '\0' || strcmp(word, "-") == 0) {
-                free(word);
-                continue;
-            }
-            if (cognate_find_form(cognate, lect_id) != 0) {
                 free(word);
                 continue;
             }
@@ -1309,6 +1429,7 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
         return status;
     }
     if (table.column_count == 0) {
+        loader_fail(1, "the file has no columns");
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1316,6 +1437,9 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
     lect_col = column_index(&table, opts.lect_id_column);
     segments_col = column_index(&table, opts.segments_column);
     if (cognate_col < 0 || lect_col < 0 || segments_col < 0) {
+        loader_fail(1, cognate_col < 0
+                    ? "no cognate_id column"
+                    : (lect_col < 0 ? "no lect_id column" : "no segments column"));
         loader_table_clear(&table);
         return RG_ERR_PARSE;
     }
@@ -1415,14 +1539,6 @@ static rg_status load_tsv(const char *path, const char *text, const rg_tsv_load_
             loader_form_clear(&form);
             free(lect_id);
             status = RG_ERR_OOM;
-            break;
-        }
-        if (cognate_find_form(cognate, lect_id) != 0) {
-            /* The generic loader treats a repeated (cognate, lect) row as a
-             * data error rather than silently keeping the first reflex. */
-            loader_form_clear(&form);
-            free(lect_id);
-            status = RG_ERR_PARSE;
             break;
         }
         form.lect_id = lect_id;
@@ -1558,11 +1674,6 @@ static rg_status load_gled(const char *path, const char *text, const rg_gled_loa
             loader_form_clear(&form);
             status = RG_ERR_OOM;
             break;
-        }
-        if (cognate_find_form(cognate, lect_id) != 0) {
-            /* Keep the first reflex per (lect, cognate). */
-            loader_form_clear(&form);
-            continue;
         }
         form.lect_id = rg_strdup_internal(lect_id);
         if (form.lect_id == 0) {
@@ -1738,10 +1849,6 @@ static rg_status load_arcaverborum(
             status = RG_ERR_OOM;
             break;
         }
-        if (cognate_find_form(cognate, lect_id) != 0) {
-            loader_form_clear(&form);
-            continue;
-        }
         form.lect_id = rg_strdup_internal(lect_id);
         if (form.lect_id == 0) {
             loader_form_clear(&form);
@@ -1782,6 +1889,7 @@ static rg_status load_arcaverborum(
 /* ---- public entry points ------------------------------------------------ */
 
 rg_status rg_corpus_load_tsv(const char *path, const rg_tsv_load_options *options, rg_corpus **out) {
+    loader_error_set = 0;
     return load_tsv(path, 0, options, out);
 }
 
@@ -1795,6 +1903,7 @@ rg_status rg_corpus_load_wide_tsv(
     const rg_wide_load_options *options,
     rg_corpus **out
 ) {
+    loader_error_set = 0;
     return load_wide_tsv(ctx, path, 0, options, out);
 }
 
@@ -1808,6 +1917,7 @@ rg_status rg_corpus_parse_wide_tsv(
 }
 
 rg_status rg_corpus_load_gled(const char *path, const rg_gled_load_options *options, rg_corpus **out) {
+    loader_error_set = 0;
     return load_gled(path, 0, options, out);
 }
 
@@ -1820,6 +1930,7 @@ rg_status rg_corpus_load_arcaverborum(
     const rg_arcaverborum_load_options *options,
     rg_corpus **out
 ) {
+    loader_error_set = 0;
     return load_arcaverborum(path, 0, options, out);
 }
 

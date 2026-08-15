@@ -87,24 +87,29 @@ def convert(clone, name, lects=None, min_lects=2, max_lects=None, drop_doubt=Tru
 
     rows = []
     for (concept, cogid), members in sorted(sets.items()):
-        # One form per lect per set. A lect with two forms in one cognate set is
-        # a doublet, and picking one arbitrarily would invent a correspondence;
-        # the first in file order is at least deterministic, and the count is
-        # reported so a caller can see how often it happened.
+        # A lect with two forms in one cognate set is a doublet, and both are
+        # emitted. regulae reads the set as one set per combination of
+        # reflexes, each carrying its share of the confidence, so both are
+        # counted and neither is a second vote. Discarding one here -- which
+        # this did until 2026-08-15 -- picks a reflex arbitrarily and invents a
+        # correspondence, and it threw away 3.2% of the cognate-set members
+        # across the datasets carrying expert judgements.
         seen = {}
         for lect, segments in members:
             if lect not in chosen:
                 continue
             if lect in seen:
                 stats["doublets"] += 1
+                seen[lect].append(segments)
                 continue
-            seen[lect] = segments
+            seen[lect] = [segments]
         if len(seen) < min_lects:
             stats["below_min_lects"] += 1
             continue
         cognate_id = f"{concept}-{cogid}"
         for lect in sorted(seen):
-            rows.append((cognate_id, lect, seen[lect]))
+            for segments in seen[lect]:
+                rows.append((cognate_id, lect, segments))
         stats["sets"] += 1
 
     stats["rows"] = len(rows)

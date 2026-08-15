@@ -555,6 +555,18 @@ static int command_check(const char *path, const char *format) {
     return count == 0 ? 0 : 1;
 }
 
+/* A corpus that will not load is the first thing a new user meets, and "parse
+ * error" names neither the line nor the reason. */
+static void report_load_failure(rg_context *ctx, rg_status status) {
+    size_t line = 0;
+    const char *detail = rg_loader_last_error(&line);
+    if (detail != 0) {
+        fprintf(stderr, "regulae: line %lu: %s\n", (unsigned long)line, detail);
+        return;
+    }
+    report_failure(ctx, "loading corpus", status);
+}
+
 static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations, int tune_search) {
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
@@ -568,9 +580,15 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
-        report_failure(ctx, "loading corpus", status);
+        report_load_failure(ctx, status);
         rg_context_free(ctx);
         return 1;
+    }
+    if (rg_corpus_doublet_set_count(corpus) > 0) {
+        fprintf(stderr, "regulae: %lu cognate sets carry a doublet; the corpus reads as %lu extra "
+                "sets, each with its share of the confidence\n",
+                (unsigned long)rg_corpus_doublet_set_count(corpus),
+                (unsigned long)rg_corpus_doublet_expansion_count(corpus));
     }
     rg_train_options_init_defaults(&options);
     options.permutation_count = permutations;
@@ -627,7 +645,7 @@ static int command_outliers(const char *path, const char *format, int top_k) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
-        report_failure(ctx, "loading corpus", status);
+        report_load_failure(ctx, status);
         rg_context_free(ctx);
         return 1;
     }
@@ -684,7 +702,7 @@ static int command_align_with_model(const char *path, const char *format) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
-        report_failure(ctx, "loading corpus", status);
+        report_load_failure(ctx, status);
         rg_context_free(ctx);
         return 1;
     }
@@ -783,7 +801,7 @@ static int command_align(const char *path, const char *format) {
     }
     status = load_corpus_with_context(ctx, path, format, &corpus);
     if (status != RG_OK) {
-        report_failure(ctx, "loading corpus", status);
+        report_load_failure(ctx, status);
         rg_context_free(ctx);
         return 1;
     }

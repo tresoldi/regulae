@@ -65,6 +65,12 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   enumeration order, which the exchange does not preserve — on a
   corpus small enough for a tie to decide an alignment, the two
   directions can still differ.
+- **A doublet is data, not an error.** One lect with two
+  reflexes in a cognate set is published as one set per
+  combination, each with its share of the confidence.
+  `rg_corpus_doublet_set_count` says how often that happened.
+  A consumer counting cognate sets should expect more of them
+  than the source file has, and weights below 1.
 - **Intervals say what they were computed from.** Every
   count-bearing row carries `rg_uncertainty_estimate`. The
   default is a Wilson interval whose denominator counts aligned

@@ -133,9 +133,16 @@ regulae outliers --top-k 10 <corpus.tsv>
 
 `--format tsv|wide|gled|arcaverborum` selects the input format
 (default `tsv`). The generic TSV reader expects `cognate_id`,
-`lect_id` and `segments` columns, with an optional
-`confidence`; a cognate set takes the lowest confidence any of
-its rows reports.
+`lect_id` and `segments` columns, with optional `confidence`,
+`breaks` (morpheme boundaries) and `syllables`; a cognate set
+takes the lowest confidence any of its rows reports.
+
+A lect may appear twice in one cognate set. That is a doublet —
+two reflexes of one etymon — and it is 3.2% of cognate-set
+members across the Lexibank datasets with expert judgements.
+The corpus reads it as one set per combination of reflexes,
+each carrying its share of the confidence, so both reflexes are
+counted and neither is a second vote.
 
 The `wide` reader takes the shape linguistic data is usually
 written in — one row per cognate, one column per lect, holding

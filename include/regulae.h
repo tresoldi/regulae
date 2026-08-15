@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 15
+#define RG_ABI_VERSION 16
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -844,6 +844,25 @@ RG_API rg_status rg_corpus_parse_arcaverborum(
 
 RG_API void rg_corpus_free(rg_corpus *corpus);
 RG_API size_t rg_corpus_cognate_count(const rg_corpus *corpus);
+/* Cognate sets in which some lect contributed more than one reflex, and how
+ * many extra sets the corpus was expanded into as a result.
+ *
+ * A doublet is a fact about a language, not an error in a file: it is 3.2% of
+ * cognate-set members across the Lexibank datasets with expert judgements, and
+ * near 10% in some Austronesian ones. The corpus carries one set per
+ * combination of reflexes, each with its share of the original confidence, so
+ * both reflexes are counted and neither is invented. These say how often that
+ * happened. */
+RG_API size_t rg_corpus_doublet_set_count(const rg_corpus *corpus);
+RG_API size_t rg_corpus_doublet_expansion_count(const rg_corpus *corpus);
+
+/* Why the last load in this process failed, and on which line. Returns 0 when
+ * nothing has failed. The message is borrowed and valid until the next load.
+ *
+ * Process-wide rather than per-corpus, because a failed load returns no corpus
+ * to hang it on. "parse error" without a line is unactionable on a corpus of
+ * any size, which is the first thing a new user meets.  */
+RG_API const char *rg_loader_last_error(size_t *line);
 RG_API const rg_cognate_set *rg_corpus_cognates(const rg_corpus *corpus);
 RG_API const rg_cognate_set *rg_corpus_cognate_at(const rg_corpus *corpus, size_t index);
 

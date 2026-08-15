@@ -550,6 +550,70 @@ static void test_syllable_breaks_column(void) {
     rg_context_free(ctx);
 }
 
+/* A lect with two reflexes in one cognate set is a doublet, and it is a fact
+ * about the language rather than an error in the file: 3.2% of cognate-set
+ * members across the Lexibank datasets with expert judgements. Until
+ * 2026-08-15 regulae had four behaviours for it -- the generic loader errored,
+ * GLED and arcaverborum kept the first, the wide loader skipped, and the C API
+ * dropped the second silently.
+ *
+ * The set now reads as one set per combination of reflexes, each carrying its
+ * share of the confidence, so both reflexes are counted and neither is a
+ * second vote. */
+static void test_doublets_expand_into_weighted_sets(void) {
+    rg_corpus *corpus = 0;
+    size_t i;
+    double proto_total = 0.0;
+    int saw_d = 0;
+    int saw_l = 0;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/doublet.tsv", 0, &corpus) == RG_OK);
+    assert(rg_corpus_doublet_set_count(corpus) == 1);
+    assert(rg_corpus_doublet_expansion_count(corpus) == 1);
+    /* Two readings of w1 plus the plain w2. */
+    assert(rg_corpus_cognate_count(corpus) == 3);
+    for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        size_t f;
+        assert(set->form_count == 2);
+        if (strcmp(set->cognate_id, "w1") == 0) {
+            /* Split in two, so each reading is worth half a set. */
+            assert(set->confidence == 0.5);
+            proto_total += set->confidence;
+        }
+        for (f = 0; f < set->form_count; f++) {
+            if (strcmp(set->forms[f].lect_id, "daughter") != 0) {
+                continue;
+            }
+            if (strcmp(set->forms[f].form.segments[2].grapheme, "d") == 0) {
+                saw_d = 1;
+            }
+            if (strcmp(set->forms[f].form.segments[2].grapheme, "l") == 0) {
+                saw_l = 1;
+            }
+        }
+    }
+    /* Both reflexes present, and between them worth one set. */
+    assert(saw_d && saw_l);
+    assert(proto_total == 1.0);
+    rg_corpus_free(corpus);
+}
+
+/* "parse error" names neither the line nor the reason, on a file that may have
+ * ten thousand rows. */
+static void test_load_failure_names_the_reason(void) {
+    rg_corpus *corpus = 0;
+    size_t line = 0;
+    const char *detail;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/missing_lect_column.tsv",
+                              0, &corpus) == RG_ERR_PARSE);
+    detail = rg_loader_last_error(&line);
+    assert(detail != 0);
+    assert(strstr(detail, "lect_id") != 0);
+    assert(line == 1);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -571,6 +635,8 @@ int main(void) {
     test_missing_file_and_columns();
     test_corpus_from_pairs();
     test_syllable_breaks_column();
+    test_doublets_expand_into_weighted_sets();
+    test_load_failure_names_the_reason();
     printf("loader tests passed\n");
     return 0;
 }
