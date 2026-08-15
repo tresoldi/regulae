@@ -2200,8 +2200,17 @@ static rg_status union_pair_alignment_edges(
         const rg_link *link = rg_alignment_link_at(alignment, link_i);
         size_t k;
         if (link->source_count == link->target_count) {
+            /* Reconciliation binds the positions that answer to each other,
+             * which for a reordering is not the diagonal. Binding `sk` to `ks`
+             * position by position makes /s/ and /k/ members of each other's
+             * class in both directions -- two false correspondences standing
+             * for one reordering. */
+            size_t pairing[RG_MAX_REORDER_SPAN];
+            int reordering = rg_link_is_reordering_internal(link->source, link->source_count,
+                                                            link->target, link->target_count, pairing);
             for (k = 0; k < link->source_count; k++) {
-                uf_union(uf, source_offset + source_pos + k, target_offset + target_pos + k);
+                size_t partner = reordering ? pairing[k] : k;
+                uf_union(uf, source_offset + source_pos + k, target_offset + target_pos + partner);
             }
         } else if (link->source_count != 0 && link->target_count != 0) {
             size_t sub_source_pos = 0;

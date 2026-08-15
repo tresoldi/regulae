@@ -726,6 +726,8 @@ rg_status rg_score_link_with_context_model_internal(
     }
     if (source_count != 1 || target_count != 1) {
         size_t paired = source_count < target_count ? source_count : target_count;
+        size_t pairing[RG_MAX_REORDER_SPAN];
+        int reordering = rg_link_is_reordering_internal(source, source_count, target, target_count, pairing);
         size_t i;
         int asymmetry = (int)source_count - (int)target_count;
         double total = 0.0;
@@ -734,13 +736,19 @@ rg_status rg_score_link_with_context_model_internal(
         }
         for (i = 0; i < paired; i++) {
             double pair_cost = 0.0;
+            /* A span whose target is its own segments in another order costs
+             * what the reordering costs, not what pretending each position
+             * substituted for the one below it would cost. Scoring it
+             * positionally makes metathesis look like a pile of unrelated
+             * substitutions and prices it out of the search. */
+            size_t partner = reordering ? pairing[i] : i;
             status = rg_score_link_with_context_model_internal(
                 ctx,
                 model,
                 options,
                 &source[i],
                 1,
-                &target[i],
+                &target[partner],
                 1,
                 link_context,
                 target_context,

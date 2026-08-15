@@ -2751,9 +2751,20 @@ static rg_status promote_chunk_rows(
                     break;
                 }
                 if (source_chunk_count > (size_t)max_chunk_size || target_chunk_count > (size_t)max_chunk_size) {
-                    segment_array_clear(source_chunk, source_chunk_count);
-                    segment_array_clear(target_chunk, target_chunk_count);
-                    break;
+                    /* A reordering is allowed past the chunk limit, for the
+                     * same reason the alignment search allows the span: a
+                     * transposition over any distance is one link covering
+                     * everything between the two segments that moved, and
+                     * capping it at the chunk width would let the search find
+                     * the reordering and then leave the model with no row
+                     * saying so. */
+                    size_t pairing[RG_MAX_REORDER_SPAN];
+                    if (!rg_link_is_reordering_internal(source_chunk, source_chunk_count,
+                                                        target_chunk, target_chunk_count, pairing)) {
+                        segment_array_clear(source_chunk, source_chunk_count);
+                        segment_array_clear(target_chunk, target_chunk_count);
+                        break;
+                    }
                 }
                 if (source_chunk_count == 0 || target_chunk_count == 0 ||
                     source_chunk_count + target_chunk_count < 3 ||
@@ -2836,6 +2847,12 @@ static rg_status promote_chunk_rows(
         rows[row_count].target_count = candidates[i].target_count;
         rows[row_count].cost = promoted - log_z_sum;
         rows[row_count].count = candidates[i].count;
+        {
+            size_t pairing[RG_MAX_REORDER_SPAN];
+            rows[row_count].reordering = rg_link_is_reordering_internal(
+                candidates[i].source, candidates[i].source_count,
+                candidates[i].target, candidates[i].target_count, pairing);
+        }
         rows[row_count].uncertainty = rg_wilson_default_internal(candidates[i].count, n_observations);
         row_count++;
     }

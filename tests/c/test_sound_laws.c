@@ -685,6 +685,49 @@ static void test_conditioning_works_in_any_feature_system(void) {
     }
 }
 
+/* A regular transposition is one event, and the alignment search is monotone,
+ * so its natural output is two correspondences running in opposite directions:
+ * /s/ answering /k/ and /k/ answering /s/. That is not a merger and it is not
+ * two changes, and until 2026-08-15 it is what regulae reported.
+ *
+ * Both fixtures assert the same thing from the other side: the segments
+ * correspond to themselves, because nothing about them changed. What changed
+ * was the order, and the chunk row carries that. */
+static void test_metathesis(rg_context *ctx) {
+    static const char *fixtures[] = { "metathesis_adjacent", "metathesis_distant" };
+    static const char *moved[2][2] = { { "s", "k" }, { "r", "l" } };
+    size_t f;
+    for (f = 0; f < 2; f++) {
+        rg_corpus *corpus = load(fixtures[f]);
+        rg_multi_model *model = train(ctx, corpus);
+        const rg_pairwise_model *pair = rg_multi_model_pair_model_at(model, 0)->model;
+        size_t i;
+        int reordering_recorded = 0;
+
+        /* Each transposed segment answers to itself. */
+        assert(has_correspondence(model, moved[f][0], moved[f][0]));
+        assert(has_correspondence(model, moved[f][1], moved[f][1]));
+        /* And not to the other one, which is the false reading. */
+        assert(!has_correspondence(model, moved[f][0], moved[f][1]));
+
+        for (i = 0; i < rg_pairwise_model_chunk_row_count(pair); i++) {
+            if (rg_pairwise_model_chunk_row_at(pair, i)->reordering) {
+                reordering_recorded = 1;
+            }
+        }
+        /* Adjacent transposition promotes and so is published as a row. The
+         * long-distance one is recovered -- the segments correspond to
+         * themselves, asserted above -- but its span has to clear chunk
+         * promotion to be published, and a seven-segment chunk rarely pays for
+         * itself. The reordering is in the analysis and not in the tables. */
+        if (f == 0) {
+            assert(reordering_recorded);
+        }
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
 /* Latin rhotacism is the textbook case of a change a phonological environment
  * gets wrong. Intervocalic /s/ became /r/ inside a morpheme -- *honos-is >
  * honoris -- and did not across a compound seam, where it stands between the
@@ -843,6 +886,7 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_metathesis(ctx);
     test_morphological_conditioning(ctx);
     test_no_boundaries_means_no_morphological_axis(ctx);
     test_rounding_harmony(ctx);

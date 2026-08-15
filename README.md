@@ -52,6 +52,12 @@ carrying:
 - **Chunk memoization.** Multi-segment correspondences that
   beat a BIC promotion test land in a phrase table and are
   used directly by subsequent alignments.
+- **Reorderings.** A span whose target is its own segments in
+  another order is read as a transposition, not as a pile of
+  substitutions: each segment corresponds to itself and the
+  chunk row records that the order changed. Long-distance
+  transposition too — the search takes a wider span when, and
+  only when, the two sides really are a permutation.
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy

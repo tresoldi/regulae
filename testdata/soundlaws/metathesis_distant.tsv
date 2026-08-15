@@ -1,0 +1,61 @@
+cognate_id	lect_id	segments
+w00	proto	p a r a k u l o
+w00	daughter	p a l a k u r o
+w01	proto	p e r a k u l o
+w01	daughter	p e l a k u r o
+w02	proto	p i r a k u l o
+w02	daughter	p i l a k u r o
+w03	proto	p o r a k u l o
+w03	daughter	p o l a k u r o
+w04	proto	p u r a k u l o
+w04	daughter	p u l a k u r o
+w05	proto	t a r a k u l o
+w05	daughter	t a l a k u r o
+w06	proto	t e r a k u l o
+w06	daughter	t e l a k u r o
+w07	proto	t i r a k u l o
+w07	daughter	t i l a k u r o
+w08	proto	t o r a k u l o
+w08	daughter	t o l a k u r o
+w09	proto	t u r a k u l o
+w09	daughter	t u l a k u r o
+w10	proto	k a r a k u l o
+w10	daughter	k a l a k u r o
+w11	proto	k e r a k u l o
+w11	daughter	k e l a k u r o
+w12	proto	k i r a k u l o
+w12	daughter	k i l a k u r o
+w13	proto	k o r a k u l o
+w13	daughter	k o l a k u r o
+w14	proto	k u r a k u l o
+w14	daughter	k u l a k u r o
+w15	proto	m a r a k u l o
+w15	daughter	m a l a k u r o
+w16	proto	m e r a k u l o
+w16	daughter	m e l a k u r o
+w17	proto	m i r a k u l o
+w17	daughter	m i l a k u r o
+w18	proto	m o r a k u l o
+w18	daughter	m o l a k u r o
+w19	proto	m u r a k u l o
+w19	daughter	m u l a k u r o
+c00	proto	p a m a n u
+c00	daughter	p a m a n u
+c01	proto	p e m a n u
+c01	daughter	p e m a n u
+c02	proto	p i m a n u
+c02	daughter	p i m a n u
+c03	proto	p o m a n u
+c03	daughter	p o m a n u
+c04	proto	p u m a n u
+c04	daughter	p u m a n u
+c05	proto	t a m a n u
+c05	daughter	t a m a n u
+c06	proto	t e m a n u
+c06	daughter	t e m a n u
+c07	proto	t i m a n u
+c07	daughter	t i m a n u
+c08	proto	t o m a n u
+c08	daughter	t o m a n u
+c09	proto	t u m a n u
+c09	daughter	t u m a n u

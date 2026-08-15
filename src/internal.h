@@ -15,6 +15,9 @@
  * then smallest target span). Three orders of magnitude below the chunk
  * complexity penalty, so real tie-breaks still decide. */
 #define RG_TIE_EPSILON 1e-12
+/* The longest span a reordering is looked for over. Attested metathesis is
+ * local: two or three segments transpose. */
+#define RG_MAX_REORDER_SPAN 8
 /* How much of the search is charged for. The split penalty gains
  * gamma * 2 * ln(candidates); gamma = 1 is the full extended-BIC term.
  *
@@ -147,6 +150,22 @@ size_t rg_model_classes_at_internal(
 
 char *rg_strdup_internal(const char *value);
 char *rg_strndup_internal(const char *text, size_t length);
+
+/* Whether a link's target is the same multiset of graphemes as its source in a
+ * different order -- a reordering rather than a set of substitutions.
+ *
+ * The alignment DP is monotone, so it can only express this by pairing the
+ * spans positionally, which reads as "s corresponds to k and k to s". That is
+ * two false correspondences describing one event, and it is what a reader
+ * takes away unless the reordering is recognised as such. Fills `pairing` with
+ * the target index each source index answers to. */
+int rg_link_is_reordering_internal(
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    size_t *pairing
+);
 void rg_segment_clear_internal(rg_segment *segment);
 rg_status rg_segment_copy_internal(const rg_segment *src, rg_segment *out);
 void rg_context_spec_clear_internal(rg_context_spec *context);

@@ -267,7 +267,8 @@ static void print_pairwise(const rg_multi_model *model) {
             for (k = 0; k < chunk->target_count; k++) {
                 printf("%s", chunk->target[k].grapheme);
             }
-            printf("\t%.6f\t%.6f\n", chunk->cost, chunk->count);
+            printf("\t%.6f\t%.6f\t%s\n", chunk->cost, chunk->count,
+                   chunk->reordering ? "reordering" : "-");
         }
         for (i = 0; i < rg_pairwise_model_tonal_count_row_count(pm); i++) {
             const rg_tonal_count_row *tone = rg_pairwise_model_tonal_count_row_at(pm, i);

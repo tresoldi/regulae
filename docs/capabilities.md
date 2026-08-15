@@ -37,16 +37,16 @@ Trained through the wide loader with default options.
 | arabic_hebrew | arabic, hebrew | 33 | 4 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
 | finnish_estonian | estonian, finnish | 36 | 2 |
-| georgian_svan | georgian, svan | 51 | 6 |
+| georgian_svan | georgian, svan | 51 | 9 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 82 | 16 |
-| latin_italian | italian, latin | 70 | 13 |
-| latin_spanish | latin, spanish | 60 | 20 |
+| latin_french | french, latin | 82 | 15 |
+| latin_italian | italian, latin | 69 | 14 |
+| latin_spanish | latin, spanish | 62 | 20 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 48 | 7 |
 | navajo_chipewyan | chipewyan, navajo | 53 | 2 |
 | oe_english | modern_english, old_english | 60 | 13 |
-| ppn_hawaiian | hawaiian, ppn | 23 | 4 |
+| ppn_hawaiian | hawaiian, ppn | 22 | 4 |
 | swahili_zulu | swahili, zulu | 41 | 2 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
 | tone_chinese_like | cantonese, mandarin | 50 | 15 |

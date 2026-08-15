@@ -205,6 +205,26 @@ by nothing at all. The boundaries come from a `breaks` column, which the long
 TSV loader learned to read for this — the wide loader has carried
 `<lect>_breaks` all along.
 
+### `metathesis_adjacent.tsv` and `metathesis_distant.tsv` — one event, not two
+
+Proto /sk/ answers daughter /ks/ in the first; /r/ and /l/ exchange places
+across three intervening segments in the second, which is the Spanish *milagro*
+< Latin *miraculo* shape.
+
+The alignment search is monotone, so its natural output for a transposition is
+two correspondences running in opposite directions: /s/ answering /k/ **and**
+/k/ answering /s/. That is not a merger, it is not two changes, and a reader
+who takes it at face value concludes something false about both segments. It is
+what regulae reported until 2026-08-15.
+
+Both fixtures assert the opposite: each transposed segment corresponds to
+itself, because nothing about the segments changed — the order did.
+
+The two are separate because they need different machinery. Adjacent
+transposition fits inside a chunk. Long-distance transposition does not: the
+search can only express it as one link covering everything between the two
+segments that moved, which is wider than a chunk is allowed to be.
+
 ## Adding one
 
 A fixture earns its place by being able to fail. Before adding one, write down

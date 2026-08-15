@@ -192,6 +192,43 @@ all. `testdata/soundlaws/rounding_harmony.tsv` — twenty-four regular instances
 environments differing in rounding alone — produced nothing under it. A
 vocabulary that fits one family is a claim about the others.
 
+### Reorderings
+
+A transposition is one event and the alignment search is monotone, so the
+search's natural output for it is two correspondences running in opposite
+directions — /s/ answering /k/ and /k/ answering /s/. Nothing about the
+segments changed; the order did.
+
+A span whose target is its own segments in another order is recognised as such
+(`rg_link_is_reordering_internal`) and handled in three places:
+
+- **Scoring.** The span costs what the reordering costs — each segment against
+  the one it actually answers to — rather than what pretending each position
+  substituted for the one below it would cost. Scoring it positionally prices
+  metathesis out of the search.
+- **Reconciliation.** Union-find binds the positions that answer to each other,
+  which for a reordering is not the diagonal. Binding it positionally makes the
+  two segments members of each other's class in both directions.
+- **The chunk row.** `rg_chunk_row.reordering` says the promotion was a
+  reordering, so the model records that something happened where the segment
+  table shows only identities.
+
+**Distance.** Adjacent transposition fits inside a chunk. Anything wider does
+not: a monotone search can only express it as one link covering everything
+between the two segments that moved, and Spanish *milagro* against Latin
+*miraculo* needs five. So a span up to `RG_MAX_REORDER_SPAN` enters the search
+as one extra candidate when — and only when — the two sides really are the same
+segments in a different order. That test is cheap and fails on the first
+grapheme they do not share. It is one candidate rather than a raised chunk
+limit, which would admit every ragged span of that width as well.
+
+**What is not published.** A long-distance reordering is recovered — the
+segments correspond to themselves, and the classes come out right — but it is
+only written into the model as a row if its span also clears chunk promotion,
+and a seven-segment chunk rarely pays for its parameters. So the analysis has
+it and the tables do not. Closing that needs a row type of its own, gated on
+its own regularity rather than on the chunk test.
+
 ### Morphological environments
 
 A morpheme boundary is not a sound, and a change that respects one is not

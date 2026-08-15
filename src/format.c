@@ -354,6 +354,9 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         append_segments(&builder, row->source, row->source_count);
         builder_append(&builder, " ~ ");
         append_segments(&builder, row->target, row->target_count);
+        if (row->reordering) {
+            builder_append(&builder, "   [reordering]");
+        }
         builder_append(&builder, "\n");
         shown++;
     }

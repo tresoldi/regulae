@@ -1265,6 +1265,9 @@ static rg_status align_forms_internal(
         for (j = 0; j <= m && status == RG_OK; j++) {
             size_t k_max;
             size_t l_max;
+            size_t base_k_max;
+            size_t base_l_max;
+            size_t reorder_span;
             size_t k;
             size_t l;
             if (i == 0 && j == 0) {
@@ -1272,12 +1275,65 @@ static rg_status align_forms_internal(
             }
             k_max = (size_t)max_chunk_size < i ? (size_t)max_chunk_size : i;
             l_max = (size_t)max_chunk_size < j ? (size_t)max_chunk_size : j;
+            base_k_max = k_max;
+            base_l_max = l_max;
+            reorder_span = 0;
+            /* A span whose target is its own segments in another order is
+             * allowed past the chunk limit, up to RG_MAX_REORDER_SPAN.
+             *
+             * The search is monotone, so a transposition can only be expressed
+             * as one link covering everything between the two segments that
+             * moved -- and for anything but an adjacent swap that is wider
+             * than a chunk is allowed to be. Spanish milagro against Latin
+             * miraculo needs five. The widening is not free, so it applies
+             * only where the span really is a permutation, which is a cheap
+             * test that fails on the first grapheme the two sides do not
+             * share. */
+            /* One extra candidate: the widest equal-length span ending here
+             * whose two sides are the same segments in a different order.
+             *
+             * The search is monotone, so a transposition can only be expressed
+             * as a single link covering everything between the two segments
+             * that moved, and for anything but an adjacent swap that is wider
+             * than a chunk may be. Spanish milagro against Latin miraculo
+             * needs five. It enters as one candidate rather than by raising
+             * the chunk limit, which would admit every ragged span up to that
+             * width as well. The span is taken from whichever side is shorter,
+             * so exchanging the lects cannot change what the search sees. */
+            {
+                size_t widest = i < j ? i : j;
+                size_t span;
+                if (widest > RG_MAX_REORDER_SPAN) {
+                    widest = RG_MAX_REORDER_SPAN;
+                }
+                for (span = widest; span > base_k_max || span > base_l_max; span--) {
+                    size_t pairing[RG_MAX_REORDER_SPAN];
+                    if (span <= 1) {
+                        break;
+                    }
+                    if (rg_link_is_reordering_internal(source->segments + (i - span), span,
+                                                       target->segments + (j - span), span, pairing)) {
+                        reorder_span = span;
+                        break;
+                    }
+                }
+                if (reorder_span > k_max) {
+                    k_max = reorder_span;
+                }
+                if (reorder_span > l_max) {
+                    l_max = reorder_span;
+                }
+            }
             for (k = 0; k <= k_max && status == RG_OK; k++) {
                 for (l = 0; l <= l_max; l++) {
                     double prev;
                     double link_cost = 0.0;
                     double total;
                     if (k == 0 && l == 0) {
+                        continue;
+                    }
+                    if ((k > base_k_max || l > base_l_max) &&
+                        !(k == reorder_span && l == reorder_span)) {
                         continue;
                     }
                     prev = cost[(i - k) * width + (j - l)];

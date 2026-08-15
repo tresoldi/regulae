@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 12
+#define RG_ABI_VERSION 13
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -332,6 +332,11 @@ typedef struct rg_chunk_row {
     size_t target_count;
     double cost;
     double count;
+    /* Set when the target is the source's own segments in another order: a
+     * reordering, not a set of substitutions. The segment table records the
+     * matching pairs -- s answering s, k answering k -- so without this the
+     * model would say nothing happened. */
+    int reordering;
     rg_uncertainty_estimate uncertainty;
 } rg_chunk_row;
 

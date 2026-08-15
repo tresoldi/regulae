@@ -1,0 +1,61 @@
+cognate_id	lect_id	segments
+w00	proto	p a s k a
+w00	daughter	p a k s a
+w01	proto	p a s k e
+w01	daughter	p a k s e
+w02	proto	p a s k i
+w02	daughter	p a k s i
+w03	proto	p a s k o
+w03	daughter	p a k s o
+w04	proto	p a s k u
+w04	daughter	p a k s u
+w05	proto	p e s k a
+w05	daughter	p e k s a
+w06	proto	p e s k e
+w06	daughter	p e k s e
+w07	proto	p e s k i
+w07	daughter	p e k s i
+w08	proto	p e s k o
+w08	daughter	p e k s o
+w09	proto	p e s k u
+w09	daughter	p e k s u
+w10	proto	p i s k a
+w10	daughter	p i k s a
+w11	proto	p i s k e
+w11	daughter	p i k s e
+w12	proto	p i s k i
+w12	daughter	p i k s i
+w13	proto	p i s k o
+w13	daughter	p i k s o
+w14	proto	p i s k u
+w14	daughter	p i k s u
+w15	proto	p o s k a
+w15	daughter	p o k s a
+w16	proto	p o s k e
+w16	daughter	p o k s e
+w17	proto	p o s k i
+w17	daughter	p o k s i
+w18	proto	p o s k o
+w18	daughter	p o k s o
+w19	proto	p o s k u
+w19	daughter	p o k s u
+c00	proto	p a l a
+c00	daughter	p a l a
+c01	proto	p e l e
+c01	daughter	p e l e
+c02	proto	p i l i
+c02	daughter	p i l i
+c03	proto	p o l o
+c03	daughter	p o l o
+c04	proto	p u l u
+c04	daughter	p u l u
+c05	proto	t a l a
+c05	daughter	t a l a
+c06	proto	t e l e
+c06	daughter	t e l e
+c07	proto	t i l i
+c07	daughter	t i l i
+c08	proto	t o l o
+c08	daughter	t o l o
+c09	proto	t u l u
+c09	daughter	t u l u
