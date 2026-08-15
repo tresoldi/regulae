@@ -68,6 +68,29 @@ void morpheme_placement(
     }
 }
 
+/* Two builders for one concept, and they do not agree.
+ *
+ * This one borrows: every slot points into the caller's precomputed per-form
+ * arrays, nothing is allocated, and clearing the result would free memory the
+ * form still owns. The DP scores against it, once per transition, which is why
+ * it may not allocate. `build_link_context` below owns what it returns and is
+ * what a published link carries.
+ *
+ * Where they diverge, and it is not cosmetic: when `syllables` is absent or
+ * empty this one returns after the immediate neighbours, so the distance,
+ * existential and stress slots stay empty, while the owning builder fills all
+ * three -- it computes the distance slots inline from `source_features` and
+ * reads stress off the segments rather than off the syllable data. So on such a
+ * form the link carries an environment the DP never scored against. They also
+ * disagree about `position`: this one stores a literal and that one a strdup,
+ * while `rg_context_spec_clear_internal` frees it unconditionally, which is why
+ * a borrowed context must never be cleared.
+ *
+ * Both are left standing here on purpose. Making them one changes which
+ * environment the DP sees, and that is a change to what regulae learns, not a
+ * tidy-up; it belongs with moving the cross-dimensional overlay into the DP,
+ * where the environment is built once per position and the question is already
+ * on the table. See docs/architecture_plan.md, phase 6. */
 void build_link_context_borrowed(
     const rg_form *source,
     const rg_feature_constraint *const *source_features,

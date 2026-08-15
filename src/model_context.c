@@ -1,4 +1,5 @@
 #include "model_internal.h"
+#include "environment.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -70,223 +71,6 @@ static rg_status append_context_observation_as(
     return RG_OK;
 }
 
-static int context_has_constraint(const rg_feature_constraint *items, size_t count, const char *feature, const char *value) {
-    size_t i;
-    for (i = 0; i < count; i++) {
-        if (strcmp(items[i].feature, feature) == 0 && strcmp(items[i].value, value) == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-static int context_has_distance_constraint(const rg_distance_constraint *items, size_t count, int offset, const char *feature, const char *value) {
-    size_t i;
-    for (i = 0; i < count; i++) {
-        if (items[i].offset == offset &&
-            strcmp(items[i].constraint.feature, feature) == 0 &&
-            strcmp(items[i].constraint.value, value) == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
-
-int rg_predicate_holds_internal(const rg_context_spec *context, const rg_split_candidate *candidate) {
-    if (strcmp(candidate->slot, "following") == 0) {
-        return context_has_constraint(context->following, context->following_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "preceding") == 0) {
-        return context_has_constraint(context->preceding, context->preceding_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "position") == 0) {
-        return context->position != 0 && strcmp(context->position, candidate->feature) == 0;
-    }
-    if (strcmp(candidate->slot, "morphological") == 0) {
-        return context->morphological != 0 && strcmp(context->morphological, candidate->feature) == 0;
-    }
-    if (strcmp(candidate->slot, "morpheme_index") == 0) {
-        return context->morpheme_index != 0 && strcmp(context->morpheme_index, candidate->feature) == 0;
-    }
-    if (strcmp(candidate->slot, "preceding@2") == 0) {
-        return context_has_distance_constraint(context->preceding_at_distance, context->preceding_at_distance_count, 2, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "preceding@3") == 0) {
-        return context_has_distance_constraint(context->preceding_at_distance, context->preceding_at_distance_count, 3, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "following@2") == 0) {
-        return context_has_distance_constraint(context->following_at_distance, context->following_at_distance_count, 2, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "following@3") == 0) {
-        return context_has_distance_constraint(context->following_at_distance, context->following_at_distance_count, 3, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "somewhere_preceding") == 0) {
-        return context_has_constraint(context->somewhere_preceding, context->somewhere_preceding_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "somewhere_following") == 0) {
-        return context_has_constraint(context->somewhere_following, context->somewhere_following_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "same_syllable") == 0) {
-        return context_has_constraint(context->same_syllable, context->same_syllable_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "next_syllable") == 0) {
-        return context_has_constraint(context->next_syllable, context->next_syllable_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "previous_syllable") == 0) {
-        return context_has_constraint(context->previous_syllable, context->previous_syllable_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "self") == 0) {
-        return context_has_constraint(context->self, context->self_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "self_stress") == 0) {
-        return context_has_constraint(context->self_stress, context->self_stress_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "preceding_stress") == 0) {
-        return context_has_constraint(context->preceding_stress, context->preceding_stress_count, candidate->feature, candidate->value);
-    }
-    if (strcmp(candidate->slot, "following_stress") == 0) {
-        return context_has_constraint(context->following_stress, context->following_stress_count, candidate->feature, candidate->value);
-    }
-    return 0;
-}
-
-rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate, rg_context_spec *out) {
-    rg_feature_constraint constraint;
-    rg_distance_constraint distance;
-    rg_status status;
-    rg_context_spec_init_empty(out);
-    if (strcmp(candidate->slot, "position") == 0) {
-        out->position = rg_strdup_internal(candidate->feature);
-        return out->position == 0 ? RG_ERR_OOM : RG_OK;
-    }
-    if (strcmp(candidate->slot, "morphological") == 0) {
-        out->morphological = rg_strdup_internal(candidate->feature);
-        return out->morphological == 0 ? RG_ERR_OOM : RG_OK;
-    }
-    if (strcmp(candidate->slot, "morpheme_index") == 0) {
-        out->morpheme_index = rg_strdup_internal(candidate->feature);
-        return out->morpheme_index == 0 ? RG_ERR_OOM : RG_OK;
-    }
-    constraint.feature = candidate->feature;
-    constraint.value = candidate->value;
-    if (strcmp(candidate->slot, "following") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->following);
-        if (status == RG_OK) {
-            out->following_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "preceding") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->preceding);
-        if (status == RG_OK) {
-            out->preceding_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "somewhere_preceding") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->somewhere_preceding);
-        if (status == RG_OK) {
-            out->somewhere_preceding_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "somewhere_following") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->somewhere_following);
-        if (status == RG_OK) {
-            out->somewhere_following_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "same_syllable") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->same_syllable);
-        if (status == RG_OK) {
-            out->same_syllable_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "next_syllable") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->next_syllable);
-        if (status == RG_OK) {
-            out->next_syllable_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "previous_syllable") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->previous_syllable);
-        if (status == RG_OK) {
-            out->previous_syllable_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "self") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->self);
-        if (status == RG_OK) {
-            out->self_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "self_stress") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->self_stress);
-        if (status == RG_OK) {
-            out->self_stress_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "preceding_stress") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->preceding_stress);
-        if (status == RG_OK) {
-            out->preceding_stress_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "following_stress") == 0) {
-        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->following_stress);
-        if (status == RG_OK) {
-            out->following_stress_count = 1;
-        }
-        return status;
-    }
-    if (strcmp(candidate->slot, "preceding@2") == 0 || strcmp(candidate->slot, "preceding@3") == 0) {
-        distance.offset = strcmp(candidate->slot, "preceding@2") == 0 ? 2 : 3;
-        distance.constraint = constraint;
-        {
-            rg_distance_constraint *items = (rg_distance_constraint *)calloc(1, sizeof(*items));
-            if (items == 0) {
-                return RG_ERR_OOM;
-            }
-            items[0].offset = distance.offset;
-            status = rg_feature_constraint_copy_internal(&distance.constraint, &items[0].constraint);
-            if (status != RG_OK) {
-                free(items);
-                return status;
-            }
-            out->preceding_at_distance = items;
-            out->preceding_at_distance_count = 1;
-        }
-        return RG_OK;
-    }
-    if (strcmp(candidate->slot, "following@2") == 0 || strcmp(candidate->slot, "following@3") == 0) {
-        distance.offset = strcmp(candidate->slot, "following@2") == 0 ? 2 : 3;
-        distance.constraint = constraint;
-        {
-            rg_distance_constraint *items = (rg_distance_constraint *)calloc(1, sizeof(*items));
-            if (items == 0) {
-                return RG_ERR_OOM;
-            }
-            items[0].offset = distance.offset;
-            status = rg_feature_constraint_copy_internal(&distance.constraint, &items[0].constraint);
-            if (status != RG_OK) {
-                free(items);
-                return status;
-            }
-            out->following_at_distance = items;
-            out->following_at_distance_count = 1;
-        }
-        return RG_OK;
-    }
-    return RG_ERR_INVALID_ARGUMENT;
-}
-
 typedef struct target_mass {
     const char *target;
     double mass;
@@ -348,20 +132,6 @@ static rg_status append_unique_source(const char ***items, size_t *count, size_t
 
 static const char *const split_positions[] = {"initial", "medial", "final"};
 
-static const char *const stress_slot_names[] = {"self_stress", "preceding_stress", "following_stress"};
-
-
-static const char *const long_range_slot_names[] = {
-    "same_syllable",
-    "next_syllable",
-    "previous_syllable",
-    "preceding@2",
-    "preceding@3",
-    "following@2",
-    "following@3",
-    "somewhere_preceding",
-    "somewhere_following"
-};
 
 typedef struct stress_inventory {
     char **values;
@@ -543,7 +313,7 @@ static size_t immediate_candidates_for(
             }
         }
     }
-    for (s = 0; s < sizeof(stress_slot_names) / sizeof(stress_slot_names[0]); s++) {
+    for (s = 0; s < rg_env_stress_slot_count; s++) {
         const rg_feature_constraint *existing = 0;
         size_t existing_count = 0;
         if (s == 0) {
@@ -567,7 +337,7 @@ static size_t immediate_candidates_for(
                 }
             }
             if (!skip && count < capacity) {
-                out[count].slot = stress_slot_names[s];
+                out[count].slot = rg_env_stress_slots[s];
                 out[count].feature = "stress";
                 out[count].value = stress->values[i];
                 count++;
@@ -596,21 +366,21 @@ static size_t long_range_candidates(
     size_t count = 0;
     size_t s;
     size_t f;
-    for (s = 0; s < sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]); s++) {
+    for (s = 0; s < rg_env_long_range_slot_count; s++) {
         for (f = 0; f < vocabulary->count; f++) {
             if (count < capacity) {
-                out[count].slot = long_range_slot_names[s];
+                out[count].slot = rg_env_long_range_slots[s];
                 out[count].feature = vocabulary->entries[f].feature;
                 out[count].value = vocabulary->entries[f].value;
                 count++;
             }
         }
-        if (strcmp(long_range_slot_names[s], "same_syllable") == 0 ||
-            strcmp(long_range_slot_names[s], "next_syllable") == 0 ||
-            strcmp(long_range_slot_names[s], "previous_syllable") == 0) {
+        if (strcmp(rg_env_long_range_slots[s], "same_syllable") == 0 ||
+            strcmp(rg_env_long_range_slots[s], "next_syllable") == 0 ||
+            strcmp(rg_env_long_range_slots[s], "previous_syllable") == 0) {
             for (f = 0; f < sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]); f++) {
                 if (count < capacity) {
-                    out[count].slot = long_range_slot_names[s];
+                    out[count].slot = rg_env_long_range_slots[s];
                     out[count].feature = syllable_shape_candidates[f].feature;
                     out[count].value = syllable_shape_candidates[f].value;
                     count++;
@@ -621,157 +391,6 @@ static size_t long_range_candidates(
     return count;
 }
 
-/* base_context extended with one more constraint. Contexts are immutable by
- * convention, so this always allocates a fresh value. */
-/* Conjoins one more predicate onto a context. The multi-lect stage needs the
- * same operation the pairwise refinement does, and a conditioning environment
- * built from two predicates is one context, not two rules. */
-rg_status rg_context_extend_internal(
-    const rg_context_spec *base_context,
-    const split_candidate *candidate,
-    rg_context_spec *out
-) {
-    rg_feature_constraint *merged = 0;
-    const rg_feature_constraint **slot = 0;
-    size_t *slot_count = 0;
-    const rg_feature_constraint *existing = 0;
-    size_t existing_count = 0;
-    rg_feature_constraint addition;
-    rg_status status;
-
-    status = rg_context_spec_copy_internal(base_context, out);
-    if (status != RG_OK) {
-        return status;
-    }
-    if (strcmp(candidate->slot, "position") == 0) {
-        rg_free_owned_internal(out->position);
-        out->position = rg_strdup_internal(candidate->feature);
-        if (out->position == 0) {
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-        return RG_OK;
-    }
-    if (strcmp(candidate->slot, "morphological") == 0) {
-        rg_free_owned_internal(out->morphological);
-        out->morphological = rg_strdup_internal(candidate->feature);
-        if (out->morphological == 0) {
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-        return RG_OK;
-    }
-    if (strcmp(candidate->slot, "morpheme_index") == 0) {
-        rg_free_owned_internal(out->morpheme_index);
-        out->morpheme_index = rg_strdup_internal(candidate->feature);
-        if (out->morpheme_index == 0) {
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-        return RG_OK;
-    }
-    addition.feature = candidate->feature;
-    addition.value = candidate->value;
-
-#define PICK(name, field)                                     \
-    if (strcmp(candidate->slot, name) == 0) {                 \
-        slot = &out->field;                                   \
-        slot_count = &out->field##_count;                     \
-        existing = out->field;                                \
-        existing_count = out->field##_count;                  \
-    }
-
-    PICK("preceding", preceding)
-    PICK("following", following)
-    PICK("somewhere_preceding", somewhere_preceding)
-    PICK("somewhere_following", somewhere_following)
-    PICK("same_syllable", same_syllable)
-    PICK("next_syllable", next_syllable)
-    PICK("previous_syllable", previous_syllable)
-    PICK("self", self)
-    PICK("self_stress", self_stress)
-    PICK("preceding_stress", preceding_stress)
-    PICK("following_stress", following_stress)
-
-#undef PICK
-
-    if (slot == 0) {
-        rg_distance_constraint *items;
-        int offset;
-        size_t base_count;
-        const rg_distance_constraint *base_items;
-        size_t i;
-        int preceding;
-        if (strncmp(candidate->slot, "preceding@", 10) == 0) {
-            preceding = 1;
-            offset = atoi(candidate->slot + 10);
-            base_items = out->preceding_at_distance;
-            base_count = out->preceding_at_distance_count;
-        } else if (strncmp(candidate->slot, "following@", 10) == 0) {
-            preceding = 0;
-            offset = atoi(candidate->slot + 10);
-            base_items = out->following_at_distance;
-            base_count = out->following_at_distance_count;
-        } else {
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_INVALID_ARGUMENT;
-        }
-        items = (rg_distance_constraint *)calloc(base_count + 1, sizeof(*items));
-        if (items == 0) {
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-        for (i = 0; i < base_count; i++) {
-            items[i].offset = base_items[i].offset;
-            if (rg_feature_constraint_copy_internal(&base_items[i].constraint, &items[i].constraint) != RG_OK) {
-                rg_distance_constraint_array_clear_internal(items, i);
-                rg_context_spec_clear_internal(out);
-                return RG_ERR_OOM;
-            }
-        }
-        items[base_count].offset = offset;
-        if (rg_feature_constraint_copy_internal(&addition, &items[base_count].constraint) != RG_OK) {
-            rg_distance_constraint_array_clear_internal(items, base_count);
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-        if (preceding) {
-            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->preceding_at_distance), out->preceding_at_distance_count);
-            out->preceding_at_distance = items;
-            out->preceding_at_distance_count = base_count + 1;
-        } else {
-            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->following_at_distance), out->following_at_distance_count);
-            out->following_at_distance = items;
-            out->following_at_distance_count = base_count + 1;
-        }
-        return RG_OK;
-    }
-
-    merged = (rg_feature_constraint *)calloc(existing_count + 1, sizeof(*merged));
-    if (merged == 0) {
-        rg_context_spec_clear_internal(out);
-        return RG_ERR_OOM;
-    }
-    {
-        size_t i;
-        for (i = 0; i < existing_count; i++) {
-            if (rg_feature_constraint_copy_internal(&existing[i], &merged[i]) != RG_OK) {
-                rg_feature_constraint_array_clear_internal(merged, i);
-                rg_context_spec_clear_internal(out);
-                return RG_ERR_OOM;
-            }
-        }
-        if (rg_feature_constraint_copy_internal(&addition, &merged[existing_count]) != RG_OK) {
-            rg_feature_constraint_array_clear_internal(merged, existing_count);
-            rg_context_spec_clear_internal(out);
-            return RG_ERR_OOM;
-        }
-    }
-    rg_feature_constraint_array_clear_internal(existing, existing_count);
-    *slot = merged;
-    *slot_count = existing_count + 1;
-    return RG_OK;
-}
 
 /* Negative log-likelihood of a group under a single unconditioned
  * correspondence. Target keys are summed in sorted order so repeated runs
@@ -1513,9 +1132,9 @@ static rg_status discover_context_counts(
             sizeof(split_positions) / sizeof(split_positions[0]) +
             3 * stress.count + 8 + morphology.placement_count + morphology.index_count;
         size_t long_cap =
-            sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
+            rg_env_long_range_slot_count *
             (vocabulary->count == 0 ? 1 : vocabulary->count) +
-            sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
+            rg_env_long_range_slot_count *
             sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]);
         rg_context_spec empty;
         immediate_list = (split_candidate *)calloc(immediate_cap, sizeof(*immediate_list));

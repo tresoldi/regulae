@@ -1,4 +1,5 @@
 #include "multilect_internal.h"
+#include "environment.h"
 
 #include <math.h>
 #include <stdlib.h>
@@ -7,24 +8,6 @@
 /* ---- multi-lect context discovery ------------------------------------- */
 
 
-static const char *const multi_long_range_slots[] = {
-    "same_syllable",
-    "next_syllable",
-    "previous_syllable",
-    "preceding@2",
-    "preceding@3",
-    "following@2",
-    "following@3",
-    "somewhere_preceding",
-    "somewhere_following"
-};
-
-
-static const char *const multi_stress_slots[] = {
-    "self_stress",
-    "preceding_stress",
-    "following_stress"
-};
 
 typedef struct sister_tuple {
     char *key;
@@ -379,8 +362,8 @@ static rg_status collect_stress_values(discovery_state *state, const rg_context_
  * because every multi-lect split is searched against an empty base context. */
 static rg_status build_candidate_lists(discovery_state *state, const rg_feature_vocabulary *vocabulary) {
     size_t immediate_total = 2 * vocabulary->count;
-    size_t slot_count = sizeof(multi_stress_slots) / sizeof(multi_stress_slots[0]);
-    size_t long_slots = sizeof(multi_long_range_slots) / sizeof(multi_long_range_slots[0]);
+    size_t slot_count = rg_env_stress_slot_count;
+    size_t long_slots = rg_env_long_range_slot_count;
     size_t long_features = vocabulary->count == 0 ? 1 : vocabulary->count;
     size_t total = immediate_total + slot_count * state->stress_count
         + state->morph_placement_count + state->morph_index_count;
@@ -404,7 +387,7 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     }
     for (s = 0; s < slot_count; s++) {
         for (i = 0; i < state->stress_count; i++) {
-            state->immediate[n].slot = multi_stress_slots[s];
+            state->immediate[n].slot = rg_env_stress_slots[s];
             state->immediate[n].feature = "stress";
             state->immediate[n].value = state->stress_values[i];
             n++;
@@ -431,7 +414,7 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     n = 0;
     for (s = 0; s < long_slots; s++) {
         for (i = 0; i < vocabulary->count; i++) {
-            state->long_range[n].slot = multi_long_range_slots[s];
+            state->long_range[n].slot = rg_env_long_range_slots[s];
             state->long_range[n].feature = vocabulary->entries[i].feature;
             state->long_range[n].value = vocabulary->entries[i].value;
             n++;

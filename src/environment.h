@@ -82,4 +82,17 @@
  * moved every class id downstream. */
 int rg_context_spec_compare_internal(const rg_context_spec *a, const rg_context_spec *b);
 
+/* The slots a candidate may name in each of the two families the discovery
+ * stages search over. Both the pairwise and the multi-lect stage build
+ * candidate lists from them, and until they were shared each kept its own copy
+ * of the same strings in the same order.
+ *
+ * These are subsets of the slot list above, not the whole of it: the immediate
+ * neighbours, position and morphology are enumerated where a stage decides what
+ * it can afford to search, which differs between the two. */
+extern const char *const rg_env_long_range_slots[];
+extern const size_t rg_env_long_range_slot_count;
+extern const char *const rg_env_stress_slots[];
+extern const size_t rg_env_stress_slot_count;
+
 #endif

@@ -306,3 +306,299 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
 #undef CLEAR_DISTANCES
     rg_context_spec_init_empty(context);
 }
+
+/* ---- The candidate slot vocabulary -------------------------------------
+ *
+ * A candidate names its slot as a string. Three of the eighteen slots hold a
+ * single string and are matched on the candidate's `feature` alone; eleven hold
+ * a feature-constraint list and are matched on `feature` and `value`; the two
+ * distance slots are named with the offset attached -- "preceding@2",
+ * "following@3" -- because one field holds constraints at several distances and
+ * the name has to say which. That is the whole vocabulary, and these three
+ * functions are the only readers of it: one asks whether a candidate holds of
+ * an environment, one builds an environment from a candidate, one conjoins a
+ * candidate onto an environment. They agreed by inspection across forty-five
+ * strcmp branches in three chains until they were expanded from one list.
+ */
+
+#define RG_ENV_DISTANCE_PREFIX_LEN 10
+
+/* Splits "preceding@2" into the field it names and the offset it carries.
+ * Returns 0 when the slot is not a distance slot. */
+static int distance_slot(
+    const char *slot,
+    const rg_context_spec *context,
+    const rg_distance_constraint **items,
+    size_t *count,
+    int *offset,
+    int *is_preceding
+) {
+    if (strncmp(slot, "preceding@", RG_ENV_DISTANCE_PREFIX_LEN) == 0) {
+        *is_preceding = 1;
+        *items = context == 0 ? 0 : context->preceding_at_distance;
+        *count = context == 0 ? 0 : context->preceding_at_distance_count;
+    } else if (strncmp(slot, "following@", RG_ENV_DISTANCE_PREFIX_LEN) == 0) {
+        *is_preceding = 0;
+        *items = context == 0 ? 0 : context->following_at_distance;
+        *count = context == 0 ? 0 : context->following_at_distance_count;
+    } else {
+        return 0;
+    }
+    *offset = atoi(slot + RG_ENV_DISTANCE_PREFIX_LEN);
+    return 1;
+}
+
+static int context_has_constraint(
+    const rg_feature_constraint *items,
+    size_t count,
+    const char *feature,
+    const char *value
+) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (strcmp(items[i].feature, feature) == 0 && strcmp(items[i].value, value) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int context_has_distance_constraint(
+    const rg_distance_constraint *items,
+    size_t count,
+    int offset,
+    const char *feature,
+    const char *value
+) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (items[i].offset == offset &&
+            strcmp(items[i].constraint.feature, feature) == 0 &&
+            strcmp(items[i].constraint.value, value) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int rg_predicate_holds_internal(const rg_context_spec *context, const rg_split_candidate *candidate) {
+    const rg_distance_constraint *items;
+    size_t count;
+    int offset;
+    int is_preceding;
+#define HOLDS_STRING(name)                                                      \
+    if (strcmp(candidate->slot, #name) == 0) {                                  \
+        return context->name != 0 && strcmp(context->name, candidate->feature) == 0; \
+    }
+    RG_ENV_STRING_SLOTS(HOLDS_STRING)
+#undef HOLDS_STRING
+#define HOLDS_FEATURES(name, label)                                             \
+    if (strcmp(candidate->slot, #name) == 0) {                                  \
+        return context_has_constraint(context->name, context->name##_count,     \
+                                      candidate->feature, candidate->value);    \
+    }
+    RG_ENV_FEATURE_SLOTS(HOLDS_FEATURES)
+#undef HOLDS_FEATURES
+    if (distance_slot(candidate->slot, context, &items, &count, &offset, &is_preceding)) {
+        return context_has_distance_constraint(items, count, offset,
+                                               candidate->feature, candidate->value);
+    }
+    return 0;
+}
+
+static rg_status distance_singleton(
+    int offset,
+    const rg_feature_constraint *constraint,
+    const rg_distance_constraint **out,
+    size_t *out_count
+) {
+    rg_distance_constraint *items = (rg_distance_constraint *)calloc(1, sizeof(*items));
+    rg_status status;
+    if (items == 0) {
+        return RG_ERR_OOM;
+    }
+    items[0].offset = offset;
+    status = rg_feature_constraint_copy_internal(constraint, &items[0].constraint);
+    if (status != RG_OK) {
+        free(items);
+        return status;
+    }
+    *out = items;
+    *out_count = 1;
+    return RG_OK;
+}
+
+rg_status rg_context_from_candidate_internal(const rg_split_candidate *candidate, rg_context_spec *out) {
+    rg_feature_constraint constraint;
+    const rg_distance_constraint *unused_items;
+    size_t unused_count;
+    int offset;
+    int is_preceding;
+    rg_status status;
+
+    rg_context_spec_init_empty(out);
+#define FROM_STRING(name)                                                       \
+    if (strcmp(candidate->slot, #name) == 0) {                                  \
+        out->name = rg_strdup_internal(candidate->feature);                     \
+        return out->name == 0 ? RG_ERR_OOM : RG_OK;                             \
+    }
+    RG_ENV_STRING_SLOTS(FROM_STRING)
+#undef FROM_STRING
+    constraint.feature = candidate->feature;
+    constraint.value = candidate->value;
+#define FROM_FEATURES(name, label)                                              \
+    if (strcmp(candidate->slot, #name) == 0) {                                  \
+        status = rg_feature_constraint_array_copy_internal(&constraint, 1, &out->name); \
+        if (status == RG_OK) {                                                  \
+            out->name##_count = 1;                                              \
+        }                                                                       \
+        return status;                                                          \
+    }
+    RG_ENV_FEATURE_SLOTS(FROM_FEATURES)
+#undef FROM_FEATURES
+    if (distance_slot(candidate->slot, 0, &unused_items, &unused_count, &offset, &is_preceding)) {
+        return is_preceding
+            ? distance_singleton(offset, &constraint,
+                                 &out->preceding_at_distance, &out->preceding_at_distance_count)
+            : distance_singleton(offset, &constraint,
+                                 &out->following_at_distance, &out->following_at_distance_count);
+    }
+    return RG_ERR_INVALID_ARGUMENT;
+}
+
+/* base_context with one more predicate conjoined. Environments are immutable by
+ * convention, so this always allocates a fresh value. The multi-lect stage needs
+ * the same operation the pairwise refinement does, and an environment built from
+ * two predicates is one environment, not two rules. */
+rg_status rg_context_extend_internal(
+    const rg_context_spec *base_context,
+    const rg_split_candidate *candidate,
+    rg_context_spec *out
+) {
+    rg_feature_constraint *merged = 0;
+    const rg_feature_constraint **slot = 0;
+    size_t *slot_count = 0;
+    const rg_feature_constraint *existing = 0;
+    size_t existing_count = 0;
+    rg_feature_constraint addition;
+    rg_status status;
+
+    status = rg_context_spec_copy_internal(base_context, out);
+    if (status != RG_OK) {
+        return status;
+    }
+    /* A string slot is replaced rather than conjoined: a position is one
+     * position. */
+#define EXTEND_STRING(name)                                                     \
+    if (strcmp(candidate->slot, #name) == 0) {                                  \
+        rg_free_owned_internal(out->name);                                      \
+        out->name = rg_strdup_internal(candidate->feature);                     \
+        if (out->name == 0) {                                                   \
+            rg_context_spec_clear_internal(out);                                \
+            return RG_ERR_OOM;                                                  \
+        }                                                                       \
+        return RG_OK;                                                           \
+    }
+    RG_ENV_STRING_SLOTS(EXTEND_STRING)
+#undef EXTEND_STRING
+    addition.feature = candidate->feature;
+    addition.value = candidate->value;
+#define PICK(name, label)                                     \
+    if (strcmp(candidate->slot, #name) == 0) {                \
+        slot = &out->name;                                    \
+        slot_count = &out->name##_count;                      \
+        existing = out->name;                                 \
+        existing_count = out->name##_count;                   \
+    }
+    RG_ENV_FEATURE_SLOTS(PICK)
+#undef PICK
+
+    if (slot == 0) {
+        rg_distance_constraint *items;
+        const rg_distance_constraint *base_items;
+        size_t base_count;
+        size_t i;
+        int offset;
+        int is_preceding;
+        if (!distance_slot(candidate->slot, out, &base_items, &base_count, &offset, &is_preceding)) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_INVALID_ARGUMENT;
+        }
+        items = (rg_distance_constraint *)calloc(base_count + 1, sizeof(*items));
+        if (items == 0) {
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        for (i = 0; i < base_count; i++) {
+            items[i].offset = base_items[i].offset;
+            if (rg_feature_constraint_copy_internal(&base_items[i].constraint, &items[i].constraint) != RG_OK) {
+                rg_distance_constraint_array_clear_internal(items, i);
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
+            }
+        }
+        items[base_count].offset = offset;
+        if (rg_feature_constraint_copy_internal(&addition, &items[base_count].constraint) != RG_OK) {
+            rg_distance_constraint_array_clear_internal(items, base_count);
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+        if (is_preceding) {
+            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->preceding_at_distance), out->preceding_at_distance_count);
+            out->preceding_at_distance = items;
+            out->preceding_at_distance_count = base_count + 1;
+        } else {
+            rg_distance_constraint_array_clear_internal(rg_owned_internal(out->following_at_distance), out->following_at_distance_count);
+            out->following_at_distance = items;
+            out->following_at_distance_count = base_count + 1;
+        }
+        return RG_OK;
+    }
+
+    merged = (rg_feature_constraint *)calloc(existing_count + 1, sizeof(*merged));
+    if (merged == 0) {
+        rg_context_spec_clear_internal(out);
+        return RG_ERR_OOM;
+    }
+    {
+        size_t i;
+        for (i = 0; i < existing_count; i++) {
+            if (rg_feature_constraint_copy_internal(&existing[i], &merged[i]) != RG_OK) {
+                rg_feature_constraint_array_clear_internal(merged, i);
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
+            }
+        }
+        if (rg_feature_constraint_copy_internal(&addition, &merged[existing_count]) != RG_OK) {
+            rg_feature_constraint_array_clear_internal(merged, existing_count);
+            rg_context_spec_clear_internal(out);
+            return RG_ERR_OOM;
+        }
+    }
+    rg_feature_constraint_array_clear_internal(existing, existing_count);
+    *slot = merged;
+    *slot_count = existing_count + 1;
+    return RG_OK;
+}
+
+const char *const rg_env_long_range_slots[] = {
+    "same_syllable",
+    "next_syllable",
+    "previous_syllable",
+    "preceding@2",
+    "preceding@3",
+    "following@2",
+    "following@3",
+    "somewhere_preceding",
+    "somewhere_following"
+};
+const size_t rg_env_long_range_slot_count =
+    sizeof(rg_env_long_range_slots) / sizeof(rg_env_long_range_slots[0]);
+
+const char *const rg_env_stress_slots[] = {
+    "self_stress",
+    "preceding_stress",
+    "following_stress"
+};
+const size_t rg_env_stress_slot_count =
+    sizeof(rg_env_stress_slots) / sizeof(rg_env_stress_slots[0]);
