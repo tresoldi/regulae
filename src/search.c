@@ -170,7 +170,12 @@ static rg_status feature_matrix_build(
     for (i = 0; i < form->segment_count; i++) {
         status = context_features_for_segment(ctx, &form->segments[i], &features[i], &counts[i]);
         if (status != RG_OK) {
+            /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc): feature_matrix_clear
+             * frees both arrays. It releases counts through
+             * rg_free_owned_internal, whose pointer copy the analyzer does not
+             * follow, so it reports the free it cannot see as a leak. */
             feature_matrix_clear(features, counts, form->segment_count);
+            /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
             return status;
         }
     }

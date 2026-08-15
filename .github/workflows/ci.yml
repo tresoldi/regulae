@@ -98,3 +98,27 @@ jobs:
       - name: Test
         working-directory: regulae
         run: ctest --test-dir build/ci-asan --output-on-failure -j"$(nproc)"
+
+  static-analysis:
+    name: clang-tidy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: regulae
+
+      - uses: actions/checkout@v4
+        with:
+          repository: tresoldi/merkmal
+          path: merkmal
+
+      - name: Install libutf8proc and clang-tidy
+        run: sudo apt-get update && sudo apt-get install -y libutf8proc-dev clang-tidy
+
+      # The baseline is zero; scripts/tidy.sh exits non-zero on any finding and
+      # prints what to do about it. It also refuses to run if a file it is
+      # supposed to cover is missing from the compilation database, because a
+      # silent skip reports clean having read nothing.
+      - name: Analyse
+        working-directory: regulae
+        run: ./scripts/tidy.sh build/ci-tidy

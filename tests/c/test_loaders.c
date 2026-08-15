@@ -407,6 +407,10 @@ static void test_parse_matches_load(rg_context *ctx) {
         assert(fh != 0);
         fseek(fh, 0, SEEK_END);
         size = ftell(fh);
+        /* ftell returns -1 on failure, and (size_t)-1 + 1 is 0: without this
+         * the malloc below asks for nothing and text[size] writes before the
+         * buffer. Found by clang-analyzer, not by running it. */
+        assert(size >= 0);
         fseek(fh, 0, SEEK_SET);
         text = (char *)malloc((size_t)size + 1);
         assert(text != 0);

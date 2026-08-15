@@ -24,10 +24,10 @@
  * private to the pipeline and hidden by the visibility preset. Renaming them
  * would make a pure move read as an API change. */
 void segment_array_clear(const rg_segment *segments, size_t count);
-rg_status segment_array_copy(const rg_segment *src, size_t count, const rg_segment **out);
+rg_status segment_array_copy(const rg_segment *segments, size_t count, const rg_segment **out);
 int segment_array_equal(const rg_segment *a, size_t a_count, const rg_segment *b, size_t b_count);
 void chunk_row_clear(rg_chunk_row *row);
-int chunk_row_cmp(const void *lhs, const void *rhs);
+int chunk_row_cmp(const void *a, const void *b);
 
 /* Chunk promotion, called by the pipeline driver. */
 rg_status promote_chunk_rows(
@@ -39,7 +39,7 @@ rg_status promote_chunk_rows(
 );
 
 void cross_dimensional_row_clear(rg_cross_dimensional_row *row);
-int cross_dimensional_row_cmp(const void *lhs, const void *rhs);
+int cross_dimensional_row_cmp(const void *a, const void *b);
 
 /* Cross-dimensional discovery, called by the pipeline driver. */
 rg_status discover_cross_dimensional_rows(
@@ -93,7 +93,7 @@ rg_status discover_long_range_context_counts(
 void string_array_free(char **items, size_t count);
 void segment_count_row_clear(rg_segment_count_row *row);
 void displacement_row_clear(rg_displacement_row *row);
-int tonal_row_cmp(const void *lhs, const void *rhs);
+int tonal_row_cmp(const void *a, const void *b);
 int count_row_cmp(const void *a, const void *b);
 int displacement_row_cmp(const void *a, const void *b);
 rg_status add_segment_count(

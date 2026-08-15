@@ -252,7 +252,9 @@ static rg_status update_segment_counts(
     }
     fill_totals(rows, row_count);
     publish_target_totals(model, rows, row_count);
-    qsort(rows, row_count, sizeof(*rows), count_row_cmp);
+    if (row_count > 1) {
+        qsort(rows, row_count, sizeof(*rows), count_row_cmp);
+    }
     for (i = 0; i < model->segment_count_count; i++) {
         segment_count_row_clear(&model->segment_counts[i]);
     }
@@ -313,7 +315,9 @@ static rg_status aggregate_displacement_counts(
         return status;
     }
     fill_displacement_total(rows, row_count);
-    qsort(rows, row_count, sizeof(*rows), displacement_row_cmp);
+    if (row_count > 1) {
+        qsort(rows, row_count, sizeof(*rows), displacement_row_cmp);
+    }
     for (i = 0; i < model->displacement_row_count; i++) {
         displacement_row_clear(&model->displacement_rows[i]);
     }
@@ -377,7 +381,9 @@ static rg_status aggregate_tonal_counts(
         return status;
     }
     fill_tonal_source_totals(rows, row_count);
-    qsort(rows, row_count, sizeof(*rows), tonal_row_cmp);
+    if (row_count > 1) {
+        qsort(rows, row_count, sizeof(*rows), tonal_row_cmp);
+    }
     for (i = 0; i < model->tonal_count_count; i++) {
         rg_free_owned_internal(model->tonal_counts[i].source_tone);
         rg_free_owned_internal(model->tonal_counts[i].target_tone);

@@ -41,6 +41,9 @@ static void test_segmentation_reads_the_tie_bar(rg_context *ctx) {
     assert(rg_context_set_segmentation(ctx, RG_SEGMENT_ORTHOGRAPHIC) == RG_OK);
 
     assert(rg_context_set_segmentation(0, RG_SEGMENT_ORTHOGRAPHIC) == RG_ERR_INVALID_ARGUMENT);
+    /* Casting a value the enum does not name is the test: a caller can do it,
+     * and the library has to refuse rather than index on it. */
+    /* NOLINTNEXTLINE(clang-analyzer-optin.core.EnumCastOutOfRange) */
     assert(rg_context_set_segmentation(ctx, (rg_segmentation)7) == RG_ERR_UNSUPPORTED_OPTION);
 }
 

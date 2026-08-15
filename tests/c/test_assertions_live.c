@@ -27,6 +27,10 @@ int main(void)
 #else
     int evaluated = 0;
 
+    /* The side effect is the test. This file exists to catch a build where
+     * NDEBUG has deleted the assertions, and the only way to see that is an
+     * assert that does something observable. */
+    /* NOLINTNEXTLINE(bugprone-assert-side-effect) */
     assert((evaluated = 1) == 1);
 
     if (!evaluated) {

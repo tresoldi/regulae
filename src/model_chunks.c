@@ -346,17 +346,26 @@ rg_status promote_chunk_rows(
             source_ends[a] = source_pos;
             target_ends[a] = target_pos;
         }
+        /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
         for (a = 0; a < link_count && status == RG_OK; a++) {
             size_t b;
+            /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
             for (b = a; b < link_count && status == RG_OK; b++) {
+                /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc): both chunks
+                 * are released by segment_array_clear on every path out. It
+                 * frees through rg_free_owned_internal, which copies the
+                 * pointer value to drop the const, and the analyzer loses the
+                 * allocation's identity across that copy. */
                 const rg_segment *source_chunk = 0;
                 const rg_segment *target_chunk = 0;
                 size_t source_chunk_count = 0;
                 size_t target_chunk_count = 0;
+                /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
                 status = append_segments_from_link_span(alignment, a, b, 1, &source_chunk, &source_chunk_count);
                 if (status != RG_OK) {
                     break;
                 }
+                /* NOLINTNEXTLINE(clang-analyzer-unix.Malloc) */
                 status = append_segments_from_link_span(alignment, a, b, 0, &target_chunk, &target_chunk_count);
                 if (status != RG_OK) {
                     segment_array_clear(source_chunk, source_chunk_count);

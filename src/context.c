@@ -754,7 +754,12 @@ void rg_feature_vocabulary_clear_internal(rg_feature_vocabulary *vocabulary) {
     if (vocabulary == 0) {
         return;
     }
+    /* NOLINTNEXTLINE(clang-analyzer-core.NullDereference): entries is null only
+     * when count is zero, which the loop then does not enter. The analyzer does
+     * not relate the two, because they are set together by the append helper
+     * and it does not follow that far. */
     for (i = 0; i < vocabulary->count; i++) {
+        /* NOLINTNEXTLINE(clang-analyzer-core.NullDereference) */
         rg_free_owned_internal(vocabulary->entries[i].feature);
         rg_free_owned_internal(vocabulary->entries[i].value);
     }

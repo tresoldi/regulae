@@ -1,0 +1,72 @@
+# Static analysis for first-party C. Deliberately narrow.
+#
+# clang-analyzer-* is the path-sensitive analyzer, and the reason this file
+# exists: it finds what a compiler warning by construction cannot. bugprone-*
+# is the family that pays for itself in C. Most of readability-* is a style
+# opinion this project does not share, so it is opted into one check at a time
+# rather than enabled and then argued with.
+#
+# Three checks are disabled with reasons, because a suppression without one is
+# worse than the finding:
+#
+#   bugprone-multi-level-implicit-pointer-conversion
+#       78 findings, every one of them free(), memcpy(), memmove(), realloc()
+#       or qsort() on an array of pointers. The check is about T** being
+#       mistaken for void**; handing a T** to a void* parameter is how those
+#       functions are called in C, and no version of this code both does the
+#       job and satisfies it.
+#
+#   bugprone-easily-swappable-parameters
+#       Fires on every (source, target) and (lect_a, lect_b) pair in the
+#       library. Those are the domain's own arguments and renaming them to
+#       please a check would make the code worse.
+#
+#   clang-analyzer-security.ArrayBound
+#       13 findings, every one on a heap array whose extent is held in an
+#       adjacent count the analyzer does not relate to the allocation --
+#       `for (k = 0; k < immediate_count; k++) all_list[k] = ...` over an array
+#       allocated with exactly that many entries, `uf->parent[root]` over a
+#       union-find sized by its own node count. Each was read; none is a defect.
+#       This is the checker's known behaviour on heap arrays rather than a
+#       property of this code.
+#
+#   clang-analyzer-optin.portability.UnixAPI
+#       2 findings, both zero-size allocations the surrounding code already
+#       handles -- C99 lets the implementation return NULL or a unique pointer
+#       and both sites accept either. It is an opt-in portability checker, and
+#       the third finding in this family, an ftell that can return -1, was a
+#       genuine defect and is fixed rather than suppressed.
+#
+#   bugprone-narrowing-conversions
+#       -Wconversion already covers this, is enabled on every target, and is an
+#       error under scripts/check.sh. A second opinion on the same question
+#       only adds noise.
+#
+# Note that the Checks: value below is a YAML block scalar: a '#' inside it is
+# part of the string, not a comment. Putting the reasoning there once silently
+# corrupted the check list and turned a clean baseline into 101 findings.
+#
+# docs/static_analysis.md records the baseline and how to reproduce it.
+Checks: >
+  -*,
+  clang-analyzer-*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  -bugprone-narrowing-conversions,
+  -bugprone-multi-level-implicit-pointer-conversion,
+  -clang-analyzer-security.ArrayBound,
+  -clang-analyzer-optin.portability.UnixAPI,
+  misc-*,
+  -misc-no-recursion,
+  -misc-include-cleaner,
+  readability-inconsistent-declaration-parameter-name,
+  readability-non-const-parameter,
+  readability-misleading-indentation
+
+# The library's own headers only. third_party/ carries no local patches and is
+# not held to regulae's warnings either; holding it to regulae's analyzer would
+# mean starting to carry them.
+HeaderFilterRegex: '(src|include)/[^/]*\.h$'
+
+FormatStyle: none
+WarningsAsErrors: ''

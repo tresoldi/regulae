@@ -130,6 +130,14 @@ if [ "$full" = "1" ] && command -v clang >/dev/null 2>&1; then
     done
 fi
 
+# Two minutes, so --full only. The baseline is zero and the script says what to
+# do when it is not; docs/static_analysis.md has the reasoning behind every
+# disabled checker and every annotation.
+if [ "$full" = "1" ] && command -v clang-tidy >/dev/null 2>&1; then
+    step "static analysis"
+    ./scripts/tidy.sh build/c-tidy || fail "clang-tidy"
+fi
+
 if [ "$full" = "1" ]; then
     step "sanitizer build and tests"
     cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address -DREGULAE_WERROR=ON >/dev/null || fail "asan configure"

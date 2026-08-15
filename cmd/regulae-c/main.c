@@ -297,6 +297,14 @@ static rg_status load_corpus_with_context(
     rg_corpus **out,
     rg_load_diagnosis *diagnosis
 ) {
+    /* Every loader clears this on entry, but an unknown format returns without
+     * reaching one, and report_load_failure then reads an uninitialised
+     * message. Found by clang-analyzer, which is the only thing that would
+     * have: the path needs a format the CLI does not recognise. */
+    if (diagnosis != 0) {
+        diagnosis->line = 0;
+        diagnosis->message[0] = '\0';
+    }
     if (format != 0 && strcmp(format, "wide") == 0) {
         return rg_corpus_load_wide_tsv(ctx, path, 0, out, diagnosis);
     }
