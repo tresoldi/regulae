@@ -1,0 +1,100 @@
+name: Build and test
+
+# The second gate. `scripts/check.sh` is the first and stays the one that has
+# to pass before a commit; this is what catches the things a single machine
+# cannot -- a compiler the author does not have installed, a dependency the
+# author happens to have installed, a build that only works from a dirty tree.
+#
+# The WebAssembly build is deliberately absent. It needs the Emscripten SDK and
+# a merkmal checkout, and pages.yml already refuses to deploy an artifact older
+# than the sources it claims to be built from, which is the property that
+# matters. Running it here would buy a slower CI and the same guarantee.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [gcc, clang]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: regulae
+
+      # merkmal is a sibling checkout, which is where CMakeLists.txt looks when
+      # find_package does not turn one up. It is public, so no token.
+      - uses: actions/checkout@v4
+        with:
+          repository: tresoldi/merkmal
+          path: merkmal
+
+      # Not optional, and not a convenience. merkmal builds either against
+      # system utf8proc or against its own fallback, and picks silently: a bare
+      # runner would quietly test the other normalization path from the one the
+      # author runs, and a disagreement would get blamed on the compiler.
+      # REQUIRE_UTF8PROC makes its absence a configure failure instead.
+      - name: Install libutf8proc
+        run: sudo apt-get update && sudo apt-get install -y libutf8proc-dev
+
+      - name: Configure
+        working-directory: regulae
+        run: >
+          cmake -S . -B build/ci
+          -DCMAKE_C_COMPILER=${{ matrix.compiler }}
+          -DREGULAE_WERROR=ON
+          -DMERKMAL_REQUIRE_UTF8PROC=ON
+
+      - name: Build
+        working-directory: regulae
+        run: cmake --build build/ci -j"$(nproc)"
+
+      - name: Test
+        working-directory: regulae
+        run: ctest --test-dir build/ci --output-on-failure -j"$(nproc)"
+
+  sanitizer:
+    name: address sanitizer
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: regulae
+
+      - uses: actions/checkout@v4
+        with:
+          repository: tresoldi/merkmal
+          path: merkmal
+
+      - name: Install libutf8proc
+        run: sudo apt-get update && sudo apt-get install -y libutf8proc-dev
+
+      - name: Configure
+        working-directory: regulae
+        run: >
+          cmake -S . -B build/ci-asan
+          -DREGULAE_ENABLE_SANITIZER=address
+          -DREGULAE_WERROR=ON
+          -DMERKMAL_REQUIRE_UTF8PROC=ON
+
+      - name: Build
+        working-directory: regulae
+        run: cmake --build build/ci-asan -j"$(nproc)"
+
+      - name: Test
+        working-directory: regulae
+        run: ctest --test-dir build/ci-asan --output-on-failure -j"$(nproc)"

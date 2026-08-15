@@ -72,6 +72,25 @@ python3 scripts/capabilities.py >/dev/null || fail "scripts/capabilities.py"
 python3 scripts/corpora.py >/dev/null || fail "scripts/corpora.py"
 python3 scripts/guide.py >/dev/null || fail "scripts/guide.py"
 
+# A second compiler, because every assumption GCC happens to be lenient about
+# is otherwise untested -- and until 2026-08-15 the string "clang" appeared
+# nowhere in this repository. The build is the cheap part and catches almost
+# all of the divergence: two seconds against the twenty the suite costs. So the
+# default path builds under clang and --full also runs the suite there, which
+# is where a difference that only shows at runtime would surface. CI runs both,
+# unconditionally.
+if command -v clang >/dev/null 2>&1; then
+    step "second compiler"
+    cmake -S . -B build/c-clang -DCMAKE_C_COMPILER=clang -DREGULAE_WERROR=ON >/dev/null \
+        || fail "clang configure"
+    cmake --build build/c-clang -j"$(nproc)" || fail "clang build"
+    if [ "$full" = "1" ]; then
+        ctest --test-dir build/c-clang --output-on-failure || fail "clang ctest"
+    fi
+else
+    printf '\n=== second compiler: clang not installed, skipped (CI runs it)\n'
+fi
+
 step "native tests"
 ctest --test-dir build/c --output-on-failure || fail "ctest"
 
