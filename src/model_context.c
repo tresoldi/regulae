@@ -1,4 +1,5 @@
 #include "model_internal.h"
+#include "split_search.h"
 #include "environment.h"
 
 #include <math.h>
@@ -181,28 +182,12 @@ static rg_status stress_inventory_add(stress_inventory *inventory, const char *v
     return RG_OK;
 }
 
+static rg_status stress_inventory_add_cb(void *user, const char *value) {
+    return stress_inventory_add((stress_inventory *)user, value);
+}
+
 static rg_status collect_observed_stress(stress_inventory *inventory, const rg_context_spec *context) {
-    const rg_feature_constraint *slots[3];
-    size_t counts[3];
-    size_t s;
-    slots[0] = context->self_stress;
-    counts[0] = context->self_stress_count;
-    slots[1] = context->preceding_stress;
-    counts[1] = context->preceding_stress_count;
-    slots[2] = context->following_stress;
-    counts[2] = context->following_stress_count;
-    for (s = 0; s < 3; s++) {
-        size_t i;
-        for (i = 0; i < counts[s]; i++) {
-            if (slots[s][i].feature != 0 && strcmp(slots[s][i].feature, "stress") == 0 && slots[s][i].value != 0) {
-                rg_status status = stress_inventory_add(inventory, slots[s][i].value);
-                if (status != RG_OK) {
-                    return status;
-                }
-            }
-        }
-    }
-    return RG_OK;
+    return rg_env_collect_stress_values(context, stress_inventory_add_cb, inventory);
 }
 
 /* Candidate axes not already constrained by base_context. A feature is dropped
@@ -395,91 +380,18 @@ static size_t long_range_candidates(
 /* Negative log-likelihood of a group under a single unconditioned
  * correspondence. Target keys are summed in sorted order so repeated runs
  * produce bit-identical results. */
-static double observation_group_cost(const context_observation *const *rows, size_t count) {
-    target_mass *targets = 0;
-    size_t target_count = 0;
-    size_t target_cap = 0;
-    double total = 0.0;
-    double cost = 0.0;
-    size_t i;
-    size_t j;
-
-    for (i = 0; i < count; i++) {
-        if (add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight) != RG_OK) {
-            free(targets);
-            return 0.0;
-        }
-        total += rows[i]->weight;
-    }
-    if (total <= 0.0) {
-        free(targets);
-        return 0.0;
-    }
-    /* add_target_mass appends in first-seen order; sort by target for a
-     * deterministic summation order. */
-    for (i = 1; i < target_count; i++) {
-        target_mass key = targets[i];
-        j = i;
-        while (j > 0 && strcmp(targets[j - 1].target, key.target) > 0) {
-            targets[j] = targets[j - 1];
-            j--;
-        }
-        targets[j] = key;
-    }
-    for (i = 0; i < target_count; i++) {
-        double p = targets[i].mass / total;
-        if (p > 0.0) {
-            cost += -targets[i].mass * log(p);
-        }
-    }
-    free(targets);
-    return cost;
-}
-
-static double observation_total_weight(const context_observation *const *rows, size_t count) {
-    double total = 0.0;
-    size_t i;
-    for (i = 0; i < count; i++) {
-        total += rows[i]->weight;
-    }
-    return total;
-}
-
-static double observation_dominant_fraction(const context_observation *const *rows, size_t count) {
-    target_mass *targets = 0;
-    size_t target_count = 0;
-    size_t target_cap = 0;
-    double total = 0.0;
-    double mode = 0.0;
-    size_t i;
-    for (i = 0; i < count; i++) {
-        if (add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight) != RG_OK) {
-            free(targets);
-            return 0.0;
-        }
-        total += rows[i]->weight;
-    }
-    for (i = 0; i < target_count; i++) {
-        if (targets[i].mass > mode) {
-            mode = targets[i].mass;
-        }
-    }
-    free(targets);
-    return total > 0.0 ? mode / total : 0.0;
-}
-
 /* Writes one conditioned entry per observed target in this group. Repeating a
  * (source, target, context) key replaces the previous count rather than adding
  * to it, because each commit states the mass of that group outright. */
 static rg_status commit_observation_group(
     rg_pairwise_model *model,
     const char *source,
-    const context_observation *const *rows,
+    const rg_split_observation *rows,
     size_t count,
     const rg_context_spec *context,
     int target_side,
     double bucket_total,
-    const context_observation *const *contrast_rows,
+    const rg_split_observation *contrast_rows,
     size_t contrast_row_count,
     double delta_bic,
     double search_margin,
@@ -502,7 +414,7 @@ static rg_status commit_observation_group(
     rg_status status = RG_OK;
 
     for (i = 0; i < count; i++) {
-        status = add_target_mass(&targets, &target_count, &target_cap, rows[i]->target, rows[i]->weight);
+        status = add_target_mass(&targets, &target_count, &target_cap, rows[i].key, rows[i].weight);
         if (status != RG_OK) {
             free(targets);
             return status;
@@ -512,13 +424,13 @@ static rg_status commit_observation_group(
      * published without it cannot be read. */
     for (i = 0; i < contrast_row_count; i++) {
         status = add_target_mass(&contrast_targets, &contrast_target_count, &contrast_target_cap,
-                                 contrast_rows[i]->target, contrast_rows[i]->weight);
+                                 contrast_rows[i].key, contrast_rows[i].weight);
         if (status != RG_OK) {
             free(targets);
             free(contrast_targets);
             return status;
         }
-        contrast_total += contrast_rows[i]->weight;
+        contrast_total += contrast_rows[i].weight;
     }
     for (i = 0; i < target_count && status == RG_OK; i++) {
         size_t existing;
@@ -587,131 +499,6 @@ static rg_status commit_observation_group(
     return status;
 }
 
-typedef struct split_search {
-    const context_observation **yes;
-    const context_observation **no;
-    const context_observation **best_yes;
-    const context_observation **best_no;
-    split_candidate *candidates;
-    size_t capacity;
-} split_search;
-
-static void split_search_clear(split_search *search) {
-    free(search->yes);
-    free(search->no);
-    free(search->best_yes);
-    free(search->best_no);
-    free(search->candidates);
-    memset(search, 0, sizeof(*search));
-}
-
-static rg_status split_search_init(split_search *search, size_t observation_capacity, size_t candidate_capacity) {
-    memset(search, 0, sizeof(*search));
-    search->capacity = candidate_capacity;
-    search->yes = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->yes));
-    search->no = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->no));
-    search->best_yes = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->best_yes));
-    search->best_no = (const context_observation **)calloc(observation_capacity == 0 ? 1 : observation_capacity, sizeof(*search->best_no));
-    search->candidates = (split_candidate *)calloc(candidate_capacity == 0 ? 1 : candidate_capacity, sizeof(*search->candidates));
-    if (search->yes == 0 || search->no == 0 || search->best_yes == 0 || search->best_no == 0 || search->candidates == 0) {
-        split_search_clear(search);
-        return RG_ERR_OOM;
-    }
-    return RG_OK;
-}
-
-/* Finds the BIC-best split of rows over the given candidates. Returns 1 when a
- * split beats the threshold, filling best_yes/best_no and best_candidate. */
-static int find_best_split(
-    split_search *search,
-    const context_observation *const *rows,
-    size_t count,
-    const split_candidate *candidates,
-    const rg_split_gate *gates,
-    size_t candidate_count,
-    double penalty,
-    double search_gamma,
-    split_candidate *best_candidate,
-    size_t *best_yes_count,
-    size_t *best_no_count,
-    double *best_delta_bic,
-    double *best_search_margin
-) {
-    double baseline = observation_group_cost(rows, count);
-    /* Charge for the search, not only for the parameter.
-     *
-     * BIC prices one added term against the likelihood it buys. The term that
-     * survives here is not one term: it is the best of candidate_count of them,
-     * and the maximum of a hundred candidates beats its bar by chance far more
-     * often than one candidate does. Permuting a corpus's pairings -- which
-     * removes every correspondence there is to find -- used to *raise* the
-     * number of committed rules, which is what an unpriced argmax looks like.
-     *
-     * 2*ln(candidates) is the same currency as the BIC penalty and is the
-     * standard extended-BIC shape for a large model space. It is not a
-     * substitute for the shuffled baseline, which measures the inflation this
-     * only models. */
-    double search_penalty = candidate_count > 1 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
-    double best_margin = 0.0;
-    int found = 0;
-    size_t ci;
-
-    for (ci = 0; ci < candidate_count; ci++) {
-        double min_obs = gates[ci].min_obs;
-        double delta_threshold = gates[ci].delta_threshold;
-        double min_dominant_fraction = gates[ci].min_dominant_fraction;
-        double margin;
-        size_t yes_count = 0;
-        size_t no_count = 0;
-        size_t i;
-        double split_cost;
-        double delta_bic;
-        for (i = 0; i < count; i++) {
-            if (rg_predicate_holds_internal(&rows[i]->context, &candidates[ci])) {
-                search->yes[yes_count++] = rows[i];
-            } else {
-                search->no[no_count++] = rows[i];
-            }
-        }
-        if (observation_total_weight(search->yes, yes_count) < min_obs ||
-            observation_total_weight(search->no, no_count) < min_obs) {
-            continue;
-        }
-        if (min_dominant_fraction > 0.0 &&
-            observation_dominant_fraction(search->yes, yes_count) < min_dominant_fraction) {
-            continue;
-        }
-        split_cost = observation_group_cost(search->yes, yes_count) + observation_group_cost(search->no, no_count);
-        delta_bic = -2.0 * (baseline - split_cost) + penalty + search_penalty;
-        margin = delta_threshold - delta_bic;
-        /* Two predicates can carve the same partition and so clear their bar by
-         * the same amount. Requiring a later candidate to beat the incumbent by
-         * more than the tie epsilon hands the tie to candidate order, which is
-         * the same everywhere, rather than to the last bit of a log. */
-        if (margin > best_margin + RG_TIE_EPSILON) {
-            best_margin = margin;
-            *best_delta_bic = delta_bic;
-            /* How heavy a search charge this split's evidence could carry and
-             * still commit. The charge is gamma * 2 * ln(candidates), so the
-             * gamma at which this split stops clearing its bar is a
-             * corpus-independent measure of how far the evidence stands above
-             * the search that found it -- and it can be compared against the
-             * same number computed on the corpus shuffled, which is what the
-             * fit summary reports. */
-            *best_search_margin = candidate_count > 1
-                ? (delta_threshold - (delta_bic - search_penalty)) / (2.0 * log((double)candidate_count))
-                : 0.0;
-            *best_candidate = candidates[ci];
-            memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
-            memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
-            *best_yes_count = yes_count;
-            *best_no_count = no_count;
-            found = 1;
-        }
-    }
-    return found;
-}
-
 /* Recursively refines an already-committed conditioned entry, looking for one
  * further conditioning axis that improves BIC. */
 /* Deepens a committed split by conjoining a second predicate within the group
@@ -730,7 +517,7 @@ static int find_best_split(
 static rg_status refine_split(
     rg_pairwise_model *model,
     const char *source,
-    const context_observation *const *rows,
+    const rg_split_observation *rows,
     size_t count,
     const rg_context_spec *base_context,
     int depth,
@@ -741,46 +528,39 @@ static rg_status refine_split(
     size_t candidate_count,
     double penalty,
     double search_gamma,
-    const stress_inventory *stress,
     size_t observation_capacity,
     int target_side,
     double bucket_total
 ) {
-    split_search search;
-    split_candidate best;
-    size_t yes_count = 0;
-    size_t no_count = 0;
+    rg_split_search search;
+    rg_split_result best;
     rg_context_spec yes_context;
-    double delta_bic = 0.0;
-    double search_margin = 0.0;
     rg_status status;
 
-    (void)stress;
-    if (depth >= max_depth || observation_total_weight(rows, count) < min_obs) {
+    if (depth >= max_depth || rg_split_total_weight(rows, count) < min_obs) {
         return RG_OK;
     }
-    status = split_search_init(&search, observation_capacity, 1);
+    status = rg_split_search_init(&search, observation_capacity);
     if (status != RG_OK) {
         return status;
     }
-    if (!find_best_split(&search, rows, count, candidates, gates, candidate_count,
-                         penalty, search_gamma, &best, &yes_count, &no_count, &delta_bic,
-                         &search_margin)) {
-        split_search_clear(&search);
+    if (!rg_split_find_best(&search, rows, count, candidates, gates, candidate_count,
+                            penalty, search_gamma, &best)) {
+        rg_split_search_clear(&search);
         return RG_OK;
     }
-    status = rg_context_extend_internal(base_context, &best, &yes_context);
+    status = rg_context_extend_internal(base_context, &best.candidate, &yes_context);
     if (status == RG_OK) {
-        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
+        status = commit_observation_group(model, source, search.best_yes, best.yes_count, &yes_context,
                                           target_side, bucket_total,
-                                          search.best_no, no_count, delta_bic, search_margin,
-                                          model->decision_count++);
+                                          search.best_no, best.no_count, best.delta_bic,
+                                          best.search_margin, model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
                 model,
                 source,
                 search.best_yes,
-                yes_count,
+                best.yes_count,
                 &yes_context,
                 depth + 1,
                 max_depth,
@@ -790,7 +570,6 @@ static rg_status refine_split(
                 candidate_count,
                 penalty,
                 search_gamma,
-                stress,
                 observation_capacity,
                 target_side,
                 bucket_total
@@ -798,7 +577,7 @@ static rg_status refine_split(
         }
         rg_context_spec_clear_internal(&yes_context);
     }
-    split_search_clear(&search);
+    rg_split_search_clear(&search);
     return status;
 }
 
@@ -809,7 +588,7 @@ static rg_status refine_split(
 static rg_status commit_splits_for_source(
     rg_pairwise_model *model,
     const char *source,
-    const context_observation *const *rows,
+    const rg_split_observation *rows,
     size_t count,
     const split_candidate *top_candidates,
     const rg_split_gate *top_gates,
@@ -817,60 +596,54 @@ static rg_status commit_splits_for_source(
     const split_candidate *all_candidates,
     const rg_split_gate *all_gates,
     size_t all_candidate_count,
-    const stress_inventory *stress,
     int max_depth,
     double min_obs,
     double penalty,
     double search_gamma,
     int target_side
 ) {
-    split_search search;
-    const context_observation **remaining;
+    rg_split_search search;
+    rg_split_observation *remaining;
     size_t remaining_count = count;
     int committed = 0;
     rg_status status;
 
-    status = split_search_init(&search, count, 64 + 3 * stress->count);
+    status = rg_split_search_init(&search, count);
     if (status != RG_OK) {
         return status;
     }
-    remaining = (const context_observation **)calloc(count == 0 ? 1 : count, sizeof(*remaining));
+    remaining = (rg_split_observation *)calloc(count == 0 ? 1 : count, sizeof(*remaining));
     if (remaining == 0) {
-        split_search_clear(&search);
+        rg_split_search_clear(&search);
         return RG_ERR_OOM;
     }
     memcpy(remaining, rows, count * sizeof(*remaining));
 
-    while (committed < max_depth * 4 && observation_total_weight(remaining, remaining_count) >= min_obs) {
-        split_candidate best;
-        size_t yes_count = 0;
-        size_t no_count = 0;
-        double delta_bic = 0.0;
-        double search_margin = 0.0;
+    while (committed < RG_SPLIT_MAX_COMMITS(max_depth) && rg_split_total_weight(remaining, remaining_count) >= min_obs) {
+        rg_split_result best;
         rg_context_spec yes_context;
         rg_context_spec empty;
 
-        if (!find_best_split(&search, remaining, remaining_count, top_candidates, top_gates,
-                             top_candidate_count, penalty, search_gamma, &best, &yes_count, &no_count,
-                             &delta_bic, &search_margin)) {
+        if (!rg_split_find_best(&search, remaining, remaining_count, top_candidates, top_gates,
+                                top_candidate_count, penalty, search_gamma, &best)) {
             break;
         }
         rg_context_spec_init_empty(&empty);
-        status = rg_context_extend_internal(&empty, &best, &yes_context);
+        status = rg_context_extend_internal(&empty, &best.candidate, &yes_context);
         rg_context_spec_clear_internal(&empty);
         if (status != RG_OK) {
             break;
         }
-        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
-                                          target_side, observation_total_weight(rows, count),
-                                          search.best_no, no_count, delta_bic, search_margin,
-                                          model->decision_count++);
+        status = commit_observation_group(model, source, search.best_yes, best.yes_count, &yes_context,
+                                          target_side, rg_split_total_weight(rows, count),
+                                          search.best_no, best.no_count, best.delta_bic,
+                                          best.search_margin, model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
                 model,
                 source,
                 search.best_yes,
-                yes_count,
+                best.yes_count,
                 &yes_context,
                 1,
                 max_depth,
@@ -880,22 +653,21 @@ static rg_status commit_splits_for_source(
                 all_candidate_count,
                 penalty,
                 search_gamma,
-                stress,
                 count,
                 target_side,
-                observation_total_weight(rows, count)
+                rg_split_total_weight(rows, count)
             );
         }
         rg_context_spec_clear_internal(&yes_context);
         if (status != RG_OK) {
             break;
         }
-        memcpy(remaining, search.best_no, no_count * sizeof(*remaining));
-        remaining_count = no_count;
+        memcpy(remaining, search.best_no, best.no_count * sizeof(*remaining));
+        remaining_count = best.no_count;
         committed++;
     }
     free(remaining);
-    split_search_clear(&search);
+    rg_split_search_clear(&search);
     return status;
 }
 
@@ -1067,7 +839,7 @@ static rg_status discover_context_counts(
     morphology_inventory morphology;
     split_candidate *long_range_list = 0;
     size_t long_range_count = 0;
-    const context_observation **rows = 0;
+    rg_split_observation *rows = 0;
     size_t i;
     rg_status status;
     double min_obs;
@@ -1179,7 +951,7 @@ static rg_status discover_context_counts(
             all_count = total;
         }
     }
-    rows = (const context_observation **)calloc(observation_count, sizeof(*rows));
+    rows = (rg_split_observation *)calloc(observation_count, sizeof(*rows));
     if (rows == 0) {
         status = RG_ERR_OOM;
     }
@@ -1193,16 +965,23 @@ static rg_status discover_context_counts(
         size_t distinct_targets = 0;
         double mass;
 
+        /* Project the stage's own rows into what the search reads: the
+         * environment to test predicates against, the target to group cost by,
+         * and the weight. */
         for (j = 0; j < observation_count; j++) {
             if (strcmp(observations[j].source, sources[i]) == 0) {
-                rows[row_count++] = &observations[j];
+                rows[row_count].context = &observations[j].context;
+                rows[row_count].key = observations[j].target;
+                rows[row_count].weight = observations[j].weight;
+                rows[row_count].owner = &observations[j];
+                row_count++;
             }
         }
         for (j = 0; j < row_count; j++) {
             size_t k;
             int seen = 0;
             for (k = 0; k < j; k++) {
-                if (strcmp(rows[k]->target, rows[j]->target) == 0) {
+                if (strcmp(rows[k].key, rows[j].key) == 0) {
                     seen = 1;
                     break;
                 }
@@ -1211,7 +990,7 @@ static rg_status discover_context_counts(
                 distinct_targets++;
             }
         }
-        mass = observation_total_weight(rows, row_count);
+        mass = rg_split_total_weight(rows, row_count);
         if (distinct_targets < 2 || mass < 4.0) {
             continue;
         }
@@ -1226,7 +1005,6 @@ static rg_status discover_context_counts(
             all_list,
             all_gates,
             all_count,
-            &stress,
             max_depth,
             long_range ? long_min_obs : immediate_min_obs,
             log(n_total),

@@ -95,4 +95,16 @@ extern const size_t rg_env_long_range_slot_count;
 extern const char *const rg_env_stress_slots[];
 extern const size_t rg_env_stress_slot_count;
 
+/* Every stress value the environment's three stress slots name, in slot order,
+ * handed to `add` one at a time. Both discovery stages build an inventory of
+ * the stress values a corpus actually shows, so that the candidates they search
+ * hold only those; they kept the walk twice, byte for byte, differing only in
+ * which container it appended to. What they keep differing about is the
+ * container, which is theirs. */
+rg_status rg_env_collect_stress_values(
+    const rg_context_spec *context,
+    rg_status (*add)(void *user, const char *value),
+    void *user
+);
+
 #endif

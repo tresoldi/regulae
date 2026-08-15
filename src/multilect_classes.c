@@ -1,4 +1,5 @@
 #include "multilect_internal.h"
+#include "split_search.h"
 #include "environment.h"
 
 #include <math.h>
@@ -334,28 +335,12 @@ static void collect_morphology_values(discovery_state *state, const rg_context_s
     record_morphology_value(state->morph_indices, &state->morph_index_count, context->morpheme_index);
 }
 
+static rg_status record_stress_value_cb(void *user, const char *value) {
+    return record_stress_value((discovery_state *)user, value);
+}
+
 static rg_status collect_stress_values(discovery_state *state, const rg_context_spec *context) {
-    const rg_feature_constraint *slots[3];
-    size_t counts[3];
-    size_t s;
-    slots[0] = context->self_stress;
-    counts[0] = context->self_stress_count;
-    slots[1] = context->preceding_stress;
-    counts[1] = context->preceding_stress_count;
-    slots[2] = context->following_stress;
-    counts[2] = context->following_stress_count;
-    for (s = 0; s < 3; s++) {
-        size_t i;
-        for (i = 0; i < counts[s]; i++) {
-            if (slots[s][i].feature != 0 && strcmp(slots[s][i].feature, "stress") == 0 && slots[s][i].value != 0) {
-                rg_status status = record_stress_value(state, slots[s][i].value);
-                if (status != RG_OK) {
-                    return status;
-                }
-            }
-        }
-    }
-    return RG_OK;
+    return rg_env_collect_stress_values(context, record_stress_value_cb, state);
 }
 
 /* The candidate lists are fixed once the observed stress values are known,
@@ -448,76 +433,11 @@ static double observation_weight(const pivot_obs *obs, size_t count) {
 
 /* Negative log-likelihood of a group under a single unconditioned outcome.
  * Sister keys are summed in sorted order so the result is reproducible. */
-static double group_cost(const discovery_state *state, const pivot_obs *obs, size_t count) {
-    double *masses;
-    size_t *order;
-    double total = 0.0;
-    double cost = 0.0;
-    size_t i;
-    size_t used = 0;
-    if (count == 0) {
-        return 0.0;
-    }
-    masses = (double *)calloc(state->sister_count, sizeof(*masses));
-    order = (size_t *)calloc(state->sister_count, sizeof(*order));
-    if (masses == 0 || order == 0) {
-        free(masses);
-        free(order);
-        return 0.0;
-    }
-    for (i = 0; i < count; i++) {
-        if (masses[obs[i].sister_index] == 0.0) {
-            size_t insert_at = used;
-            while (insert_at > 0 &&
-                   strcmp(state->sisters[order[insert_at - 1]].key, state->sisters[obs[i].sister_index].key) > 0) {
-                insert_at--;
-            }
-            if (insert_at < used) {
-                memmove(&order[insert_at + 1], &order[insert_at], (used - insert_at) * sizeof(*order));
-            }
-            order[insert_at] = obs[i].sister_index;
-            used++;
-        }
-        masses[obs[i].sister_index] += obs[i].weight;
-        total += obs[i].weight;
-    }
-    if (total > 0.0) {
-        for (i = 0; i < used; i++) {
-            double n = masses[order[i]];
-            double p = n / total;
-            if (p > 0.0) {
-                cost += -n * log(p);
-            }
-        }
-    }
-    free(masses);
-    free(order);
-    return cost;
-}
-
-static double dominant_fraction(const discovery_state *state, const pivot_obs *obs, size_t count) {
-    double *masses;
-    double mode = 0.0;
-    double total = 0.0;
-    size_t i;
-    if (count == 0) {
-        return 0.0;
-    }
-    masses = (double *)calloc(state->sister_count, sizeof(*masses));
-    if (masses == 0) {
-        return 0.0;
-    }
-    for (i = 0; i < count; i++) {
-        masses[obs[i].sister_index] += obs[i].weight;
-        total += obs[i].weight;
-    }
-    for (i = 0; i < state->sister_count; i++) {
-        if (masses[i] > mode) {
-            mode = masses[i];
-        }
-    }
-    free(masses);
-    return total > 0.0 ? mode / total : 0.0;
+/* The pivot observation a projected row was made from. The search only needs
+ * an environment, a key and a weight; committing needs the sister the row
+ * realises and the aligned position it came from, and those ride along. */
+static const pivot_obs *pivot_of(const rg_split_observation *row) {
+    return (const pivot_obs *)row->owner;
 }
 
 static int multi_lect_min_commit_count(double n_total, double scale) {
@@ -605,9 +525,9 @@ static rg_status emit_sister_classes(
     const char *pivot_lect,
     const char *pivot_grapheme,
     const rg_context_spec *yes_context,
-    const pivot_obs *yes_obs,
+    const rg_split_observation *yes_obs,
     size_t yes_count,
-    const pivot_obs *no_obs,
+    const rg_split_observation *no_obs,
     size_t no_count,
     double delta_bic,
     double search_margin,
@@ -632,22 +552,22 @@ static rg_status emit_sister_classes(
         return RG_ERR_OOM;
     }
     for (i = 0; i < no_count; i++) {
-        contrast_masses[no_obs[i].sister_index] += no_obs[i].weight;
+        contrast_masses[pivot_of(&no_obs[i])->sister_index] += no_obs[i].weight;
     }
     for (i = 0; i < yes_count; i++) {
-        if (masses[yes_obs[i].sister_index] == 0.0) {
+        if (masses[pivot_of(&yes_obs[i])->sister_index] == 0.0) {
             size_t insert_at = used;
             while (insert_at > 0 &&
-                   strcmp(state->sisters[order[insert_at - 1]].key, state->sisters[yes_obs[i].sister_index].key) > 0) {
+                   strcmp(state->sisters[order[insert_at - 1]].key, state->sisters[pivot_of(&yes_obs[i])->sister_index].key) > 0) {
                 insert_at--;
             }
             if (insert_at < used) {
                 memmove(&order[insert_at + 1], &order[insert_at], (used - insert_at) * sizeof(*order));
             }
-            order[insert_at] = yes_obs[i].sister_index;
+            order[insert_at] = pivot_of(&yes_obs[i])->sister_index;
             used++;
         }
-        masses[yes_obs[i].sister_index] += yes_obs[i].weight;
+        masses[pivot_of(&yes_obs[i])->sister_index] += yes_obs[i].weight;
     }
     for (i = 0; i < used && status == RG_OK; i++) {
         size_t *evidence;
@@ -662,8 +582,8 @@ static rg_status emit_sister_classes(
             break;
         }
         for (j = 0; j < yes_count; j++) {
-            if (yes_obs[j].sister_index == order[i]) {
-                evidence[evidence_count++] = yes_obs[j].observation_index;
+            if (pivot_of(&yes_obs[j])->sister_index == order[i]) {
+                evidence[evidence_count++] = pivot_of(&yes_obs[j])->observation_index;
             }
         }
         status = append_committed_split(
@@ -694,76 +614,6 @@ static rg_status emit_sister_classes(
  * small-sample penalty, and the dominance filter. */
 /* Finds the best split of a group, weighing every candidate against its own
  * bar. Returns 0 when nothing clears one. */
-static int pivot_best_split(
-    discovery_state *state,
-    const pivot_obs *rows,
-    size_t count,
-    const rg_split_candidate *candidates,
-    const rg_split_gate *gates,
-    size_t candidate_count,
-    double penalty,
-    double search_gamma,
-    pivot_obs *yes,
-    pivot_obs *no,
-    pivot_obs *best_yes,
-    pivot_obs *best_no,
-    size_t *best_yes_count,
-    size_t *best_no_count,
-    size_t *best_candidate,
-    double *best_delta_bic,
-    double *best_search_margin
-) {
-    double baseline = group_cost(state, rows, count);
-    /* The same charge for the same reason as find_best_split in model.c. */
-    double search_penalty = candidate_count > 1 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
-    double best_margin = 0.0;
-    int found = 0;
-    size_t ci;
-
-    for (ci = 0; ci < candidate_count; ci++) {
-        size_t yes_count = 0;
-        size_t no_count = 0;
-        double split_cost;
-        double delta_bic;
-        double margin;
-        size_t i;
-        for (i = 0; i < count; i++) {
-            if (rg_predicate_holds_internal(rows[i].context, &candidates[ci])) {
-                yes[yes_count++] = rows[i];
-            } else {
-                no[no_count++] = rows[i];
-            }
-        }
-        if (observation_weight(yes, yes_count) < gates[ci].min_obs ||
-            observation_weight(no, no_count) < gates[ci].min_obs) {
-            continue;
-        }
-        if (gates[ci].min_dominant_fraction > 0.0 &&
-            dominant_fraction(state, yes, yes_count) < gates[ci].min_dominant_fraction) {
-            continue;
-        }
-        split_cost = group_cost(state, yes, yes_count) + group_cost(state, no, no_count);
-        delta_bic = -2.0 * (baseline - split_cost) + penalty + search_penalty;
-        margin = gates[ci].delta_threshold - delta_bic;
-        /* Ties go to candidate order, which is the same everywhere, rather
-         * than to the last bit of a log. */
-        if (margin > best_margin + RG_TIE_EPSILON) {
-            best_margin = margin;
-            *best_delta_bic = delta_bic;
-            *best_search_margin = candidate_count > 1
-                ? (gates[ci].delta_threshold - (delta_bic - search_penalty)) / (2.0 * log((double)candidate_count))
-                : 0.0;
-            *best_candidate = ci;
-            memcpy(best_yes, yes, yes_count * sizeof(*yes));
-            memcpy(best_no, no, no_count * sizeof(*no));
-            *best_yes_count = yes_count;
-            *best_no_count = no_count;
-            found = 1;
-        }
-    }
-    return found;
-}
-
 /* Conjoins a second predicate within a committed group, and emits the narrower
  * classes it separates. Without this the stage can only ever say one thing
  * about an environment, and a change conditioned by two -- preceded by a nasal
@@ -773,7 +623,7 @@ static rg_status refine_pivot_split(
     discovery_state *state,
     const pivot_bucket *bucket,
     const rg_context_spec *base_context,
-    const pivot_obs *rows,
+    const rg_split_observation *rows,
     size_t count,
     int depth,
     int max_depth,
@@ -783,48 +633,36 @@ static rg_status refine_pivot_split(
     double min_commit,
     double n_total
 ) {
-    pivot_obs *yes;
-    pivot_obs *no;
-    pivot_obs *best_yes;
-    pivot_obs *best_no;
-    size_t best_yes_count = 0;
-    size_t best_no_count = 0;
-    size_t best_candidate = 0;
-    double delta_bic = 0.0;
-    double search_margin = 0.0;
+    rg_split_search search;
+    rg_split_result best;
     rg_status status = RG_OK;
 
     if (depth >= max_depth || count == 0) {
         return RG_OK;
     }
-    yes = (pivot_obs *)calloc(count, sizeof(*yes));
-    no = (pivot_obs *)calloc(count, sizeof(*no));
-    best_yes = (pivot_obs *)calloc(count, sizeof(*best_yes));
-    best_no = (pivot_obs *)calloc(count, sizeof(*best_no));
-    if (yes == 0 || no == 0 || best_yes == 0 || best_no == 0) {
-        free(yes); free(no); free(best_yes); free(best_no);
-        return RG_ERR_OOM;
+    status = rg_split_search_init(&search, count);
+    if (status != RG_OK) {
+        return status;
     }
-    if (pivot_best_split(state, rows, count, state->all, gates, state->all_count,
-                         penalty, search_gamma, yes, no, best_yes, best_no,
-                         &best_yes_count, &best_no_count, &best_candidate, &delta_bic,
-                         &search_margin)) {
+    if (rg_split_find_best(&search, rows, count, state->all, gates, state->all_count,
+                           penalty, search_gamma, &best)) {
         rg_context_spec narrowed;
-        status = rg_context_extend_internal(base_context, &state->all[best_candidate], &narrowed);
+        status = rg_context_extend_internal(base_context, &best.candidate, &narrowed);
         if (status == RG_OK) {
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
-                                         &narrowed, best_yes, best_yes_count,
-                                         best_no, best_no_count, delta_bic, search_margin,
+                                         &narrowed, search.best_yes, best.yes_count,
+                                         search.best_no, best.no_count, best.delta_bic,
+                                         best.search_margin,
                                          state->decision_count++, min_commit, n_total);
             if (status == RG_OK) {
-                status = refine_pivot_split(state, bucket, &narrowed, best_yes,
-                                            best_yes_count, depth + 1, max_depth,
+                status = refine_pivot_split(state, bucket, &narrowed, search.best_yes,
+                                            best.yes_count, depth + 1, max_depth,
                                             gates, penalty, search_gamma, min_commit, n_total);
             }
             rg_context_spec_clear_internal(&narrowed);
         }
     }
-    free(yes); free(no); free(best_yes); free(best_no);
+    rg_split_search_clear(&search);
     return status;
 }
 
@@ -842,61 +680,54 @@ static rg_status commit_splits_for_pivot(
     double min_commit,
     double n_total
 ) {
-    pivot_obs *remaining;
-    pivot_obs *yes;
-    pivot_obs *no;
-    pivot_obs *best_yes;
-    pivot_obs *best_no;
+    rg_split_search search;
+    rg_split_observation *remaining;
     size_t remaining_count = bucket->obs_count;
     int committed_count = 0;
+    size_t i;
     rg_status status = RG_OK;
 
-    remaining = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*remaining));
-    yes = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*yes));
-    no = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*no));
-    if (remaining == 0 || yes == 0 || no == 0) {
-        free(remaining);
-        free(yes);
-        free(no);
+    status = rg_split_search_init(&search, bucket->obs_count);
+    if (status != RG_OK) {
+        return status;
+    }
+    remaining = (rg_split_observation *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*remaining));
+    if (remaining == 0) {
+        rg_split_search_clear(&search);
         return RG_ERR_OOM;
     }
-    memcpy(remaining, bucket->obs, bucket->obs_count * sizeof(*remaining));
-
-    best_yes = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_yes));
-    best_no = (pivot_obs *)calloc(bucket->obs_count == 0 ? 1 : bucket->obs_count, sizeof(*best_no));
-    if (best_yes == 0 || best_no == 0) {
-        free(remaining); free(yes); free(no); free(best_yes); free(best_no);
-        return RG_ERR_OOM;
+    /* Project the bucket's rows into what the search reads. The sister's key
+     * is what cost groups by, and it is a string so the sum stays in sorted
+     * key order. */
+    for (i = 0; i < bucket->obs_count; i++) {
+        remaining[i].context = bucket->obs[i].context;
+        remaining[i].key = state->sisters[bucket->obs[i].sister_index].key;
+        remaining[i].weight = bucket->obs[i].weight;
+        remaining[i].owner = &bucket->obs[i];
     }
 
-    while (committed_count < max_depth * 4 && observation_weight(remaining, remaining_count) >= min_obs) {
-        size_t best_candidate = 0;
-        size_t best_yes_count = 0;
-        size_t best_no_count = 0;
-        double delta_bic = 0.0;
-        double search_margin = 0.0;
+    while (committed_count < RG_SPLIT_MAX_COMMITS(max_depth) && rg_split_total_weight(remaining, remaining_count) >= min_obs) {
+        rg_split_result best;
 
-        if (!pivot_best_split(state, remaining, remaining_count, candidates, gates,
-                              candidate_count, penalty, search_gamma, yes, no, best_yes, best_no,
-                              &best_yes_count, &best_no_count, &best_candidate,
-                              &delta_bic, &search_margin)) {
+        if (!rg_split_find_best(&search, remaining, remaining_count, candidates, gates,
+                                candidate_count, penalty, search_gamma, &best)) {
             break;
         }
         {
             rg_context_spec yes_context;
-            status = rg_context_from_candidate_internal(&candidates[best_candidate], &yes_context);
+            status = rg_context_from_candidate_internal(&best.candidate, &yes_context);
             if (status == RG_OK) {
                 status = emit_sister_classes(
                     state,
                     bucket->lect,
                     bucket->grapheme,
                     &yes_context,
-                    best_yes,
-                    best_yes_count,
-                    best_no,
-                    best_no_count,
-                    delta_bic,
-                    search_margin,
+                    search.best_yes,
+                    best.yes_count,
+                    search.best_no,
+                    best.no_count,
+                    best.delta_bic,
+                    best.search_margin,
                     state->decision_count++,
                     min_commit,
                     n_total
@@ -905,25 +736,22 @@ static rg_status commit_splits_for_pivot(
                  * a second predicate within it is a narrower environment, not
                  * a competing rule. */
                 if (status == RG_OK) {
-                    status = refine_pivot_split(state, bucket, &yes_context, best_yes,
-                                                best_yes_count, 1, max_depth, all_gates,
+                    status = refine_pivot_split(state, bucket, &yes_context, search.best_yes,
+                                                best.yes_count, 1, max_depth, all_gates,
                                                 penalty, search_gamma, min_commit, n_total);
                 }
                 rg_context_spec_clear_internal(&yes_context);
             }
         }
-        memcpy(remaining, best_no, best_no_count * sizeof(*remaining));
-        remaining_count = best_no_count;
+        memcpy(remaining, search.best_no, best.no_count * sizeof(*remaining));
+        remaining_count = best.no_count;
         if (status != RG_OK) {
             break;
         }
         committed_count++;
     }
-    free(best_yes);
-    free(best_no);
     free(remaining);
-    free(yes);
-    free(no);
+    rg_split_search_clear(&search);
     return status;
 }
 

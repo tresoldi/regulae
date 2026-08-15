@@ -602,3 +602,32 @@ const char *const rg_env_stress_slots[] = {
 };
 const size_t rg_env_stress_slot_count =
     sizeof(rg_env_stress_slots) / sizeof(rg_env_stress_slots[0]);
+
+rg_status rg_env_collect_stress_values(
+    const rg_context_spec *context,
+    rg_status (*add)(void *user, const char *value),
+    void *user
+) {
+    const rg_feature_constraint *slots[3];
+    size_t counts[3];
+    size_t s;
+    slots[0] = context->self_stress;
+    counts[0] = context->self_stress_count;
+    slots[1] = context->preceding_stress;
+    counts[1] = context->preceding_stress_count;
+    slots[2] = context->following_stress;
+    counts[2] = context->following_stress_count;
+    for (s = 0; s < 3; s++) {
+        size_t i;
+        for (i = 0; i < counts[s]; i++) {
+            if (slots[s][i].feature != 0 && strcmp(slots[s][i].feature, "stress") == 0 &&
+                slots[s][i].value != 0) {
+                rg_status status = add(user, slots[s][i].value);
+                if (status != RG_OK) {
+                    return status;
+                }
+            }
+        }
+    }
+    return RG_OK;
+}
