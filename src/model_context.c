@@ -460,10 +460,10 @@ static rg_status commit_observation_group(
                 row->source_total = source_total;
                 row->contrast_count = contrast_count;
                 row->contrast_total = contrast_total;
-                row->delta_bic = delta_bic;
-                row->search_margin = search_margin;
-                if (row->decision_index < 0 || decision_index < row->decision_index) {
-                    row->decision_index = decision_index;
+                row->evidence.delta_bic = delta_bic;
+                row->evidence.search_margin = search_margin;
+                if (row->evidence.decision_index < 0 || decision_index < row->evidence.decision_index) {
+                    row->evidence.decision_index = decision_index;
                 }
                 row->uncertainty = rg_wilson_default_internal(row->count, source_total);
                 row->uncertainty.post_selection = 1;

@@ -663,7 +663,7 @@ rg_status aggregate_position_classes(
         model->unconditioned_classes[c].view.count = buckets[c].count;
         model->unconditioned_classes[c].view.confidence = 1.0;
         /* An unconditioned class is aggregated, not decided. */
-        model->unconditioned_classes[c].view.decision_index = -1;
+        model->unconditioned_classes[c].view.evidence.decision_index = -1;
         model->unconditioned_classes[c].view.supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
         model->unconditioned_classes[c].view.supporting_cognate_count = buckets[c].supporting_cognate_count;
         model->unconditioned_classes[c].view.uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);

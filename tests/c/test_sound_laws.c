@@ -239,7 +239,7 @@ static void test_a_conditioned_class_publishes_its_contrast(rg_context *ctx) {
         int seen_s = 0;
         /* Every committed split beat its bar, so every published class carries
          * the score that says so. */
-        assert(row->delta_bic < 0.0);
+        assert(row->evidence.delta_bic < 0.0);
         assert(row->contrast_count >= 0.0);
         for (j = 0; j < row->segment_count; j++) {
             if (strcmp(row->graphemes[j], "r") == 0) {
@@ -264,7 +264,7 @@ static void test_a_conditioned_class_publishes_its_contrast(rg_context *ctx) {
     for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
         const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
         assert(row->contrast_count == 0.0);
-        assert(row->delta_bic == 0.0);
+        assert(row->evidence.delta_bic == 0.0);
     }
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -282,7 +282,7 @@ static void test_a_conditioned_row_publishes_its_contrast(rg_context *ctx) {
     for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pair); i++) {
         const rg_conditioned_segment_count_row *row =
             rg_pairwise_model_conditioned_segment_count_row_at(pair, i);
-        assert(row->delta_bic < 0.0);
+        assert(row->evidence.delta_bic < 0.0);
         assert(row->contrast_count >= 0.0);
         assert(row->contrast_total >= row->contrast_count);
         /* The environment has to have a complement, or it partitions nothing
@@ -768,11 +768,11 @@ static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
             const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
             /* A measured rule has a verdict, and it agrees with the numbers it
              * was computed from. */
-            assert(row->standing != RG_RULE_STANDING_UNMEASURED);
-            if (row->search_margin > fit->null_search_margin) {
-                assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+            assert(row->evidence.standing != RG_RULE_STANDING_UNMEASURED);
+            if (row->evidence.search_margin > fit->null_search_margin) {
+                assert(row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE);
             } else {
-                assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+                assert(row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
             }
         }
         if (strcmp(fixtures[f], "rounding_harmony") == 0) {
@@ -817,13 +817,13 @@ static void test_cross_dimensional_rules_report_whether_they_stand(rg_context *c
     assert(rg_multi_model_cross_dimensional_row_count(model) > 0);
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        assert(row->standing != RG_RULE_STANDING_UNMEASURED);
-        if (row->search_margin > fit->null_search_margin) {
-            assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+        assert(row->rule.evidence.standing != RG_RULE_STANDING_UNMEASURED);
+        if (row->rule.evidence.search_margin > fit->null_search_margin) {
+            assert(row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE);
         } else {
-            assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+            assert(row->rule.evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
         }
-        if (row->search_margin > 0.0) {
+        if (row->rule.evidence.search_margin > 0.0) {
             margin_seen = 1;
         }
         measured++;
@@ -836,11 +836,11 @@ static void test_cross_dimensional_rules_report_whether_they_stand(rg_context *c
         size_t j;
         for (j = 0; j < rg_pairwise_model_cross_dimensional_row_count(pair); j++) {
             const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(pair, j);
-            assert(row->standing != RG_RULE_STANDING_UNMEASURED);
-            if (row->search_margin > fit->null_search_margin) {
-                assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+            assert(row->evidence.standing != RG_RULE_STANDING_UNMEASURED);
+            if (row->evidence.search_margin > fit->null_search_margin) {
+                assert(row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE);
             } else {
-                assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+                assert(row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
             }
         }
     }
@@ -864,7 +864,7 @@ static void test_no_baseline_means_no_verdict(rg_context *ctx) {
 
     assert(rg_multi_model_fit(model)->rules_measured == 0);
     for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        assert(rg_multi_model_conditioned_class_at(model, i)->standing ==
+        assert(rg_multi_model_conditioned_class_at(model, i)->evidence.standing ==
                RG_RULE_STANDING_UNMEASURED);
     }
     rg_multi_model_free(model);
@@ -893,12 +893,12 @@ static void test_rules_carry_the_order_they_were_decided(rg_context *ctx) {
 
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        assert(row->decision_index >= 0);
+        assert(row->rule.evidence.decision_index >= 0);
         /* The conjunction refines what a single predicate left, so it cannot
          * have been decided first. */
-        if (row->source_environment.preceding_count == 1 &&
-            row->source_environment.self_count == 1) {
-            assert(row->decision_index > 0);
+        if (row->rule.source_environment.preceding_count == 1 &&
+            row->rule.source_environment.self_count == 1) {
+            assert(row->rule.evidence.decision_index > 0);
             refinement_seen = 1;
         }
     }
@@ -906,10 +906,10 @@ static void test_rules_carry_the_order_they_were_decided(rg_context *ctx) {
 
     /* An unconditioned class was aggregated, not decided. */
     for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        assert(rg_multi_model_unconditioned_class_at(model, i)->decision_index == -1);
+        assert(rg_multi_model_unconditioned_class_at(model, i)->evidence.decision_index == -1);
     }
     for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        assert(rg_multi_model_conditioned_class_at(model, i)->decision_index >= 0);
+        assert(rg_multi_model_conditioned_class_at(model, i)->evidence.decision_index >= 0);
     }
     rg_multi_model_free(model);
     rg_corpus_free(corpus);

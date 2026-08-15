@@ -223,13 +223,13 @@ static void print_summary(const rg_multi_model *model) {
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
         char environment[2048];
-        context_key(&row->source_environment, environment, sizeof(environment));
+        context_key(&row->rule.source_environment, environment, sizeof(environment));
         printf("XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
                row->source_lect, row->target_lect, environment,
-               row->target_dimension, row->target_value, row->target_position_offset,
-               row->count, row->source_count, row->confidence,
-               row->contrast_count, row->contrast_source_count, row->contrast_confidence,
-               row->delta_bic);
+               row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset,
+               row->rule.count, row->rule.source_count, row->rule.confidence,
+               row->rule.contrast_count, row->rule.contrast_source_count, row->rule.contrast_confidence,
+               row->rule.evidence.delta_bic);
     }
 }
 

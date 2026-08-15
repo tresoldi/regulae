@@ -241,7 +241,7 @@ static void test_tone_clean_fixture(rg_context *ctx) {
          * outside it. */
         assert(row->contrast_count == 0.0);
         assert(row->contrast_confidence == 0.0);
-        assert(row->delta_bic < 0.0);
+        assert(row->evidence.delta_bic < 0.0);
         if (strcmp(row->source_environment.preceding[0].value, "+") == 0 &&
             strcmp(row->target_value, "\xe2\x81\xb4\xe2\x81\xb4") == 0) {
             found_voiced = 1;

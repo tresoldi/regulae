@@ -341,13 +341,13 @@ rg_status add_conditioned_segment_count(
             (*rows)[i].source_total = source_total;
             (*rows)[i].contrast_count = contrast_count;
             (*rows)[i].contrast_total = contrast_total;
-            (*rows)[i].delta_bic = delta_bic;
-            (*rows)[i].search_margin = search_margin;
+            (*rows)[i].evidence.delta_bic = delta_bic;
+            (*rows)[i].evidence.search_margin = search_margin;
             /* The earliest decision that reached this row keeps it: a later
              * refinement restating the same correspondence did not discover
              * it. */
-            if ((*rows)[i].decision_index < 0 || decision_index < (*rows)[i].decision_index) {
-                (*rows)[i].decision_index = decision_index;
+            if ((*rows)[i].evidence.decision_index < 0 || decision_index < (*rows)[i].evidence.decision_index) {
+                (*rows)[i].evidence.decision_index = decision_index;
             }
             (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
             (*rows)[i].uncertainty.post_selection = 1;
@@ -371,10 +371,10 @@ rg_status add_conditioned_segment_count(
     (*rows)[*count].source_total = source_total;
     (*rows)[*count].contrast_count = contrast_count;
     (*rows)[*count].contrast_total = contrast_total;
-    (*rows)[*count].delta_bic = delta_bic;
-    (*rows)[*count].search_margin = search_margin;
-    (*rows)[*count].decision_index = decision_index;
-    (*rows)[*count].search_margin = search_margin;
+    (*rows)[*count].evidence.delta_bic = delta_bic;
+    (*rows)[*count].evidence.search_margin = search_margin;
+    (*rows)[*count].evidence.decision_index = decision_index;
+    (*rows)[*count].evidence.search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     (*rows)[*count].uncertainty.post_selection = 1;
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {

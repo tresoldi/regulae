@@ -371,7 +371,7 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         append_count(&builder, row->contrast_count);
         builder_append(&builder, "/");
         append_count(&builder, row->contrast_total);
-        builder_appendf(&builder, "  dBIC=%.1f  [%.2f,%.2f]%s  %s ~ %s", row->delta_bic,
+        builder_appendf(&builder, "  dBIC=%.1f  [%.2f,%.2f]%s  %s ~ %s", row->evidence.delta_bic,
                         row->uncertainty.lower, row->uncertainty.upper,
                         row->uncertainty.post_selection ? "*" : "",
                         row->source, row->target);
@@ -498,7 +498,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         while (insert_at > 0) {
             const rg_multi_class_row *prior =
                 rg_multi_model_conditioned_class_at(model, decision_order[insert_at - 1]);
-            if (prior->decision_index <= row->decision_index) {
+            if (prior->evidence.decision_index <= row->evidence.decision_index) {
                 break;
             }
             decision_order[insert_at] = decision_order[insert_at - 1];
@@ -522,13 +522,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
-        builder_appendf(&builder, "  #%d", row->decision_index);
-        if (row->standing != RG_RULE_STANDING_UNMEASURED) {
+        builder_appendf(&builder, "  #%d", row->evidence.decision_index);
+        if (row->evidence.standing != RG_RULE_STANDING_UNMEASURED) {
             builder_appendf(&builder, " %s",
-                            row->standing == RG_RULE_STANDING_ABOVE_NOISE ? "STANDS" : "within-noise");
+                            row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "STANDS" : "within-noise");
         }
         builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f [%.2f,%.2f]%s  ",
-                        row->confidence, row->delta_bic, row->search_margin,
+                        row->confidence, row->evidence.delta_bic, row->evidence.search_margin,
                         row->uncertainty.lower, row->uncertainty.upper,
                         row->uncertainty.post_selection ? "*" : "");
         append_class_segments(&builder, row);
@@ -557,7 +557,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         while (insert_at > 0) {
             const rg_multi_cross_dimensional_row *prior =
                 rg_multi_model_cross_dimensional_row_at(model, decision_order[insert_at - 1]);
-            if (prior->decision_index <= row->decision_index) {
+            if (prior->rule.evidence.decision_index <= row->rule.evidence.decision_index) {
                 break;
             }
             decision_order[insert_at] = decision_order[insert_at - 1];
@@ -568,16 +568,16 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row =
             rg_multi_model_cross_dimensional_row_at(model, decision_order[i]);
-        builder_appendf(&builder, "  #%d %s>%s ", row->decision_index,
+        builder_appendf(&builder, "  #%d %s>%s ", row->rule.evidence.decision_index,
                         row->source_lect, row->target_lect);
-        append_context(&builder, &row->source_environment);
+        append_context(&builder, &row->rule.source_environment);
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
-                        row->target_dimension, row->target_value, row->target_position_offset);
-        append_count(&builder, row->count);
+                        row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset);
+        append_count(&builder, row->rule.count);
         builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere%s\n",
-                        row->confidence, row->contrast_confidence,
-                        row->standing == RG_RULE_STANDING_UNMEASURED ? ""
-                            : (row->standing == RG_RULE_STANDING_ABOVE_NOISE ? "  STANDS" : "  within-noise"));
+                        row->rule.confidence, row->rule.contrast_confidence,
+                        row->rule.evidence.standing == RG_RULE_STANDING_UNMEASURED ? ""
+                            : (row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "  STANDS" : "  within-noise"));
     }
     free(decision_order);
     return builder_finish(&builder);
@@ -629,7 +629,7 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
                 append_count(&builder, row->count);
                 builder_append(&builder, " elsewhere=");
                 append_count(&builder, row->contrast_count);
-                builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->delta_bic);
+                builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->evidence.delta_bic);
                 append_class_segments(&builder, row);
                 append_class_contexts(&builder, row);
                 builder_append(&builder, "\n");

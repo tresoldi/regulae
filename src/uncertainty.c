@@ -198,3 +198,11 @@ const char *rg_rule_standing_string(rg_rule_standing standing) {
         return "unknown";
     }
 }
+
+void rg_rule_evidence_judge_internal(rg_rule_evidence *evidence, double null_search_margin) {
+    if (evidence == 0) {
+        return;
+    }
+    evidence->standing = evidence->search_margin > null_search_margin
+        ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+}

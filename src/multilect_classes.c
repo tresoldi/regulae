@@ -1289,9 +1289,9 @@ rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.count = merged[i].count;
                 model->conditioned_classes[i].view.confidence = merged[i].confidence;
                 model->conditioned_classes[i].view.contrast_count = merged[i].contrast_count;
-                model->conditioned_classes[i].view.delta_bic = merged[i].delta_bic;
-                model->conditioned_classes[i].view.search_margin = merged[i].search_margin;
-                model->conditioned_classes[i].view.decision_index = merged[i].decision_index;
+                model->conditioned_classes[i].view.evidence.delta_bic = merged[i].delta_bic;
+                model->conditioned_classes[i].view.evidence.search_margin = merged[i].search_margin;
+                model->conditioned_classes[i].view.evidence.decision_index = merged[i].decision_index;
                 model->conditioned_classes[i].view.uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 /* The environment was chosen by the same observations, so the

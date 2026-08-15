@@ -105,24 +105,15 @@ rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
                 model->cross_dimensional_rows = next;
                 cap = next_cap;
             }
-            memset(&model->cross_dimensional_rows[model->cross_dimensional_count], 0, sizeof(model->cross_dimensional_rows[model->cross_dimensional_count]));
+            memset(&model->cross_dimensional_rows[model->cross_dimensional_count], 0,
+                   sizeof(model->cross_dimensional_rows[model->cross_dimensional_count]));
+            /* The rule is the pairwise row. Only which pair it was found in is
+             * new here, so there is nothing to copy field by field -- and
+             * nothing to forget to copy, which forty lines of assignment could.
+             * Borrowed from the pairwise row, which outlives the lifted view. */
             model->cross_dimensional_rows[model->cross_dimensional_count].view.source_lect = model->pair_models[i].lect_a;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.target_lect = model->pair_models[i].lect_b;
-            /* Borrowed from the pairwise row, which outlives the lifted view. */
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_environment = row->source_environment;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.target_dimension = row->target_dimension;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.target_value = row->target_value;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.target_position_offset = row->target_position_offset;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.count = row->count;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_count = row->source_count;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.confidence = row->confidence;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_count = row->contrast_count;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_source_count = row->contrast_source_count;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_confidence = row->contrast_confidence;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.delta_bic = row->delta_bic;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.decision_index = row->decision_index;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.search_margin = row->search_margin;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.uncertainty = row->uncertainty;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.rule = *row;
             model->cross_dimensional_count++;
         }
     }

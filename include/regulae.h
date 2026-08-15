@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 22
+#define RG_ABI_VERSION 23
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -254,6 +254,49 @@ typedef enum rg_rule_standing {
 
 RG_API const char *rg_rule_standing_string(rg_rule_standing standing);
 
+/* What a search decided, and how the decision stands.
+ *
+ * Every rule a discovery stage commits carries the same four facts, and they
+ * were copy-pasted field for field into four published row types. Naming them
+ * once means the standing verdict is computed in one place for every table,
+ * and that an appender takes one argument rather than four positional doubles
+ * and ints -- the two sibling appenders took the same trailing pair in
+ * opposite orders, both a double and an int, so a swap compiled.
+ *
+ * Not on the aggregated tables. A segment, displacement, tonal or chunk row is
+ * counted, not decided: there is no comparison behind it and no place in a
+ * decision list for it to hold. Those rows carry an interval and nothing else.
+ *
+ * `uncertainty` is deliberately not here either. How well a rate is pinned is a
+ * different question from whether the environment is real, it is asked of every
+ * row including the aggregated ones, and rg_uncertainty_estimate already names
+ * it. */
+typedef struct rg_rule_evidence {
+    /* What the split scored. Negative means it paid for its parameter. */
+    double delta_bic;
+    /* Where this rule sits in the decision list.
+     *
+     * Discovery is greedy and each rule is committed against what the earlier
+     * ones left unexplained, so the rules are ordered and the order carries
+     * meaning: a later rule refines, or applies within, what an earlier one
+     * did not settle. The Middle Chinese register split reads as three
+     * decisions in sequence -- source tone accounts for one class, then the
+     * onset's voicing splits what it left -- and as an unordered set it reads
+     * as three unrelated facts, one of them at confidence 0.50.
+     *
+     * Published tables are sorted by key so lookups can binary-search them,
+     * which destroys that order; this preserves it. Rules committed by one
+     * decision share an index. -1 where the row was not committed by a search:
+     * an unconditioned class is aggregated, not decided. */
+    int decision_index;
+    /* How heavy a search charge this rule's evidence could carry and still
+     * commit. Comparable across corpora, and comparable against the same
+     * number measured on the corpus shuffled -- see rg_corpus_fit. */
+    double search_margin;
+    /* Set once the shuffled baseline has been measured; see rg_rule_standing. */
+    rg_rule_standing standing;
+} rg_rule_evidence;
+
 typedef struct rg_uncertainty_estimate {
     double estimate;
     double lower;
@@ -356,30 +399,9 @@ typedef struct rg_conditioned_segment_count_row {
     bool context_is_target;
     double count;
     double source_total;
-    /* Where this rule sits in the decision list.
-     *
-     * Discovery is greedy and each rule is committed against what the earlier
-     * ones left unexplained, so the rules are ordered and the order carries
-     * meaning: a later rule refines, or applies within, what an earlier one
-     * did not settle. The Middle Chinese register split reads as three
-     * decisions in sequence -- source tone accounts for one class, then the
-     * onset's voicing splits what it left -- and as an unordered set it reads
-     * as three unrelated facts, one of them at confidence 0.50.
-     *
-     * Published tables are sorted by key so lookups can binary-search them,
-     * which destroys that order; this preserves it. Rules committed by one
-     * decision share an index. -1 where the row was not committed by a search:
-     * an unconditioned class is aggregated, not decided. */
-    int decision_index;
     double contrast_count;
     double contrast_total;
-    double delta_bic;
-    /* How heavy a search charge this rule's evidence could carry and still
-     * commit. Comparable across corpora, and comparable against the same
-     * number measured on the corpus shuffled -- see rg_corpus_fit. */
-    double search_margin;
-    /* Set once the shuffled baseline has been measured; see rg_rule_standing. */
-    rg_rule_standing standing;
+    rg_rule_evidence evidence;
     rg_uncertainty_estimate uncertainty;
 } rg_conditioned_segment_count_row;
 
@@ -445,10 +467,7 @@ typedef struct rg_cross_dimensional_row {
     double contrast_count;
     double contrast_source_count;
     double contrast_confidence;
-    double delta_bic;
-    int decision_index;
-    double search_margin;
-    rg_rule_standing standing;
+    rg_rule_evidence evidence;
     rg_uncertainty_estimate uncertainty;
 } rg_cross_dimensional_row;
 
@@ -466,40 +485,27 @@ typedef struct rg_multi_class_row {
     size_t segment_count;
     double count;
     double confidence;
-    /* The same segment tuple where the environment does not hold, and the
-     * delta-BIC the split scored. Zero on an unconditioned class, which has no
-     * environment and so no complement to compare against. */
+    /* The same segment tuple where the environment does not hold. Zero on an
+     * unconditioned class, which has no environment and so no complement to
+     * compare against -- as are that class's evidence fields, which was not
+     * committed by a search. */
     double contrast_count;
-    double delta_bic;
-    int decision_index;
-    /* How heavy a search charge this class's evidence could carry and still
-     * commit; read against rg_corpus_fit's null_search_margin. Zero on an
-     * unconditioned class, which was not committed by a search. */
-    double search_margin;
-    rg_rule_standing standing;
+    rg_rule_evidence evidence;
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;
 } rg_multi_class_row;
 
+/* A cross-dimensional rule, and which pair of lects it was found in.
+ *
+ * The rule itself is exactly the pairwise row -- the multi-lect table is built
+ * by lifting every pair's rows into one place, and the lifting used to be forty
+ * lines copying fifteen identical fields across, in the same order, into a
+ * struct that differed from its source by two strings. */
 typedef struct rg_multi_cross_dimensional_row {
     const char *source_lect;
     const char *target_lect;
-    rg_context_spec source_environment;
-    const char *target_dimension;
-    const char *target_value;
-    int target_position_offset;
-    double count;
-    double source_count;
-    double confidence;
-    double contrast_count;
-    double contrast_source_count;
-    double contrast_confidence;
-    double delta_bic;
-    int decision_index;
-    double search_margin;
-    rg_rule_standing standing;
-    rg_uncertainty_estimate uncertainty;
+    rg_cross_dimensional_row rule;
 } rg_multi_cross_dimensional_row;
 
 typedef struct rg_cognate_outlier_row {

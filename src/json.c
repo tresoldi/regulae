@@ -128,13 +128,13 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     /* The comparison the split was measured against. Zero on an unconditioned
      * class, which has no environment and so no complement. */
     cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
-    cJSON_AddNumberToObject(out, "delta_bic", row->delta_bic);
-    cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
+    cJSON_AddNumberToObject(out, "delta_bic", row->evidence.delta_bic);
+    cJSON_AddNumberToObject(out, "search_margin", row->evidence.search_margin);
     /* Where this rule sits in the decision list. Sorting the table by key
      * destroys the order discovery settled them in, and that order carries
      * meaning: a later rule refines what an earlier one left. */
-    cJSON_AddNumberToObject(out, "decision_index", row->decision_index);
-    cJSON_AddStringToObject(out, "standing", rg_rule_standing_string(row->standing));
+    cJSON_AddNumberToObject(out, "decision_index", row->evidence.decision_index);
+    cJSON_AddStringToObject(out, "standing", rg_rule_standing_string(row->evidence.standing));
 
     segments = cJSON_CreateArray();
     if (segments == 0) {
@@ -527,25 +527,25 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddStringToObject(entry, "source_lect", row->source_lect);
         cJSON_AddStringToObject(entry, "target_lect", row->target_lect);
         {
-            cJSON *environment = json_context(&row->source_environment);
+            cJSON *environment = json_context(&row->rule.source_environment);
             if (environment != 0) {
                 cJSON_AddItemToObject(entry, "source_environment", environment);
             }
         }
-        cJSON_AddStringToObject(entry, "target_dimension", row->target_dimension);
-        cJSON_AddStringToObject(entry, "target_value", row->target_value);
-        cJSON_AddNumberToObject(entry, "target_position_offset", row->target_position_offset);
-        cJSON_AddNumberToObject(entry, "count", row->count);
-        cJSON_AddNumberToObject(entry, "source_count", row->source_count);
-        cJSON_AddNumberToObject(entry, "confidence", row->confidence);
-        cJSON_AddNumberToObject(entry, "contrast_count", row->contrast_count);
-        cJSON_AddNumberToObject(entry, "contrast_source_count", row->contrast_source_count);
-        cJSON_AddNumberToObject(entry, "contrast_confidence", row->contrast_confidence);
-        cJSON_AddNumberToObject(entry, "delta_bic", row->delta_bic);
-        cJSON_AddNumberToObject(entry, "decision_index", row->decision_index);
-        cJSON_AddNumberToObject(entry, "search_margin", row->search_margin);
-        cJSON_AddStringToObject(entry, "standing", rg_rule_standing_string(row->standing));
-        cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->uncertainty));
+        cJSON_AddStringToObject(entry, "target_dimension", row->rule.target_dimension);
+        cJSON_AddStringToObject(entry, "target_value", row->rule.target_value);
+        cJSON_AddNumberToObject(entry, "target_position_offset", row->rule.target_position_offset);
+        cJSON_AddNumberToObject(entry, "count", row->rule.count);
+        cJSON_AddNumberToObject(entry, "source_count", row->rule.source_count);
+        cJSON_AddNumberToObject(entry, "confidence", row->rule.confidence);
+        cJSON_AddNumberToObject(entry, "contrast_count", row->rule.contrast_count);
+        cJSON_AddNumberToObject(entry, "contrast_source_count", row->rule.contrast_source_count);
+        cJSON_AddNumberToObject(entry, "contrast_confidence", row->rule.contrast_confidence);
+        cJSON_AddNumberToObject(entry, "delta_bic", row->rule.evidence.delta_bic);
+        cJSON_AddNumberToObject(entry, "decision_index", row->rule.evidence.decision_index);
+        cJSON_AddNumberToObject(entry, "search_margin", row->rule.evidence.search_margin);
+        cJSON_AddStringToObject(entry, "standing", rg_rule_standing_string(row->rule.evidence.standing));
+        cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->rule.uncertainty));
         cJSON_AddItemToArray(array, entry);
     }
 

@@ -420,6 +420,12 @@ rg_status rg_score_link_with_context_model_internal(
  * constant that cannot be unsupported. */
 rg_uncertainty_estimate rg_wilson_default_internal(double count, double total);
 
+/* Sets a rule's standing from its search margin against the level the same
+ * search reached on the shuffled corpus. Written out four times in
+ * multilect_fit.c before this, which is three more places for the comparison
+ * to be got backwards. */
+void rg_rule_evidence_judge_internal(rg_rule_evidence *evidence, double null_search_margin);
+
 /* A percentile interval over resampled rates. Implemented since the port and
  * unreachable until 2026-08-15, when bootstrap_n stopped being an option that
  * did nothing. */

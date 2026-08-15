@@ -351,7 +351,7 @@ rg_status run_permutation_baseline(
                 margins = next;
                 margin_cap = next_cap;
             }
-            margins[margin_count++] = row->search_margin;
+            margins[margin_count++] = row->evidence.search_margin;
         }
         rg_multi_model_free(shuffled);
     }
@@ -434,33 +434,43 @@ rg_status compute_corpus_fit(
         size_t j;
         for (i = 0; i < model->conditioned_class_count; i++) {
             rg_multi_class_row *row = &model->conditioned_classes[i].view;
-            row->standing = row->search_margin > baseline->search_margin
-                ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
             model->fit.rules_measured++;
-            if (row->standing == RG_RULE_STANDING_ABOVE_NOISE) {
+            if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
                 model->fit.rules_above_noise++;
             }
         }
         for (i = 0; i < model->cross_dimensional_count; i++) {
             rg_multi_cross_dimensional_row *row = &model->cross_dimensional_rows[i].view;
-            row->standing = row->search_margin > baseline->search_margin
-                ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            rg_rule_evidence_judge_internal(&row->rule.evidence, baseline->search_margin);
             model->fit.rules_measured++;
-            if (row->standing == RG_RULE_STANDING_ABOVE_NOISE) {
+            if (row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
                 model->fit.rules_above_noise++;
             }
         }
+        /* The per-pair tables are judged but not counted, and that is not an
+         * oversight to be tidied away.
+         *
+         * lift_cross_dimensional_rows copies every pairwise cross-dimensional
+         * row into the multi-lect table, so the loop above has already counted
+         * each of those rules once; counting here would count it twice. Their
+         * standing is still set, because the pairwise model is published in its
+         * own right and a rule that says nothing about how it stands is not
+         * readable.
+         *
+         * The pairwise *conditioned correspondences* are a different case: they
+         * are not lifted anywhere, so they are genuinely outside the count.
+         * Whether they belong in it is a question about what "how many rules
+         * stand" is counting, not a bug -- see docs/architecture_plan.md. */
         for (i = 0; i < model->pair_model_count; i++) {
             rg_pairwise_model *pair = model->pair_models[i].model;
             for (j = 0; j < pair->conditioned_segment_count_count; j++) {
                 rg_conditioned_segment_count_row *row = &pair->conditioned_segment_counts[j];
-                row->standing = row->search_margin > baseline->search_margin
-                    ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+                rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
             }
             for (j = 0; j < pair->cross_dimensional_count; j++) {
                 rg_cross_dimensional_row *row = &pair->cross_dimensional_rows[j];
-                row->standing = row->search_margin > baseline->search_margin
-                    ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+                rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
             }
         }
     }
