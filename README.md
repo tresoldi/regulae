@@ -67,12 +67,16 @@ carrying:
   the categorical systems and the valued ones (`phoible`,
   `pbase-*`) both work. A fixed list fits the language its
   author had in mind and silently loses the rest.
-- **A margin per rule, and the level noise reaches.** Every
-  conditioned rule reports how heavy a search charge its
-  evidence could carry; `--permutations` reports the same
-  number measured on the corpus shuffled. A rule at or under
-  that level was findable in data with no correspondences in
-  it. `--tune-search` turns the comparison into a gate. Every committed
+- **A verdict per rule.** Every conditioned rule reports how
+  heavy a search charge its evidence carries, and — with
+  `--permutations` — whether that clears what the same search
+  reaches on the corpus shuffled. On sixty unrelated pseudo-word
+  pairs, a run produces thirty-two conditioned rules and marks
+  thirty-one of them as findable in noise. `--tune-search`
+  turns the comparison into a gate.
+- **A decision list, not a bag of rules.** Discovery is greedy,
+  so a later rule refines what an earlier one left unsettled.
+  That order is published and the reports render it. Every committed
   rule publishes the contrast it was measured against — the same
   correspondence where the environment does not hold — and the
   ΔBIC it scored, because a conditioning claim without its

@@ -685,6 +685,73 @@ static void test_conditioning_works_in_any_feature_system(void) {
     }
 }
 
+/* The reader should not have to synthesise a verdict from a count, a contrast,
+ * a delta-BIC, a margin and a corpus-level ceiling, on twenty-five rules. Each
+ * rule says whether its evidence carries a heavier search charge than the level
+ * the same search reaches on the corpus with its correspondences shuffled out,
+ * and the fit summary counts them.
+ *
+ * The two fixtures here are the two answers. Rounding harmony is a regular
+ * change on a corpus large enough to show it, and its rule towers over the
+ * noise. Verner's law is real and its corpus is forty sets, and on forty sets
+ * the search finds artefacts stronger than the law -- which is a fact about the
+ * evidence, and the tool now says it rather than leaving the reader to work it
+ * out. */
+static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
+    static const char *fixtures[] = { "rounding_harmony", "verner" };
+    size_t f;
+    for (f = 0; f < 2; f++) {
+        rg_corpus *corpus = load(fixtures[f]);
+        rg_train_options options;
+        rg_multi_model *model = 0;
+        const rg_corpus_fit *fit;
+        size_t i;
+
+        rg_train_options_init_defaults(&options);
+        options.permutation_count = 10;
+        assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                              rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+        fit = rg_multi_model_fit(model);
+        assert(fit->rules_measured > 0);
+        assert(fit->rules_above_noise <= fit->rules_measured);
+        for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+            /* A measured rule has a verdict, and it agrees with the numbers it
+             * was computed from. */
+            assert(row->standing != RG_RULE_STANDING_UNMEASURED);
+            if (row->search_margin > fit->null_search_margin) {
+                assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+            } else {
+                assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+            }
+        }
+        if (strcmp(fixtures[f], "rounding_harmony") == 0) {
+            assert(fit->rules_above_noise == fit->rules_measured);
+        } else {
+            /* Not every real law clears its own corpus's noise. */
+            assert(fit->rules_above_noise < fit->rules_measured);
+        }
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
+/* Without a baseline there is nothing to stand above, and the rule says so
+ * rather than claiming a verdict it has not earned. */
+static void test_no_baseline_means_no_verdict(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+
+    assert(rg_multi_model_fit(model)->rules_measured == 0);
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        assert(rg_multi_model_conditioned_class_at(model, i)->standing ==
+               RG_RULE_STANDING_UNMEASURED);
+    }
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* Discovery is greedy: each rule is committed against what the earlier ones
  * left unexplained, so the rules are ordered and the order carries meaning. The
  * Middle Chinese register split is three decisions in sequence -- source tone
@@ -930,6 +997,8 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_rules_report_whether_they_stand_above_noise(ctx);
+    test_no_baseline_means_no_verdict(ctx);
     test_rules_carry_the_order_they_were_decided(ctx);
     test_metathesis(ctx);
     test_morphological_conditioning(ctx);

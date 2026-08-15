@@ -385,8 +385,32 @@ against the same number measured on the corpus **shuffled** — which
 `--permutations` reports as `null_search_margin`, the p95 of what the search
 reaches in data with no correspondences left in it.
 
-That comparison is the per-rule verdict, and it agrees with linguistic
-expectation wherever the answer is known:
+That comparison **is** the per-rule verdict, and the tool makes it: every
+conditioned rule carries `standing`, and the fit summary counts how many stand.
+Leaving the reader to synthesise it from a count, a contrast, a ΔBIC, a margin
+and a corpus-level ceiling — on twenty-five rules — was asking them to do the
+judging the tool exists for.
+
+| corpus | noise ceiling | rules standing |
+| --- | --- | --- |
+| `rounding_harmony` | 1.00 | **1 of 1** |
+| `place_assimilation` | 1.69 | **2 of 2** |
+| `rhotacism` | 1.18 | **3 of 3** |
+| `verner` | 1.73 | **0 of 5** |
+| `ppn_hawaiian` | 1.59 | **0 of 4** |
+| unrelated pseudo-words | 1.76 | **1 of 32** |
+
+The last row is the one to keep in mind: on data with no relationship in it, a
+run still produces thirty-two conditioned rules with stated environments, and
+thirty-one of them are now marked as findable in noise. The `verner` row is the
+honest cost — a real law on forty cognate sets does not clear the artefacts its
+own corpus's search can produce, and saying so is better than not knowing.
+
+`standing` is `unmeasured` without `--permutations`. It is not a verdict then,
+and does not pretend to be one.
+
+The underlying comparison agrees with linguistic expectation wherever the
+answer is known:
 
 | corpus | strongest rule | noise reaches | reading |
 | --- | --- | --- | --- |

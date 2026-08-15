@@ -3261,6 +3261,46 @@ static rg_status compute_corpus_fit(
     if (status != RG_OK || baseline->runs == 0) {
         return status;
     }
+    /* The verdict a reader would otherwise have to reach by hand, on
+     * twenty-five rules: does this one's evidence carry a heavier search
+     * charge than the level the same search reaches on the corpus with its
+     * correspondences shuffled out? Reported per rule and counted for the
+     * corpus. */
+    {
+        size_t i;
+        size_t j;
+        for (i = 0; i < model->conditioned_class_count; i++) {
+            rg_multi_class_row *row = &model->conditioned_classes[i].view;
+            row->standing = row->search_margin > baseline->search_margin
+                ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            model->fit.rules_measured++;
+            if (row->standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                model->fit.rules_above_noise++;
+            }
+        }
+        for (i = 0; i < model->cross_dimensional_count; i++) {
+            rg_multi_cross_dimensional_row *row = &model->cross_dimensional_rows[i].view;
+            row->standing = row->search_margin > baseline->search_margin
+                ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            model->fit.rules_measured++;
+            if (row->standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                model->fit.rules_above_noise++;
+            }
+        }
+        for (i = 0; i < model->pair_model_count; i++) {
+            rg_pairwise_model *pair = model->pair_models[i].model;
+            for (j = 0; j < pair->conditioned_segment_count_count; j++) {
+                rg_conditioned_segment_count_row *row = &pair->conditioned_segment_counts[j];
+                row->standing = row->search_margin > baseline->search_margin
+                    ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            }
+            for (j = 0; j < pair->cross_dimensional_count; j++) {
+                rg_cross_dimensional_row *row = &pair->cross_dimensional_rows[j];
+                row->standing = row->search_margin > baseline->search_margin
+                    ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+            }
+        }
+    }
     model->fit.permutation_count = baseline->runs;
     model->fit.null_cost_per_segment_mean = baseline->cost_mean;
     model->fit.null_cost_per_segment_sd = baseline->cost_sd;

@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 19
+#define RG_ABI_VERSION 20
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -227,6 +227,28 @@ typedef enum rg_uncertainty_method {
 /* A two-sided interval on a rate in [0, 1] — the conditional probability the
  * count represents — plus the provenance needed to read it. n is the
  * denominator behind the point estimate, not the number of bootstrap samples. */
+/* Whether a rule stands above what the search finds in this corpus with the
+ * correspondences taken out of it.
+ *
+ * Every conditioned rule already reports a count, a contrast, a delta-BIC, a
+ * search margin and an interval, and the corpus reports what its own shuffles
+ * reach. Putting those together was left to the reader, which is a synthesis
+ * a reader should not have to do on twenty-five rules -- and is exactly the
+ * judgement the tool is for. */
+typedef enum rg_rule_standing {
+    /* No shuffled baseline was run, so there is nothing to stand above.
+     * Not a verdict: pass permutation_count to get one. */
+    RG_RULE_STANDING_UNMEASURED = 0,
+    /* The rule's evidence carries a heavier search charge than the level the
+     * same search reaches on the shuffled corpus. */
+    RG_RULE_STANDING_ABOVE_NOISE = 1,
+    /* It does not. The rule may still be true; what it is not is
+     * distinguishable from an artefact of having looked. */
+    RG_RULE_STANDING_WITHIN_NOISE = 2
+} rg_rule_standing;
+
+RG_API const char *rg_rule_standing_string(rg_rule_standing standing);
+
 typedef struct rg_uncertainty_estimate {
     double estimate;
     double lower;
@@ -351,6 +373,8 @@ typedef struct rg_conditioned_segment_count_row {
      * commit. Comparable across corpora, and comparable against the same
      * number measured on the corpus shuffled -- see rg_corpus_fit. */
     double search_margin;
+    /* Set once the shuffled baseline has been measured; see rg_rule_standing. */
+    rg_rule_standing standing;
     rg_uncertainty_estimate uncertainty;
 } rg_conditioned_segment_count_row;
 
@@ -408,6 +432,8 @@ typedef struct rg_cross_dimensional_row {
     double contrast_confidence;
     double delta_bic;
     int decision_index;
+    double search_margin;
+    rg_rule_standing standing;
     rg_uncertainty_estimate uncertainty;
 } rg_cross_dimensional_row;
 
@@ -435,6 +461,7 @@ typedef struct rg_multi_class_row {
      * commit; read against rg_corpus_fit's null_search_margin. Zero on an
      * unconditioned class, which was not committed by a search. */
     double search_margin;
+    rg_rule_standing standing;
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;
@@ -455,6 +482,8 @@ typedef struct rg_multi_cross_dimensional_row {
     double contrast_confidence;
     double delta_bic;
     int decision_index;
+    double search_margin;
+    rg_rule_standing standing;
     rg_uncertainty_estimate uncertainty;
 } rg_multi_cross_dimensional_row;
 
@@ -506,6 +535,10 @@ typedef struct rg_corpus_fit {
      * guess. */
     size_t inferred_nucleus_form_count;
     size_t syllabified_form_count;
+    /* How many conditioned rules stand above the shuffled baseline, of how
+     * many that were measured. Zero and zero when no baseline was run. */
+    size_t rules_above_noise;
+    size_t rules_measured;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);

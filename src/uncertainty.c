@@ -185,3 +185,16 @@ rg_uncertainty_estimate rg_wilson_default_internal(double count, double total) {
     }
     return out;
 }
+
+const char *rg_rule_standing_string(rg_rule_standing standing) {
+    switch (standing) {
+    case RG_RULE_STANDING_ABOVE_NOISE:
+        return "above noise";
+    case RG_RULE_STANDING_WITHIN_NOISE:
+        return "within noise";
+    case RG_RULE_STANDING_UNMEASURED:
+        return "unmeasured";
+    default:
+        return "unknown";
+    }
+}

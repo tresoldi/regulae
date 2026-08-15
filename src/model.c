@@ -506,6 +506,7 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].search_margin = search_margin;
     (*rows)[*count].decision_index = decision_index;
+    (*rows)[*count].search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     (*rows)[*count].uncertainty.post_selection = 1;
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
@@ -3005,7 +3006,8 @@ static rg_status append_cross_dimensional_row(
     double contrast_count,
     double contrast_source_count,
     double delta_bic,
-    int decision_index
+    int decision_index,
+    double search_margin
 ) {
     rg_cross_dimensional_row *next;
     if (*count == *cap) {
@@ -3833,6 +3835,7 @@ static rg_status discover_cross_dimensional_rows(
             size_t best_env = 0;
             int found = 0;
             int decision_index = model->decision_count;
+            double best_margin = 0.0;
             size_t env_i;
             double search_charge = candidate_count > 1
                 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
@@ -3885,6 +3888,13 @@ static rg_status discover_cross_dimensional_rows(
                     }
                     best = scored;
                     best_env = env_i;
+                    /* How heavy a search charge this rule's evidence carries,
+                     * in the same units the context splitter reports, so it
+                     * can be read against the corpus's shuffled ceiling. */
+                    best_margin = candidate_count > 1
+                        ? (delta_threshold - (scored.delta_bic - search_charge)) /
+                          (2.0 * log((double)candidate_count))
+                        : 0.0;
                     found = 1;
                 } else {
                     xdim_scored_clear(&scored);
@@ -3965,7 +3975,7 @@ static rg_status discover_cross_dimensional_rows(
                             &rows, &row_count, &row_cap,
                             &environment, target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
-                            best.delta_bic, decision_index);
+                            best.delta_bic, decision_index, best_margin);
                         if (status == RG_OK) {
                             size_t obs_i;
                             /* Retire what this rule accounts for. An

@@ -462,6 +462,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                             "  noise reaches search margin %.2f (p%.0f); a rule at or under that\n"
                             "  was findable in data with no correspondences left in it\n",
                             fit->null_search_margin, fit->null_search_margin_quantile * 100.0);
+            builder_appendf(&builder,
+                            "verdict:             %lu of %lu conditioned rules stand above it\n",
+                            (unsigned long)fit->rules_above_noise,
+                            (unsigned long)fit->rules_measured);
         } else {
             builder_append(&builder,
                            "shuffled baseline:   not run (--permutations <n>)\n"
@@ -526,6 +530,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
         builder_appendf(&builder, "  #%d", row->decision_index);
+        if (row->standing != RG_RULE_STANDING_UNMEASURED) {
+            builder_appendf(&builder, " %s",
+                            row->standing == RG_RULE_STANDING_ABOVE_NOISE ? "STANDS" : "within-noise");
+        }
         builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f [%.2f,%.2f]%s  ",
                         row->confidence, row->delta_bic, row->search_margin,
                         row->uncertainty.lower, row->uncertainty.upper,
@@ -573,8 +581,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->target_dimension, row->target_value, row->target_position_offset);
         append_count(&builder, row->count);
-        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere\n",
-                        row->confidence, row->contrast_confidence);
+        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere%s\n",
+                        row->confidence, row->contrast_confidence,
+                        row->standing == RG_RULE_STANDING_UNMEASURED ? ""
+                            : (row->standing == RG_RULE_STANDING_ABOVE_NOISE ? "  STANDS" : "  within-noise"));
     }
     free(decision_order);
     return builder_finish(&builder);
