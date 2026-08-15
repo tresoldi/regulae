@@ -254,11 +254,11 @@ static size_t *decision_order_of(
 }
 
 static int conditioned_class_decision_index(const void *rows, size_t index) {
-    return rg_multi_model_conditioned_class_at((const rg_multi_model *)rows, index)->evidence.decision_index;
+    return ((const rg_multi_class_row *)rows)[index].evidence.decision_index;
 }
 
 static int multi_cross_dimensional_decision_index(const void *rows, size_t index) {
-    return rg_multi_model_cross_dimensional_row_at((const rg_multi_model *)rows, index)->rule.evidence.decision_index;
+    return ((const rg_multi_cross_dimensional_row *)rows)[index].rule.evidence.decision_index;
 }
 
 void rg_format_model_options_init_defaults(rg_format_model_options *options) {
@@ -323,6 +323,14 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     size_t *order = 0;
     size_t i;
     size_t shown;
+    const rg_segment_count_row *segment_rows;
+    const rg_conditioned_segment_count_row *conditioned_rows;
+    const rg_chunk_row *chunk_rows;
+    size_t segment_total = 0;
+    size_t conditioned_total = 0;
+    size_t chunk_total = 0;
+    size_t xdim_total = 0;
+    size_t tonal_total = 0;
 
     if (model == 0) {
         return 0;
@@ -332,27 +340,27 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     builder_append(&builder, "============================================================\n");
     builder_append(&builder, "PairwiseModel\n");
     builder_append(&builder, "============================================================\n");
-    builder_appendf(&builder, "segment correspondences: %lu\n",
-                    (unsigned long)rg_pairwise_model_segment_count_row_count(model));
-    builder_appendf(&builder, "conditioned entries:     %lu\n",
-                    (unsigned long)rg_pairwise_model_conditioned_segment_count_row_count(model));
-    builder_appendf(&builder, "promoted chunks:         %lu\n",
-                    (unsigned long)rg_pairwise_model_chunk_row_count(model));
-    builder_appendf(&builder, "cross-dimensional rules: %lu\n",
-                    (unsigned long)rg_pairwise_model_cross_dimensional_row_count(model));
-    builder_appendf(&builder, "tonal correspondences:   %lu\n\n",
-                    (unsigned long)rg_pairwise_model_tonal_count_row_count(model));
+    segment_rows = rg_pairwise_model_segment_counts(model, &segment_total);
+    conditioned_rows = rg_pairwise_model_conditioned_segment_counts(model, &conditioned_total);
+    chunk_rows = rg_pairwise_model_chunks(model, &chunk_total);
+    rg_pairwise_model_cross_dimensional_rows(model, &xdim_total);
+    rg_pairwise_model_tonal_counts(model, &tonal_total);
+    builder_appendf(&builder, "segment correspondences: %lu\n", (unsigned long)segment_total);
+    builder_appendf(&builder, "conditioned entries:     %lu\n", (unsigned long)conditioned_total);
+    builder_appendf(&builder, "promoted chunks:         %lu\n", (unsigned long)chunk_total);
+    builder_appendf(&builder, "cross-dimensional rules: %lu\n", (unsigned long)xdim_total);
+    builder_appendf(&builder, "tonal correspondences:   %lu\n\n", (unsigned long)tonal_total);
 
     builder_appendf(&builder, "--- Top %d segment correspondences ---\n", opts.top_segments);
     {
-        size_t row_count = rg_pairwise_model_segment_count_row_count(model);
+        size_t row_count = segment_total;
         counts = (double *)calloc(row_count == 0 ? 1 : row_count, sizeof(*counts));
         if (counts == 0) {
             builder.failed = 1;
             return builder_finish(&builder);
         }
         for (i = 0; i < row_count; i++) {
-            counts[i] = rg_pairwise_model_segment_count_row_at(model, i)->count;
+            counts[i] = segment_rows[i].count;
         }
         order = order_by_count_desc(counts, row_count);
         if (order == 0) {
@@ -362,7 +370,7 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         }
         shown = 0;
         for (i = 0; i < row_count && shown < (size_t)opts.top_segments; i++) {
-            const rg_segment_count_row *row = rg_pairwise_model_segment_count_row_at(model, order[i]);
+            const rg_segment_count_row *row = &segment_rows[order[i]];
             if (row->count < opts.min_count) {
                 continue;
             }
@@ -380,8 +388,8 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
 
     builder_appendf(&builder, "\n--- Top %d promoted chunks ---\n", opts.top_chunks);
     shown = 0;
-    for (i = 0; i < rg_pairwise_model_chunk_row_count(model) && shown < (size_t)opts.top_chunks; i++) {
-        const rg_chunk_row *row = rg_pairwise_model_chunk_row_at(model, i);
+    for (i = 0; i < chunk_total && shown < (size_t)opts.top_chunks; i++) {
+        const rg_chunk_row *row = &chunk_rows[i];
         builder_append(&builder, "  cost=");
         builder_appendf(&builder, "%7.3f  ", row->cost);
         append_segments(&builder, row->source, row->source_count);
@@ -399,9 +407,8 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
 
     builder_append(&builder, "\n--- Conditioned entries ---\n");
     shown = 0;
-    for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(model); i++) {
-        const rg_conditioned_segment_count_row *row =
-            rg_pairwise_model_conditioned_segment_count_row_at(model, i);
+    for (i = 0; i < conditioned_total; i++) {
+        const rg_conditioned_segment_count_row *row = &conditioned_rows[i];
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
         builder_append(&builder, "/");
@@ -448,6 +455,14 @@ static void append_class_contexts(string_builder *builder, const rg_multi_class_
 
 char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_options *options) {
     string_builder builder;
+    const char *const *lect_names;
+    const rg_multi_class_row *uncond_rows;
+    const rg_multi_class_row *cond_rows;
+    const rg_multi_cross_dimensional_row *xdim_rows;
+    size_t lect_total = 0;
+    size_t uncond_total = 0;
+    size_t cond_total = 0;
+    size_t xdim_total = 0;
     rg_format_model_options opts;
     size_t *decision_order = 0;
     size_t i;
@@ -461,15 +476,19 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     builder_append(&builder, "============================================================\n");
     builder_append(&builder, "MultiLectModel\n");
     builder_append(&builder, "============================================================\n");
-    builder_appendf(&builder, "lects (%lu): ", (unsigned long)rg_multi_model_lect_count(model));
-    for (i = 0; i < rg_multi_model_lect_count(model); i++) {
-        builder_appendf(&builder, "%s%s", i > 0 ? ", " : "", rg_multi_model_lect_at(model, i));
+    lect_names = rg_multi_model_lects(model, &lect_total);
+    uncond_rows = rg_multi_model_unconditioned_classes(model, &uncond_total);
+    cond_rows = rg_multi_model_conditioned_classes(model, &cond_total);
+    xdim_rows = rg_multi_model_cross_dimensional_rows(model, &xdim_total);
+    builder_appendf(&builder, "lects (%lu): ", (unsigned long)lect_total);
+    for (i = 0; i < lect_total; i++) {
+        builder_appendf(&builder, "%s%s", i > 0 ? ", " : "", lect_names[i]);
     }
     builder_append(&builder, "\n");
     builder_appendf(&builder, "pairwise models:     %lu\n", (unsigned long)rg_multi_model_pair_model_count(model));
-    builder_appendf(&builder, "unconditioned cls:   %lu\n", (unsigned long)rg_multi_model_unconditioned_class_count(model));
-    builder_appendf(&builder, "conditioned cls:     %lu\n", (unsigned long)rg_multi_model_conditioned_class_count(model));
-    builder_appendf(&builder, "cross-dimensional:   %lu\n", (unsigned long)rg_multi_model_cross_dimensional_row_count(model));
+    builder_appendf(&builder, "unconditioned cls:   %lu\n", (unsigned long)uncond_total);
+    builder_appendf(&builder, "conditioned cls:     %lu\n", (unsigned long)cond_total);
+    builder_appendf(&builder, "cross-dimensional:   %lu\n", (unsigned long)xdim_total);
     {
         const rg_corpus_fit *fit = rg_multi_model_fit(model);
         builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
@@ -508,13 +527,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_append(&builder, "\n");
     }
 
-    total = rg_multi_model_unconditioned_class_count(model);
+    total = uncond_total;
     builder_appendf(&builder, "--- Top %d unconditioned classes ---\n", opts.top_classes);
     if (total == 0) {
         builder_append(&builder, "  (none)\n");
     }
     for (i = 0; i < total && i < (size_t)opts.top_classes; i++) {
-        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        const rg_multi_class_row *row = &uncond_rows[i];
         builder_appendf(&builder, "  [%lu-way] count=", (unsigned long)row->segment_count);
         append_count(&builder, row->count);
         builder_append(&builder, "  ");
@@ -525,8 +544,8 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_appendf(&builder, "  ... (%lu more)\n", (unsigned long)(total - (size_t)opts.top_classes));
     }
 
-    total = rg_multi_model_conditioned_class_count(model);
-    decision_order = decision_order_of(total, conditioned_class_decision_index, model);
+    total = cond_total;
+    decision_order = decision_order_of(total, conditioned_class_decision_index, cond_rows);
     if (decision_order == 0) {
         free(builder_finish(&builder));
         return 0;
@@ -542,7 +561,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_append(&builder, "  (none - class-level discovery committed no splits)\n");
     }
     for (i = 0; i < total && i < (size_t)opts.top_classes; i++) {
-        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, decision_order[i]);
+        const rg_multi_class_row *row = &cond_rows[decision_order[i]];
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
@@ -566,19 +585,18 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     free(decision_order);
     decision_order = 0;
 
-    total = rg_multi_model_cross_dimensional_row_count(model);
+    total = xdim_total;
     builder_append(&builder, "\n--- Cross-dimensional rules, in the order they were decided ---\n");
     if (total == 0) {
         builder_append(&builder, "  (none)\n");
     }
-    decision_order = decision_order_of(total, multi_cross_dimensional_decision_index, model);
+    decision_order = decision_order_of(total, multi_cross_dimensional_decision_index, xdim_rows);
     if (decision_order == 0) {
         free(builder_finish(&builder));
         return 0;
     }
     for (i = 0; i < total; i++) {
-        const rg_multi_cross_dimensional_row *row =
-            rg_multi_model_cross_dimensional_row_at(model, decision_order[i]);
+        const rg_multi_cross_dimensional_row *row = &xdim_rows[decision_order[i]];
         builder_appendf(&builder, "  #%d %s>%s ", row->rule.evidence.decision_index,
                         row->source_lect, row->target_lect);
         append_context(&builder, &row->rule.source_environment);
@@ -596,6 +614,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
 
 char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, const char *grapheme) {
     string_builder builder;
+    const rg_multi_class_row *uncond_rows;
+    const rg_multi_class_row *cond_rows;
+    size_t uncond_total = 0;
+    size_t cond_total = 0;
     size_t i;
     size_t shown;
 
@@ -606,9 +628,11 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
     builder_appendf(&builder, "Classes with %s:%s\n", lect_id, grapheme);
     builder_append(&builder, "==================================================\n");
 
+    uncond_rows = rg_multi_model_unconditioned_classes(model, &uncond_total);
+    cond_rows = rg_multi_model_conditioned_classes(model, &cond_total);
     shown = 0;
-    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+    for (i = 0; i < uncond_total; i++) {
+        const rg_multi_class_row *row = &uncond_rows[i];
         size_t j;
         for (j = 0; j < row->segment_count; j++) {
             if (strcmp(row->lect_ids[j], lect_id) == 0 && strcmp(row->graphemes[j], grapheme) == 0) {
@@ -631,8 +655,8 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
 
     builder_append(&builder, "\nConditioned entries\n");
     shown = 0;
-    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+    for (i = 0; i < cond_total; i++) {
+        const rg_multi_class_row *row = &cond_rows[i];
         size_t j;
         for (j = 0; j < row->segment_count; j++) {
             if (strcmp(row->lect_ids[j], lect_id) == 0 && strcmp(row->graphemes[j], grapheme) == 0) {
@@ -815,24 +839,32 @@ static void summary_class(
 char *rg_format_multi_model_summary(const rg_multi_model *model) {
     string_builder builder;
     size_t i;
+    size_t total = 0;
+    const char *const *lect_names;
+    const rg_multi_class_row *class_rows;
+    const rg_multi_cross_dimensional_row *xdim_rows;
 
     if (model == 0) {
         return 0;
     }
     builder_init(&builder);
+    lect_names = rg_multi_model_lects(model, &total);
     builder_append(&builder, "LECTS\t");
-    for (i = 0; i < rg_multi_model_lect_count(model); i++) {
-        builder_appendf(&builder, "%s%s", i > 0 ? " " : "", rg_multi_model_lect_at(model, i));
+    for (i = 0; i < total; i++) {
+        builder_appendf(&builder, "%s%s", i > 0 ? " " : "", lect_names[i]);
     }
     builder_append(&builder, "\n");
-    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        summary_class(&builder, rg_multi_model_unconditioned_class_at(model, i), "UNCOND", 0);
+    class_rows = rg_multi_model_unconditioned_classes(model, &total);
+    for (i = 0; i < total; i++) {
+        summary_class(&builder, &class_rows[i], "UNCOND", 0);
     }
-    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        summary_class(&builder, rg_multi_model_conditioned_class_at(model, i), "COND", 1);
+    class_rows = rg_multi_model_conditioned_classes(model, &total);
+    for (i = 0; i < total; i++) {
+        summary_class(&builder, &class_rows[i], "COND", 1);
     }
-    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
-        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
+    xdim_rows = rg_multi_model_cross_dimensional_rows(model, &total);
+    for (i = 0; i < total; i++) {
+        const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
         char environment[2048];
         summary_context_key(&row->rule.source_environment, environment, sizeof(environment));
         builder_appendf(&builder,
@@ -859,19 +891,25 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
     for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
         const rg_multi_pair_model_row *row = rg_multi_model_pair_model_at(model, p);
         const rg_pairwise_model *pm = row->model;
+        const rg_segment_count_row *seg_rows;
+        const rg_conditioned_segment_count_row *cond_rows;
+        const rg_chunk_row *chunk_rows;
+        const rg_tonal_count_row *tone_rows;
+        size_t n = 0;
         size_t i;
         size_t k;
-        for (i = 0; i < rg_pairwise_model_segment_count_row_count(pm); i++) {
-            const rg_segment_count_row *seg = rg_pairwise_model_segment_count_row_at(pm, i);
+        seg_rows = rg_pairwise_model_segment_counts(pm, &n);
+        for (i = 0; i < n; i++) {
+            const rg_segment_count_row *seg = &seg_rows[i];
             builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t-\t%.6f\t[%.4f,%.4f]\t%s\n",
                             row->lect_a, row->lect_b,
                             seg->source, seg->target, seg->count,
                             seg->uncertainty.lower, seg->uncertainty.upper,
                             rg_uncertainty_method_string(seg->uncertainty.method));
         }
-        for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pm); i++) {
-            const rg_conditioned_segment_count_row *seg =
-                rg_pairwise_model_conditioned_segment_count_row_at(pm, i);
+        cond_rows = rg_pairwise_model_conditioned_segment_counts(pm, &n);
+        for (i = 0; i < n; i++) {
+            const rg_conditioned_segment_count_row *seg = &cond_rows[i];
             char key[2048];
             summary_context_key(&seg->context, key, sizeof(key));
             /* Which form's environment the rule names. Two rows can carry the
@@ -885,8 +923,9 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
                             rg_uncertainty_method_string(seg->uncertainty.method),
                             seg->uncertainty.post_selection ? "/post-selection" : "");
         }
-        for (i = 0; i < rg_pairwise_model_chunk_row_count(pm); i++) {
-            const rg_chunk_row *chunk = rg_pairwise_model_chunk_row_at(pm, i);
+        chunk_rows = rg_pairwise_model_chunks(pm, &n);
+        for (i = 0; i < n; i++) {
+            const rg_chunk_row *chunk = &chunk_rows[i];
             builder_appendf(&builder, "CHUNK\t%s>%s\t", row->lect_a, row->lect_b);
             for (k = 0; k < chunk->source_count; k++) {
                 builder_append(&builder, chunk->source[k].grapheme);
@@ -898,8 +937,9 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
             builder_appendf(&builder, "\t%.6f\t%.6f\t%s\n", chunk->cost, chunk->count,
                             chunk->reordering ? "reordering" : "-");
         }
-        for (i = 0; i < rg_pairwise_model_tonal_count_row_count(pm); i++) {
-            const rg_tonal_count_row *tone = rg_pairwise_model_tonal_count_row_at(pm, i);
+        tone_rows = rg_pairwise_model_tonal_counts(pm, &n);
+        for (i = 0; i < n; i++) {
+            const rg_tonal_count_row *tone = &tone_rows[i];
             builder_appendf(&builder, "TONE\t%s>%s\t%s>%s\t%.6f\n", row->lect_a, row->lect_b,
                             tone->source_tone, tone->target_tone, tone->count);
         }

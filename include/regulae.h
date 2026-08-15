@@ -781,36 +781,12 @@ RG_API rg_status rg_train_pairwise(
     rg_pairwise_model **out
 );
 RG_API void rg_pairwise_model_free(rg_pairwise_model *model);
-RG_API size_t rg_pairwise_model_segment_count_row_count(const rg_pairwise_model *model);
-RG_API const rg_segment_count_row *rg_pairwise_model_segment_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
-RG_API size_t rg_pairwise_model_displacement_row_count(const rg_pairwise_model *model);
-RG_API const rg_displacement_row *rg_pairwise_model_displacement_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
-RG_API size_t rg_pairwise_model_tonal_count_row_count(const rg_pairwise_model *model);
-RG_API const rg_tonal_count_row *rg_pairwise_model_tonal_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
-RG_API size_t rg_pairwise_model_conditioned_segment_count_row_count(const rg_pairwise_model *model);
-RG_API const rg_conditioned_segment_count_row *rg_pairwise_model_conditioned_segment_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
-RG_API size_t rg_pairwise_model_chunk_row_count(const rg_pairwise_model *model);
-RG_API const rg_chunk_row *rg_pairwise_model_chunk_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
-RG_API size_t rg_pairwise_model_cross_dimensional_row_count(const rg_pairwise_model *model);
-RG_API const rg_cross_dimensional_row *rg_pairwise_model_cross_dimensional_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-);
+RG_API const rg_segment_count_row *rg_pairwise_model_segment_counts(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_displacement_row *rg_pairwise_model_displacements(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_tonal_count_row *rg_pairwise_model_tonal_counts(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_conditioned_segment_count_row *rg_pairwise_model_conditioned_segment_counts(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_chunk_row *rg_pairwise_model_chunks(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_cross_dimensional_row *rg_pairwise_model_cross_dimensional_rows(const rg_pairwise_model *model, size_t *count);
 
 typedef struct rg_tsv_load_options {
     const char *cognate_id_column;
@@ -1055,7 +1031,6 @@ RG_API rg_status rg_train_model(
     rg_multi_model **out
 );
 RG_API void rg_multi_model_free(rg_multi_model *model);
-RG_API size_t rg_multi_model_lect_count(const rg_multi_model *model);
 /* Cognate sets that carried fewer than two forms, and so contributed no
  * correspondence. Not an error: a form whose cognates are in lects the corpus
  * did not sample has nothing to align against, and every cognate-coded
@@ -1064,24 +1039,33 @@ RG_API size_t rg_multi_model_lect_count(const rg_multi_model *model);
 RG_API size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model);
 /* Borrowed; valid while the model lives. Never NULL for a trained model. */
 RG_API const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model);
-RG_API const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index);
+/* Every published table is handed out whole: the rows and how many, borrowed
+ * and valid while the model lives. A table is sorted by a stable key at
+ * publication, so a caller may binary-search it; the order rules were decided
+ * in is on each row's evidence, not in the table's order.
+ *
+ * They were a count function and an index function each, twenty-two of them,
+ * every one a null check and an array index -- so each caller wrote its own
+ * loop calling a function per row and dereferencing the result without
+ * checking the null those functions document. */
+RG_API const char *const *rg_multi_model_lects(const rg_multi_model *model, size_t *count);
+RG_API const rg_multi_class_row *rg_multi_model_unconditioned_classes(
+    const rg_multi_model *model,
+    size_t *count
+);
+RG_API const rg_multi_class_row *rg_multi_model_conditioned_classes(
+    const rg_multi_model *model,
+    size_t *count
+);
+RG_API const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_rows(
+    const rg_multi_model *model,
+    size_t *count
+);
+/* The pair models keep an index accessor: the table holds each pair's owned
+ * strings alongside the published row, so there is no array of rows to hand
+ * out. */
 RG_API size_t rg_multi_model_pair_model_count(const rg_multi_model *model);
 RG_API const rg_multi_pair_model_row *rg_multi_model_pair_model_at(
-    const rg_multi_model *model,
-    size_t index
-);
-RG_API size_t rg_multi_model_unconditioned_class_count(const rg_multi_model *model);
-RG_API const rg_multi_class_row *rg_multi_model_unconditioned_class_at(
-    const rg_multi_model *model,
-    size_t index
-);
-RG_API size_t rg_multi_model_conditioned_class_count(const rg_multi_model *model);
-RG_API const rg_multi_class_row *rg_multi_model_conditioned_class_at(
-    const rg_multi_model *model,
-    size_t index
-);
-RG_API size_t rg_multi_model_cross_dimensional_row_count(const rg_multi_model *model);
-RG_API const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_row_at(
     const rg_multi_model *model,
     size_t index
 );

@@ -1276,28 +1276,28 @@ rg_status multi_lect_context_discovery(
         if (merged_count > 1) {
             qsort(merged, merged_count, sizeof(*merged), merged_class_cmp);
         }
-        model->conditioned_classes = (rg_multi_class_owned *)calloc(merged_count, sizeof(*model->conditioned_classes));
+        model->conditioned_classes = (rg_multi_class_row *)calloc(merged_count, sizeof(*model->conditioned_classes));
         if (model->conditioned_classes == 0) {
             status = RG_ERR_OOM;
         } else {
             for (i = 0; i < merged_count; i++) {
-                model->conditioned_classes[i].view.class_id = (int)(model->unconditioned_class_count + i);
-                model->conditioned_classes[i].view.lect_ids = (const char *const *)merged[i].lects;
-                model->conditioned_classes[i].view.graphemes = (const char *const *)merged[i].graphemes;
-                model->conditioned_classes[i].view.contexts = merged[i].contexts;
-                model->conditioned_classes[i].view.segment_count = merged[i].segment_count;
-                model->conditioned_classes[i].view.count = merged[i].count;
-                model->conditioned_classes[i].view.confidence = merged[i].confidence;
-                model->conditioned_classes[i].view.contrast_count = merged[i].contrast_count;
-                model->conditioned_classes[i].view.evidence.delta_bic = merged[i].delta_bic;
-                model->conditioned_classes[i].view.evidence.search_margin = merged[i].search_margin;
-                model->conditioned_classes[i].view.evidence.decision_index = merged[i].decision_index;
-                model->conditioned_classes[i].view.uncertainty =
+                model->conditioned_classes[i].class_id = (int)(model->unconditioned_class_count + i);
+                model->conditioned_classes[i].lect_ids = (const char *const *)merged[i].lects;
+                model->conditioned_classes[i].graphemes = (const char *const *)merged[i].graphemes;
+                model->conditioned_classes[i].contexts = merged[i].contexts;
+                model->conditioned_classes[i].segment_count = merged[i].segment_count;
+                model->conditioned_classes[i].count = merged[i].count;
+                model->conditioned_classes[i].confidence = merged[i].confidence;
+                model->conditioned_classes[i].contrast_count = merged[i].contrast_count;
+                model->conditioned_classes[i].evidence.delta_bic = merged[i].delta_bic;
+                model->conditioned_classes[i].evidence.search_margin = merged[i].search_margin;
+                model->conditioned_classes[i].evidence.decision_index = merged[i].decision_index;
+                model->conditioned_classes[i].uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 /* The environment was chosen by the same observations, so the
                  * interval says how well the rate is pinned given it, not
                  * whether it is real. search_margin answers that. */
-                model->conditioned_classes[i].view.uncertainty.post_selection = 1;
+                model->conditioned_classes[i].uncertainty.post_selection = 1;
                 merged[i].lects = 0;
                 merged[i].graphemes = 0;
                 merged[i].contexts = 0;

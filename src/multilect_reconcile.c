@@ -639,7 +639,7 @@ rg_status aggregate_position_classes(
         }
         free(bucket_to_class);
     }
-    model->unconditioned_classes = (rg_multi_class_owned *)calloc(bucket_count == 0 ? 1 : bucket_count, sizeof(*model->unconditioned_classes));
+    model->unconditioned_classes = (rg_multi_class_row *)calloc(bucket_count == 0 ? 1 : bucket_count, sizeof(*model->unconditioned_classes));
     if (model->unconditioned_classes == 0) {
         for (c = 0; c < bucket_count; c++) {
             class_bucket_clear(&buckets[c]);
@@ -656,17 +656,17 @@ rg_status aggregate_position_classes(
                 participant_total += buckets[i].count;
             }
         }
-        model->unconditioned_classes[c].view.class_id = (int)c;
-        model->unconditioned_classes[c].view.lect_ids = (const char *const *)buckets[c].lect_ids;
-        model->unconditioned_classes[c].view.graphemes = (const char *const *)buckets[c].graphemes;
-        model->unconditioned_classes[c].view.segment_count = buckets[c].segment_count;
-        model->unconditioned_classes[c].view.count = buckets[c].count;
-        model->unconditioned_classes[c].view.confidence = 1.0;
+        model->unconditioned_classes[c].class_id = (int)c;
+        model->unconditioned_classes[c].lect_ids = (const char *const *)buckets[c].lect_ids;
+        model->unconditioned_classes[c].graphemes = (const char *const *)buckets[c].graphemes;
+        model->unconditioned_classes[c].segment_count = buckets[c].segment_count;
+        model->unconditioned_classes[c].count = buckets[c].count;
+        model->unconditioned_classes[c].confidence = 1.0;
         /* An unconditioned class is aggregated, not decided. */
-        model->unconditioned_classes[c].view.evidence.decision_index = -1;
-        model->unconditioned_classes[c].view.supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
-        model->unconditioned_classes[c].view.supporting_cognate_count = buckets[c].supporting_cognate_count;
-        model->unconditioned_classes[c].view.uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);
+        model->unconditioned_classes[c].evidence.decision_index = -1;
+        model->unconditioned_classes[c].supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
+        model->unconditioned_classes[c].supporting_cognate_count = buckets[c].supporting_cognate_count;
+        model->unconditioned_classes[c].uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);
         buckets[c].lect_ids = 0;
         buckets[c].graphemes = 0;
         buckets[c].supporting_cognates = 0;

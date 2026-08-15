@@ -233,20 +233,20 @@ rg_status bootstrap_class_intervals(
         }
     }
     for (i = 0; i < class_count; i++) {
-        rg_multi_class_owned *owned = i < model->unconditioned_class_count
+        rg_multi_class_row *owned = i < model->unconditioned_class_count
             ? &model->unconditioned_classes[i]
             : &model->conditioned_classes[i - model->unconditioned_class_count];
         rg_uncertainty_estimate estimate;
         int post = i >= model->unconditioned_class_count;
         if (rg_percentile_interval(&rates[i * draws], draws,
-                                  owned->view.uncertainty.estimate,
-                                  owned->view.uncertainty.n,
-                                  owned->view.uncertainty.alpha,
+                                  owned->uncertainty.estimate,
+                                  owned->uncertainty.n,
+                                  owned->uncertainty.alpha,
                                   &estimate) != RG_OK) {
             continue;
         }
         estimate.post_selection = post;
-        owned->view.uncertainty = estimate;
+        owned->uncertainty = estimate;
     }
     free(multiplicity);
     free(counts);
@@ -335,12 +335,12 @@ rg_status run_permutation_baseline(
         status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count, &cost, &scored);
         if (status == RG_OK && scored > 0) {
             costs[completed] = cost;
-            uncond += (double)rg_multi_model_unconditioned_class_count(shuffled);
-            cond += (double)rg_multi_model_conditioned_class_count(shuffled);
+            uncond += (double)shuffled->unconditioned_class_count;
+            cond += (double)shuffled->conditioned_class_count;
             completed++;
         }
-        for (k = 0; k < rg_multi_model_conditioned_class_count(shuffled) && status == RG_OK; k++) {
-            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(shuffled, k);
+        for (k = 0; k < shuffled->conditioned_class_count && status == RG_OK; k++) {
+            const rg_multi_class_row *row = &shuffled->conditioned_classes[k];
             if (margin_count == margin_cap) {
                 size_t next_cap = margin_cap == 0 ? 64 : margin_cap * 2;
                 double *next = (double *)realloc(margins, next_cap * sizeof(*next));
@@ -433,7 +433,7 @@ rg_status compute_corpus_fit(
         size_t i;
         size_t j;
         for (i = 0; i < model->conditioned_class_count; i++) {
-            rg_multi_class_row *row = &model->conditioned_classes[i].view;
+            rg_multi_class_row *row = &model->conditioned_classes[i];
             rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
             model->fit.rules_measured++;
             if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
@@ -441,7 +441,7 @@ rg_status compute_corpus_fit(
             }
         }
         for (i = 0; i < model->cross_dimensional_count; i++) {
-            rg_multi_cross_dimensional_row *row = &model->cross_dimensional_rows[i].view;
+            rg_multi_cross_dimensional_row *row = &model->cross_dimensional_rows[i];
             rg_rule_evidence_judge_internal(&row->rule.evidence, baseline->search_margin);
             model->fit.rules_measured++;
             if (row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {

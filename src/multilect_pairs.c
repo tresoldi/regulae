@@ -89,16 +89,18 @@ rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
     size_t cap = 0;
     for (i = 0; i < model->pair_model_count; i++) {
         size_t j;
-        size_t row_count = rg_pairwise_model_cross_dimensional_row_count(model->pair_models[i].model);
+        size_t row_count = 0;
+        const rg_cross_dimensional_row *pair_rows =
+            rg_pairwise_model_cross_dimensional_rows(model->pair_models[i].model, &row_count);
         for (j = 0; j < row_count; j++) {
-            const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model->pair_models[i].model, j);
-            rg_multi_cross_dimensional_owned *next;
+            const rg_cross_dimensional_row *row = &pair_rows[j];
+            rg_multi_cross_dimensional_row *next;
             if (row == 0) {
                 continue;
             }
             if (model->cross_dimensional_count == cap) {
                 size_t next_cap = cap == 0 ? 8 : cap * 2;
-                next = (rg_multi_cross_dimensional_owned *)realloc(model->cross_dimensional_rows, next_cap * sizeof(*model->cross_dimensional_rows));
+                next = (rg_multi_cross_dimensional_row *)realloc(model->cross_dimensional_rows, next_cap * sizeof(*model->cross_dimensional_rows));
                 if (next == 0) {
                     return RG_ERR_OOM;
                 }
@@ -111,9 +113,9 @@ rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
              * new here, so there is nothing to copy field by field -- and
              * nothing to forget to copy, which forty lines of assignment could.
              * Borrowed from the pairwise row, which outlives the lifted view. */
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_lect = model->pair_models[i].lect_a;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.target_lect = model->pair_models[i].lect_b;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.rule = *row;
+            model->cross_dimensional_rows[model->cross_dimensional_count].source_lect = model->pair_models[i].lect_a;
+            model->cross_dimensional_rows[model->cross_dimensional_count].target_lect = model->pair_models[i].lect_b;
+            model->cross_dimensional_rows[model->cross_dimensional_count].rule = *row;
             model->cross_dimensional_count++;
         }
     }

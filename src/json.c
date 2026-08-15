@@ -254,8 +254,10 @@ static rg_status json_add_alignments(
                 if (pair_model == 0) {
                     continue;
                 }
-                for (p = 0; p < rg_multi_model_lect_count(model); p++) {
-                    const char *name = rg_multi_model_lect_at(model, p);
+                size_t lect_total = 0;
+                const char *const *lect_names = rg_multi_model_lects(model, &lect_total);
+                for (p = 0; p < lect_total; p++) {
+                    const char *name = lect_names[p];
                     if (strcmp(name, lect_a) == 0) {
                         lect_index_a = p;
                     }
@@ -432,6 +434,10 @@ char *rg_json_from_multi_model_internal(
     cJSON *array;
     char *text;
     size_t i;
+    size_t table_count = 0;
+    const char *const *lect_names;
+    const rg_multi_class_row *class_rows;
+    const rg_multi_cross_dimensional_row *xdim_rows;
 
     if (model == 0) {
         return 0;
@@ -451,8 +457,9 @@ char *rg_json_from_multi_model_internal(
         cJSON_Delete(root);
         return 0;
     }
-    for (i = 0; i < rg_multi_model_lect_count(model); i++) {
-        cJSON_AddItemToArray(lects, cJSON_CreateString(rg_multi_model_lect_at(model, i)));
+    lect_names = rg_multi_model_lects(model, &table_count);
+    for (i = 0; i < table_count; i++) {
+        cJSON_AddItemToArray(lects, cJSON_CreateString(lect_names[i]));
     }
     cJSON_AddItemToObject(root, "lects", lects);
 
@@ -497,8 +504,9 @@ char *rg_json_from_multi_model_internal(
         return 0;
     }
     cJSON_AddItemToObject(classes, "unconditioned", array);
-    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        cJSON_AddItemToArray(array, json_class(rg_multi_model_unconditioned_class_at(model, i), 0));
+    class_rows = rg_multi_model_unconditioned_classes(model, &table_count);
+    for (i = 0; i < table_count; i++) {
+        cJSON_AddItemToArray(array, json_class(&class_rows[i], 0));
     }
 
     array = cJSON_CreateArray();
@@ -507,8 +515,9 @@ char *rg_json_from_multi_model_internal(
         return 0;
     }
     cJSON_AddItemToObject(classes, "conditioned", array);
-    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
-        cJSON_AddItemToArray(array, json_class(rg_multi_model_conditioned_class_at(model, i), 1));
+    class_rows = rg_multi_model_conditioned_classes(model, &table_count);
+    for (i = 0; i < table_count; i++) {
+        cJSON_AddItemToArray(array, json_class(&class_rows[i], 1));
     }
 
     array = cJSON_CreateArray();
@@ -517,8 +526,9 @@ char *rg_json_from_multi_model_internal(
         return 0;
     }
     cJSON_AddItemToObject(root, "cross_dimensional", array);
-    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
-        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
+    xdim_rows = rg_multi_model_cross_dimensional_rows(model, &table_count);
+    for (i = 0; i < table_count; i++) {
+        const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
         cJSON *entry = cJSON_CreateObject();
         if (entry == 0) {
             cJSON_Delete(root);

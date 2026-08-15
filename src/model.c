@@ -568,104 +568,21 @@ rg_status rg_train_pairwise(
     return rg_train_pairwise_segment_counts(ctx, pairs, pair_count, options, out);
 }
 
-size_t rg_pairwise_model_displacement_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
+#define RG_PAIRWISE_TABLE(fn, rowtype, field, countfield)                       \
+    const rowtype *fn(const rg_pairwise_model *model, size_t *count) {           \
+        if (model == 0) {                                                       \
+            if (count != 0) { *count = 0; }                                     \
+            return 0;                                                           \
+        }                                                                       \
+        if (count != 0) { *count = model->countfield; }                         \
+        return model->field;                                                    \
     }
-    return model->displacement_row_count;
-}
 
-const rg_displacement_row *rg_pairwise_model_displacement_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->displacement_row_count) {
-        return 0;
-    }
-    return &model->displacement_rows[index];
-}
+RG_PAIRWISE_TABLE(rg_pairwise_model_segment_counts, rg_segment_count_row, segment_counts, segment_count_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_displacements, rg_displacement_row, displacement_rows, displacement_row_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_tonal_counts, rg_tonal_count_row, tonal_counts, tonal_count_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_conditioned_segment_counts, rg_conditioned_segment_count_row, conditioned_segment_counts, conditioned_segment_count_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_chunks, rg_chunk_row, chunks, chunk_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_cross_dimensional_rows, rg_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)
 
-size_t rg_pairwise_model_tonal_count_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
-    }
-    return model->tonal_count_count;
-}
-
-const rg_tonal_count_row *rg_pairwise_model_tonal_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->tonal_count_count) {
-        return 0;
-    }
-    return &model->tonal_counts[index];
-}
-
-size_t rg_pairwise_model_segment_count_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
-    }
-    return model->segment_count_count;
-}
-
-const rg_segment_count_row *rg_pairwise_model_segment_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->segment_count_count) {
-        return 0;
-    }
-    return &model->segment_counts[index];
-}
-
-size_t rg_pairwise_model_conditioned_segment_count_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
-    }
-    return model->conditioned_segment_count_count;
-}
-
-const rg_conditioned_segment_count_row *rg_pairwise_model_conditioned_segment_count_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->conditioned_segment_count_count) {
-        return 0;
-    }
-    return &model->conditioned_segment_counts[index];
-}
-
-size_t rg_pairwise_model_chunk_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
-    }
-    return model->chunk_count;
-}
-
-const rg_chunk_row *rg_pairwise_model_chunk_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->chunk_count) {
-        return 0;
-    }
-    return &model->chunks[index];
-}
-
-size_t rg_pairwise_model_cross_dimensional_row_count(const rg_pairwise_model *model) {
-    if (model == 0) {
-        return 0;
-    }
-    return model->cross_dimensional_count;
-}
-
-const rg_cross_dimensional_row *rg_pairwise_model_cross_dimensional_row_at(
-    const rg_pairwise_model *model,
-    size_t index
-) {
-    if (model == 0 || index >= model->cross_dimensional_count) {
-        return 0;
-    }
-    return &model->cross_dimensional_rows[index];
-}
+#undef RG_PAIRWISE_TABLE

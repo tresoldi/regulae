@@ -158,20 +158,20 @@ void reconciled_observations_free(reconciled_observation *items, size_t count) {
 
 
 
-static void multi_class_clear(rg_multi_class_owned *klass) {
+static void multi_class_clear(rg_multi_class_row *klass) {
     size_t i;
     if (klass == 0) {
         return;
     }
-    string_array_clear(rg_owned_internal(klass->view.lect_ids), klass->view.segment_count);
-    string_array_clear(rg_owned_internal(klass->view.graphemes), klass->view.segment_count);
-    if (klass->view.contexts != 0) {
-        for (i = 0; i < klass->view.segment_count; i++) {
-            rg_context_spec_clear_internal(rg_owned_internal(&klass->view.contexts[i]));
+    string_array_clear(rg_owned_internal(klass->lect_ids), klass->segment_count);
+    string_array_clear(rg_owned_internal(klass->graphemes), klass->segment_count);
+    if (klass->contexts != 0) {
+        for (i = 0; i < klass->segment_count; i++) {
+            rg_context_spec_clear_internal(rg_owned_internal(&klass->contexts[i]));
         }
-        rg_free_owned_internal(klass->view.contexts);
+        rg_free_owned_internal(klass->contexts);
     }
-    string_array_clear(rg_owned_internal(klass->view.supporting_cognates), klass->view.supporting_cognate_count);
+    string_array_clear(rg_owned_internal(klass->supporting_cognates), klass->supporting_cognate_count);
     memset(klass, 0, sizeof(*klass));
 }
 
@@ -430,19 +430,37 @@ const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model) {
     return model == 0 ? 0 : &model->fit;
 }
 
-size_t rg_multi_model_lect_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->lect_count;
-}
-
 size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model) {
     return model == 0 ? 0 : model->unpaired_set_count;
 }
 
-const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->lect_count) {
+#define RG_MULTI_TABLE(fn, rowtype, field, countfield)                          \
+    const rowtype *fn(const rg_multi_model *model, size_t *count) {              \
+        if (model == 0) {                                                       \
+            if (count != 0) { *count = 0; }                                     \
+            return 0;                                                           \
+        }                                                                       \
+        if (count != 0) { *count = model->countfield; }                         \
+        return model->field;                                                    \
+    }
+
+RG_MULTI_TABLE(rg_multi_model_unconditioned_classes, rg_multi_class_row, unconditioned_classes, unconditioned_class_count)
+RG_MULTI_TABLE(rg_multi_model_conditioned_classes, rg_multi_class_row, conditioned_classes, conditioned_class_count)
+RG_MULTI_TABLE(rg_multi_model_cross_dimensional_rows, rg_multi_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)
+
+#undef RG_MULTI_TABLE
+
+const char *const *rg_multi_model_lects(const rg_multi_model *model, size_t *count) {
+    if (model == 0) {
+        if (count != 0) {
+            *count = 0;
+        }
         return 0;
     }
-    return model->lect_ids[index];
+    if (count != 0) {
+        *count = model->lect_count;
+    }
+    return (const char *const *)model->lect_ids;
 }
 
 size_t rg_multi_model_pair_model_count(const rg_multi_model *model) {
@@ -454,39 +472,6 @@ const rg_multi_pair_model_row *rg_multi_model_pair_model_at(const rg_multi_model
         return 0;
     }
     return &model->pair_models[index].view;
-}
-
-size_t rg_multi_model_unconditioned_class_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->unconditioned_class_count;
-}
-
-const rg_multi_class_row *rg_multi_model_unconditioned_class_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->unconditioned_class_count) {
-        return 0;
-    }
-    return &model->unconditioned_classes[index].view;
-}
-
-size_t rg_multi_model_conditioned_class_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->conditioned_class_count;
-}
-
-const rg_multi_class_row *rg_multi_model_conditioned_class_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->conditioned_class_count) {
-        return 0;
-    }
-    return &model->conditioned_classes[index].view;
-}
-
-size_t rg_multi_model_cross_dimensional_row_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->cross_dimensional_count;
-}
-
-const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_row_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->cross_dimensional_count) {
-        return 0;
-    }
-    return &model->cross_dimensional_rows[index].view;
 }
 
 void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {

@@ -1,4 +1,5 @@
 #include "regulae.h"
+#include "table_access.h"
 
 #include <assert.h>
 #include <ctype.h>

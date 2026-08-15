@@ -98,13 +98,11 @@ typedef struct rg_multi_pair_model_owned {
     rg_multi_pair_model_row view;
 } rg_multi_pair_model_owned;
 
-typedef struct rg_multi_class_owned {
-    rg_multi_class_row view;
-} rg_multi_class_owned;
-
-typedef struct rg_multi_cross_dimensional_owned {
-    rg_multi_cross_dimensional_row view;
-} rg_multi_cross_dimensional_owned;
+/* The multi-lect class and cross-dimensional tables hold their published rows
+ * directly. Each used to sit inside a struct whose only member was the row --
+ * `{ rg_multi_class_row view; }` -- so every reader wrote `.view` to get past a
+ * wrapper that held nothing, seventy-odd times, and the tables could not be
+ * handed out as arrays because they were arrays of the wrapper. */
 
 /* One reconciled position tuple and the classes it realises. Reconciliation
  * already knows which aligned positions formed each class; retaining it is what
@@ -128,11 +126,11 @@ struct rg_multi_model {
     size_t lect_count;
     rg_multi_pair_model_owned *pair_models;
     size_t pair_model_count;
-    rg_multi_class_owned *unconditioned_classes;
+    rg_multi_class_row *unconditioned_classes;
     size_t unconditioned_class_count;
-    rg_multi_class_owned *conditioned_classes;
+    rg_multi_class_row *conditioned_classes;
     size_t conditioned_class_count;
-    rg_multi_cross_dimensional_owned *cross_dimensional_rows;
+    rg_multi_cross_dimensional_row *cross_dimensional_rows;
     size_t cross_dimensional_count;
     size_t unpaired_set_count;
     rg_corpus_fit fit;
