@@ -177,6 +177,7 @@ if(REGULAE_BUILD_TESTS)
 
     add_executable(test_sound_laws tests/c/test_sound_laws.c)
     target_compile_definitions(test_sound_laws PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_compile_definitions(test_uncertainty PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_sound_laws PRIVATE regulae::regulae)
     add_test(NAME sound_laws COMMAND test_sound_laws)
 

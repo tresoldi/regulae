@@ -1893,6 +1893,10 @@ static rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.search_margin = merged[i].search_margin;
                 model->conditioned_classes[i].view.uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
+                /* The environment was chosen by the same observations, so the
+                 * interval says how well the rate is pinned given it, not
+                 * whether it is real. search_margin answers that. */
+                model->conditioned_classes[i].view.uncertainty.post_selection = 1;
                 merged[i].lects = 0;
                 merged[i].graphemes = 0;
                 merged[i].contexts = 0;
@@ -2718,6 +2722,11 @@ static rg_status run_permutation_baseline(
     size_t lect_count,
     permutation_baseline *out
 );
+static rg_status bootstrap_class_intervals(
+    rg_multi_model *model,
+    size_t cognate_count,
+    const rg_train_options *options
+);
 
 rg_status rg_train_model(
     const rg_context *ctx,
@@ -2878,6 +2887,9 @@ rg_status rg_train_model(
     }
     reconciled_observations_free(observations, observation_count);
     if (status == RG_OK) {
+        status = bootstrap_class_intervals(model, cognate_count, options);
+    }
+    if (status == RG_OK) {
         status = compute_corpus_fit(ctx, cognates, cognate_count, options, &baseline, model);
     }
     if (status != RG_OK) {
@@ -2966,6 +2978,101 @@ void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
  * it that has a trained model. This is the corpus's goodness of fit read one
  * set at a time: the outlier diagnostic z-scores it across sets, and the fit
  * summary averages it. */
+/* Replaces the closed-form intervals on the multi-lect classes with ones
+ * resampled over whole cognate sets.
+ *
+ * The Wilson interval's denominator counts aligned positions, and positions
+ * from one word pair are not independent observations of anything: a
+ * Latin-Spanish corpus has 413 of them over 97 cognate sets, so the interval
+ * is narrower than the evidence supports by roughly the square root of that
+ * ratio. Resampling the sets rather than the positions is what makes the
+ * denominator mean what the arithmetic assumes, and it carries the corpus's
+ * confidence weighting along with it, since a set is drawn or not as a whole.
+ *
+ * No realignment is involved. `class_positions` already records which cognate
+ * each reconciled position came from, so a resample is a reweighting of a
+ * table that exists. */
+static rg_status bootstrap_class_intervals(
+    rg_multi_model *model,
+    size_t cognate_count,
+    const rg_train_options *options
+) {
+    size_t draws = options->bootstrap_n > 0 ? (size_t)options->bootstrap_n : 0;
+    size_t class_count = model->unconditioned_class_count + model->conditioned_class_count;
+    size_t *multiplicity;
+    double *rates;
+    double *counts;
+    uint64_t rng;
+    size_t b;
+    size_t i;
+
+    if (draws == 0 || class_count == 0 || cognate_count == 0) {
+        return RG_OK;
+    }
+    multiplicity = (size_t *)calloc(cognate_count, sizeof(*multiplicity));
+    counts = (double *)calloc(class_count, sizeof(*counts));
+    rates = (double *)calloc(class_count * draws, sizeof(*rates));
+    if (multiplicity == 0 || counts == 0 || rates == 0) {
+        free(multiplicity);
+        free(counts);
+        free(rates);
+        return RG_ERR_OOM;
+    }
+    rng = (uint64_t)(unsigned int)options->bootstrap_seed * 6364136223846793005ULL
+        + 1442695040888963407ULL;
+    for (b = 0; b < draws; b++) {
+        double total = 0.0;
+        for (i = 0; i < cognate_count; i++) {
+            multiplicity[i] = 0;
+        }
+        for (i = 0; i < cognate_count; i++) {
+            multiplicity[(size_t)(permutation_next(&rng) % (uint64_t)(unsigned long)cognate_count)]++;
+        }
+        for (i = 0; i < class_count; i++) {
+            counts[i] = 0.0;
+        }
+        for (i = 0; i < model->class_position_count; i++) {
+            const rg_class_position *position = &model->class_positions[i];
+            double weight;
+            size_t k;
+            if (position->cognate_index >= cognate_count) {
+                continue;
+            }
+            weight = (double)multiplicity[position->cognate_index];
+            total += weight;
+            for (k = 0; k < position->class_id_count; k++) {
+                int id = position->class_ids[k];
+                if (id >= 0 && (size_t)id < class_count) {
+                    counts[id] += weight;
+                }
+            }
+        }
+        for (i = 0; i < class_count; i++) {
+            rates[i * draws + b] = total > 0.0 ? counts[i] / total : 0.0;
+        }
+    }
+    for (i = 0; i < class_count; i++) {
+        rg_multi_class_owned *owned = i < model->unconditioned_class_count
+            ? &model->unconditioned_classes[i]
+            : &model->conditioned_classes[i - model->unconditioned_class_count];
+        rg_uncertainty_estimate estimate;
+        int post = i >= model->unconditioned_class_count;
+        if (rg_percentile_interval(&rates[i * draws], draws,
+                                  owned->view.uncertainty.estimate,
+                                  owned->view.uncertainty.n,
+                                  owned->view.uncertainty.alpha,
+                                  &estimate) != RG_OK) {
+            continue;
+        }
+        estimate.post_selection = post;
+        owned->view.uncertainty = estimate;
+    }
+    free(multiplicity);
+    free(counts);
+    free(rates);
+    return RG_OK;
+}
+
 /* Trains the corpus with its correspondences taken out of it, as many times as
  * asked, and reports what the method finds in nothing.
  *

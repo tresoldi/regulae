@@ -36,6 +36,7 @@ static rg_uncertainty_estimate unconstrained(double estimate, double total, doub
     out.n = total > 0.0 ? total : 0.0;
     out.alpha = alpha;
     out.method = RG_UNCERTAINTY_NONE;
+    out.post_selection = 0;
     return out;
 }
 
@@ -75,6 +76,7 @@ rg_status rg_wilson_interval(
         out->n = total;
         out->alpha = alpha;
         out->method = RG_UNCERTAINTY_WILSON;
+        out->post_selection = 0;
     }
     return RG_OK;
 }
@@ -158,6 +160,7 @@ rg_status rg_percentile_interval(
     out->n = total > 0.0 ? total : 0.0;
     out->alpha = alpha;
     out->method = RG_UNCERTAINTY_BOOTSTRAP;
+    out->post_selection = 0;
     free(ordered);
     return RG_OK;
 }

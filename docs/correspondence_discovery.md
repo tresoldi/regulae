@@ -229,6 +229,40 @@ and a seven-segment chunk rarely pays for its parameters. So the analysis has
 it and the tables do not. Closing that needs a row type of its own, gated on
 its own regularity rather than on the chunk test.
 
+### Intervals, and what they are computed from
+
+Every count-bearing row carries an interval on the rate the count
+represents. Two things about it are easy to misread, so both are now
+stated on the row itself.
+
+**What the denominator counts.** The default Wilson interval's `n` is
+aligned positions, and positions from one word pair are not
+independent observations: Latin–Spanish has 413 of them over 97
+cognate sets, 4.3 per set. Setting `bootstrap_n` replaces the closed
+form with a percentile interval resampled over whole **cognate sets** —
+the unit the corpus actually samples — which handles the clustering
+and the confidence weighting together, and needs no realignment
+because `class_positions` already records which cognate each
+reconciled position came from.
+
+The measured effect is the opposite of the obvious guess. Resampling
+sets gives *narrower* intervals on most rows: 229 of 240 classes across
+six corpora, mean width 0.049 → 0.041. The rate is a ratio whose
+numerator and denominator move together under a set-level resample,
+and the Wilson model — fixed denominator, independent Bernoulli trials
+in the numerator — does not capture that. It is conservative here, not
+optimistic.
+
+**Whether the environment was chosen from the same data.**
+`post_selection` is set on every conditioned row. The interval then
+says how well the rate is pinned *given* the environment, and nothing
+about whether the environment is real; that is what `search_margin`
+against `rg_corpus_fit.null_search_margin` is for. Two numbers
+answering two questions, each labelled.
+
+Intervals are published on every row that carries one. Six of the eight
+row types computed one and surfaced it nowhere until 2026-08-15.
+
 ### Morphological environments
 
 A morpheme boundary is not a sound, and a change that respects one is not

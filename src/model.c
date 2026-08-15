@@ -486,6 +486,7 @@ static rg_status add_conditioned_segment_count(
             (*rows)[i].delta_bic = delta_bic;
             (*rows)[i].search_margin = search_margin;
             (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
+            (*rows)[i].uncertainty.post_selection = 1;
             return RG_OK;
         }
     }
@@ -509,6 +510,7 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
+    (*rows)[*count].uncertainty.post_selection = 1;
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
         conditioned_segment_count_row_clear(&(*rows)[*count]);
         return RG_ERR_OOM;
@@ -1679,6 +1681,7 @@ static rg_status commit_observation_group(
                 row->delta_bic = delta_bic;
                 row->search_margin = search_margin;
                 row->uncertainty = rg_wilson_default_internal(row->count, source_total);
+                row->uncertainty.post_selection = 1;
                 replaced = 1;
                 break;
             }

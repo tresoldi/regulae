@@ -387,4 +387,16 @@ rg_status rg_score_link_with_context_model_internal(
  * constant that cannot be unsupported. */
 rg_uncertainty_estimate rg_wilson_default_internal(double count, double total);
 
+/* A percentile interval over resampled rates. Implemented since the port and
+ * unreachable until 2026-08-15, when bootstrap_n stopped being an option that
+ * did nothing. */
+rg_status rg_percentile_interval(
+    const double *samples,
+    size_t sample_count,
+    double estimate,
+    double total,
+    double alpha,
+    rg_uncertainty_estimate *out
+);
+
 #endif

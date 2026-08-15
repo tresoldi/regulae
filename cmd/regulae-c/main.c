@@ -244,7 +244,10 @@ static void print_pairwise(const rg_multi_model *model) {
         size_t k;
         for (i = 0; i < rg_pairwise_model_segment_count_row_count(pm); i++) {
             const rg_segment_count_row *seg = rg_pairwise_model_segment_count_row_at(pm, i);
-            printf("SEG\t%s>%s\t%s\t%s\t-\t%.6f\n", row->lect_a, row->lect_b, seg->source, seg->target, seg->count);
+            printf("SEG\t%s>%s\t%s\t%s\t-\t%.6f\t[%.4f,%.4f]\t%s\n", row->lect_a, row->lect_b,
+                   seg->source, seg->target, seg->count,
+                   seg->uncertainty.lower, seg->uncertainty.upper,
+                   rg_uncertainty_method_string(seg->uncertainty.method));
         }
         for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pm); i++) {
             const rg_conditioned_segment_count_row *seg = rg_pairwise_model_conditioned_segment_count_row_at(pm, i);
@@ -253,9 +256,12 @@ static void print_pairwise(const rg_multi_model *model) {
             /* Which form's environment the rule names. Two rows can carry the
              * same context and mean different things: one says the source
              * looked like that, the other the target. */
-            printf("SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\n", row->lect_a, row->lect_b,
+            printf("SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\t[%.4f,%.4f]\t%s%s\n", row->lect_a, row->lect_b,
                    seg->source, seg->target,
-                   seg->context_is_target ? "@target " : "", key, seg->count);
+                   seg->context_is_target ? "@target " : "", key, seg->count,
+                   seg->uncertainty.lower, seg->uncertainty.upper,
+                   rg_uncertainty_method_string(seg->uncertainty.method),
+                   seg->uncertainty.post_selection ? "/post-selection" : "");
         }
         for (i = 0; i < rg_pairwise_model_chunk_row_count(pm); i++) {
             const rg_chunk_row *chunk = rg_pairwise_model_chunk_row_at(pm, i);

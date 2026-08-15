@@ -377,7 +377,10 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         append_count(&builder, row->contrast_count);
         builder_append(&builder, "/");
         append_count(&builder, row->contrast_total);
-        builder_appendf(&builder, "  dBIC=%.1f  %s ~ %s", row->delta_bic, row->source, row->target);
+        builder_appendf(&builder, "  dBIC=%.1f  [%.2f,%.2f]%s  %s ~ %s", row->delta_bic,
+                        row->uncertainty.lower, row->uncertainty.upper,
+                        row->uncertainty.post_selection ? "*" : "",
+                        row->source, row->target);
         append_context(&builder, &row->context);
         builder_append(&builder, "\n");
         shown++;
@@ -495,8 +498,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
-        builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f  ",
-                        row->confidence, row->delta_bic, row->search_margin);
+        builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f [%.2f,%.2f]%s  ",
+                        row->confidence, row->delta_bic, row->search_margin,
+                        row->uncertainty.lower, row->uncertainty.upper,
+                        row->uncertainty.post_selection ? "*" : "");
         append_class_segments(&builder, row);
         append_class_contexts(&builder, row);
         builder_append(&builder, "\n");

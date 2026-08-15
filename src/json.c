@@ -27,6 +27,9 @@ static cJSON *json_uncertainty(rg_uncertainty_estimate value) {
     cJSON_AddNumberToObject(out, "n", value.n);
     cJSON_AddNumberToObject(out, "alpha", value.alpha);
     cJSON_AddStringToObject(out, "method", rg_uncertainty_method_string(value.method));
+    if (value.post_selection) {
+        cJSON_AddBoolToObject(out, "post_selection", 1);
+    }
     return out;
 }
 

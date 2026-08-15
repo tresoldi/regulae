@@ -65,6 +65,21 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   enumeration order, which the exchange does not preserve — on a
   corpus small enough for a tie to decide an alignment, the two
   directions can still differ.
+- **Intervals say what they were computed from.** Every
+  count-bearing row carries `rg_uncertainty_estimate`. The
+  default is a Wilson interval whose denominator counts aligned
+  positions, which are not independent observations — a
+  Latin–Spanish corpus has 413 of them over 97 cognate sets.
+  Setting `bootstrap_n` replaces it with a percentile interval
+  resampled over whole **cognate sets**, which is the unit the
+  corpus actually samples, and carries the confidence weighting
+  with it. Measured, the resampled interval is *narrower* on
+  most rows, not wider: the rate is a ratio whose numerator and
+  denominator move together under resampling, which the
+  fixed-denominator binomial model does not capture.
+  `post_selection` marks a row whose environment was chosen by
+  the same data; that interval says how well the rate is pinned
+  given the environment, not whether the environment is real.
 - **A conditioned class reports how far it stands above the
   search that found it.** `search_margin` is the search charge
   the rule's evidence could carry; `rg_corpus_fit.null_search_margin`

@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 14
+#define RG_ABI_VERSION 15
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -225,6 +225,11 @@ typedef struct rg_uncertainty_estimate {
     double n;
     double alpha;
     rg_uncertainty_method method;
+    /* Set when the row's environment was chosen by the same data the interval
+     * is computed from. The interval then says how well the rate is pinned
+     * *given* that environment, and not whether the environment is real -- for
+     * which see `search_margin` against `rg_corpus_fit.null_search_margin`. */
+    int post_selection;
 } rg_uncertainty_estimate;
 
 typedef struct rg_link {
