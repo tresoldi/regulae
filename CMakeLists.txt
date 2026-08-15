@@ -89,6 +89,13 @@ add_library(regulae
     src/format.c
     src/json.c
     src/loaders.c
+    src/loader_table.c
+    src/loader_forms.c
+    src/loader_corpus.c
+    src/loader_wide.c
+    src/loader_tsv.c
+    src/loader_gled.c
+    src/loader_arcaverborum.c
     src/chunk_diagnostics.c
     src/model.c
     src/model_chunks.c
@@ -103,6 +110,10 @@ add_library(regulae
     src/options.c
     src/scoring.c
     src/search.c
+    src/search_features.c
+    src/search_syllables.c
+    src/search_context.c
+    src/search_cost.c
     src/syllabification.c
     src/types.c
     src/uncertainty.c
