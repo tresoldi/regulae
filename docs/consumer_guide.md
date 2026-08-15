@@ -7,14 +7,27 @@ cross-family comparison, whatever.
 
 **On names.** The contract below is written in the original
 Python spelling (`train_model`, `MultiLectModel`,
-`snake_case` fields). The implementation is now a C99 core, so
-the authoritative spelling of any name is `include/regulae.h`:
+`snake_case` fields). The implementation is a C99 core, so the
+authoritative spelling of any name is `include/regulae.h`:
 `train_model` is `rg_train_model`, `MultiLectModel` is the
 opaque `rg_multi_model` read through `rg_multi_model_*`
 accessors, `find_cognate_outliers` is
 `rg_find_cognate_outliers`, and the loaders are
-`rg_corpus_load_*`. What each field *means*, and what it does
-not mean, is unchanged and is the point of this document.
+`rg_corpus_load_*`. What each field *means*, and what it does not
+mean, is the point of this document.
+
+This document said until 2026-08-15 that the meanings were
+"unchanged", and it was wrong in four places: a cross-dimensional
+rule's environment is a whole `Context` rather than one feature at
+one position (§6), the model does not retain the input corpus
+(§4.4), `Context` gained the segment-itself and morphological
+slots (§5), and there is no Python package to install (§2). The
+reliability fields — `standing`, `search_margin`,
+`decision_index`, the contrast counts, `rg_corpus_fit` — were
+never described here at all, and they are what decides whether an
+inference built on this output is defensible. §4.6 is that
+section. **Where this document and `include/regulae.h` disagree,
+the header is right.**
 
 The target reader is someone building a separate package (not
 modifying `regulae` itself) who needs to know:
@@ -134,12 +147,25 @@ variables.
 
 ## 2. Installation and import
 
+**There is no installable Python package today.** The original
+implementation is archived under `python/` and is not built,
+tested or supported; the Python wrapper over the C core is M6 on
+the roadmap and has not been written. A consumer today links the
+C library:
+
 ```sh
-pip install -e path/to/src/regulae
-pip install -e path/to/merkmal  # required dependency
+cmake -S . -B build && cmake --build build
+# libregulae.a (or .so), include/regulae.h, and merkmal alongside it
 ```
 
-The package exposes its public API on `regulae` at the top level:
+`include/regulae.h` is the contract, and `README.md` has a tour
+of it. The Python spelling below describes the *shape* of what
+that API returns, which is what the rest of this document is
+about; the archived listing is kept because it reads better than
+a list of accessor names, not because it can be imported.
+
+The archived package exposed its public API on `regulae` at the
+top level:
 
 ```python
 from regulae import (
@@ -156,10 +182,11 @@ from regulae import (
 )
 ```
 
-The complete export list is in `src/regulae/src/regulae/__init__.py`
-under `__all__`. Names not in that list (internal helpers,
-underscore-prefixed functions) are **not** public API — they can
-change between releases without notice.
+That list was in `python/src/regulae/__init__.py` under
+`__all__`. For the C API the equivalent boundary is `RG_API` in
+`include/regulae.h`: anything not marked with it is not exported,
+and the `*_internal` symbols that carry external linkage for the
+library's own use are hidden by the visibility preset.
 
 ## 3. The canonical entry point
 
@@ -213,6 +240,14 @@ A mapping keyed by `frozenset({lect_a, lect_b})` — explicitly
 *not* an ordered tuple, because pairwise training is symmetric
 (see §1). A pair missing from the mapping means the two lects
 had no shared cognate data in the corpus.
+
+In C this is `rg_multi_model_pair_model_at`, which returns an
+`rg_multi_pair_model_row` carrying `lect_a`, `lect_b` and the
+model. The row *is* ordered — reconciliation walks lect pairs in
+ascending lect-id order, which fixes the direction each pair is
+aligned in — but the analysis it holds is not: training A against
+B and B against A produce mirror models, and the tests assert it.
+Read the pair as a labelled edge, not as a direction of change.
 
 Each value is a `LearnedModel` — the full per-pair training
 output for that lect pair. It carries:
@@ -301,10 +336,17 @@ evidence.
 
 ### 4.4 `cognate_corpus`
 
-The input corpus retained on the model for provenance. If you
-want to walk back from a class to the source forms (e.g. to
-display a few exemplar words, or to recompute statistics), this
-is the anchor.
+**Not on the C model.** The Python model retained the input
+corpus for provenance; `rg_multi_model` does not, and there is no
+accessor for it. The corpus is a handle the caller already owns
+(`rg_corpus`, from one of the loaders), and it has to outlive the
+training call anyway, because the model borrows from it. Walking
+back from a class to the source forms means keeping that handle,
+not asking the model for it.
+
+`rg_multi_class_row.supporting_cognates` is the anchor that does
+exist: the cognate ids a class was built from, so a consumer can
+point at the evidence without matching graphemes back by hand.
 
 ### 4.5 `lect_ids`
 
@@ -313,15 +355,94 @@ First-seen order — **not** alphabetical. This ordering is stable
 and deterministic; downstream packages can rely on it as an
 index.
 
+### 4.6 What the model says about its own reliability
+
+This is the part a consumer is most likely to miss by reading the
+type definitions alone, and the part that decides whether an
+inference built on top of regulae is defensible.
+
+**Class counts are not evidence of relatedness, and they move the
+wrong way.** Shuffling a corpus's pairings removes every
+correspondence there is to find, and greedy splitting over a
+large candidate inventory then finds *more* environments in the
+noise, not fewer. A downstream stage that ranks language pairs by
+how many classes they produce has built a detector for corpus
+size. `rg_corpus_fit.cost_per_segment` is the number that
+separates signal from noise — strongly negative on real cognates,
+near zero on shuffled ones — and its scale depends on the corpus,
+so it has to be read against that corpus's own baseline.
+
+`rg_multi_model_fit` returns an `rg_corpus_fit`:
+
+- `cost_per_segment`, and with `permutation_count > 0`, the same
+  measure over shuffled trainings: `null_cost_per_segment_mean`,
+  `null_cost_per_segment_sd`, and `cost_per_segment_z` between
+  them. The baseline is off by default because it costs one full
+  training run per shuffle; when it is off, every `null_` field
+  is zero and means "not measured", not "zero".
+- `null_search_margin` at `null_search_margin_quantile`: the
+  search charge a rule has to clear to be saying more than the
+  search itself does.
+- `rules_above_noise` of `rules_measured`.
+- `inferred_nucleus_form_count` and `syllabified_form_count`:
+  forms with no vowel and no syllabic consonant, which were given
+  a nucleus so the syllable predicates had something to hold of.
+  A syllable-conditioned rule on a corpus with many of these is
+  resting on a guess.
+- `scored_set_count`, and separately
+  `rg_multi_model_unpaired_set_count` — sets that carried fewer
+  than two forms and so contributed no correspondence. Worth
+  reading as a proportion: a high one means the lect sample, not
+  the method, is deciding the result.
+
+Every conditioned rule and every conditioned class carries four
+fields that belong together:
+
+- `standing` — the verdict, `above-noise`, `within-noise`, or
+  `unmeasured` when no baseline was run. **`unmeasured` is not a
+  pass.** It says the comparison was never made.
+- `search_margin` — the number that verdict is computed from,
+  against `rg_corpus_fit.null_search_margin`.
+- `decision_index` — discovery is greedy, so the rules form a
+  decision list: a later rule refines what an earlier one left
+  unsettled. Published tables are sorted by key so lookups can
+  binary-search them, which destroys that order; this preserves
+  it. `-1` means the row was not decided by a search.
+- `contrast_count` and `delta_bic` — a conditioning claim is a
+  comparison, and these are the other side of it. A rule
+  published without the contrast it was measured against cannot
+  be read.
+
+Intervals say what they were computed from.
+`rg_uncertainty_estimate.method` distinguishes a closed-form
+Wilson interval from a resampled bootstrap one, which answer
+different questions, and `post_selection` is set on every row
+whose environment was chosen by the same data the interval is
+computed from. Such an interval says how well the rate is pinned
+*given* that environment, and nothing about whether the
+environment is real; `search_margin` against `null_search_margin`
+is what answers that.
+
+Finally, the corpus reports how it was built:
+`rg_corpus_doublet_set_count` and
+`rg_corpus_doublet_expansion_count` say how often a lect
+contributed more than one reflex to a set. A doublet is a fact
+about a language, not an error in a file, and the corpus carries
+one set per combination of reflexes with a share of the
+confidence each.
+
 ## 5. The conditioning environment: `Context`
 
 ```python
 @dataclass(frozen=True)
-class Context:
+class Context:                                # C: rg_context_spec
     position:             str | None = None   # "initial"|"medial"|"final"
     preceding:            tuple[FeatureConstraint, ...] = ()
     following:            tuple[FeatureConstraint, ...] = ()
-    morphological:        str | None = None   # reserved
+    self_:                tuple[FeatureConstraint, ...] = ()
+    # Morphological, from boundaries the caller supplied:
+    morphological:        str | None = None   # "initial"|"final"|"internal"|"only"
+    morpheme_index:       str | None = None   # "0", "1", ... counted from the start
     # Long-range fields:
     preceding_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
     following_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
@@ -330,7 +451,27 @@ class Context:
     same_syllable:         tuple[FeatureConstraint, ...] = ()
     next_syllable:         tuple[FeatureConstraint, ...] = ()
     previous_syllable:     tuple[FeatureConstraint, ...] = ()
+    # Stress, which is a dimension rather than a feature of a neighbour:
+    self_stress:           tuple[FeatureConstraint, ...] = ()
+    preceding_stress:      tuple[FeatureConstraint, ...] = ()
+    following_stress:      tuple[FeatureConstraint, ...] = ()
 ```
+
+Three of those slots are newer than the rest of this document and
+matter to a consumer.
+
+`self` (C: `rg_context_spec.self`) constrains the segment the
+environment is *about*, not a neighbour. A conditioned
+correspondence rarely needs it — the segment is already the key —
+but a cross-dimensional rule does, and §6 explains why.
+
+`morphological` and `morpheme_index` are no longer reserved. They
+are derived from the morpheme boundaries **the caller supplied on
+the form**, and never from inference: regulae does not segment
+words. A corpus with no boundaries gets no morphological axis at
+all, so an absent value means "not asked", not "not conditioned".
+`morpheme_index` does not travel between a suffixing language and
+a prefixing one, where the same index is a different thing.
 
 A non-empty field is a **conjunction**: every `FeatureConstraint`
 in the tuple must hold for the context to apply. A
@@ -367,50 +508,60 @@ read half its rules against the wrong form.
 
 ```python
 @dataclass(frozen=True)
-class CrossDimensionalLink:
-    src_feature:         FeatureConstraint
-    src_position:        str                  # "relative_-1"|"relative_0"|...
-    tgt_dimension:       str                  # "tone"|"length"|"stress"
-    tgt_value:           str                  # e.g. "4" for tone 4
-    tgt_position_offset: int                  # signed offset from link
-    count:               float                # observed matches
-    src_count:           float                # observations in the environment
-    confidence:          float                # count / src_count
-    contrast_count:      float                # matches outside the environment
-    contrast_src_count:  float                # observations outside it
-    contrast_confidence: float                # contrast_count / contrast_src_count
-    delta_bic:           float                # score for the environment
+class CrossDimensionalLink:            # C: rg_cross_dimensional_row
+    source_environment:  Context       # not one feature at one position
+    tgt_dimension:       str           # "tone"|"length"|"stress"
+    tgt_value:           str           # e.g. "4" for tone 4
+    tgt_position_offset: int           # signed offset from the link
+    count:               float         # observed matches
+    src_count:           float         # observations in the environment
+    confidence:          float         # count / src_count
+    contrast_count:      float         # matches outside the environment
+    contrast_src_count:  float         # observations outside it
+    contrast_confidence: float         # contrast_count / contrast_src_count
+    delta_bic:           float         # score for the environment
+    decision_index:      int           # where in the decision list (§4.6)
+    search_margin:       float         # search charge the evidence carries
+    standing:            str           # the verdict (§4.6)
+    uncertainty:         UncertaintyEstimate
 ```
 
-`src_feature.value` is `"+"` or `"-"`. A conditioned split is a two-sided
-statement, and both halves are published: `"-"` names the complementary
-environment, and a consumer that filters to `"+"` will read a merger as a
-one-way change.
+**The environment is a whole `Context`, not a single feature at a
+single position.** This document described it as an
+`src_feature` / `src_position` pair until 2026-08-15, and that
+shape could not state the rule the stage exists for. The Middle
+Chinese register split conditions the target tone on the
+preceding onset's voicing *and* on the source segment's own tone,
+and neither predicate alone predicts it above chance: with one
+predicate the rule was published at confidence 0.50 and read as a
+weak finding rather than half of one. The environment is the same
+type a conditioned correspondence carries, so it can name several
+predicates, including one about the segment itself via `self`.
 
-**Do not read `confidence` on its own.** It is P(value | environment), and a
-rule holding at 0.9 where the contrast also holds at 0.9 is the ambient
-distribution rather than a conditioning effect. The contrast fields are what
-make the row a claim; `delta_bic` scores the environment as a whole and is
+A conditioned split is a two-sided statement and both halves are
+published: a `"-"` constraint names the complementary
+environment, and a consumer that filters to `"+"` will read a
+merger as a one-way change.
+
+**Do not read `confidence` on its own.** It is
+P(value | environment), and a rule holding at 0.9 where the
+contrast also holds at 0.9 is the ambient distribution rather
+than a conditioning effect. The contrast fields are what make the
+row a claim; `delta_bic` scores the environment as a whole and is
 negative for every published row.
 
-Lives on `LearnedModel.cross_dimensional_table.entries`, not on
-multi-lect classes — the cross-dimensional discovery loop
-commits rules per-pair only. The multi-lect model surfaces
-these via its own lifted
-`cross_dimensional_table: MultiLectCrossDimensionalLinkTable`,
-which carries the same rules with explicit `src_lect` /
-`tgt_lect` labels.
+The rule reads: "where the source form satisfies
+`source_environment`, the target form's `tgt_dimension` carries
+`tgt_value` at `tgt_position_offset` from the link." That is the
+tonogenesis signature — onset voicing predicting tone on the
+following vowel, for example.
 
-The rule reads "when the source form has `src_feature` at the
-position given by `src_position` (relative to a link), the
-target form's `tgt_dimension` carries `tgt_value` at
-`tgt_position_offset` from the link". This is the tonogenesis
-signature: segmental voicing at position -1 predicts tone on
-position 0, for example.
-
-`src_count` and `count` are the denominator and numerator of
-the confidence. `confidence` is the fraction of matches among
-the observations where the source feature held.
+These live on the per-pair model
+(`rg_pairwise_model_cross_dimensional_row_at`), because discovery
+commits them per pair. The multi-lect model lifts them with
+explicit `source_lect` / `target_lect` labels
+(`rg_multi_model_cross_dimensional_row_at`), and the lifted row
+carries the same fields.
 
 ## 7. Public API stability contract
 
@@ -432,6 +583,21 @@ new capabilities land — this is how
 slots on `Context` were added without breaking prior
 consumers. Existing fields will not be renamed, removed, or
 have their semantics changed.
+
+**In C, that promise is `RG_ABI_VERSION`, and it is weaker.**
+Adding a field to a public struct changes its layout, so it moves
+the ABI version whether or not it breaks a source-level consumer.
+The rule is: `RG_ABI_VERSION` moves on any exported struct
+layout, enum, signature or ownership change, and the reason is
+recorded in `docs/c_conversion_roadmap.md`. It is at **22**.
+
+Two changes landed at 22, and are the kind to expect: public
+booleans became `bool` rather than `int`, and every loader now
+reports its own failure into a caller-supplied
+`rg_load_diagnosis` instead of a process-wide buffer that was
+neither thread-safe nor cleared between calls. Both break a
+consumer at compile time rather than silently, which is the
+intent.
 
 **Not public API**:
 
