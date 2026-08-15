@@ -3109,6 +3109,7 @@ static rg_status append_cross_dimensional_row(
         contrast_source_count > 0.0 ? contrast_count / contrast_source_count : 0.0;
     (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].decision_index = decision_index;
+    (*rows)[*count].search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(rule_count, source_count);
     if ((*rows)[*count].target_dimension == 0 ||
         (*rows)[*count].target_value == 0) {

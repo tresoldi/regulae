@@ -786,6 +786,75 @@ static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
     }
 }
 
+/* A cross-dimensional rule is a rule, and reports whether it stands on the same
+ * terms as any other.
+ *
+ * The sibling test above walks the conditioned classes, which is why this went
+ * unnoticed: the pairwise cross-dimensional appender took the margin its caller
+ * had computed and dropped it on the floor, and the multi-lect lift copied every
+ * field of the row except that one. Both published 0.0, so every one of these
+ * rules read `within-noise` whatever its evidence -- a verdict, delivered with
+ * the same words a measured one uses, resting on a number nobody had set. */
+static void test_cross_dimensional_rules_report_whether_they_stand(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    rg_train_options options;
+    rg_multi_model *model = 0;
+    const rg_corpus_fit *fit;
+    char path[512];
+    size_t i;
+    size_t measured = 0;
+    int margin_seen = 0;
+
+    snprintf(path, sizeof(path), "%s/testdata/corpora/joint_tonogenesis.tsv", REGULAE_SOURCE_DIR);
+    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+
+    rg_train_options_init_defaults(&options);
+    options.permutation_count = 10;
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+    fit = rg_multi_model_fit(model);
+
+    assert(rg_multi_model_cross_dimensional_row_count(model) > 0);
+    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
+        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
+        assert(row->standing != RG_RULE_STANDING_UNMEASURED);
+        if (row->search_margin > fit->null_search_margin) {
+            assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+        } else {
+            assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+        }
+        if (row->search_margin > 0.0) {
+            margin_seen = 1;
+        }
+        measured++;
+    }
+
+    /* The same rows before they were lifted. A margin the pairwise model does
+     * not carry cannot arrive in the multi-lect one. */
+    for (i = 0; i < rg_multi_model_pair_model_count(model); i++) {
+        const rg_pairwise_model *pair = rg_multi_model_pair_model_at(model, i)->model;
+        size_t j;
+        for (j = 0; j < rg_pairwise_model_cross_dimensional_row_count(pair); j++) {
+            const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(pair, j);
+            assert(row->standing != RG_RULE_STANDING_UNMEASURED);
+            if (row->search_margin > fit->null_search_margin) {
+                assert(row->standing == RG_RULE_STANDING_ABOVE_NOISE);
+            } else {
+                assert(row->standing == RG_RULE_STANDING_WITHIN_NOISE);
+            }
+        }
+    }
+
+    /* A rule committed by a search paid a search charge to get there, so at
+     * least one of these has a margin above zero. This is the assertion the
+     * dropped field failed. */
+    assert(measured > 0);
+    assert(margin_seen);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* Without a baseline there is nothing to stand above, and the rule says so
  * rather than claiming a verdict it has not earned. */
 static void test_no_baseline_means_no_verdict(rg_context *ctx) {
@@ -1110,6 +1179,7 @@ int main(void) {
     test_grassmann(ctx);
     test_verner(ctx);
     test_rules_report_whether_they_stand_above_noise(ctx);
+    test_cross_dimensional_rules_report_whether_they_stand(ctx);
     test_no_baseline_means_no_verdict(ctx);
     test_rules_carry_the_order_they_were_decided(ctx);
     test_metathesis(ctx);

@@ -423,6 +423,7 @@ static rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
             model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_confidence = row->contrast_confidence;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.delta_bic = row->delta_bic;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.decision_index = row->decision_index;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.search_margin = row->search_margin;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.uncertainty = row->uncertainty;
             model->cross_dimensional_count++;
         }
