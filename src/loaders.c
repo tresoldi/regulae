@@ -1539,98 +1539,81 @@ static rg_status load_tsv(
         loader_cognate *cognate;
         loader_form form;
 
-        if (cognate_id == 0 || lect_id == 0) {
-            free(cognate_id);
-            free(lect_id);
-            status = RG_ERR_OOM;
-            break;
-        }
-        if (cognate_id[0] == '\0' || lect_id[0] == '\0') {
-            free(cognate_id);
-            free(lect_id);
-            continue;
-        }
         memset(&form, 0, sizeof(form));
+
+        if (cognate_id == 0 || lect_id == 0) {
+            status = RG_ERR_OOM;
+            goto row_done;
+        }
+        /* An unlabelled row is skipped rather than refused: a wordlist with a
+         * blank line in it is not a broken file. status stays RG_OK, so the
+         * loop continues. */
+        if (cognate_id[0] == '\0' || lect_id[0] == '\0') {
+            goto row_done;
+        }
         status = parse_segments(cell(row, segments_col), 0, &form.segments, &form.segment_count, 0, 0);
         if (status != RG_OK) {
-            free(cognate_id);
-            free(lect_id);
-            break;
+            goto row_done;
         }
         if (form.segment_count == 0) {
-            loader_form_clear(&form);
-            free(cognate_id);
-            free(lect_id);
-            continue;
+            goto row_done;
         }
         if (stress_col >= 0) {
             status = attach_dimension(cell(row, stress_col), form.segments, form.segment_count, RG_DIMENSION_STRESS);
             if (status != RG_OK) {
-                loader_form_clear(&form);
-                free(cognate_id);
-                free(lect_id);
-                break;
+                goto row_done;
             }
         }
         if (tone_col >= 0) {
             status = attach_dimension(cell(row, tone_col), form.segments, form.segment_count, RG_DIMENSION_TONE);
             if (status != RG_OK) {
-                loader_form_clear(&form);
-                free(cognate_id);
-                free(lect_id);
-                break;
+                goto row_done;
             }
         }
         if (breaks_col >= 0) {
             status = parse_break_indices(cell(row, breaks_col), &form.morpheme_breaks,
                                          &form.morpheme_break_count);
             if (status != RG_OK) {
-                loader_form_clear(&form);
-                free(cognate_id);
-                free(lect_id);
-                break;
+                goto row_done;
             }
         }
         if (length_col >= 0) {
             status = attach_dimension(cell(row, length_col), form.segments, form.segment_count,
                                       RG_DIMENSION_LENGTH);
             if (status != RG_OK) {
-                loader_form_clear(&form);
-                free(cognate_id);
-                free(lect_id);
-                break;
+                goto row_done;
             }
         }
         if (syllables_col >= 0) {
             status = parse_break_indices(cell(row, syllables_col), &form.syllable_breaks,
                                          &form.syllable_break_count);
             if (status != RG_OK) {
-                loader_form_clear(&form);
-                free(cognate_id);
-                free(lect_id);
-                break;
+                goto row_done;
             }
         }
         cognate = corpus_ensure_cognate(corpus, cognate_id);
-        free(cognate_id);
         if (cognate == 0) {
-            loader_form_clear(&form);
-            free(lect_id);
             status = RG_ERR_OOM;
-            break;
+            goto row_done;
         }
+        /* The form takes the lect id, and then the cognate takes the form.
+         * Each handover is a clearing of the local, so the cleanup below frees
+         * exactly what this iteration still owns and nothing that has moved
+         * on. */
         form.lect_id = lect_id;
+        lect_id = 0;
         status = cognate_append_form(cognate, &form);
         if (status != RG_OK) {
-            loader_form_clear(&form);
-            break;
+            goto row_done;
         }
+        memset(&form, 0, sizeof(form));
+
         if (alignment_col >= 0) {
             long length = alignment_token_count(cell(row, alignment_col));
             if (length > 0) {
                 if (cognate->alignment_length >= 0 && cognate->alignment_length != length) {
                     status = RG_ERR_PARSE;
-                    break;
+                    goto row_done;
                 }
                 cognate->alignment_length = length;
             }
@@ -1639,7 +1622,7 @@ static rg_status load_tsv(
             char *raw = trim_copy(cell(row, confidence_col));
             if (raw == 0) {
                 status = RG_ERR_OOM;
-                break;
+                goto row_done;
             }
             if (raw[0] != '\0') {
                 char *endptr = 0;
@@ -1647,7 +1630,7 @@ static rg_status load_tsv(
                 if (endptr == raw || (endptr != 0 && *endptr != '\0')) {
                     free(raw);
                     status = RG_ERR_PARSE;
-                    break;
+                    goto row_done;
                 }
                 /* A cognate set takes the lowest confidence any of its rows
                  * reports, so a single doubtful reflex downweights the set. */
@@ -1657,6 +1640,19 @@ static rg_status load_tsv(
                 }
             }
             free(raw);
+        }
+
+    row_done:
+        /* One cleanup for the iteration, whichever way it ended. There were
+         * eight of these, written out separately, and one of them -- the
+         * stress column's -- was missing the two frees the other seven had.
+         * The fuzzer found it as a leak on a refused row; this is why it was
+         * possible to write. */
+        loader_form_clear(&form);
+        free(cognate_id);
+        free(lect_id);
+        if (status != RG_OK) {
+            break;
         }
     }
     loader_table_clear(&table);
