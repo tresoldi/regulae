@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 16
+#define RG_ABI_VERSION 17
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -189,6 +189,15 @@ typedef struct rg_context_spec {
     size_t next_syllable_count;
     const rg_feature_constraint *previous_syllable;
     size_t previous_syllable_count;
+    /* Constraints on the segment the environment is *about*, rather than on
+     * its neighbours. A conditioned correspondence rarely needs this -- the
+     * segment is already the key -- but a cross-dimensional rule does: the
+     * Middle Chinese register split conditions a target tone on the preceding
+     * onset's voicing *and* on the source segment's own tone, and the second
+     * of those is a statement about the segment itself. Suprasegmentals appear
+     * here as ordinary features named "tone", "length" and "stress". */
+    const rg_feature_constraint *self;
+    size_t self_count;
     const rg_feature_constraint *self_stress;
     size_t self_stress_count;
     const rg_feature_constraint *preceding_stress;
@@ -362,10 +371,17 @@ typedef struct rg_chunk_row {
  * likelihood gain from modelling the target dimension separately inside and
  * outside the environment, penalised by the parameters that costs. It is
  * negative for every published row, and more negative is stronger. */
+/* A rule where something about the source form conditions a suprasegmental
+ * value on the target.
+ *
+ * The environment is an rg_context_spec, the same type a conditioned
+ * correspondence uses, so it can name more than one predicate. It has to: the
+ * Middle Chinese register split conditions the target tone on the preceding
+ * onset's voicing *and* on the source segment's own tone, and neither alone
+ * predicts it above chance. A single-predicate row reported that rule at
+ * confidence 0.50 and looked like a weak finding rather than half of one. */
 typedef struct rg_cross_dimensional_row {
-    const char *source_feature;
-    const char *source_value;
-    const char *source_position;
+    rg_context_spec source_environment;
     const char *target_dimension;
     const char *target_value;
     int target_position_offset;
@@ -410,9 +426,7 @@ typedef struct rg_multi_class_row {
 typedef struct rg_multi_cross_dimensional_row {
     const char *source_lect;
     const char *target_lect;
-    const char *source_feature;
-    const char *source_value;
-    const char *source_position;
+    rg_context_spec source_environment;
     const char *target_dimension;
     const char *target_value;
     int target_position_offset;

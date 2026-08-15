@@ -135,6 +135,110 @@ static void test_uninformative_environments_commit_nothing(rg_context *ctx) {
     }
 }
 
+/* The Middle Chinese register split: a source tone splits by the voicing of
+ * the onset before it. Source tone 2 becomes tone 4 after a voiced onset and
+ * tone 2 after a voiceless one, while source tone 1 is unaffected either way.
+ *
+ * Neither predicate alone predicts anything. Voicing alone reported this at
+ * confidence 0.50 and read as a weak finding rather than half of one, and the
+ * source's own tone was not in the predicate vocabulary at all. A rule needs
+ * to name both, which is what an rg_context_spec environment is for. */
+static void test_joint_cross_dimensional_rule(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    rg_form_pair *views;
+    rg_pairwise_model *model = 0;
+    rg_train_options options;
+    size_t count;
+    size_t i;
+    int found_voiced = 0;
+    int found_voiceless = 0;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/joint_tonogenesis.tsv",
+                              0, &corpus) == RG_OK);
+    count = rg_corpus_cognate_count(corpus);
+    views = (rg_form_pair *)calloc(count, sizeof(*views));
+    assert(views != 0);
+    for (i = 0; i < count; i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        assert(set->form_count == 2);
+        views[i].source = set->forms[0].form;
+        views[i].target = set->forms[1].form;
+        views[i].weight = 1.0;
+    }
+    rg_train_options_init_defaults(&options);
+    assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
+    for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
+        const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
+        const rg_context_spec *environment = &row->source_environment;
+        /* Both predicates, and neither is enough: the onset's voicing, and the
+         * source segment's own tone. */
+        if (environment->preceding_count != 1 || environment->self_count != 1) {
+            continue;
+        }
+        if (strcmp(environment->preceding[0].feature, "voiced") != 0 ||
+            strcmp(environment->self[0].feature, "tone") != 0 ||
+            strcmp(environment->self[0].value, "2") != 0) {
+            continue;
+        }
+        /* Naming both makes the rule exact where naming one left it at half. */
+        assert(row->confidence == 1.0);
+        if (strcmp(environment->preceding[0].value, "+") == 0 &&
+            strcmp(row->target_value, "4") == 0) {
+            found_voiced = 1;
+        }
+        if (strcmp(environment->preceding[0].value, "-") == 0 &&
+            strcmp(row->target_value, "2") == 0) {
+            found_voiceless = 1;
+        }
+    }
+    assert(found_voiced);
+    assert(found_voiceless);
+    rg_pairwise_model_free(model);
+    free(views);
+    rg_corpus_free(corpus);
+}
+
+/* The target dimension is not only tone. The scorer has handled stress and
+ * length as targets since the port; this stage proposed neither until
+ * 2026-08-15, so compensatory lengthening and stress shifts were unreachable
+ * however regular they were. */
+static void test_cross_dimensional_stress_target(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    rg_form_pair *views;
+    rg_pairwise_model *model = 0;
+    rg_train_options options;
+    size_t count;
+    size_t i;
+    int found = 0;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/stress_dimension_target.tsv",
+                              0, &corpus) == RG_OK);
+    count = rg_corpus_cognate_count(corpus);
+    views = (rg_form_pair *)calloc(count, sizeof(*views));
+    assert(views != 0);
+    for (i = 0; i < count; i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        views[i].source = set->forms[0].form;
+        views[i].target = set->forms[1].form;
+        views[i].weight = 1.0;
+    }
+    rg_train_options_init_defaults(&options);
+    assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
+    for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
+        const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
+        if (strcmp(row->target_dimension, "stress") == 0 &&
+            row->source_environment.preceding_count == 1 &&
+            strcmp(row->source_environment.preceding[0].feature, "voiced") == 0) {
+            assert(row->confidence == 1.0);
+            found = 1;
+        }
+    }
+    assert(found);
+    rg_pairwise_model_free(model);
+    free(views);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     rg_pairwise_model *model = 0;
@@ -446,9 +550,11 @@ int main(void) {
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
         assert(row != 0);
-        if (strcmp(row->source_feature, "voiced") == 0 &&
-            strcmp(row->source_value, "+") == 0 &&
-            strcmp(row->source_position, "relative_0") == 0 &&
+        /* The environment is a context now, so the rule is identified by what
+         * it names rather than by three parallel strings. */
+        if (row->source_environment.self_count == 1 &&
+            strcmp(row->source_environment.self[0].feature, "voiced") == 0 &&
+            strcmp(row->source_environment.self[0].value, "+") == 0 &&
             strcmp(row->target_dimension, "tone") == 0 &&
             strcmp(row->target_value, "H") == 0) {
             found_cross_dimensional = 1;
@@ -482,6 +588,8 @@ int main(void) {
     assert(fabs(learned_pf - prior_pf) < 1e-12);
     assert(rg_align_forms_with_model(ctx, 0, &options, &pairs[0].source, &pairs[0].target, 0, &learned_alignment) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_train_pairwise(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
+    test_joint_cross_dimensional_rule(ctx);
+    test_cross_dimensional_stress_target(ctx);
     test_uninformative_environments_commit_nothing(ctx);
     rg_context_free(ctx);
     return 0;

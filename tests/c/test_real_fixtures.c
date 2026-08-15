@@ -219,8 +219,11 @@ static void test_tone_clean_fixture(rg_context *ctx) {
     assert(rg_pairwise_model_cross_dimensional_row_count(model) == 2);
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        assert(strcmp(row->source_feature, "voiced") == 0);
-        assert(strcmp(row->source_position, "relative_-1") == 0);
+        /* One predicate, on the preceding segment: the onset's voicing. */
+        assert(row->source_environment.preceding_count == 1);
+        assert(strcmp(row->source_environment.preceding[0].feature, "voiced") == 0);
+        assert(row->source_environment.self_count == 0);
+        assert(row->source_environment.following_count == 0);
         assert(row->count == 40.0 && row->source_count == 40.0);
         assert(row->confidence == 1.0);
         /* The environment is what makes the difference: the value never occurs
@@ -228,11 +231,11 @@ static void test_tone_clean_fixture(rg_context *ctx) {
         assert(row->contrast_count == 0.0);
         assert(row->contrast_confidence == 0.0);
         assert(row->delta_bic < 0.0);
-        if (strcmp(row->source_value, "+") == 0 &&
+        if (strcmp(row->source_environment.preceding[0].value, "+") == 0 &&
             strcmp(row->target_value, "\xe2\x81\xb4\xe2\x81\xb4") == 0) {
             found_voiced = 1;
         }
-        if (strcmp(row->source_value, "-") == 0 &&
+        if (strcmp(row->source_environment.preceding[0].value, "-") == 0 &&
             strcmp(row->target_value, "\xc2\xb9\xc2\xb9") == 0) {
             found_voiceless = 1;
         }

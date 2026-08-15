@@ -112,6 +112,7 @@ size_t rg_context_spec_constraint_count(const rg_context_spec *context) {
     count += context->same_syllable_count;
     count += context->next_syllable_count;
     count += context->previous_syllable_count;
+    count += context->self_count;
     count += context->self_stress_count;
     count += context->preceding_stress_count;
     count += context->following_stress_count;
@@ -162,6 +163,10 @@ rg_status rg_context_spec_is_subset(
         return RG_OK;
     }
     if (!feature_slice_is_subset(subset->previous_syllable, subset->previous_syllable_count, other->previous_syllable, other->previous_syllable_count)) {
+        return RG_OK;
+    }
+    if (!feature_slice_is_subset(subset->self, subset->self_count, other->self, other->self_count)) {
+        *out = 0;
         return RG_OK;
     }
     if (!feature_slice_is_subset(subset->self_stress, subset->self_stress_count, other->self_stress, other->self_stress_count)) {

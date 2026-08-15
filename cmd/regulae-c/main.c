@@ -222,9 +222,10 @@ static void print_summary(const rg_multi_model *model) {
     }
     for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        printf("XDIM\t%s>%s\t%s=%s@%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
-               row->source_lect, row->target_lect,
-               row->source_feature, row->source_value, row->source_position,
+        char environment[2048];
+        context_key(&row->source_environment, environment, sizeof(environment));
+        printf("XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
+               row->source_lect, row->target_lect, environment,
                row->target_dimension, row->target_value, row->target_position_offset,
                row->count, row->source_count, row->confidence,
                row->contrast_count, row->contrast_source_count, row->contrast_confidence,

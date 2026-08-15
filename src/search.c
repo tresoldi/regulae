@@ -1652,43 +1652,73 @@ static int parse_cross_dimensional_offset(const char *position) {
     return 0;
 }
 
+/* Whether the source form satisfies a cross-dimensional rule's environment at
+ * a position. The environment is an rg_context_spec, so this walks the slots
+ * it can name: the preceding segment, the segment itself, the following one.
+ * Suprasegmentals appear as features called "tone", "length" and "stress". */
+static int cross_dimensional_slot_holds(
+    const rg_context *ctx,
+    const rg_form *form,
+    int index,
+    const rg_feature_constraint *constraints,
+    size_t count
+) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        const char *feature = constraints[i].feature;
+        const char *want = constraints[i].value == 0 ? "+" : constraints[i].value;
+        int negated = strcmp(want, "-") == 0;
+        int holds;
+        if (index < 0 || (size_t)index >= form->segment_count) {
+            return 0;
+        }
+        if (strcmp(feature, "tone") == 0 || strcmp(feature, "length") == 0 ||
+            strcmp(feature, "stress") == 0) {
+            const char *value = strcmp(feature, "tone") == 0 ? form->segments[index].tone
+                : (strcmp(feature, "length") == 0 ? form->segments[index].length
+                                                  : form->segments[index].stress);
+            holds = value != 0 && strcmp(value, want) == 0;
+            if (negated) {
+                holds = !(value != 0 && value[0] != '\0');
+            }
+        } else {
+            const rg_feature_set *features = 0;
+            if (form->segments[index].grapheme == 0 ||
+                rg_context_features_internal(ctx, form->segments[index].grapheme, &features) != RG_OK) {
+                return 0;
+            }
+            holds = feature_set_contains(features, feature);
+            if (negated) {
+                holds = !holds;
+            }
+        }
+        if (!holds) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int cross_dimensional_source_holds(
     const rg_context *ctx,
     const rg_form *form,
     size_t src_pos,
     const rg_cross_dimensional_row *row
 ) {
-    int offset;
-    int index;
-    const rg_feature_set *features = 0;
-    rg_status status;
-    if (ctx == 0 || form == 0 || row == 0 || row->source_feature == 0) {
+    const rg_context_spec *environment;
+    if (ctx == 0 || form == 0 || row == 0) {
         return 0;
     }
-    offset = parse_cross_dimensional_offset(row->source_position);
-    index = (int)src_pos + offset;
-    if (index < 0 || (size_t)index >= form->segment_count) {
+    environment = &row->source_environment;
+    if (rg_context_spec_constraint_count(environment) == 0) {
         return 0;
     }
-    if (strcmp(row->source_feature, "tone") == 0) {
-        const char *tone = form->segments[index].tone == 0 ? "" : form->segments[index].tone;
-        return strcmp(tone, row->source_value == 0 ? "" : row->source_value) == 0;
-    }
-    if (form->segments[index].grapheme == 0) {
-        return 0;
-    }
-    status = rg_context_features_internal(ctx, form->segments[index].grapheme, &features);
-    if (status != RG_OK) {
-        return 0;
-    }
-    {
-        /* source_value "-" is the complementary environment, which is half of
-         * every conditioned split. Reading the feature alone and ignoring the
-         * value fires a rule about voiceless onsets on a voiced one. */
-        int holds = feature_set_contains(features, row->source_feature);
-        const char *value = row->source_value == 0 ? "+" : row->source_value;
-        return strcmp(value, "-") == 0 ? !holds : holds;
-    }
+    return cross_dimensional_slot_holds(ctx, form, (int)src_pos - 1,
+                                        environment->preceding, environment->preceding_count) &&
+           cross_dimensional_slot_holds(ctx, form, (int)src_pos,
+                                        environment->self, environment->self_count) &&
+           cross_dimensional_slot_holds(ctx, form, (int)src_pos + 1,
+                                        environment->following, environment->following_count);
 }
 
 static double cross_dimensional_adjustment_for_row(

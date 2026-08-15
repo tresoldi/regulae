@@ -261,6 +261,7 @@ rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_s
     COPY_FC_FIELD(same_syllable);
     COPY_FC_FIELD(next_syllable);
     COPY_FC_FIELD(previous_syllable);
+    COPY_FC_FIELD(self);
     COPY_FC_FIELD(self_stress);
     COPY_FC_FIELD(preceding_stress);
     COPY_FC_FIELD(following_stress);
@@ -285,6 +286,7 @@ void rg_context_spec_clear_internal(rg_context_spec *context) {
     rg_feature_constraint_array_clear_internal(context->same_syllable, context->same_syllable_count);
     rg_feature_constraint_array_clear_internal(context->next_syllable, context->next_syllable_count);
     rg_feature_constraint_array_clear_internal(context->previous_syllable, context->previous_syllable_count);
+    rg_feature_constraint_array_clear_internal(context->self, context->self_count);
     rg_feature_constraint_array_clear_internal(context->self_stress, context->self_stress_count);
     rg_feature_constraint_array_clear_internal(context->preceding_stress, context->preceding_stress_count);
     rg_feature_constraint_array_clear_internal(context->following_stress, context->following_stress_count);

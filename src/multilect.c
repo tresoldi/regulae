@@ -410,9 +410,8 @@ static rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
             memset(&model->cross_dimensional_rows[model->cross_dimensional_count], 0, sizeof(model->cross_dimensional_rows[model->cross_dimensional_count]));
             model->cross_dimensional_rows[model->cross_dimensional_count].view.source_lect = model->pair_models[i].lect_a;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.target_lect = model->pair_models[i].lect_b;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_feature = row->source_feature;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_value = row->source_value;
-            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_position = row->source_position;
+            /* Borrowed from the pairwise row, which outlives the lifted view. */
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.source_environment = row->source_environment;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.target_dimension = row->target_dimension;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.target_value = row->target_value;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.target_position_offset = row->target_position_offset;

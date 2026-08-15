@@ -263,6 +263,63 @@ answering two questions, each labelled.
 Intervals are published on every row that carries one. Six of the eight
 row types computed one and surfaced it nowhere until 2026-08-15.
 
+### Cross-dimensional rules, and why one predicate is not enough
+
+Does something about the source form condition a suprasegmental value on the
+target? The claim is a conditioned split and is tested as one: the complement
+must be attested, and modelling the dimension separately inside and outside must
+beat modelling it once, under BIC plus the search charge.
+
+**The environment is an `rg_context_spec`** — the same type a conditioned
+correspondence uses. It has to be, because one predicate is not always enough.
+The Middle Chinese register split conditions the target tone on the preceding
+onset's voicing **and** on the source segment's own tone:
+
+| source tone | voiced onset | voiceless onset |
+| --- | --- | --- |
+| 1 | → 1 | → 1 |
+| 2 | → **4** | → **2** |
+
+Neither half predicts anything alone. Voicing alone reported this at confidence
+0.50, which reads as a weak finding rather than half of one, and the source's
+own tone was not a predicate at all — the vocabulary was thirteen hardcoded
+segmental features. Both are now searched, and the rule comes back as
+`pre[voiced:+] self[tone:2] -> tone=4` at confidence 1.00, with its complement.
+
+**Predicates** come from the same corpus-derived vocabulary as context
+conditioning, plus every suprasegmental value the corpus carries, at each of
+three positions, in both polarities. `self` is the segment the rule is about;
+suprasegmentals are features named `tone`, `length` and `stress`.
+
+**Pairs are searched, and paid for.** P predicates give P(P-1)/2 pairs and P is
+in the hundreds, so conjunctions are formed among the best sixteen singles by
+ΔBIC, and the whole candidate count enters the split penalty as
+`γ · 2 · ln(m)`, the same charge the context splitter pays.
+
+Three rules keep the output readable, each of which was a real failure first:
+
+- **A conjunction publishes only the side it holds on.** The complement of
+  "voiced and source tone 2" is not "voiceless and not source tone 2", and a
+  context cannot say *not (A and B)*. The other half is reachable as its own
+  conjunction, because negation is a predicate. A single predicate still
+  publishes both sides, where the complement is one predicate.
+- **An environment that raises several values has not determined the
+  outcome**, so its members stay live for a narrower environment to explain.
+  Retiring them is what stopped the register split being found: source tone 2
+  raises both tone 2 and tone 4, and consuming both left the conjunction with
+  nothing to work on.
+- **Equivalent and redundant environments are skipped.** Different predicates
+  often carve one corpus identically, and committing each in turn republishes
+  one finding as several. A narrower environment inside one that already
+  determined its outcome is skipped too — but only inside a *determined* one,
+  because refining an undetermined environment is the whole point.
+
+**The target dimension is not only tone.** The scorer has handled stress and
+length as targets since the port and this stage proposed neither, so
+compensatory lengthening and stress shifts were unreachable however regular.
+All three are searched now. One gap remains: no loader populates
+`rg_segment.length`, so a length-target rule cannot be reached from a file.
+
 ### Morphological environments
 
 A morpheme boundary is not a sound, and a change that respects one is not

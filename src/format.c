@@ -167,6 +167,7 @@ static void append_context(string_builder *builder, const rg_context_spec *conte
     append_constraint_bracket(builder, "same-syl", context->same_syllable, context->same_syllable_count);
     append_constraint_bracket(builder, "next-syl", context->next_syllable, context->next_syllable_count);
     append_constraint_bracket(builder, "prev-syl", context->previous_syllable, context->previous_syllable_count);
+    append_constraint_bracket(builder, "self", context->self, context->self_count);
     append_constraint_bracket(builder, "self-stress", context->self_stress, context->self_stress_count);
     append_constraint_bracket(builder, "pre-stress", context->preceding_stress, context->preceding_stress_count);
     append_constraint_bracket(builder, "fol-stress", context->following_stress, context->following_stress_count);
@@ -517,9 +518,9 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        builder_appendf(&builder, "  %s>%s  %s=%s@%s -> %s=%s@%+d  count=",
-                        row->source_lect, row->target_lect,
-                        row->source_feature, row->source_value, row->source_position,
+        builder_appendf(&builder, "  %s>%s ", row->source_lect, row->target_lect);
+        append_context(&builder, &row->source_environment);
+        builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->target_dimension, row->target_value, row->target_position_offset);
         append_count(&builder, row->count);
         builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere\n",

@@ -107,6 +107,7 @@ static cJSON *json_context(const rg_context_spec *context) {
     SLOT("same_syllable", same_syllable)
     SLOT("next_syllable", next_syllable)
     SLOT("previous_syllable", previous_syllable)
+    SLOT("self", self)
     SLOT("self_stress", self_stress)
     SLOT("preceding_stress", preceding_stress)
     SLOT("following_stress", following_stress)
@@ -531,9 +532,12 @@ char *rg_json_from_multi_model_internal(
         }
         cJSON_AddStringToObject(entry, "source_lect", row->source_lect);
         cJSON_AddStringToObject(entry, "target_lect", row->target_lect);
-        cJSON_AddStringToObject(entry, "source_feature", row->source_feature);
-        cJSON_AddStringToObject(entry, "source_value", row->source_value);
-        cJSON_AddStringToObject(entry, "source_position", row->source_position);
+        {
+            cJSON *environment = json_context(&row->source_environment);
+            if (environment != 0) {
+                cJSON_AddItemToObject(entry, "source_environment", environment);
+            }
+        }
         cJSON_AddStringToObject(entry, "target_dimension", row->target_dimension);
         cJSON_AddStringToObject(entry, "target_value", row->target_value);
         cJSON_AddNumberToObject(entry, "target_position_offset", row->target_position_offset);
