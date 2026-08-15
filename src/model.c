@@ -333,6 +333,7 @@ static rg_status add_conditioned_segment_count(
     const char *source,
     const char *target,
     const rg_context_spec *context,
+    int context_is_target,
     double weight,
     double source_total
 ) {
@@ -341,7 +342,8 @@ static rg_status add_conditioned_segment_count(
     for (i = 0; i < *count; i++) {
         int a_subset_b = 0;
         int b_subset_a = 0;
-        if (strcmp((*rows)[i].source, source) == 0 &&
+        if ((*rows)[i].context_is_target == context_is_target &&
+            strcmp((*rows)[i].source, source) == 0 &&
             strcmp((*rows)[i].target, target) == 0 &&
             rg_context_spec_is_subset(&(*rows)[i].context, context, &a_subset_b) == RG_OK &&
             rg_context_spec_is_subset(context, &(*rows)[i].context, &b_subset_a) == RG_OK &&
@@ -364,6 +366,7 @@ static rg_status add_conditioned_segment_count(
     memset(&(*rows)[*count], 0, sizeof((*rows)[*count]));
     (*rows)[*count].source = rg_strdup_internal(source);
     (*rows)[*count].target = rg_strdup_internal(target);
+    (*rows)[*count].context_is_target = context_is_target;
     (*rows)[*count].count = weight;
     (*rows)[*count].source_total = source_total;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
@@ -611,11 +614,18 @@ static void context_observation_clear(context_observation *obs) {
     obs->weight = 0.0;
 }
 
-static rg_status append_context_observation(
+/* `swap` records the link from the target's point of view: the target grapheme
+ * becomes the thing being conditioned and the source grapheme the outcome, and
+ * the caller supplies the target form's context. Everything downstream --
+ * bucketing, splitting, refinement -- then works unchanged, and the roles are
+ * put back when the row is written. */
+static rg_status append_context_observation_as(
     context_observation **items,
     size_t *count,
     size_t *cap,
     const rg_link *link,
+    const rg_context_spec *context,
+    int swap,
     double weight
 ) {
     context_observation *next;
@@ -630,14 +640,16 @@ static rg_status append_context_observation(
         *cap = next_cap;
     }
     memset(&(*items)[*count], 0, sizeof((*items)[*count]));
-    (*items)[*count].source = rg_strdup_internal(link->source[0].grapheme);
-    (*items)[*count].target = rg_strdup_internal(link->target[0].grapheme);
+    (*items)[*count].source = rg_strdup_internal(
+        swap ? link->target[0].grapheme : link->source[0].grapheme);
+    (*items)[*count].target = rg_strdup_internal(
+        swap ? link->source[0].grapheme : link->target[0].grapheme);
     (*items)[*count].weight = weight;
     if ((*items)[*count].source == 0 || (*items)[*count].target == 0) {
         context_observation_clear(&(*items)[*count]);
         return RG_ERR_OOM;
     }
-    status = rg_context_spec_copy_internal(&link->context, &(*items)[*count].context);
+    status = rg_context_spec_copy_internal(context, &(*items)[*count].context);
     if (status != RG_OK) {
         context_observation_clear(&(*items)[*count]);
         return status;
@@ -1385,13 +1397,19 @@ static rg_status commit_observation_group(
     const char *source,
     const context_observation *const *rows,
     size_t count,
-    const rg_context_spec *context
+    const rg_context_spec *context,
+    int target_side,
+    double bucket_total
 ) {
     target_mass *targets = 0;
     size_t target_count = 0;
     size_t target_cap = 0;
     size_t conditioned_cap = model->conditioned_segment_count_count;
-    double source_total = source_total_for_rows(model->segment_counts, model->segment_count_count, source);
+    /* On the target side the bucket key is a target grapheme, which the segment
+     * table is not keyed by, so the denominator is the bucket's own mass. */
+    double source_total = target_side
+        ? bucket_total
+        : source_total_for_rows(model->segment_counts, model->segment_count_count, source);
     size_t i;
     rg_status status = RG_OK;
 
@@ -1409,7 +1427,11 @@ static rg_status commit_observation_group(
             rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[existing];
             int a_subset_b = 0;
             int b_subset_a = 0;
-            if (strcmp(row->source, source) != 0 || strcmp(row->target, targets[i].target) != 0) {
+            const char *want_source = target_side ? targets[i].target : source;
+            const char *want_target = target_side ? source : targets[i].target;
+            if (row->context_is_target != target_side ||
+                strcmp(row->source, want_source) != 0 ||
+                strcmp(row->target, want_target) != 0) {
                 continue;
             }
             if (rg_context_spec_is_subset(&row->context, context, &a_subset_b) == RG_OK &&
@@ -1425,13 +1447,17 @@ static rg_status commit_observation_group(
         if (replaced) {
             continue;
         }
+        if (target_side) {
+            model->has_target_conditioned = 1;
+        }
         status = add_conditioned_segment_count(
             &model->conditioned_segment_counts,
             &model->conditioned_segment_count_count,
             &conditioned_cap,
-            source,
-            targets[i].target,
+            target_side ? targets[i].target : source,
+            target_side ? source : targets[i].target,
             context,
+            target_side,
             targets[i].mass,
             source_total
         );
@@ -1565,7 +1591,9 @@ static rg_status refine_split(
     size_t candidate_count,
     double penalty,
     const stress_inventory *stress,
-    size_t observation_capacity
+    size_t observation_capacity,
+    int target_side,
+    double bucket_total
 ) {
     split_search search;
     split_candidate best;
@@ -1589,7 +1617,8 @@ static rg_status refine_split(
     }
     status = rg_context_extend_internal(base_context, &best, &yes_context);
     if (status == RG_OK) {
-        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
+        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
+                                          target_side, bucket_total);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1605,7 +1634,9 @@ static rg_status refine_split(
                 candidate_count,
                 penalty,
                 stress,
-                observation_capacity
+                observation_capacity,
+                target_side,
+                bucket_total
             );
         }
         rg_context_spec_clear_internal(&yes_context);
@@ -1632,7 +1663,8 @@ static rg_status commit_splits_for_source(
     const stress_inventory *stress,
     int max_depth,
     double min_obs,
-    double penalty
+    double penalty,
+    int target_side
 ) {
     split_search search;
     const context_observation **remaining;
@@ -1668,7 +1700,8 @@ static rg_status commit_splits_for_source(
         if (status != RG_OK) {
             break;
         }
-        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context);
+        status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
+                                          target_side, observation_total_weight(rows, count));
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1684,7 +1717,9 @@ static rg_status commit_splits_for_source(
                 all_candidate_count,
                 penalty,
                 stress,
-                count
+                count,
+                target_side,
+                observation_total_weight(rows, count)
             );
         }
         rg_context_spec_clear_internal(&yes_context);
@@ -1711,6 +1746,7 @@ static rg_status flatten_context_observations(
     const rg_train_options *options,
     rg_pairwise_model *model,
     int decompose_chunks,
+    int target_side,
     context_observation **out,
     size_t *out_count,
     double *out_total
@@ -1720,6 +1756,9 @@ static rg_status flatten_context_observations(
     size_t observation_cap = 0;
     double n_total = 0.0;
     int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_context_spec *target_contexts = 0;
+    size_t target_context_count = 0;
+    size_t target_position = 0;
     size_t i;
     rg_status status = RG_OK;
 
@@ -1740,11 +1779,40 @@ static rg_status flatten_context_observations(
         if (status != RG_OK) {
             break;
         }
+        /* The same alignments either way. Reversing the pair would produce
+         * different ones, and the question is what the model's own alignment
+         * looks like from the other side, not what a differently-trained model
+         * would do. */
+        if (target_side) {
+            status = rg_form_position_contexts_internal(ctx, &pairs[i].target,
+                                                        &target_contexts, &target_context_count);
+            if (status != RG_OK) {
+                rg_alignment_free(alignment);
+                break;
+            }
+        }
+        target_position = 0;
         for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
             const rg_link *link = rg_alignment_link_at(alignment, j);
+            size_t this_target = target_position;
+            target_position += link->target_count;
             if (link->source_count == 1 && link->target_count == 1) {
-                status = append_context_observation(&observations, &observation_count, &observation_cap, link, weight);
-                n_total += weight;
+                if (target_side) {
+                    if (this_target < target_context_count) {
+                        status = append_context_observation_as(
+                            &observations, &observation_count, &observation_cap, link,
+                            &target_contexts[this_target], 1, weight);
+                        n_total += weight;
+                    }
+                } else {
+                    status = append_context_observation_as(
+                        &observations, &observation_count, &observation_cap, link,
+                        &link->context, 0, weight);
+                    n_total += weight;
+                }
+                continue;
+            }
+            if (target_side && this_target >= target_context_count) {
                 continue;
             }
             if (!decompose_chunks || link->source_count == 0 || link->target_count == 0) {
@@ -1774,15 +1842,32 @@ static rg_status flatten_context_observations(
                         continue;
                     }
                     /* The outer link's context is what conditions this pair. */
+                    /* The outer link's context is what conditions this pair.
+                     * On the target side that is the target form's view at the
+                     * chunk's first position -- the source side uses the outer
+                     * link's own span context, and dropping chunks instead
+                     * would lose precisely the correspondences chunk promotion
+                     * found interesting. */
                     merged = *sub_link;
                     merged.context = link->context;
-                    status = append_context_observation(&observations, &observation_count, &observation_cap, &merged, weight);
+                    status = append_context_observation_as(
+                        &observations, &observation_count, &observation_cap, &merged,
+                        target_side ? &target_contexts[this_target] : &link->context,
+                        target_side, weight);
                     n_total += weight;
                 }
                 rg_alignment_free(sub);
             }
         }
         rg_alignment_free(alignment);
+        if (target_side) {
+            rg_context_spec_array_free_internal(target_contexts, target_context_count);
+            target_contexts = 0;
+            target_context_count = 0;
+        }
+    }
+    if (target_side) {
+        rg_context_spec_array_free_internal(target_contexts, target_context_count);
     }
     if (status != RG_OK) {
         for (i = 0; i < observation_count; i++) {
@@ -1804,7 +1889,8 @@ static rg_status discover_context_counts(
     size_t pair_count,
     const rg_train_options *options,
     rg_pairwise_model *model,
-    int long_range
+    int long_range,
+    int target_side
 ) {
     context_observation *observations = 0;
     size_t observation_count = 0;
@@ -1859,7 +1945,7 @@ static rg_status discover_context_counts(
     (void)dominant_fraction;
 
     status = flatten_context_observations(
-        ctx, pairs, pair_count, options, model, long_range ? 0 : 1,
+        ctx, pairs, pair_count, options, model, long_range ? 0 : 1, target_side,
         &observations, &observation_count, &n_total
     );
     if (status != RG_OK) {
@@ -1980,7 +2066,8 @@ static rg_status discover_context_counts(
             &stress,
             max_depth,
             long_range ? long_min_obs : immediate_min_obs,
-            log(n_total)
+            log(n_total),
+            target_side
         );
     }
 
@@ -2011,7 +2098,18 @@ static rg_status discover_immediate_context_counts(
     const rg_train_options *options,
     rg_pairwise_model *model
 ) {
-    return discover_context_counts(ctx, pairs, pair_count, options, model, 0);
+    /* Both directions. A change is only visible from the side that has the
+     * split: where the daughter reflects a conditioned change, the ancestor's
+     * segment answers to two daughter segments and the ancestor's environment
+     * is what separates them, while from the daughter's side each segment has
+     * one source and there is nothing to condition. Looking from one side only
+     * left half of every pair's conditioning unreachable, and which half
+     * depended on which lect happened to sort first. */
+    rg_status status = discover_context_counts(ctx, pairs, pair_count, options, model, 0, 0);
+    if (status == RG_OK) {
+        status = discover_context_counts(ctx, pairs, pair_count, options, model, 0, 1);
+    }
+    return status;
 }
 
 /* Long-range discovery runs after cross-dimensional discovery and adds more
@@ -2023,7 +2121,11 @@ static rg_status discover_long_range_context_counts(
     const rg_train_options *options,
     rg_pairwise_model *model
 ) {
-    return discover_context_counts(ctx, pairs, pair_count, options, model, 1);
+    rg_status status = discover_context_counts(ctx, pairs, pair_count, options, model, 1, 0);
+    if (status == RG_OK) {
+        status = discover_context_counts(ctx, pairs, pair_count, options, model, 1, 1);
+    }
+    return status;
 }
 typedef struct chunk_candidate {
     const rg_segment *source;
@@ -2214,7 +2316,7 @@ static rg_status compositional_chunk_cost_raw(
             rg_context_spec empty;
             double posterior = 0.0;
             rg_context_spec_init_empty(&empty);
-            if (!rg_segment_posterior_internal(model, link->source[0].grapheme, link->target[0].grapheme, &empty, &posterior) ||
+            if (!rg_segment_posterior_internal(model, link->source[0].grapheme, link->target[0].grapheme, &empty, 0, &posterior) ||
                 posterior <= 0.0) {
                 rg_context_spec_clear_internal(&empty);
                 rg_alignment_free(sub);

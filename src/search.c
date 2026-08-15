@@ -1084,6 +1084,12 @@ static rg_status align_forms_internal(
     const rg_feature_constraint **source_features = 0;
     size_t *source_feature_counts = 0;
     syllable_data syllables;
+    /* The target form's own view of each position. A conditioned rule may name
+     * either form's environment, and the one it names is the one it has to be
+     * matched against. */
+    const rg_feature_constraint **target_features = 0;
+    size_t *target_feature_counts = 0;
+    syllable_data target_syllables;
     size_t rev_count = 0;
     size_t rev_cap = 0;
     rg_status status = RG_OK;
@@ -1101,15 +1107,31 @@ static rg_status align_forms_internal(
     n = source->segment_count;
     m = target->segment_count;
     memset(&syllables, 0, sizeof(syllables));
+    memset(&target_syllables, 0, sizeof(target_syllables));
     if (model != 0) {
         status = feature_matrix_build(ctx, source, &source_features, &source_feature_counts);
         if (status != RG_OK) {
+            return status;
+        }
+        if (model->has_target_conditioned) {
+            status = feature_matrix_build(ctx, target, &target_features, &target_feature_counts);
+            if (status == RG_OK) {
+                status = syllable_data_build(ctx, target, target_features, target_feature_counts,
+                                             &target_syllables);
+            }
+        }
+        if (status != RG_OK) {
+            feature_matrix_clear(source_features, source_feature_counts, source->segment_count);
+            feature_matrix_clear(target_features, target_feature_counts, target->segment_count);
+            syllable_data_clear(&target_syllables);
             return status;
         }
         status = syllable_data_build(ctx, source, source_features, source_feature_counts, &syllables);
         if (status != RG_OK) {
             feature_matrix_clear(source_features, source_feature_counts, n);
             syllable_data_clear(&syllables);
+            feature_matrix_clear(target_features, target_feature_counts, m);
+            syllable_data_clear(&target_syllables);
             return status;
         }
     }
@@ -1119,6 +1141,8 @@ static rg_status align_forms_internal(
     if (cost == 0 || back == 0) {
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
+        feature_matrix_clear(target_features, target_feature_counts, m);
+        syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
         return RG_ERR_OOM;
@@ -1156,6 +1180,8 @@ static rg_status align_forms_internal(
                         /* Borrowed: read-only, points into the precomputed
                          * per-form arrays, and must not be cleared. */
                         rg_context_spec link_context;
+                        rg_context_spec target_link_context;
+                        int have_target = model->has_target_conditioned;
                         build_link_context_borrowed(
                             source,
                             source_features,
@@ -1166,6 +1192,18 @@ static rg_status align_forms_internal(
                             l,
                             &link_context
                         );
+                        if (have_target) {
+                            build_link_context_borrowed(
+                                target,
+                                target_features,
+                                target_feature_counts,
+                                &target_syllables,
+                                j - l,
+                                l,
+                                k,
+                                &target_link_context
+                            );
+                        }
                         status = rg_score_link_with_context_model_internal(
                             ctx,
                             model,
@@ -1175,6 +1213,7 @@ static rg_status align_forms_internal(
                             target->segments + (j - l),
                             l,
                             &link_context,
+                            have_target ? &target_link_context : 0,
                             &link_cost
                         );
                     } else {
@@ -1199,6 +1238,8 @@ static rg_status align_forms_internal(
     if (status != RG_OK) {
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
+        feature_matrix_clear(target_features, target_feature_counts, m);
+        syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
         return status;
@@ -1209,6 +1250,8 @@ static rg_status align_forms_internal(
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
+        feature_matrix_clear(target_features, target_feature_counts, m);
+        syllable_data_clear(&target_syllables);
         return RG_ERR_OOM;
     }
     status = form_copy(source, &alignment->source_form);
@@ -1221,6 +1264,8 @@ static rg_status align_forms_internal(
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
+        feature_matrix_clear(target_features, target_feature_counts, m);
+        syllable_data_clear(&target_syllables);
         return status;
     }
     i = n;
@@ -1285,6 +1330,8 @@ static rg_status align_forms_internal(
         free(back);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
+        feature_matrix_clear(target_features, target_feature_counts, m);
+        syllable_data_clear(&target_syllables);
         return status;
     }
     free(rev_links);
@@ -1292,6 +1339,8 @@ static rg_status align_forms_internal(
     free(back);
     feature_matrix_clear(source_features, source_feature_counts, n);
     syllable_data_clear(&syllables);
+    feature_matrix_clear(target_features, target_feature_counts, m);
+    syllable_data_clear(&target_syllables);
     *out = alignment;
     return RG_OK;
 }
@@ -1534,21 +1583,41 @@ rg_status rg_alignment_cost_with_model(
     double *out
 ) {
     size_t i;
+    size_t target_position = 0;
     double total = 0.0;
+    rg_context_spec *target_contexts = 0;
+    size_t target_context_count = 0;
     rg_status status;
     if (ctx == 0 || model == 0 || alignment == 0 || out == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0.0;
+    /* A link carries the source form's context only, so the target's is
+     * rebuilt here. A rule naming the target's environment would otherwise be
+     * silently inert whenever a cost is taken of an alignment already made. */
+    if (model->has_target_conditioned) {
+        status = rg_form_position_contexts_internal(ctx, &alignment->target_form,
+                                                    &target_contexts, &target_context_count);
+        if (status != RG_OK) {
+            return status;
+        }
+    }
     for (i = 0; i < alignment->link_count; i++) {
         double link_cost = 0.0;
         const rg_link *link = &alignment->links[i];
-        status = rg_score_link_with_context_model_internal(ctx, model, options, link->source, link->source_count, link->target, link->target_count, &link->context, &link_cost);
+        const rg_context_spec *target_context =
+            (link->target_count == 1 && target_position < target_context_count)
+                ? &target_contexts[target_position]
+                : 0;
+        target_position += link->target_count;
+        status = rg_score_link_with_context_model_internal(ctx, model, options, link->source, link->source_count, link->target, link->target_count, &link->context, target_context, &link_cost);
         if (status != RG_OK) {
+            rg_context_spec_array_free_internal(target_contexts, target_context_count);
             return status;
         }
         total += link_cost;
     }
+    rg_context_spec_array_free_internal(target_contexts, target_context_count);
     total += cross_dimensional_alignment_adjustment(ctx, model, alignment);
     *out = total;
     return RG_OK;

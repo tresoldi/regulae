@@ -52,6 +52,11 @@ struct rg_pairwise_model {
     size_t segment_count_count;
     rg_conditioned_segment_count_row *conditioned_segment_counts;
     size_t conditioned_segment_count_count;
+    /* Whether any conditioned row names the target's environment. The DP builds
+     * a target-side context for every cell it costs, and that is pure waste
+     * while no rule can consult it -- which is the whole of EM, before any
+     * conditioning has been discovered. */
+    int has_target_conditioned;
     rg_chunk_row *chunks;
     size_t chunk_count;
     rg_cross_dimensional_row *cross_dimensional_rows;
@@ -283,6 +288,7 @@ int rg_segment_posterior_internal(
     const char *source,
     const char *target,
     const rg_context_spec *link_context,
+    const rg_context_spec *target_context,
     double *out
 );
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source);
@@ -296,6 +302,7 @@ rg_status rg_score_link_with_context_model_internal(
     const rg_segment *target,
     size_t target_count,
     const rg_context_spec *link_context,
+    const rg_context_spec *target_context,
     double *out
 );
 

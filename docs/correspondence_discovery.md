@@ -229,6 +229,27 @@ honest than filtering it afterwards by name.
 `_CROSS_DIM_MAX_ITERATIONS` bounds the loop. Typical corpora exit after one or
 two rounds, when nothing left unexplained passes.
 
+### Both sides of a pair
+
+A sound change is conditioned by the environment it happened in, and that
+environment lives in the ancestor — which regulae refuses to identify. So
+conditioning is looked for from both sides of every pair.
+
+The target-side pass reads the same alignments the model produced, and records
+each link from the target's point of view: the target grapheme becomes the
+thing being conditioned, the source grapheme the outcome, and the target form's
+context the environment. Everything downstream is unchanged, and the roles are
+put back when the row is written. `rg_conditioned_segment_count_row` carries
+`context_is_target` to say which form a rule's environment belongs to, and the
+scorer matches each rule against that form's context.
+
+This is not a refinement. A change is only *visible* from the side that has the
+split: where the daughter reflects a conditioned change, the ancestor's segment
+answers to two daughter segments, and from the daughter's side each segment has
+one source and there is nothing to condition at all. Latin rhotacism read from
+the Latin side is "r answers to s before a vowel", which is true and is not the
+law; read from the other side it is /s/ becoming /r/ *between* vowels.
+
 ### One search, two bars
 
 Immediate neighbours and long-range axes are searched by separate stages, and

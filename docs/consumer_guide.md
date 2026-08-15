@@ -306,6 +306,12 @@ triggering feature themselves. They are populated by the
 long-range discovery loop that runs after the
 immediate-neighbour split stage.
 
+Conditioned correspondences carry `context_is_target`, which says whose
+environment the context describes — the source form's or the target's.
+Conditioning is discovered from both sides, because a change is only visible
+from the side that has the split, and a consumer that ignores the flag will
+read half its rules against the wrong form.
+
 ## 6. Cross-dimensional rules: `CrossDimensionalLink`
 
 ```python

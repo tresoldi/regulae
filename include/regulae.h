@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 6
+#define RG_ABI_VERSION 7
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -250,10 +250,24 @@ typedef struct rg_tonal_count_row {
     rg_uncertainty_estimate uncertainty;
 } rg_tonal_count_row;
 
+/* A correspondence conditioned on an environment, and which form the
+ * environment is read from.
+ *
+ * A sound change is conditioned by the environment it happened in, which lives
+ * in the ancestor -- and regulae refuses to decide which lect that is. So it
+ * looks from both: a rule may name the source form's environment or the
+ * target's, and `context_is_target` says which. The distinction is not
+ * cosmetic. A change is only *visible* from the side that has the split: where
+ * Greek reflects Grassmann's Law, Proto-Indo-European tʰ answers to Greek t in
+ * some words and tʰ in others, while from the Greek side each segment has one
+ * source and there is nothing to condition. Looking from one side only leaves
+ * half of every pair's conditioning unreachable, and which half depends on
+ * which lect happened to sort first. */
 typedef struct rg_conditioned_segment_count_row {
     const char *source;
     const char *target;
     rg_context_spec context;
+    int context_is_target;
     double count;
     double source_total;
     rg_uncertainty_estimate uncertainty;

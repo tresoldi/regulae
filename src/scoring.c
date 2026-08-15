@@ -270,11 +270,16 @@ static const rg_segment_count_row *find_segment_count(
     return 0;
 }
 
+/* A rule names one form's environment, and must be matched against that form's
+ * context. `target_context` may be null where the caller has no target-side
+ * context to offer, in which case target-side rules simply do not fire --
+ * which is the safe direction to be wrong in. */
 static const rg_conditioned_segment_count_row *find_conditioned_segment_count(
     const rg_pairwise_model *model,
     const char *source,
     const char *target,
-    const rg_context_spec *link_context
+    const rg_context_spec *link_context,
+    const rg_context_spec *target_context
 ) {
     const rg_conditioned_segment_count_row *best = 0;
     size_t best_specificity = 0;
@@ -306,8 +311,14 @@ static const rg_conditioned_segment_count_row *find_conditioned_segment_count(
         if (strcmp(row->source, source) != 0 || strcmp(row->target, target) != 0) {
             break;
         }
-        if (rg_context_spec_is_subset(&row->context, link_context, &subset) != RG_OK || !subset) {
-            continue;
+        {
+            const rg_context_spec *against = row->context_is_target ? target_context : link_context;
+            if (against == 0) {
+                continue;
+            }
+            if (rg_context_spec_is_subset(&row->context, against, &subset) != RG_OK || !subset) {
+                continue;
+            }
         }
         specificity = rg_context_spec_constraint_count(&row->context);
         if (best == 0 || specificity > best_specificity) {
@@ -499,6 +510,7 @@ int rg_segment_posterior_internal(
     const char *source,
     const char *target,
     const rg_context_spec *link_context,
+    const rg_context_spec *target_context,
     double *out
 ) {
     const rg_conditioned_segment_count_row *conditioned;
@@ -511,7 +523,7 @@ int rg_segment_posterior_internal(
     if (model == 0 || source == 0 || target == 0) {
         return 0;
     }
-    conditioned = find_conditioned_segment_count(model, source, target, link_context);
+    conditioned = find_conditioned_segment_count(model, source, target, link_context, target_context);
     unconditioned = find_segment_count(model, source, target);
     if (conditioned != 0) {
         /* Conditioned keys carry no prior mass of their own. */
@@ -560,6 +572,7 @@ rg_status rg_score_link_with_model(
         target,
         target_count,
         0,
+        0,
         out
     );
 }
@@ -573,6 +586,7 @@ rg_status rg_score_link_with_context_model_internal(
     const rg_segment *target,
     size_t target_count,
     const rg_context_spec *link_context,
+    const rg_context_spec *target_context,
     double *out
 ) {
     rg_status status;
@@ -611,6 +625,7 @@ rg_status rg_score_link_with_context_model_internal(
                 &target[i],
                 1,
                 link_context,
+                target_context,
                 &pair_cost
             );
             if (status != RG_OK) {
@@ -632,7 +647,7 @@ rg_status rg_score_link_with_context_model_internal(
         double layered_cost;
         double disp_cost = 0.0;
 
-        if (!rg_segment_posterior_internal(model, src, tgt, link_context, &posterior)) {
+        if (!rg_segment_posterior_internal(model, src, tgt, link_context, target_context, &posterior)) {
             /* The prior never saw this pair, so fall back to the bare merkmal
              * distance. Computed here rather than up front: the model path is
              * the common case and does not need it. */

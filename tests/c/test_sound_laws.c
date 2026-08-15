@@ -408,6 +408,48 @@ static void test_place_dissimilation(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* A conditioned rule may name either form's environment, and the environment a
+ * change happened in lives in the ancestor.
+ *
+ * Latin rhotacism is the clean case. With the lects in the order they sort,
+ * "latin" is the source, and from that side the rule is "latin r answers to
+ * old_latin s before a vowel" -- true, and not the law. The law is on the
+ * other side: old_latin /s/ became /r/ *between* vowels, and that statement
+ * needs old_latin's own environment, which until 2026-08-15 the pairwise stage
+ * never looked at. Which half of a pair's conditioning was reachable depended
+ * on which lect happened to sort first. */
+static void test_conditioning_is_found_from_both_sides(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_pairwise_model *pair;
+    size_t i;
+    int source_side = 0;
+    int target_side = 0;
+
+    assert(rg_multi_model_pair_model_count(model) == 1);
+    pair = rg_multi_model_pair_model_at(model, 0)->model;
+    for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pair); i++) {
+        const rg_conditioned_segment_count_row *row =
+            rg_pairwise_model_conditioned_segment_count_row_at(pair, i);
+        if (row->context_is_target) {
+            target_side = 1;
+            /* The environment named on the ancestor's side is the real one:
+             * between vowels, not merely before one. */
+            if (row->context.preceding_count > 0 && row->context.following_count > 0) {
+                source_side |= 2;
+            }
+        } else {
+            source_side |= 1;
+        }
+    }
+    assert(target_side);
+    assert(source_side & 1);
+    assert(source_side & 2);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -419,6 +461,7 @@ int main(void) {
     test_place_assimilation(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
+    test_conditioning_is_found_from_both_sides(ctx);
     test_row_order_does_not_change_the_model(ctx);
     rg_context_free(ctx);
     printf("sound-law tests passed\n");

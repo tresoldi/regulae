@@ -242,7 +242,12 @@ static void print_pairwise(const rg_multi_model *model) {
             const rg_conditioned_segment_count_row *seg = rg_pairwise_model_conditioned_segment_count_row_at(pm, i);
             char key[2048];
             context_key(&seg->context, key, sizeof(key));
-            printf("SEG\t%s>%s\t%s\t%s\t%s\t%.6f\n", row->lect_a, row->lect_b, seg->source, seg->target, key, seg->count);
+            /* Which form's environment the rule names. Two rows can carry the
+             * same context and mean different things: one says the source
+             * looked like that, the other the target. */
+            printf("SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\n", row->lect_a, row->lect_b,
+                   seg->source, seg->target,
+                   seg->context_is_target ? "@target " : "", key, seg->count);
         }
         for (i = 0; i < rg_pairwise_model_chunk_row_count(pm); i++) {
             const rg_chunk_row *chunk = rg_pairwise_model_chunk_row_at(pm, i);
