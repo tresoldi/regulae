@@ -72,6 +72,10 @@ struct rg_pairwise_model {
     size_t segment_count_count;
     rg_conditioned_segment_count_row *conditioned_segment_counts;
     size_t conditioned_segment_count_count;
+    /* Decisions committed so far, so a rule can record where in the sequence
+     * it was settled. Publication sorts the rows by key and would otherwise
+     * lose it. */
+    int decision_count;
     /* Whether any conditioned row names the target's environment. The DP builds
      * a target-side context for every cell it costs, and that is pure waste
      * while no rule can consult it -- which is the whole of EM, before any

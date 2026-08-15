@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 18
+#define RG_ABI_VERSION 19
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -329,6 +329,21 @@ typedef struct rg_conditioned_segment_count_row {
     int context_is_target;
     double count;
     double source_total;
+    /* Where this rule sits in the decision list.
+     *
+     * Discovery is greedy and each rule is committed against what the earlier
+     * ones left unexplained, so the rules are ordered and the order carries
+     * meaning: a later rule refines, or applies within, what an earlier one
+     * did not settle. The Middle Chinese register split reads as three
+     * decisions in sequence -- source tone accounts for one class, then the
+     * onset's voicing splits what it left -- and as an unordered set it reads
+     * as three unrelated facts, one of them at confidence 0.50.
+     *
+     * Published tables are sorted by key so lookups can binary-search them,
+     * which destroys that order; this preserves it. Rules committed by one
+     * decision share an index. -1 where the row was not committed by a search:
+     * an unconditioned class is aggregated, not decided. */
+    int decision_index;
     double contrast_count;
     double contrast_total;
     double delta_bic;
@@ -392,6 +407,7 @@ typedef struct rg_cross_dimensional_row {
     double contrast_source_count;
     double contrast_confidence;
     double delta_bic;
+    int decision_index;
     rg_uncertainty_estimate uncertainty;
 } rg_cross_dimensional_row;
 
@@ -414,6 +430,7 @@ typedef struct rg_multi_class_row {
      * environment and so no complement to compare against. */
     double contrast_count;
     double delta_bic;
+    int decision_index;
     /* How heavy a search charge this class's evidence could carry and still
      * commit; read against rg_corpus_fit's null_search_margin. Zero on an
      * unconditioned class, which was not committed by a search. */
@@ -437,6 +454,7 @@ typedef struct rg_multi_cross_dimensional_row {
     double contrast_source_count;
     double contrast_confidence;
     double delta_bic;
+    int decision_index;
     rg_uncertainty_estimate uncertainty;
 } rg_multi_cross_dimensional_row;
 

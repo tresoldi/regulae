@@ -50,34 +50,46 @@ if [ -n "$newest_source" ]; then
     fail "libregulae.a is older than $newest_source"
 fi
 
-step "native tests"
-ctest --test-dir build/c --output-on-failure || fail "ctest"
-
-step "generated artifacts"
-python3 scripts/capabilities.py >/dev/null || fail "scripts/capabilities.py"
-python3 scripts/corpora.py >/dev/null || fail "scripts/corpora.py"
-python3 scripts/guide.py >/dev/null || fail "scripts/guide.py"
-
+# The WebAssembly artifacts are committed and the native suite checks them
+# against the native build, so they have to be rebuilt *before* the tests run,
+# not after. Getting this order wrong is what the first run of this script
+# found.
 if [ "$full" = "1" ]; then
     step "WebAssembly build"
     if [ -z "${EMSDK:-}" ]; then
         fail "--full needs the Emscripten SDK: source ~/emsdk/emsdk_env.sh"
     fi
     ./web/build-wasm.sh >/dev/null || fail "web/build-wasm.sh"
+fi
 
+step "generated artifacts"
+python3 scripts/capabilities.py >/dev/null || fail "scripts/capabilities.py"
+python3 scripts/corpora.py >/dev/null || fail "scripts/corpora.py"
+python3 scripts/guide.py >/dev/null || fail "scripts/guide.py"
+
+step "native tests"
+ctest --test-dir build/c --output-on-failure || fail "ctest"
+
+if [ "$full" = "1" ]; then
     step "sanitizer build and tests"
     cmake -S . -B build/c-asan -DREGULAE_ENABLE_SANITIZER=address >/dev/null || fail "asan configure"
     cmake --build build/c-asan -j"$(nproc)" || fail "asan build"
     ctest --test-dir build/c-asan --output-on-failure || fail "asan ctest"
-
-    step "native tests again, against the rebuilt artifacts"
-    ctest --test-dir build/c --output-on-failure || fail "ctest after regeneration"
 fi
 
 # Regenerating must not have changed anything: if it did, what was committed
 # was stale. Untracked files are the author's business; modifications are not.
+#
+# regulae.js and regulae.wasm are deliberately not on this list. Emscripten's
+# output is not byte-reproducible -- it embeds build metadata -- so rebuilding
+# always changes them and the check would fail every time in --full mode,
+# which is worse than not having it. BUILD_INFO is the proxy: it records the
+# hashes of the sources the artifacts were built from, it is deterministic, and
+# the `wasm_current` test fails when it falls behind. The artifacts themselves
+# are checked by `wasm_smoke`, which trains real corpora in both builds and
+# requires byte-identical JSON.
 step "generated artifacts were already current"
-dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/regulae.js web/regulae.wasm web/BUILD_INFO)"
+dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO)"
 if [ -n "$dirty" ]; then
     printf '%s\n' "$dirty" >&2
     fail "generated artifacts were stale; they have been regenerated, review and commit them"

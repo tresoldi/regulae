@@ -430,6 +430,41 @@ suppressed, on a corpus too small for it to stand above the search. It is off
 by default for that reason, and it is a per-corpus decision a reader can make
 from the margins the default run already prints.
 
+### The rules are a sequence, and it is published
+
+Discovery is greedy. A rule is committed against what the already-committed
+rules have not accounted for, which means the rules are ordered and the order
+carries meaning: a later rule refines, or applies within, what an earlier one
+did not settle.
+
+Every published table is sorted by key so lookups can binary-search it, and
+that destroyed the order until 2026-08-15. So each row a greedy loop commits
+carries `decision_index`, and `train --human` renders the conditioned and
+cross-dimensional blocks in that order rather than by size. Rows committed by
+one decision share an index; `-1` marks a row not decided by a search at all,
+which is what an unconditioned class is.
+
+The Middle Chinese register split shows why it matters:
+
+```
+#0  self[tone:-]                -> tone=1  count=24 conf=1.00
+#0  self[tone:2]                -> tone=2  count=12 conf=0.50
+#0  self[tone:2]                -> tone=4  count=12 conf=0.50
+#1  pre[voiced:+] self[tone:2]  -> tone=4  count=12 conf=1.00
+#2  pre[voiced:-] self[tone:2]  -> tone=2  count=12 conf=1.00
+```
+
+Decision 0 settles the source-tone-1 class outright and leaves the tone-2 class
+at 50/50. Decisions 1 and 2 split exactly what it left. Sorted by size those are
+five unrelated facts, two of them weak for no visible reason; in order they are
+one change with a condition and a sub-condition, which is what a relative
+chronology looks like.
+
+This is not a claim about historical sequence. It is the order the search
+settled things in, which is a claim about the evidence: what the corpus
+determines outright, and what it determines only once something else is
+accounted for.
+
 ### What a committed split publishes
 
 Every conditioned row carries the comparison that produced it, not just its own

@@ -422,6 +422,7 @@ static rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
             model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_source_count = row->contrast_source_count;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.contrast_confidence = row->contrast_confidence;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.delta_bic = row->delta_bic;
+            model->cross_dimensional_rows[model->cross_dimensional_count].view.decision_index = row->decision_index;
             model->cross_dimensional_rows[model->cross_dimensional_count].view.uncertainty = row->uncertainty;
             model->cross_dimensional_count++;
         }
@@ -486,6 +487,7 @@ typedef struct committed_split {
     double contrast_count;
     double delta_bic;
     double search_margin;
+    int decision_index;
     /* The observations that justified this split, so the class it merges into
      * can name its own evidence. */
     size_t *observation_indices;
@@ -508,6 +510,7 @@ typedef struct merged_class {
     double contrast_count;
     double delta_bic;
     double search_margin;
+    int decision_index;
 } merged_class;
 
 typedef struct discovery_state {
@@ -538,6 +541,9 @@ typedef struct discovery_state {
      * with. */
     rg_split_candidate *all;
     size_t all_count;
+    /* Decisions committed so far. Publication sorts the classes and would
+     * otherwise lose the order they were settled in. */
+    int decision_count;
 } discovery_state;
 
 static void discovery_state_clear(discovery_state *state) {
@@ -980,6 +986,7 @@ static rg_status append_committed_split(
     double contrast_count,
     double delta_bic,
     double search_margin,
+    int decision_index,
     const size_t *observation_indices,
     size_t observation_count
 ) {
@@ -999,6 +1006,7 @@ static rg_status append_committed_split(
     slot->contrast_count = contrast_count;
     slot->delta_bic = delta_bic;
     slot->search_margin = search_margin;
+    slot->decision_index = decision_index;
     slot->pivot_lect = rg_strdup_internal(pivot_lect);
     slot->pivot_grapheme = rg_strdup_internal(pivot_grapheme);
     if (slot->pivot_lect == 0 || slot->pivot_grapheme == 0) {
@@ -1046,6 +1054,7 @@ static rg_status emit_sister_classes(
     size_t no_count,
     double delta_bic,
     double search_margin,
+    int decision_index,
     double min_commit,
     double n_total
 ) {
@@ -1111,6 +1120,7 @@ static rg_status emit_sister_classes(
             contrast_masses[order[i]],
             delta_bic,
             search_margin,
+            decision_index,
             evidence,
             evidence_count
         );
@@ -1248,7 +1258,7 @@ static rg_status refine_pivot_split(
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                          &narrowed, best_yes, best_yes_count,
                                          best_no, best_no_count, delta_bic, search_margin,
-                                         min_commit, n_total);
+                                         state->decision_count++, min_commit, n_total);
             if (status == RG_OK) {
                 status = refine_pivot_split(state, bucket, &narrowed, best_yes,
                                             best_yes_count, depth + 1, max_depth,
@@ -1330,6 +1340,7 @@ static rg_status commit_splits_for_pivot(
                     best_no_count,
                     delta_bic,
                     search_margin,
+                    state->decision_count++,
                     min_commit,
                     n_total
                 );
@@ -1555,6 +1566,10 @@ static rg_status merge_committed_splits(
                 entry->contrast_count = split->contrast_count;
                 entry->delta_bic = split->delta_bic;
                 entry->search_margin = split->search_margin;
+                /* The earliest decision that reached this class keeps it. */
+                if (split->decision_index < entry->decision_index) {
+                    entry->decision_index = split->decision_index;
+                }
             }
             for (slot = 0; slot < entry->segment_count; slot++) {
                 if (strcmp(entry->lects[slot], split->pivot_lect) != 0) {
@@ -1599,6 +1614,7 @@ static rg_status merge_committed_splits(
         merged[count].contrast_count = split->contrast_count;
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
+        merged[count].decision_index = split->decision_index;
         if (merged_class_add_evidence(&merged[count], split->observation_indices,
                                       split->observation_count) != RG_OK) {
             merged_classes_free(merged, count + 1);
@@ -1890,6 +1906,7 @@ static rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.contrast_count = merged[i].contrast_count;
                 model->conditioned_classes[i].view.delta_bic = merged[i].delta_bic;
                 model->conditioned_classes[i].view.search_margin = merged[i].search_margin;
+                model->conditioned_classes[i].view.decision_index = merged[i].decision_index;
                 model->conditioned_classes[i].view.uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 /* The environment was chosen by the same observations, so the
@@ -2565,6 +2582,8 @@ static rg_status aggregate_position_classes(
         model->unconditioned_classes[c].view.segment_count = buckets[c].segment_count;
         model->unconditioned_classes[c].view.count = buckets[c].count;
         model->unconditioned_classes[c].view.confidence = 1.0;
+        /* An unconditioned class is aggregated, not decided. */
+        model->unconditioned_classes[c].view.decision_index = -1;
         model->unconditioned_classes[c].view.supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
         model->unconditioned_classes[c].view.supporting_cognate_count = buckets[c].supporting_cognate_count;
         model->unconditioned_classes[c].view.uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);

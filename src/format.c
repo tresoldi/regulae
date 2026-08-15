@@ -417,6 +417,7 @@ static void append_class_contexts(string_builder *builder, const rg_multi_class_
 char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_options *options) {
     string_builder builder;
     rg_format_model_options opts;
+    size_t *decision_order = 0;
     size_t i;
     size_t total;
 
@@ -489,16 +490,42 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
 
     total = rg_multi_model_conditioned_class_count(model);
-    builder_appendf(&builder, "\n--- Top %d conditioned classes ---\n", opts.top_classes);
+    decision_order = (size_t *)calloc(total == 0 ? 1 : total, sizeof(*decision_order));
+    if (decision_order == 0) {
+        free(builder_finish(&builder));
+        return 0;
+    }
+    for (i = 0; i < total; i++) {
+        size_t insert_at = i;
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        while (insert_at > 0) {
+            const rg_multi_class_row *prior =
+                rg_multi_model_conditioned_class_at(model, decision_order[insert_at - 1]);
+            if (prior->decision_index <= row->decision_index) {
+                break;
+            }
+            decision_order[insert_at] = decision_order[insert_at - 1];
+            insert_at--;
+        }
+        decision_order[insert_at] = i;
+    }
+    /* In the order they were decided, not by size. Discovery is greedy and each
+     * rule is committed against what the earlier ones left unexplained, so this
+     * is a decision list: a later rule refines, or applies within, what an
+     * earlier one did not settle. Sorted by count it reads as a set of
+     * unrelated facts, some of them weak for no visible reason. */
+    builder_appendf(&builder, "\n--- Conditioned classes, in the order they were decided"
+                              " (first %d) ---\n", opts.top_classes);
     if (total == 0) {
         builder_append(&builder, "  (none - class-level discovery committed no splits)\n");
     }
     for (i = 0; i < total && i < (size_t)opts.top_classes; i++) {
-        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, decision_order[i]);
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
+        builder_appendf(&builder, "  #%d", row->decision_index);
         builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f [%.2f,%.2f]%s  ",
                         row->confidence, row->delta_bic, row->search_margin,
                         row->uncertainty.lower, row->uncertainty.upper,
@@ -510,15 +537,38 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     if (total > (size_t)opts.top_classes) {
         builder_appendf(&builder, "  ... (%lu more)\n", (unsigned long)(total - (size_t)opts.top_classes));
     }
+    free(decision_order);
+    decision_order = 0;
 
     total = rg_multi_model_cross_dimensional_row_count(model);
-    builder_append(&builder, "\n--- Cross-dimensional rules ---\n");
+    builder_append(&builder, "\n--- Cross-dimensional rules, in the order they were decided ---\n");
     if (total == 0) {
         builder_append(&builder, "  (none)\n");
     }
+    decision_order = (size_t *)calloc(total == 0 ? 1 : total, sizeof(*decision_order));
+    if (decision_order == 0) {
+        free(builder_finish(&builder));
+        return 0;
+    }
     for (i = 0; i < total; i++) {
+        size_t insert_at = i;
         const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
-        builder_appendf(&builder, "  %s>%s ", row->source_lect, row->target_lect);
+        while (insert_at > 0) {
+            const rg_multi_cross_dimensional_row *prior =
+                rg_multi_model_cross_dimensional_row_at(model, decision_order[insert_at - 1]);
+            if (prior->decision_index <= row->decision_index) {
+                break;
+            }
+            decision_order[insert_at] = decision_order[insert_at - 1];
+            insert_at--;
+        }
+        decision_order[insert_at] = i;
+    }
+    for (i = 0; i < total; i++) {
+        const rg_multi_cross_dimensional_row *row =
+            rg_multi_model_cross_dimensional_row_at(model, decision_order[i]);
+        builder_appendf(&builder, "  #%d %s>%s ", row->decision_index,
+                        row->source_lect, row->target_lect);
         append_context(&builder, &row->source_environment);
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->target_dimension, row->target_value, row->target_position_offset);
@@ -526,6 +576,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere\n",
                         row->confidence, row->contrast_confidence);
     }
+    free(decision_order);
     return builder_finish(&builder);
 }
 

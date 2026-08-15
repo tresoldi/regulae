@@ -455,7 +455,8 @@ static rg_status add_conditioned_segment_count(
     double contrast_count,
     double contrast_total,
     double delta_bic,
-    double search_margin
+    double search_margin,
+    int decision_index
 ) {
     size_t i;
     rg_conditioned_segment_count_row *next;
@@ -474,6 +475,12 @@ static rg_status add_conditioned_segment_count(
             (*rows)[i].contrast_total = contrast_total;
             (*rows)[i].delta_bic = delta_bic;
             (*rows)[i].search_margin = search_margin;
+            /* The earliest decision that reached this row keeps it: a later
+             * refinement restating the same correspondence did not discover
+             * it. */
+            if ((*rows)[i].decision_index < 0 || decision_index < (*rows)[i].decision_index) {
+                (*rows)[i].decision_index = decision_index;
+            }
             (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
             (*rows)[i].uncertainty.post_selection = 1;
             return RG_OK;
@@ -498,6 +505,7 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].contrast_total = contrast_total;
     (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].search_margin = search_margin;
+    (*rows)[*count].decision_index = decision_index;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     (*rows)[*count].uncertainty.post_selection = 1;
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
@@ -1598,7 +1606,8 @@ static rg_status commit_observation_group(
     const context_observation *const *contrast_rows,
     size_t contrast_row_count,
     double delta_bic,
-    double search_margin
+    double search_margin,
+    int decision_index
 ) {
     target_mass *targets = 0;
     target_mass *contrast_targets = 0;
@@ -1665,6 +1674,9 @@ static rg_status commit_observation_group(
                 row->contrast_total = contrast_total;
                 row->delta_bic = delta_bic;
                 row->search_margin = search_margin;
+                if (row->decision_index < 0 || decision_index < row->decision_index) {
+                    row->decision_index = decision_index;
+                }
                 row->uncertainty = rg_wilson_default_internal(row->count, source_total);
                 row->uncertainty.post_selection = 1;
                 replaced = 1;
@@ -1690,7 +1702,8 @@ static rg_status commit_observation_group(
             contrast_count,
             contrast_total,
             delta_bic,
-            search_margin
+            search_margin,
+            decision_index
         );
     }
     free(targets);
@@ -1884,7 +1897,8 @@ static rg_status refine_split(
     if (status == RG_OK) {
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
                                           target_side, bucket_total,
-                                          search.best_no, no_count, delta_bic, search_margin);
+                                          search.best_no, no_count, delta_bic, search_margin,
+                                          model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1973,7 +1987,8 @@ static rg_status commit_splits_for_source(
         }
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
                                           target_side, observation_total_weight(rows, count),
-                                          search.best_no, no_count, delta_bic, search_margin);
+                                          search.best_no, no_count, delta_bic, search_margin,
+                                          model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -2989,7 +3004,8 @@ static rg_status append_cross_dimensional_row(
     double source_count,
     double contrast_count,
     double contrast_source_count,
-    double delta_bic
+    double delta_bic,
+    int decision_index
 ) {
     rg_cross_dimensional_row *next;
     if (*count == *cap) {
@@ -3016,6 +3032,7 @@ static rg_status append_cross_dimensional_row(
     (*rows)[*count].contrast_confidence =
         contrast_source_count > 0.0 ? contrast_count / contrast_source_count : 0.0;
     (*rows)[*count].delta_bic = delta_bic;
+    (*rows)[*count].decision_index = decision_index;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(rule_count, source_count);
     if ((*rows)[*count].target_dimension == 0 ||
         (*rows)[*count].target_value == 0) {
@@ -3815,6 +3832,7 @@ static rg_status discover_cross_dimensional_rows(
             xdim_scored best;
             size_t best_env = 0;
             int found = 0;
+            int decision_index = model->decision_count;
             size_t env_i;
             double search_charge = candidate_count > 1
                 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
@@ -3947,7 +3965,7 @@ static rg_status discover_cross_dimensional_rows(
                             &rows, &row_count, &row_cap,
                             &environment, target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
-                            best.delta_bic);
+                            best.delta_bic, decision_index);
                         if (status == RG_OK) {
                             size_t obs_i;
                             /* Retire what this rule accounts for. An
@@ -3994,6 +4012,7 @@ static rg_status discover_cross_dimensional_rows(
                     }
                     rg_context_spec_clear_internal(&environment);
                 }
+                model->decision_count++;
                 committed[best_env] = 1;
                 if (determined_here) {
                     determined[best_env] = 1;

@@ -143,6 +143,10 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
     cJSON_AddNumberToObject(out, "delta_bic", row->delta_bic);
     cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
+    /* Where this rule sits in the decision list. Sorting the table by key
+     * destroys the order discovery settled them in, and that order carries
+     * meaning: a later rule refines what an earlier one left. */
+    cJSON_AddNumberToObject(out, "decision_index", row->decision_index);
 
     segments = cJSON_CreateArray();
     if (segments == 0) {
@@ -548,6 +552,7 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(entry, "contrast_source_count", row->contrast_source_count);
         cJSON_AddNumberToObject(entry, "contrast_confidence", row->contrast_confidence);
         cJSON_AddNumberToObject(entry, "delta_bic", row->delta_bic);
+        cJSON_AddNumberToObject(entry, "decision_index", row->decision_index);
         cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->uncertainty));
         cJSON_AddItemToArray(array, entry);
     }

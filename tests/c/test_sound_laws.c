@@ -685,6 +685,50 @@ static void test_conditioning_works_in_any_feature_system(void) {
     }
 }
 
+/* Discovery is greedy: each rule is committed against what the earlier ones
+ * left unexplained, so the rules are ordered and the order carries meaning. The
+ * Middle Chinese register split is three decisions in sequence -- source tone
+ * settles one class and leaves another at 50/50, then the onset's voicing
+ * splits what it left -- and read as an unordered set it is three unrelated
+ * facts, one of them weak for no visible reason.
+ *
+ * Published tables are sorted by key so lookups can binary-search them, which
+ * destroyed that order until 2026-08-15. */
+static void test_rules_carry_the_order_they_were_decided(rg_context *ctx) {
+    rg_corpus *corpus;
+    rg_multi_model *model;
+    size_t i;
+    int refinement_seen = 0;
+    char path[512];
+
+    snprintf(path, sizeof(path), "%s/testdata/corpora/joint_tonogenesis.tsv", REGULAE_SOURCE_DIR);
+    assert(rg_corpus_load_tsv(path, 0, &corpus) == RG_OK);
+    model = train(ctx, corpus);
+
+    for (i = 0; i < rg_multi_model_cross_dimensional_row_count(model); i++) {
+        const rg_multi_cross_dimensional_row *row = rg_multi_model_cross_dimensional_row_at(model, i);
+        assert(row->decision_index >= 0);
+        /* The conjunction refines what a single predicate left, so it cannot
+         * have been decided first. */
+        if (row->source_environment.preceding_count == 1 &&
+            row->source_environment.self_count == 1) {
+            assert(row->decision_index > 0);
+            refinement_seen = 1;
+        }
+    }
+    assert(refinement_seen);
+
+    /* An unconditioned class was aggregated, not decided. */
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        assert(rg_multi_model_unconditioned_class_at(model, i)->decision_index == -1);
+    }
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        assert(rg_multi_model_conditioned_class_at(model, i)->decision_index >= 0);
+    }
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* A regular transposition is one event, and the alignment search is monotone,
  * so its natural output is two correspondences running in opposite directions:
  * /s/ answering /k/ and /k/ answering /s/. That is not a merger and it is not
@@ -886,6 +930,7 @@ int main(void) {
     test_lenition(ctx);
     test_grassmann(ctx);
     test_verner(ctx);
+    test_rules_carry_the_order_they_were_decided(ctx);
     test_metathesis(ctx);
     test_morphological_conditioning(ctx);
     test_no_boundaries_means_no_morphological_axis(ctx);
