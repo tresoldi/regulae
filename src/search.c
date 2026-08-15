@@ -276,15 +276,6 @@ static rg_status distance_context_copy_two(
     return RG_OK;
 }
 
-static int constraint_array_has(const rg_feature_constraint *items, size_t count, const char *feature, const char *value) {
-    size_t i;
-    for (i = 0; i < count; i++) {
-        if (strcmp(items[i].feature, feature) == 0 && strcmp(items[i].value, value) == 0) {
-            return 1;
-        }
-    }
-    return 0;
-}
 
 /* Union of the context features over [start, end), optionally skipping one
  * index. Feature names are emitted in the fixed alphabetical order of
@@ -299,34 +290,74 @@ static rg_status context_feature_union_copy_excluding(
     const rg_feature_constraint **out,
     size_t *out_count
 ) {
-    rg_feature_constraint constraints[rg_context_feature_name_count];
+    rg_feature_constraint *constraints;
+    size_t capacity = 0;
     size_t i;
-    size_t f;
     size_t count = 0;
     if (out == 0 || out_count == 0 || (end > start && (source_features == 0 || source_feature_counts == 0))) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
     *out_count = 0;
-    for (f = 0; f < rg_context_feature_name_count; f++) {
-        int found = 0;
-        for (i = start; i < end && !found; i++) {
-            if (has_exclude && i == exclude) {
-                continue;
-            }
-            found = constraint_array_has(source_features[i], source_feature_counts[i], rg_context_feature_names[f], "+");
+    /* The union of what the span carries, deduplicated. Built from the
+     * segments rather than from a list of feature names, because there is no
+     * such list: what a grapheme carries is whatever the merkmal system in use
+     * reports for it. */
+    for (i = start; i < end; i++) {
+        if (has_exclude && i == exclude) {
+            continue;
         }
-        if (found) {
-            constraints[count].feature = rg_context_feature_names[f];
-            constraints[count].value = "+";
-            count++;
+        capacity += source_feature_counts[i];
+    }
+    if (capacity == 0) {
+        return RG_OK;
+    }
+    constraints = (rg_feature_constraint *)calloc(capacity, sizeof(*constraints));
+    if (constraints == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = start; i < end; i++) {
+        size_t c;
+        if (has_exclude && i == exclude) {
+            continue;
+        }
+        for (c = 0; c < source_feature_counts[i]; c++) {
+            const rg_feature_constraint *item = &source_features[i][c];
+            size_t k;
+            int seen = 0;
+            for (k = 0; k < count && !seen; k++) {
+                seen = strcmp(constraints[k].feature, item->feature) == 0 &&
+                       strcmp(constraints[k].value, item->value) == 0;
+            }
+            if (!seen) {
+                constraints[count++] = *item;
+            }
         }
     }
     if (count == 0) {
+        free(constraints);
         return RG_OK;
+    }
+    /* Sorted so the published environment does not depend on segment order. */
+    for (i = 1; i < count; i++) {
+        rg_feature_constraint key = constraints[i];
+        size_t j = i;
+        while (j > 0) {
+            int c = strcmp(constraints[j - 1].feature, key.feature);
+            if (c == 0) {
+                c = strcmp(constraints[j - 1].value, key.value);
+            }
+            if (c <= 0) {
+                break;
+            }
+            constraints[j] = constraints[j - 1];
+            j--;
+        }
+        constraints[j] = key;
     }
     {
         rg_status status = rg_feature_constraint_array_copy_internal(constraints, count, out);
+        free(constraints);
         if (status != RG_OK) {
             return status;
         }

@@ -15,22 +15,20 @@
 /* The feature dimensions a link context can constrain on, in the fixed order
  * they are emitted. Alphabetical, so a union over a span comes out sorted
  * without a sort step. */
-/* The conditioning vocabulary: every feature name merkmal's system reports,
- * which is what a context can be stated in terms of.
+/* A readability preference, and nothing more.
  *
- * This was a hand-picked 27 until 2026-08-15, and the hand that picked it was
- * writing about Latin. It carried no rounding, no vowel nasalisation, no
- * lateral, trill, tap or retroflex, no ejective, implosive or click, no
- * breathy or creaky, no syllabicity, and no vowel height between close and
- * open -- so a change conditioned by rounding, which is the organising fact of
- * Turkic and Uralic vowel harmony, could not be found however regular it was.
- * A vocabulary that fits one family is a claim about the others.
+ * When two predicates separate a corpus identically the search cannot tell
+ * them apart, and which name gets printed is arbitrary. This orders the names
+ * merkmal's categorical systems use so that the one a linguist would reach for
+ * wins, and so that a cover term beats its own subtype -- `coronal` before
+ * `alveolar`, `labial` before `bilabial` -- because when a corpus cannot
+ * distinguish two environments the weaker claim is the honest report.
  *
- * Which of these are worth *searching* is a separate question, answered per
- * corpus: see rg_feature_vocabulary_build_internal. This list is the
- * representation, and it stays a pure function of the grapheme so the
- * constraint cache remains valid across runs. */
-const char *const rg_context_feature_names[] = {
+ * A name absent from this list is not penalised: unlisted names simply order
+ * after listed ones, alphabetically. Nothing here decides what can be found,
+ * only what a tie is called, so a system with an entirely different vocabulary
+ * loses readability and no capability. */
+static const char *const feature_name_preference[] = {
     "vowel",
     "consonant",
     "sonorant",
@@ -97,8 +95,19 @@ const char *const rg_context_feature_names[] = {
     "non-pulmonic",
     "dorsal-closure"
 };
-const size_t rg_context_feature_name_count =
-    sizeof(rg_context_feature_names) / sizeof(rg_context_feature_names[0]);
+static const size_t feature_name_preference_count =
+    sizeof(feature_name_preference) / sizeof(feature_name_preference[0]);
+
+/* Where a name sorts. Listed names keep their order; unlisted ones follow. */
+static size_t feature_preference_rank(const char *name) {
+    size_t i;
+    for (i = 0; i < feature_name_preference_count; i++) {
+        if (strcmp(feature_name_preference[i], name) == 0) {
+            return i;
+        }
+    }
+    return feature_name_preference_count;
+}
 
 typedef struct feature_cache_entry {
     char *grapheme;
@@ -186,6 +195,13 @@ static void context_caches_clear(rg_context *ctx) {
         if (ctx->features[i].grapheme != 0) {
             free(ctx->features[i].grapheme);
             rg_feature_set_free(ctx->features[i].features);
+            {
+                size_t j;
+                for (j = 0; j < ctx->features[i].constraint_count; j++) {
+                    free((char *)ctx->features[i].constraints[j].feature);
+                    free((char *)ctx->features[i].constraints[j].value);
+                }
+            }
             free(ctx->features[i].constraints);
         }
     }
@@ -498,69 +514,108 @@ static rg_status vocabulary_collect_form(
     return RG_OK;
 }
 
-/* Decides the searchable vocabulary from the corpus's own segment inventory.
- *
- * Two filters, and the second matters as much as the first.
- *
- * Contrastive: some segment carries the feature and some does not. A feature
- * nothing carries is dead weight; a feature everything carries is the
- * predicate that partitions nothing, which is a documented way to commit a
- * rule on no evidence.
- *
- * Distinct: no two features that pick out exactly the same segments both stay.
- * merkmal's vocabulary is not orthogonal -- `vowel`, `vocoid` and `syllabic`
- * separate the same segments in most corpora, `stop` and `non-continuant`
- * almost always do -- and keeping all of them widens the argmax without
- * widening what can be found, then reports the environment under whichever
- * synonym the search happened to reach first. Equivalence is a fact about this
- * corpus: features that coincide in Latin come apart in a language that
- * contrasts syllabic consonants, and there they are kept separately.
- *
- * The survivor of a tie is the earliest in rg_context_feature_names, which is
- * ordered so the name a linguist would reach for comes first. */
+/* Every (feature, value) pair any of these graphemes carries, once each, then
+ * filtered to the ones worth searching. See rg_feature_vocabulary in
+ * internal.h for what the two filters are and why. */
 static rg_status vocabulary_from_graphemes(
     const rg_context *ctx,
     char *const *graphemes,
     size_t grapheme_count,
     rg_feature_vocabulary *out
 ) {
-    unsigned char *masks;
+    rg_feature_constraint *universe = 0;
+    size_t universe_count = 0;
+    size_t universe_cap = 0;
+    unsigned char *masks = 0;
+    size_t *kept = 0;
+    size_t kept_count = 0;
+    size_t g;
     size_t f;
-    size_t kept = 0;
-    size_t *kept_index;
+    rg_status status = RG_OK;
 
-    out->contrastive = (unsigned char *)calloc(rg_context_feature_name_count, sizeof(*out->contrastive));
-    masks = (unsigned char *)calloc(rg_context_feature_name_count * (grapheme_count == 0 ? 1 : grapheme_count),
-                                    sizeof(*masks));
-    kept_index = (size_t *)calloc(rg_context_feature_name_count, sizeof(*kept_index));
-    if (out->contrastive == 0 || masks == 0 || kept_index == 0) {
-        free(out->contrastive);
-        free(masks);
-        free(kept_index);
-        out->contrastive = 0;
-        return RG_ERR_OOM;
-    }
-    for (f = 0; f < grapheme_count; f++) {
+    for (g = 0; g < grapheme_count; g++) {
         const rg_feature_constraint *constraints = 0;
         size_t constraint_count = 0;
         size_t c;
-        if (rg_context_constraints_internal(ctx, graphemes[f], &constraints, &constraint_count) != RG_OK) {
+        if (rg_context_constraints_internal(ctx, graphemes[g], &constraints, &constraint_count) != RG_OK) {
             continue;
         }
         for (c = 0; c < constraint_count; c++) {
-            size_t k;
-            for (k = 0; k < rg_context_feature_name_count; k++) {
-                if (strcmp(constraints[c].feature, rg_context_feature_names[k]) == 0) {
-                    masks[k * grapheme_count + f] = 1;
+            size_t u;
+            int seen = 0;
+            for (u = 0; u < universe_count && !seen; u++) {
+                seen = strcmp(universe[u].feature, constraints[c].feature) == 0 &&
+                       strcmp(universe[u].value, constraints[c].value) == 0;
+            }
+            if (seen) {
+                continue;
+            }
+            if (universe_count == universe_cap) {
+                size_t next_cap = universe_cap == 0 ? 32 : universe_cap * 2;
+                rg_feature_constraint *next =
+                    (rg_feature_constraint *)realloc(universe, next_cap * sizeof(*next));
+                if (next == 0) {
+                    free(universe);
+                    return RG_ERR_OOM;
+                }
+                universe = next;
+                universe_cap = next_cap;
+            }
+            universe[universe_count] = constraints[c];
+            universe_count++;
+        }
+    }
+    /* Sorted before anything is decided, so which synonym survives a tie is a
+     * property of the vocabulary rather than of the order graphemes happened
+     * to appear in the corpus. */
+    for (f = 1; f < universe_count; f++) {
+        rg_feature_constraint key = universe[f];
+        size_t rank = feature_preference_rank(key.feature);
+        size_t j = f;
+        while (j > 0) {
+            size_t other = feature_preference_rank(universe[j - 1].feature);
+            int c = other < rank ? -1 : (other > rank ? 1 : strcmp(universe[j - 1].feature, key.feature));
+            if (c == 0) {
+                c = strcmp(universe[j - 1].value, key.value);
+            }
+            if (c <= 0) {
+                break;
+            }
+            universe[j] = universe[j - 1];
+            j--;
+        }
+        universe[j] = key;
+    }
+
+    masks = (unsigned char *)calloc((universe_count == 0 ? 1 : universe_count) *
+                                    (grapheme_count == 0 ? 1 : grapheme_count), sizeof(*masks));
+    kept = (size_t *)calloc(universe_count == 0 ? 1 : universe_count, sizeof(*kept));
+    if (masks == 0 || kept == 0) {
+        free(universe);
+        free(masks);
+        free(kept);
+        return RG_ERR_OOM;
+    }
+    for (g = 0; g < grapheme_count; g++) {
+        const rg_feature_constraint *constraints = 0;
+        size_t constraint_count = 0;
+        size_t c;
+        if (rg_context_constraints_internal(ctx, graphemes[g], &constraints, &constraint_count) != RG_OK) {
+            continue;
+        }
+        for (c = 0; c < constraint_count; c++) {
+            for (f = 0; f < universe_count; f++) {
+                if (strcmp(universe[f].feature, constraints[c].feature) == 0 &&
+                    strcmp(universe[f].value, constraints[c].value) == 0) {
+                    masks[f * grapheme_count + g] = 1;
                     break;
                 }
             }
         }
     }
-    for (f = 0; f < rg_context_feature_name_count; f++) {
+    for (f = 0; f < universe_count; f++) {
         const unsigned char *mask = &masks[f * (grapheme_count == 0 ? 1 : grapheme_count)];
         size_t carriers = 0;
-        size_t g;
         size_t k;
         int duplicate = 0;
         for (g = 0; g < grapheme_count; g++) {
@@ -569,20 +624,36 @@ static rg_status vocabulary_from_graphemes(
         if (carriers == 0 || carriers == grapheme_count) {
             continue;
         }
-        for (k = 0; k < kept && !duplicate; k++) {
-            const unsigned char *other = &masks[kept_index[k] * grapheme_count];
-            duplicate = memcmp(mask, other, grapheme_count) == 0;
+        for (k = 0; k < kept_count && !duplicate; k++) {
+            duplicate = memcmp(mask, &masks[kept[k] * grapheme_count], grapheme_count) == 0;
         }
-        if (duplicate) {
-            continue;
+        if (!duplicate) {
+            kept[kept_count++] = f;
         }
-        kept_index[kept++] = f;
-        out->contrastive[f] = 1;
-        out->contrastive_count++;
     }
+    out->entries = (rg_feature_constraint *)calloc(kept_count == 0 ? 1 : kept_count, sizeof(*out->entries));
+    if (out->entries == 0) {
+        status = RG_ERR_OOM;
+    }
+    if (status == RG_OK) {
+        size_t k;
+        for (k = 0; k < kept_count; k++) {
+            out->entries[k].feature = rg_strdup_internal(universe[kept[k]].feature);
+            out->entries[k].value = rg_strdup_internal(universe[kept[k]].value);
+            if (out->entries[k].feature == 0 || out->entries[k].value == 0) {
+                status = RG_ERR_OOM;
+                break;
+            }
+            out->count = k + 1;
+        }
+    }
+    free(universe);
     free(masks);
-    free(kept_index);
-    return RG_OK;
+    free(kept);
+    if (status != RG_OK) {
+        rg_feature_vocabulary_clear_internal(out);
+    }
+    return status;
 }
 
 static void vocabulary_graphemes_free(char **graphemes, size_t count) {
@@ -608,8 +679,8 @@ rg_status rg_feature_vocabulary_build_internal(
     if (ctx == 0 || out == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
-    out->contrastive = 0;
-    out->contrastive_count = 0;
+    out->entries = 0;
+    out->count = 0;
     for (i = 0; i < pair_count && status == RG_OK; i++) {
         status = vocabulary_collect_form(&pairs[i].source, &graphemes, &count, &cap);
         if (status == RG_OK) {
@@ -638,8 +709,8 @@ rg_status rg_feature_vocabulary_build_from_sets_internal(
     if (ctx == 0 || out == 0 || (cognate_count > 0 && cognates == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
-    out->contrastive = 0;
-    out->contrastive_count = 0;
+    out->entries = 0;
+    out->count = 0;
     for (i = 0; i < cognate_count && status == RG_OK; i++) {
         size_t j;
         for (j = 0; j < cognates[i].form_count && status == RG_OK; j++) {
@@ -654,12 +725,17 @@ rg_status rg_feature_vocabulary_build_from_sets_internal(
 }
 
 void rg_feature_vocabulary_clear_internal(rg_feature_vocabulary *vocabulary) {
+    size_t i;
     if (vocabulary == 0) {
         return;
     }
-    free(vocabulary->contrastive);
-    vocabulary->contrastive = 0;
-    vocabulary->contrastive_count = 0;
+    for (i = 0; i < vocabulary->count; i++) {
+        free((char *)vocabulary->entries[i].feature);
+        free((char *)vocabulary->entries[i].value);
+    }
+    free(vocabulary->entries);
+    vocabulary->entries = 0;
+    vocabulary->count = 0;
 }
 
 rg_status rg_context_segment_distance(
@@ -1032,21 +1108,45 @@ rg_status rg_context_constraints_internal(
         *out_count = mutable_ctx->features[slot].constraint_count;
         return RG_OK;
     }
-    constraints = (rg_feature_constraint *)calloc(rg_context_feature_name_count, sizeof(*constraints));
-    if (constraints == 0) {
-        return RG_ERR_OOM;
-    }
-    for (i = 0; i < rg_context_feature_name_count; i++) {
-        size_t j;
+    {
         size_t size = rg_feature_set_size(features);
+        size_t j;
+        constraints = (rg_feature_constraint *)calloc(size == 0 ? 1 : size, sizeof(*constraints));
+        if (constraints == 0) {
+            return RG_ERR_OOM;
+        }
         for (j = 0; j < size; j++) {
             const char *item = rg_feature_set_get(features, j);
-            if (item != 0 && strcmp(item, rg_context_feature_names[i]) == 0) {
-                constraints[count].feature = rg_context_feature_names[i];
-                constraints[count].value = "+";
-                count++;
-                break;
+            const char *split;
+            if (item == 0) {
+                continue;
             }
+            /* merkmal's systems report two shapes. The categorical ones name
+             * the features a segment has -- "bilabial", "nasal" -- and the
+             * valued ones name every feature with its value -- "anterior=+",
+             * "approximant=-", "advancedTongueRoot=.". Splitting on the sign
+             * keeps both readable as the same (feature, value) pair, and on a
+             * valued system it is what makes "not anterior" an environment
+             * regulae can state: the negative value is in the data rather than
+             * something the candidate list has to invent. */
+            split = strchr(item, '=');
+            if (split != 0) {
+                constraints[count].feature = rg_strndup_internal(item, (size_t)(split - item));
+                constraints[count].value = rg_strdup_internal(split + 1);
+            } else {
+                constraints[count].feature = rg_strdup_internal(item);
+                constraints[count].value = rg_strdup_internal("+");
+            }
+            if (constraints[count].feature == 0 || constraints[count].value == 0) {
+                size_t k;
+                for (k = 0; k <= count; k++) {
+                    free((char *)constraints[k].feature);
+                    free((char *)constraints[k].value);
+                }
+                free(constraints);
+                return RG_ERR_OOM;
+            }
+            count++;
         }
     }
     mutable_ctx->features[slot].constraints = constraints;

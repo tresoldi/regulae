@@ -1,4 +1,6 @@
 #include "internal.h"
+#include <stdio.h>
+#include <stdlib.h>
 
 #include <math.h>
 #include <stdlib.h>
@@ -459,7 +461,8 @@ static rg_status add_conditioned_segment_count(
     double source_total,
     double contrast_count,
     double contrast_total,
-    double delta_bic
+    double delta_bic,
+    double search_margin
 ) {
     size_t i;
     rg_conditioned_segment_count_row *next;
@@ -477,6 +480,7 @@ static rg_status add_conditioned_segment_count(
             (*rows)[i].contrast_count = contrast_count;
             (*rows)[i].contrast_total = contrast_total;
             (*rows)[i].delta_bic = delta_bic;
+            (*rows)[i].search_margin = search_margin;
             (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
             return RG_OK;
         }
@@ -499,6 +503,7 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].contrast_count = contrast_count;
     (*rows)[*count].contrast_total = contrast_total;
     (*rows)[*count].delta_bic = delta_bic;
+    (*rows)[*count].search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
         conditioned_segment_count_row_clear(&(*rows)[*count]);
@@ -1175,17 +1180,14 @@ static size_t immediate_candidates_for(
     size_t count = 0;
     size_t i;
     size_t s;
-    for (i = 0; i < 2 * rg_context_feature_name_count; i++) {
+    for (i = 0; i < 2 * vocabulary->count; i++) {
         split_candidate generated;
         const split_candidate *candidate = &generated;
         int skip = 0;
-        size_t feature_index = i / 2;
-        if (!vocabulary->contrastive[feature_index]) {
-            continue;
-        }
+        size_t entry = i / 2;
         generated.slot = (i % 2) == 0 ? "preceding" : "following";
-        generated.feature = rg_context_feature_names[feature_index];
-        generated.value = "+";
+        generated.feature = vocabulary->entries[entry].feature;
+        generated.value = vocabulary->entries[entry].value;
         if (strcmp(candidate->slot, "following") == 0) {
             size_t j;
             for (j = 0; j < base_context->following_count; j++) {
@@ -1260,14 +1262,11 @@ static size_t long_range_candidates(
     size_t s;
     size_t f;
     for (s = 0; s < sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]); s++) {
-        for (f = 0; f < rg_context_feature_name_count; f++) {
-            if (!vocabulary->contrastive[f]) {
-                continue;
-            }
+        for (f = 0; f < vocabulary->count; f++) {
             if (count < capacity) {
                 out[count].slot = long_range_slot_names[s];
-                out[count].feature = rg_context_feature_names[f];
-                out[count].value = "+";
+                out[count].feature = vocabulary->entries[f].feature;
+                out[count].value = vocabulary->entries[f].value;
                 count++;
             }
         }
@@ -1497,7 +1496,8 @@ static rg_status commit_observation_group(
     double bucket_total,
     const context_observation *const *contrast_rows,
     size_t contrast_row_count,
-    double delta_bic
+    double delta_bic,
+    double search_margin
 ) {
     target_mass *targets = 0;
     target_mass *contrast_targets = 0;
@@ -1563,6 +1563,7 @@ static rg_status commit_observation_group(
                 row->contrast_count = contrast_count;
                 row->contrast_total = contrast_total;
                 row->delta_bic = delta_bic;
+                row->search_margin = search_margin;
                 row->uncertainty = rg_wilson_default_internal(row->count, source_total);
                 replaced = 1;
                 break;
@@ -1586,7 +1587,8 @@ static rg_status commit_observation_group(
             source_total,
             contrast_count,
             contrast_total,
-            delta_bic
+            delta_bic,
+            search_margin
         );
     }
     free(targets);
@@ -1637,10 +1639,12 @@ static int find_best_split(
     const rg_split_gate *gates,
     size_t candidate_count,
     double penalty,
+    double search_gamma,
     split_candidate *best_candidate,
     size_t *best_yes_count,
     size_t *best_no_count,
-    double *best_delta_bic
+    double *best_delta_bic,
+    double *best_search_margin
 ) {
     double baseline = observation_group_cost(rows, count);
     /* Charge for the search, not only for the parameter.
@@ -1656,7 +1660,7 @@ static int find_best_split(
      * standard extended-BIC shape for a large model space. It is not a
      * substitute for the shuffled baseline, which measures the inflation this
      * only models. */
-    double search_penalty = candidate_count > 1 ? RG_SEARCH_PENALTY_GAMMA * 2.0 * log((double)candidate_count) : 0.0;
+    double search_penalty = candidate_count > 1 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
     double best_margin = 0.0;
     int found = 0;
     size_t ci;
@@ -1696,6 +1700,16 @@ static int find_best_split(
         if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
             *best_delta_bic = delta_bic;
+            /* How heavy a search charge this split's evidence could carry and
+             * still commit. The charge is gamma * 2 * ln(candidates), so the
+             * gamma at which this split stops clearing its bar is a
+             * corpus-independent measure of how far the evidence stands above
+             * the search that found it -- and it can be compared against the
+             * same number computed on the corpus shuffled, which is what the
+             * fit summary reports. */
+            *best_search_margin = candidate_count > 1
+                ? (delta_threshold - (delta_bic - search_penalty)) / (2.0 * log((double)candidate_count))
+                : 0.0;
             *best_candidate = candidates[ci];
             memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
             memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
@@ -1735,6 +1749,7 @@ static rg_status refine_split(
     const rg_split_gate *gates,
     size_t candidate_count,
     double penalty,
+    double search_gamma,
     const stress_inventory *stress,
     size_t observation_capacity,
     int target_side,
@@ -1746,6 +1761,7 @@ static rg_status refine_split(
     size_t no_count = 0;
     rg_context_spec yes_context;
     double delta_bic = 0.0;
+    double search_margin = 0.0;
     rg_status status;
 
     (void)stress;
@@ -1757,7 +1773,8 @@ static rg_status refine_split(
         return status;
     }
     if (!find_best_split(&search, rows, count, candidates, gates, candidate_count,
-                         penalty, &best, &yes_count, &no_count, &delta_bic)) {
+                         penalty, search_gamma, &best, &yes_count, &no_count, &delta_bic,
+                         &search_margin)) {
         split_search_clear(&search);
         return RG_OK;
     }
@@ -1765,7 +1782,7 @@ static rg_status refine_split(
     if (status == RG_OK) {
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
                                           target_side, bucket_total,
-                                          search.best_no, no_count, delta_bic);
+                                          search.best_no, no_count, delta_bic, search_margin);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1780,6 +1797,7 @@ static rg_status refine_split(
                 gates,
                 candidate_count,
                 penalty,
+                search_gamma,
                 stress,
                 observation_capacity,
                 target_side,
@@ -1811,6 +1829,7 @@ static rg_status commit_splits_for_source(
     int max_depth,
     double min_obs,
     double penalty,
+    double search_gamma,
     int target_side
 ) {
     split_search search;
@@ -1835,12 +1854,13 @@ static rg_status commit_splits_for_source(
         size_t yes_count = 0;
         size_t no_count = 0;
         double delta_bic = 0.0;
+        double search_margin = 0.0;
         rg_context_spec yes_context;
         rg_context_spec empty;
 
         if (!find_best_split(&search, remaining, remaining_count, top_candidates, top_gates,
-                             top_candidate_count, penalty, &best, &yes_count, &no_count,
-                             &delta_bic)) {
+                             top_candidate_count, penalty, search_gamma, &best, &yes_count, &no_count,
+                             &delta_bic, &search_margin)) {
             break;
         }
         rg_context_spec_init_empty(&empty);
@@ -1851,7 +1871,7 @@ static rg_status commit_splits_for_source(
         }
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
                                           target_side, observation_total_weight(rows, count),
-                                          search.best_no, no_count, delta_bic);
+                                          search.best_no, no_count, delta_bic, search_margin);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1866,6 +1886,7 @@ static rg_status commit_splits_for_source(
                 all_gates,
                 all_candidate_count,
                 penalty,
+                search_gamma,
                 stress,
                 count,
                 target_side,
@@ -2111,12 +2132,12 @@ static rg_status discover_context_counts(
      * either kind onto it. */
     if (status == RG_OK) {
         size_t immediate_cap =
-            2 * rg_context_feature_name_count +
+            2 * vocabulary->count +
             sizeof(split_positions) / sizeof(split_positions[0]) +
             3 * stress.count + 8;
         size_t long_cap =
             sizeof(long_range_slot_names) / sizeof(long_range_slot_names[0]) *
-            rg_context_feature_name_count;
+            (vocabulary->count == 0 ? 1 : vocabulary->count);
         rg_context_spec empty;
         immediate_list = (split_candidate *)calloc(immediate_cap, sizeof(*immediate_list));
         if (long_range_list == 0) {
@@ -2211,6 +2232,7 @@ static rg_status discover_context_counts(
             max_depth,
             long_range ? long_min_obs : immediate_min_obs,
             log(n_total),
+            options->bic.search_penalty_gamma,
             target_side
         );
     }
@@ -3825,8 +3847,8 @@ rg_status rg_train_pairwise_internal(
     rg_feature_vocabulary vocabulary;
     rg_status status;
 
-    vocabulary.contrastive = 0;
-    vocabulary.contrastive_count = 0;
+    vocabulary.entries = 0;
+    vocabulary.count = 0;
     if (ctx == 0 || out == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }

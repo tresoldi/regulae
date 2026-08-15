@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 10
+#define RG_ABI_VERSION 11
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -89,6 +89,17 @@ typedef struct rg_bic_config {
     double cross_dim_delta_bic_threshold;
     int multi_lect_bic_small_sample_correction;
     double multi_lect_min_commit_scale;
+    /* How much of the search a split is charged for, on top of its parameter.
+     * The penalty gains `search_penalty_gamma * 2 * ln(candidates)`: BIC prices
+     * one added term, but the term that survives is the best of many, and the
+     * maximum of a hundred candidates clears its bar by chance far more often
+     * than one does.
+     *
+     * 0.5 is the largest fixed value at which no sound law in
+     * testdata/soundlaws/ is lost. Setting `permutation_count` and
+     * `tune_search_penalty` replaces it with a value measured from the corpus
+     * itself. */
+    double search_penalty_gamma;
 } rg_bic_config;
 
 typedef struct rg_train_options {
@@ -110,6 +121,15 @@ typedef struct rg_train_options {
      * training time; 0 (the default) skips it. */
     int permutation_count;
     int permutation_seed;
+    /* Set the search charge from the corpus's own shuffled baseline rather
+     * than from bic.search_penalty_gamma: the shuffles are trained with no
+     * charge at all, and the level their spurious rules reach becomes the bar
+     * the real run has to clear. Requires permutation_count > 0.
+     *
+     * This buys precision with recall, and the trade is real: a corpus whose
+     * genuine conditioning is weak relative to its own noise will lose rules
+     * that the fixed 0.5 keeps. It is off by default for that reason. */
+    int tune_search_penalty;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -291,6 +311,10 @@ typedef struct rg_conditioned_segment_count_row {
     double contrast_count;
     double contrast_total;
     double delta_bic;
+    /* How heavy a search charge this rule's evidence could carry and still
+     * commit. Comparable across corpora, and comparable against the same
+     * number measured on the corpus shuffled -- see rg_corpus_fit. */
+    double search_margin;
     rg_uncertainty_estimate uncertainty;
 } rg_conditioned_segment_count_row;
 
@@ -357,6 +381,10 @@ typedef struct rg_multi_class_row {
      * environment and so no complement to compare against. */
     double contrast_count;
     double delta_bic;
+    /* How heavy a search charge this class's evidence could carry and still
+     * commit; read against rg_corpus_fit's null_search_margin. Zero on an
+     * unconditioned class, which was not committed by a search. */
+    double search_margin;
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;
@@ -416,6 +444,12 @@ typedef struct rg_corpus_fit {
     double cost_per_segment_z;
     double null_unconditioned_class_mean;
     double null_conditioned_class_mean;
+    /* The search margin the shuffled corpus reached, at the quantile named
+     * below: the level a rule has to clear to be saying more than the search
+     * itself does. Rules at or under it were findable in data with no
+     * correspondences left in it. */
+    double null_search_margin;
+    double null_search_margin_quantile;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);

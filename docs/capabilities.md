@@ -44,7 +44,7 @@ Trained through the wide loader with default options.
 | latin_spanish | latin, spanish | 60 | 20 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 48 | 7 |
-| navajo_chipewyan | chipewyan, navajo | 53 | 3 |
+| navajo_chipewyan | chipewyan, navajo | 53 | 2 |
 | oe_english | modern_english, old_english | 60 | 13 |
 | ppn_hawaiian | hawaiian, ppn | 23 | 4 |
 | swahili_zulu | swahili, zulu | 41 | 2 |

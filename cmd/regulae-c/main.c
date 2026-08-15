@@ -39,6 +39,9 @@ static int usage(void) {
     printf("                                     Costs one training run each,\n");
     printf("                                     and is the only way to read\n");
     printf("                                     whether the corpus has signal\n");
+    printf("  --tune-search                      set the search charge from that\n");
+    printf("                                     baseline instead of the default.\n");
+    printf("                                     Buys precision with recall\n");
     return 0;
 }
 
@@ -545,7 +548,7 @@ static int command_check(const char *path, const char *format) {
     return count == 0 ? 0 : 1;
 }
 
-static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations) {
+static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations, int tune_search) {
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
     rg_multi_model *model = 0;
@@ -564,6 +567,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     rg_train_options_init_defaults(&options);
     options.permutation_count = permutations;
+    options.tune_search_penalty = tune_search;
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
         report_failure(ctx, "training", status);
@@ -826,6 +830,7 @@ int main(int argc, char **argv) {
     int human = 0;
     int json = 0;
     int permutations = 0;
+    int tune_search = 0;
     int i;
 
     if (argc < 2 || strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -842,6 +847,8 @@ int main(int argc, char **argv) {
             top_k = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--permutations") == 0 && i + 1 < argc) {
             permutations = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--tune-search") == 0) {
+            tune_search = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             json = 1;
         } else if (strcmp(argv[i], "--human") == 0) {
@@ -866,7 +873,7 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (strcmp(argv[1], "train") == 0) {
-        return command_train(path, format, pairwise, human, json, permutations);
+        return command_train(path, format, pairwise, human, json, permutations, tune_search);
     }
     if (strcmp(argv[1], "outliers") == 0) {
         return command_outliers(path, format, top_k);

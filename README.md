@@ -55,10 +55,18 @@ carrying:
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy
-  BIC-driven search over a feature vocabulary derived from the
-  corpus itself — every feature merkmal reports, filtered to
-  those the corpus actually contrasts. A fixed list fits the
-  language its author had in mind and silently loses the rest. Every committed
+  BIC-driven search over a vocabulary derived from the corpus
+  itself. regulae holds no list of feature names: a segment's
+  features are whatever the merkmal system in use reports, so
+  the categorical systems and the valued ones (`phoible`,
+  `pbase-*`) both work. A fixed list fits the language its
+  author had in mind and silently loses the rest.
+- **A margin per rule, and the level noise reaches.** Every
+  conditioned rule reports how heavy a search charge its
+  evidence could carry; `--permutations` reports the same
+  number measured on the corpus shuffled. A rule at or under
+  that level was findable in data with no correspondences in
+  it. `--tune-search` turns the comparison into a gate. Every committed
   rule publishes the contrast it was measured against — the same
   correspondence where the environment does not hold — and the
   ΔBIC it scored, because a conditioning claim without its

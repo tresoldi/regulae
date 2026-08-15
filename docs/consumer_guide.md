@@ -65,6 +65,12 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   enumeration order, which the exchange does not preserve — on a
   corpus small enough for a tie to decide an alignment, the two
   directions can still differ.
+- **A conditioned class reports how far it stands above the
+  search that found it.** `search_margin` is the search charge
+  the rule's evidence could carry; `rg_corpus_fit.null_search_margin`
+  is what the same search reaches on the corpus shuffled. A rule
+  at or under that level is not distinguishable from an artefact
+  of looking, however large its count.
 - **A conditioned class is a comparison, and reports one.**
   `contrast_count` is the same correspondence where the
   environment does not hold, and `delta_bic` is what the split

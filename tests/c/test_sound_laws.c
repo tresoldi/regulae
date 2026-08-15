@@ -627,6 +627,64 @@ static void test_conditioning_ladder(rg_context *ctx) {
     }
 }
 
+/* regulae states an environment in whatever vocabulary the feature system in
+ * use provides, and has no list of its own. That is testable: the same
+ * rounding-conditioned change has to be found under every system merkmal
+ * ships, each naming it in its own terms -- `rounded` in the categorical
+ * systems, `round` in pbase-spe, `labial` in phoible.
+ *
+ * Until 2026-08-15 a hand-written list of names decided what a context could
+ * say, and the valued systems -- which report "anterior=+" rather than
+ * "anterior" -- matched none of it. rg_context_use_system accepted them and
+ * then found no conditioning at all, silently, which is worse than refusing
+ * them. */
+static void test_conditioning_works_in_any_feature_system(void) {
+    static const char *systems[] = { "distinctive", "descriptive", "broad", "phoible", "pbase-spe" };
+    size_t s;
+    for (s = 0; s < sizeof(systems) / sizeof(systems[0]); s++) {
+        rg_context *ctx = 0;
+        rg_corpus *corpus;
+        rg_multi_model *model;
+        size_t i;
+        int found = 0;
+        assert(rg_context_new_builtin(&ctx) == RG_OK);
+        if (rg_context_use_system(ctx, systems[s]) != RG_OK) {
+            rg_context_free(ctx);
+            continue;
+        }
+        corpus = load("rounding_harmony");
+        model = train(ctx, corpus);
+        /* Which feature names the environment is a fact about the system, so
+         * the assertion is that the change is conditioned at all, on the
+         * segment that follows. */
+        for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+            size_t j;
+            int seen_p = 0;
+            int seen_f = 0;
+            int conditioned = 0;
+            for (j = 0; j < row->segment_count; j++) {
+                if (strcmp(row->graphemes[j], "p") == 0) {
+                    seen_p = 1;
+                }
+                if (strcmp(row->graphemes[j], "f") == 0) {
+                    seen_f = 1;
+                }
+                if (row->contexts[j].following_count > 0) {
+                    conditioned = 1;
+                }
+            }
+            if (seen_p && seen_f && conditioned) {
+                found = 1;
+            }
+        }
+        assert(found);
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+        rg_context_free(ctx);
+    }
+}
+
 /* A change conditioned by lip rounding. Regular, twenty-four instances, and the
  * two environments differ in rounding alone -- and until the conditioning
  * vocabulary became corpus-derived on 2026-08-15 it produced no conditioned
@@ -733,6 +791,7 @@ int main(void) {
     test_grassmann(ctx);
     test_verner(ctx);
     test_rounding_harmony(ctx);
+    test_conditioning_works_in_any_feature_system();
     test_place_assimilation(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);

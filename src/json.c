@@ -135,6 +135,7 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
      * class, which has no environment and so no complement. */
     cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
     cJSON_AddNumberToObject(out, "delta_bic", row->delta_bic);
+    cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
 
     segments = cJSON_CreateArray();
     if (segments == 0) {
@@ -475,6 +476,8 @@ char *rg_json_from_multi_model_internal(
             cJSON_AddNumberToObject(fit, "cost_per_segment_z", f->cost_per_segment_z);
             cJSON_AddNumberToObject(fit, "null_unconditioned_class_mean", f->null_unconditioned_class_mean);
             cJSON_AddNumberToObject(fit, "null_conditioned_class_mean", f->null_conditioned_class_mean);
+            cJSON_AddNumberToObject(fit, "null_search_margin", f->null_search_margin);
+            cJSON_AddNumberToObject(fit, "null_search_margin_quantile", f->null_search_margin_quantile);
         }
     }
 

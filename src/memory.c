@@ -18,6 +18,21 @@ char *rg_strdup_internal(const char *value) {
     return out;
 }
 
+/* strndup is not in C99. */
+char *rg_strndup_internal(const char *text, size_t length) {
+    char *copy;
+    if (text == 0) {
+        return 0;
+    }
+    copy = (char *)malloc(length + 1);
+    if (copy == 0) {
+        return 0;
+    }
+    memcpy(copy, text, length);
+    copy[length] = '\0';
+    return copy;
+}
+
 void rg_segment_clear_internal(rg_segment *segment) {
     if (segment == 0) {
         return;

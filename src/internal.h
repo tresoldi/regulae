@@ -146,6 +146,7 @@ size_t rg_model_classes_at_internal(
 );
 
 char *rg_strdup_internal(const char *value);
+char *rg_strndup_internal(const char *text, size_t length);
 void rg_segment_clear_internal(rg_segment *segment);
 rg_status rg_segment_copy_internal(const rg_segment *src, rg_segment *out);
 void rg_context_spec_clear_internal(rg_context_spec *context);
@@ -224,18 +225,24 @@ rg_status rg_form_position_contexts_internal(
 );
 void rg_context_spec_array_free_internal(rg_context_spec *contexts, size_t count);
 
-/* Which context features distinguish anything in the corpus at hand.
+/* Which conditioning predicates distinguish anything in the corpus at hand.
  *
- * A feature every segment carries, or none does, partitions nothing: it cannot
- * be a conditioning environment, and searching it only widens the argmax that
- * the BIC gate already struggles to price. Deriving the searchable vocabulary
- * from the corpus rather than fixing it in the source is also the only way one
- * list fits Latin and Yoruba and Nuxalk -- each gets the features its own
- * inventory contrasts. */
+ * There is no fixed list of feature names anywhere in regulae. A grapheme's
+ * features are whatever the merkmal system in use reports for it, and the
+ * searchable vocabulary is derived from the corpus's own inventory. That is
+ * what lets one code path serve `distinctive`, which names the features a
+ * segment *has*, and `phoible`, which names every feature with a value; and it
+ * is why widening the vocabulary is a question about the data rather than a
+ * question about whose phonology the author had in mind.
+ *
+ * Two filters. Contrastive: some segment carries the predicate and some does
+ * not, since a predicate true of everything partitions nothing. Distinct: no
+ * two predicates that separate this corpus's inventory identically both
+ * survive, because keeping synonyms widens the argmax without widening what
+ * can be found. */
 typedef struct rg_feature_vocabulary {
-    /* Indexed by rg_context_feature_names; 1 when contrastive. */
-    unsigned char *contrastive;
-    size_t contrastive_count;
+    rg_feature_constraint *entries;
+    size_t count;
 } rg_feature_vocabulary;
 
 rg_status rg_feature_vocabulary_build_internal(
@@ -252,8 +259,6 @@ rg_status rg_feature_vocabulary_build_from_sets_internal(
 );
 void rg_feature_vocabulary_clear_internal(rg_feature_vocabulary *vocabulary);
 
-extern const char *const rg_context_feature_names[];
-extern const size_t rg_context_feature_name_count;
 
 rg_status rg_context_displacement_internal(
     const rg_context *ctx,

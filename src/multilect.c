@@ -486,6 +486,7 @@ typedef struct committed_split {
      * a number with no denominator. */
     double contrast_count;
     double delta_bic;
+    double search_margin;
     /* The observations that justified this split, so the class it merges into
      * can name its own evidence. */
     size_t *observation_indices;
@@ -507,6 +508,7 @@ typedef struct merged_class {
     double winning_count;
     double contrast_count;
     double delta_bic;
+    double search_margin;
 } merged_class;
 
 typedef struct discovery_state {
@@ -770,10 +772,10 @@ static rg_status collect_stress_values(discovery_state *state, const rg_context_
 /* The candidate lists are fixed once the observed stress values are known,
  * because every multi-lect split is searched against an empty base context. */
 static rg_status build_candidate_lists(discovery_state *state, const rg_feature_vocabulary *vocabulary) {
-    size_t immediate_total = 2 * rg_context_feature_name_count;
+    size_t immediate_total = 2 * vocabulary->count;
     size_t slot_count = sizeof(multi_stress_slots) / sizeof(multi_stress_slots[0]);
     size_t long_slots = sizeof(multi_long_range_slots) / sizeof(multi_long_range_slots[0]);
-    size_t long_features = rg_context_feature_name_count;
+    size_t long_features = vocabulary->count == 0 ? 1 : vocabulary->count;
     size_t total = immediate_total + slot_count * state->stress_count;
     size_t i;
     size_t s;
@@ -783,17 +785,14 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     if (state->immediate == 0) {
         return RG_ERR_OOM;
     }
-    for (i = 0; i < rg_context_feature_name_count; i++) {
-        if (!vocabulary->contrastive[i]) {
-            continue;
-        }
+    for (i = 0; i < vocabulary->count; i++) {
         state->immediate[n].slot = "preceding";
-        state->immediate[n].feature = rg_context_feature_names[i];
-        state->immediate[n].value = "+";
+        state->immediate[n].feature = vocabulary->entries[i].feature;
+        state->immediate[n].value = vocabulary->entries[i].value;
         n++;
         state->immediate[n].slot = "following";
-        state->immediate[n].feature = rg_context_feature_names[i];
-        state->immediate[n].value = "+";
+        state->immediate[n].feature = vocabulary->entries[i].feature;
+        state->immediate[n].value = vocabulary->entries[i].value;
         n++;
     }
     for (s = 0; s < slot_count; s++) {
@@ -812,13 +811,10 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     }
     n = 0;
     for (s = 0; s < long_slots; s++) {
-        for (i = 0; i < rg_context_feature_name_count; i++) {
-            if (!vocabulary->contrastive[i]) {
-                continue;
-            }
+        for (i = 0; i < vocabulary->count; i++) {
             state->long_range[n].slot = multi_long_range_slots[s];
-            state->long_range[n].feature = rg_context_feature_names[i];
-            state->long_range[n].value = "+";
+            state->long_range[n].feature = vocabulary->entries[i].feature;
+            state->long_range[n].value = vocabulary->entries[i].value;
             n++;
         }
     }
@@ -944,6 +940,7 @@ static rg_status append_committed_split(
     double bucket_size,
     double contrast_count,
     double delta_bic,
+    double search_margin,
     const size_t *observation_indices,
     size_t observation_count
 ) {
@@ -962,6 +959,7 @@ static rg_status append_committed_split(
     memset(slot, 0, sizeof(*slot));
     slot->contrast_count = contrast_count;
     slot->delta_bic = delta_bic;
+    slot->search_margin = search_margin;
     slot->pivot_lect = rg_strdup_internal(pivot_lect);
     slot->pivot_grapheme = rg_strdup_internal(pivot_grapheme);
     if (slot->pivot_lect == 0 || slot->pivot_grapheme == 0) {
@@ -1008,6 +1006,7 @@ static rg_status emit_sister_classes(
     const pivot_obs *no_obs,
     size_t no_count,
     double delta_bic,
+    double search_margin,
     double min_commit,
     double n_total
 ) {
@@ -1072,6 +1071,7 @@ static rg_status emit_sister_classes(
             n_total,
             contrast_masses[order[i]],
             delta_bic,
+            search_margin,
             evidence,
             evidence_count
         );
@@ -1096,6 +1096,7 @@ static int pivot_best_split(
     const rg_split_gate *gates,
     size_t candidate_count,
     double penalty,
+    double search_gamma,
     pivot_obs *yes,
     pivot_obs *no,
     pivot_obs *best_yes,
@@ -1103,11 +1104,12 @@ static int pivot_best_split(
     size_t *best_yes_count,
     size_t *best_no_count,
     size_t *best_candidate,
-    double *best_delta_bic
+    double *best_delta_bic,
+    double *best_search_margin
 ) {
     double baseline = group_cost(state, rows, count);
     /* The same charge for the same reason as find_best_split in model.c. */
-    double search_penalty = candidate_count > 1 ? RG_SEARCH_PENALTY_GAMMA * 2.0 * log((double)candidate_count) : 0.0;
+    double search_penalty = candidate_count > 1 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
     double best_margin = 0.0;
     int found = 0;
     size_t ci;
@@ -1142,6 +1144,9 @@ static int pivot_best_split(
         if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
             *best_delta_bic = delta_bic;
+            *best_search_margin = candidate_count > 1
+                ? (gates[ci].delta_threshold - (delta_bic - search_penalty)) / (2.0 * log((double)candidate_count))
+                : 0.0;
             *best_candidate = ci;
             memcpy(best_yes, yes, yes_count * sizeof(*yes));
             memcpy(best_no, no, no_count * sizeof(*no));
@@ -1168,6 +1173,7 @@ static rg_status refine_pivot_split(
     int max_depth,
     const rg_split_gate *gates,
     double penalty,
+    double search_gamma,
     double min_commit,
     double n_total
 ) {
@@ -1179,6 +1185,7 @@ static rg_status refine_pivot_split(
     size_t best_no_count = 0;
     size_t best_candidate = 0;
     double delta_bic = 0.0;
+    double search_margin = 0.0;
     rg_status status = RG_OK;
 
     if (depth >= max_depth || count == 0) {
@@ -1193,19 +1200,20 @@ static rg_status refine_pivot_split(
         return RG_ERR_OOM;
     }
     if (pivot_best_split(state, rows, count, state->all, gates, state->all_count,
-                         penalty, yes, no, best_yes, best_no,
-                         &best_yes_count, &best_no_count, &best_candidate, &delta_bic)) {
+                         penalty, search_gamma, yes, no, best_yes, best_no,
+                         &best_yes_count, &best_no_count, &best_candidate, &delta_bic,
+                         &search_margin)) {
         rg_context_spec narrowed;
         status = rg_context_extend_internal(base_context, &state->all[best_candidate], &narrowed);
         if (status == RG_OK) {
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                          &narrowed, best_yes, best_yes_count,
-                                         best_no, best_no_count, delta_bic,
+                                         best_no, best_no_count, delta_bic, search_margin,
                                          min_commit, n_total);
             if (status == RG_OK) {
                 status = refine_pivot_split(state, bucket, &narrowed, best_yes,
                                             best_yes_count, depth + 1, max_depth,
-                                            gates, penalty, min_commit, n_total);
+                                            gates, penalty, search_gamma, min_commit, n_total);
             }
             rg_context_spec_clear_internal(&narrowed);
         }
@@ -1224,6 +1232,7 @@ static rg_status commit_splits_for_pivot(
     double min_obs,
     int max_depth,
     double penalty,
+    double search_gamma,
     double min_commit,
     double n_total
 ) {
@@ -1259,11 +1268,12 @@ static rg_status commit_splits_for_pivot(
         size_t best_yes_count = 0;
         size_t best_no_count = 0;
         double delta_bic = 0.0;
+        double search_margin = 0.0;
 
         if (!pivot_best_split(state, remaining, remaining_count, candidates, gates,
-                              candidate_count, penalty, yes, no, best_yes, best_no,
+                              candidate_count, penalty, search_gamma, yes, no, best_yes, best_no,
                               &best_yes_count, &best_no_count, &best_candidate,
-                              &delta_bic)) {
+                              &delta_bic, &search_margin)) {
             break;
         }
         {
@@ -1280,6 +1290,7 @@ static rg_status commit_splits_for_pivot(
                     best_no,
                     best_no_count,
                     delta_bic,
+                    search_margin,
                     min_commit,
                     n_total
                 );
@@ -1289,7 +1300,7 @@ static rg_status commit_splits_for_pivot(
                 if (status == RG_OK) {
                     status = refine_pivot_split(state, bucket, &yes_context, best_yes,
                                                 best_yes_count, 1, max_depth, all_gates,
-                                                penalty, min_commit, n_total);
+                                                penalty, search_gamma, min_commit, n_total);
                 }
                 rg_context_spec_clear_internal(&yes_context);
             }
@@ -1504,6 +1515,7 @@ static rg_status merge_committed_splits(
                  * merged in last. */
                 entry->contrast_count = split->contrast_count;
                 entry->delta_bic = split->delta_bic;
+                entry->search_margin = split->search_margin;
             }
             for (slot = 0; slot < entry->segment_count; slot++) {
                 if (strcmp(entry->lects[slot], split->pivot_lect) != 0) {
@@ -1547,6 +1559,7 @@ static rg_status merge_committed_splits(
         merged[count].winning_count = split->count;
         merged[count].contrast_count = split->contrast_count;
         merged[count].delta_bic = split->delta_bic;
+        merged[count].search_margin = split->search_margin;
         if (merged_class_add_evidence(&merged[count], split->observation_indices,
                                       split->observation_count) != RG_OK) {
             merged_classes_free(merged, count + 1);
@@ -1592,6 +1605,7 @@ static rg_status multi_lect_context_discovery(
     size_t observation_count
 ) {
     discovery_state state;
+    rg_feature_vocabulary vocabulary;
     rg_split_gate *immediate_gates = 0;
     rg_split_gate *long_gates = 0;
     rg_split_gate *all_gates = 0;
@@ -1607,6 +1621,8 @@ static rg_status multi_lect_context_discovery(
         return RG_OK;
     }
     memset(&state, 0, sizeof(state));
+    vocabulary.entries = 0;
+    vocabulary.count = 0;
 
     form_contexts = (rg_context_spec **)calloc(cache_size == 0 ? 1 : cache_size, sizeof(*form_contexts));
     form_context_counts = (size_t *)calloc(cache_size == 0 ? 1 : cache_size, sizeof(*form_context_counts));
@@ -1682,11 +1698,11 @@ static rg_status multi_lect_context_discovery(
     }
 
     if (status == RG_OK) {
-        rg_feature_vocabulary vocabulary;
+        /* The candidate lists borrow the vocabulary's strings, so it has to
+         * outlive them: it is released with the rest of the discovery state. */
         status = rg_feature_vocabulary_build_from_sets_internal(ctx, cognates, cognate_count, &vocabulary);
         if (status == RG_OK) {
             status = build_candidate_lists(&state, &vocabulary);
-            rg_feature_vocabulary_clear_internal(&vocabulary);
         }
     }
     /* One bar per candidate: the immediate axes are few and cheap to trust,
@@ -1781,6 +1797,7 @@ static rg_status multi_lect_context_discovery(
                 (double)options->bic.min_split_observations,
                 options->bic.max_split_depth,
                 penalty,
+                options->bic.search_penalty_gamma,
                 min_commit,
                 n_total
             );
@@ -1803,6 +1820,7 @@ static rg_status multi_lect_context_discovery(
                 (double)options->bic.long_range_min_split_observations,
                 options->bic.max_split_depth,
                 log(n_total),
+                options->bic.search_penalty_gamma,
                 long_min_commit,
                 n_total
             );
@@ -1831,6 +1849,7 @@ static rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.confidence = merged[i].confidence;
                 model->conditioned_classes[i].view.contrast_count = merged[i].contrast_count;
                 model->conditioned_classes[i].view.delta_bic = merged[i].delta_bic;
+                model->conditioned_classes[i].view.search_margin = merged[i].search_margin;
                 model->conditioned_classes[i].view.uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 merged[i].lects = 0;
@@ -1865,6 +1884,7 @@ static rg_status multi_lect_context_discovery(
     }
     free(form_contexts);
     free(form_context_counts);
+    rg_feature_vocabulary_clear_internal(&vocabulary);
     discovery_state_clear(&state);
     free(immediate_gates);
     free(long_gates);
@@ -2510,239 +2530,6 @@ static rg_status aggregate_position_classes(
     return RG_OK;
 }
 
-static rg_status compute_corpus_fit(
-    const rg_context *ctx,
-    const rg_cognate_set *cognates,
-    size_t cognate_count,
-    const rg_train_options *options,
-    rg_multi_model *model
-);
-
-rg_status rg_train_model(
-    const rg_context *ctx,
-    const rg_cognate_set *cognates,
-    size_t cognate_count,
-    const rg_train_options *options,
-    rg_multi_model **out
-) {
-    rg_multi_model *model;
-    rg_progress_state progress;
-    rg_train_options resolved_options;
-    reconciled_observation *observations = 0;
-    size_t observation_count = 0;
-    size_t c;
-    size_t lect_cap = 0;
-    rg_status status;
-    if (ctx == 0 || out == 0 || (cognate_count > 0 && cognates == 0)) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
-    *out = 0;
-    model = (rg_multi_model *)calloc(1, sizeof(*model));
-    if (model == 0) {
-        return RG_ERR_OOM;
-    }
-    for (c = 0; c < cognate_count; c++) {
-        size_t f;
-        if (cognates[c].form_count == 0 || cognates[c].forms == 0) {
-            rg_multi_model_free(model);
-            return RG_ERR_INVALID_ARGUMENT;
-        }
-        if (cognates[c].confidence < 0.0 || cognates[c].confidence > 1.0) {
-            rg_multi_model_free(model);
-            return RG_ERR_INVALID_ARGUMENT;
-        }
-        for (f = 0; f < cognates[c].form_count; f++) {
-            if (cognates[c].forms[f].form.segment_count == 0 ||
-                cognates[c].forms[f].form.segments == 0 ||
-                cognates[c].forms[f].lect_id == 0) {
-                rg_multi_model_free(model);
-                return RG_ERR_INVALID_ARGUMENT;
-            }
-            status = append_lect(&model->lect_ids, &model->lect_count, &lect_cap, cognates[c].forms[f].lect_id);
-            if (status != RG_OK) {
-                rg_multi_model_free(model);
-                return status;
-            }
-        }
-    }
-    if (options == 0) {
-        rg_train_options_init_defaults(&resolved_options);
-        options = &resolved_options;
-    }
-    /* A set with one form carries no correspondence: there is nothing to align
-     * it against. That is a fact about the data, not an error in it. Every
-     * cognate-coded wordlist has them -- an isolate, a loan, a unique
-     * retention, or a form whose cognates are in lects this corpus did not
-     * sample -- and refusing the whole corpus over one of them made regulae
-     * unable to read the field's standard datasets without preprocessing. It
-     * was also inconsistent: the wide loader drops such rows on its own, so the
-     * same data trained when read wide and failed when read long.
-     *
-     * They are counted rather than silently dropped, and the count is
-     * published: a user is entitled to know how much of their corpus
-     * contributed nothing. */
-    for (c = 0; c < cognate_count; c++) {
-        if (cognates[c].form_count < 2) {
-            model->unpaired_set_count++;
-        }
-    }
-    /* Lects are held in ascending id order, which every later stage assumes.
-     * They used to be held in the order they were first seen in the corpus,
-     * while reconciliation, class discovery and the outlier ranking all walk
-     * pairs in ascending order -- so whenever a corpus did not happen to list
-     * its lects alphabetically, those stages aligned a pair in the opposite
-     * direction from the one its model was trained in. A model of P(b|a) read
-     * as P(a|b) misses on nearly every lookup and falls back to the prior, so
-     * the classes came out of an untrained alignment. Renaming a lect changed
-     * a quarter of the published classes on real data, which is how this
-     * surfaced: a name is metadata, and no analysis may turn on it. */
-    if (model->lect_count > 1) {
-        size_t a;
-        for (a = 1; a < model->lect_count; a++) {
-            char *key = model->lect_ids[a];
-            size_t b = a;
-            while (b > 0 && strcmp(model->lect_ids[b - 1], key) > 0) {
-                model->lect_ids[b] = model->lect_ids[b - 1];
-                b--;
-            }
-            model->lect_ids[b] = key;
-        }
-    }
-    /* One counter spans every lect pair and the multi-lect stages, so a caller
-     * sees a single monotonic fraction rather than a bar that restarts. */
-    {
-        size_t pairs = model->lect_count < 2 ? 0 : model->lect_count * (model->lect_count - 1) / 2;
-        rg_progress_init_internal(&progress, options,
-                                  pairs * RG_PAIRWISE_STAGE_COUNT + RG_MULTILECT_STAGE_COUNT);
-    }
-    status = train_pair_models(ctx, cognates, cognate_count, options, &progress, model);
-    if (status == RG_OK && rg_progress_step_internal(&progress, "reconciliation")) {
-        status = RG_ERR_CANCELLED;
-    }
-    if (status == RG_OK) {
-        status = aggregate_position_classes(
-            ctx,
-            cognates,
-            cognate_count,
-            options,
-            model,
-            &observations,
-            &observation_count
-        );
-    }
-    if (status == RG_OK && rg_progress_step_internal(&progress, "class discovery")) {
-        status = RG_ERR_CANCELLED;
-    }
-    if (status == RG_OK) {
-        status = publish_class_positions(model, observations, observation_count);
-    }
-    if (status == RG_OK) {
-        status = multi_lect_context_discovery(
-            ctx,
-            cognates,
-            cognate_count,
-            options,
-            model,
-            observations,
-            observation_count
-        );
-    }
-    if (status == RG_OK) {
-        status = lift_cross_dimensional_rows(model);
-    }
-    if (status == RG_OK && rg_progress_step_internal(&progress, "cross-dimensional lifting")) {
-        status = RG_ERR_CANCELLED;
-    }
-    reconciled_observations_free(observations, observation_count);
-    if (status == RG_OK) {
-        status = compute_corpus_fit(ctx, cognates, cognate_count, options, model);
-    }
-    if (status != RG_OK) {
-        rg_multi_model_free(model);
-        return status;
-    }
-    *out = model;
-    return RG_OK;
-}
-
-const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model) {
-    return model == 0 ? 0 : &model->fit;
-}
-
-size_t rg_multi_model_lect_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->lect_count;
-}
-
-size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->unpaired_set_count;
-}
-
-const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->lect_count) {
-        return 0;
-    }
-    return model->lect_ids[index];
-}
-
-size_t rg_multi_model_pair_model_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->pair_model_count;
-}
-
-const rg_multi_pair_model_row *rg_multi_model_pair_model_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->pair_model_count) {
-        return 0;
-    }
-    return &model->pair_models[index].view;
-}
-
-size_t rg_multi_model_unconditioned_class_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->unconditioned_class_count;
-}
-
-const rg_multi_class_row *rg_multi_model_unconditioned_class_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->unconditioned_class_count) {
-        return 0;
-    }
-    return &model->unconditioned_classes[index].view;
-}
-
-size_t rg_multi_model_conditioned_class_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->conditioned_class_count;
-}
-
-const rg_multi_class_row *rg_multi_model_conditioned_class_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->conditioned_class_count) {
-        return 0;
-    }
-    return &model->conditioned_classes[index].view;
-}
-
-size_t rg_multi_model_cross_dimensional_row_count(const rg_multi_model *model) {
-    return model == 0 ? 0 : model->cross_dimensional_count;
-}
-
-const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_row_at(const rg_multi_model *model, size_t index) {
-    if (model == 0 || index >= model->cross_dimensional_count) {
-        return 0;
-    }
-    return &model->cross_dimensional_rows[index].view;
-}
-
-void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
-    size_t i;
-    if (rows == 0) {
-        return;
-    }
-    for (i = 0; i < count; i++) {
-        free((char *)rows[i].cognate_id);
-    }
-    free(rows);
-}
-
-/* Mean alignment cost per segment for one cognate set, over every lect pair in
- * it that has a trained model. This is the corpus's goodness of fit read one
- * set at a time: the outlier diagnostic z-scores it across sets, and the fit
- * summary averages it. */
 static rg_status score_cognate_set(
     const rg_context *ctx,
     const rg_multi_model *model,
@@ -2852,105 +2639,445 @@ static rg_status permute_cognate_sets(
     return RG_OK;
 }
 
-/* Fills in the model's fit summary, and, when asked, the shuffled baseline it
- * has to be read against. Each baseline run is a full training pass, so the
- * caller pays for it explicitly. */
+
+typedef struct permutation_baseline permutation_baseline;
+struct permutation_baseline {
+    size_t runs;
+    double cost_mean;
+    double cost_sd;
+    double unconditioned_mean;
+    double conditioned_mean;
+    double search_margin;
+    double search_margin_quantile;
+};
+
 static rg_status compute_corpus_fit(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options,
+    const permutation_baseline *baseline,
+    rg_multi_model *model
+);
+static rg_status run_permutation_baseline(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const char *const *lect_ids,
+    size_t lect_count,
+    permutation_baseline *out
+);
+
+rg_status rg_train_model(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    rg_multi_model **out
+) {
+    rg_multi_model *model;
+    rg_progress_state progress;
+    rg_train_options resolved_options;
+    permutation_baseline baseline;
+    reconciled_observation *observations = 0;
+    size_t observation_count = 0;
+    size_t c;
+    size_t lect_cap = 0;
+    rg_status status;
+    if (ctx == 0 || out == 0 || (cognate_count > 0 && cognates == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *out = 0;
+    model = (rg_multi_model *)calloc(1, sizeof(*model));
+    if (model == 0) {
+        return RG_ERR_OOM;
+    }
+    for (c = 0; c < cognate_count; c++) {
+        size_t f;
+        if (cognates[c].form_count == 0 || cognates[c].forms == 0) {
+            rg_multi_model_free(model);
+            return RG_ERR_INVALID_ARGUMENT;
+        }
+        if (cognates[c].confidence < 0.0 || cognates[c].confidence > 1.0) {
+            rg_multi_model_free(model);
+            return RG_ERR_INVALID_ARGUMENT;
+        }
+        for (f = 0; f < cognates[c].form_count; f++) {
+            if (cognates[c].forms[f].form.segment_count == 0 ||
+                cognates[c].forms[f].form.segments == 0 ||
+                cognates[c].forms[f].lect_id == 0) {
+                rg_multi_model_free(model);
+                return RG_ERR_INVALID_ARGUMENT;
+            }
+            status = append_lect(&model->lect_ids, &model->lect_count, &lect_cap, cognates[c].forms[f].lect_id);
+            if (status != RG_OK) {
+                rg_multi_model_free(model);
+                return status;
+            }
+        }
+    }
+    memset(&baseline, 0, sizeof(baseline));
+    if (options == 0) {
+        rg_train_options_init_defaults(&resolved_options);
+    } else {
+        resolved_options = *options;
+    }
+    options = &resolved_options;
+    /* The baseline runs before the model, not after, because it is what sets
+     * the search charge when the caller asks for a tuned one. Its own runs
+     * recurse into this function with permutation_count cleared. */
+    if (options->permutation_count > 0) {
+        status = run_permutation_baseline(ctx, cognates, cognate_count, options,
+                                          (const char *const *)model->lect_ids, model->lect_count,
+                                          &baseline);
+        if (status != RG_OK) {
+            rg_multi_model_free(model);
+            return status;
+        }
+        if (options->tune_search_penalty && baseline.search_margin > 0.0) {
+            /* What the shuffles reached is what a rule has to beat. Bought
+             * with recall: a corpus whose conditioning is weak against its own
+             * noise loses rules the fixed charge would have kept. */
+            resolved_options.bic.search_penalty_gamma = baseline.search_margin;
+        }
+    }
+    /* A set with one form carries no correspondence: there is nothing to align
+     * it against. That is a fact about the data, not an error in it. Every
+     * cognate-coded wordlist has them -- an isolate, a loan, a unique
+     * retention, or a form whose cognates are in lects this corpus did not
+     * sample -- and refusing the whole corpus over one of them made regulae
+     * unable to read the field's standard datasets without preprocessing. It
+     * was also inconsistent: the wide loader drops such rows on its own, so the
+     * same data trained when read wide and failed when read long.
+     *
+     * They are counted rather than silently dropped, and the count is
+     * published: a user is entitled to know how much of their corpus
+     * contributed nothing. */
+    for (c = 0; c < cognate_count; c++) {
+        if (cognates[c].form_count < 2) {
+            model->unpaired_set_count++;
+        }
+    }
+    /* Lects are held in ascending id order, which every later stage assumes.
+     * They used to be held in the order they were first seen in the corpus,
+     * while reconciliation, class discovery and the outlier ranking all walk
+     * pairs in ascending order -- so whenever a corpus did not happen to list
+     * its lects alphabetically, those stages aligned a pair in the opposite
+     * direction from the one its model was trained in. A model of P(b|a) read
+     * as P(a|b) misses on nearly every lookup and falls back to the prior, so
+     * the classes came out of an untrained alignment. Renaming a lect changed
+     * a quarter of the published classes on real data, which is how this
+     * surfaced: a name is metadata, and no analysis may turn on it. */
+    if (model->lect_count > 1) {
+        size_t a;
+        for (a = 1; a < model->lect_count; a++) {
+            char *key = model->lect_ids[a];
+            size_t b = a;
+            while (b > 0 && strcmp(model->lect_ids[b - 1], key) > 0) {
+                model->lect_ids[b] = model->lect_ids[b - 1];
+                b--;
+            }
+            model->lect_ids[b] = key;
+        }
+    }
+    /* One counter spans every lect pair and the multi-lect stages, so a caller
+     * sees a single monotonic fraction rather than a bar that restarts. */
+    {
+        size_t pairs = model->lect_count < 2 ? 0 : model->lect_count * (model->lect_count - 1) / 2;
+        rg_progress_init_internal(&progress, options,
+                                  pairs * RG_PAIRWISE_STAGE_COUNT + RG_MULTILECT_STAGE_COUNT);
+    }
+    status = train_pair_models(ctx, cognates, cognate_count, options, &progress, model);
+    if (status == RG_OK && rg_progress_step_internal(&progress, "reconciliation")) {
+        status = RG_ERR_CANCELLED;
+    }
+    if (status == RG_OK) {
+        status = aggregate_position_classes(
+            ctx,
+            cognates,
+            cognate_count,
+            options,
+            model,
+            &observations,
+            &observation_count
+        );
+    }
+    if (status == RG_OK && rg_progress_step_internal(&progress, "class discovery")) {
+        status = RG_ERR_CANCELLED;
+    }
+    if (status == RG_OK) {
+        status = publish_class_positions(model, observations, observation_count);
+    }
+    if (status == RG_OK) {
+        status = multi_lect_context_discovery(
+            ctx,
+            cognates,
+            cognate_count,
+            options,
+            model,
+            observations,
+            observation_count
+        );
+    }
+    if (status == RG_OK) {
+        status = lift_cross_dimensional_rows(model);
+    }
+    if (status == RG_OK && rg_progress_step_internal(&progress, "cross-dimensional lifting")) {
+        status = RG_ERR_CANCELLED;
+    }
+    reconciled_observations_free(observations, observation_count);
+    if (status == RG_OK) {
+        status = compute_corpus_fit(ctx, cognates, cognate_count, options, &baseline, model);
+    }
+    if (status != RG_OK) {
+        rg_multi_model_free(model);
+        return status;
+    }
+    *out = model;
+    return RG_OK;
+}
+
+const rg_corpus_fit *rg_multi_model_fit(const rg_multi_model *model) {
+    return model == 0 ? 0 : &model->fit;
+}
+
+size_t rg_multi_model_lect_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->lect_count;
+}
+
+size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->unpaired_set_count;
+}
+
+const char *rg_multi_model_lect_at(const rg_multi_model *model, size_t index) {
+    if (model == 0 || index >= model->lect_count) {
+        return 0;
+    }
+    return model->lect_ids[index];
+}
+
+size_t rg_multi_model_pair_model_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->pair_model_count;
+}
+
+const rg_multi_pair_model_row *rg_multi_model_pair_model_at(const rg_multi_model *model, size_t index) {
+    if (model == 0 || index >= model->pair_model_count) {
+        return 0;
+    }
+    return &model->pair_models[index].view;
+}
+
+size_t rg_multi_model_unconditioned_class_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->unconditioned_class_count;
+}
+
+const rg_multi_class_row *rg_multi_model_unconditioned_class_at(const rg_multi_model *model, size_t index) {
+    if (model == 0 || index >= model->unconditioned_class_count) {
+        return 0;
+    }
+    return &model->unconditioned_classes[index].view;
+}
+
+size_t rg_multi_model_conditioned_class_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->conditioned_class_count;
+}
+
+const rg_multi_class_row *rg_multi_model_conditioned_class_at(const rg_multi_model *model, size_t index) {
+    if (model == 0 || index >= model->conditioned_class_count) {
+        return 0;
+    }
+    return &model->conditioned_classes[index].view;
+}
+
+size_t rg_multi_model_cross_dimensional_row_count(const rg_multi_model *model) {
+    return model == 0 ? 0 : model->cross_dimensional_count;
+}
+
+const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_row_at(const rg_multi_model *model, size_t index) {
+    if (model == 0 || index >= model->cross_dimensional_count) {
+        return 0;
+    }
+    return &model->cross_dimensional_rows[index].view;
+}
+
+void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
+    size_t i;
+    if (rows == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        free((char *)rows[i].cognate_id);
+    }
+    free(rows);
+}
+
+/* Mean alignment cost per segment for one cognate set, over every lect pair in
+ * it that has a trained model. This is the corpus's goodness of fit read one
+ * set at a time: the outlier diagnostic z-scores it across sets, and the fit
+ * summary averages it. */
+/* Trains the corpus with its correspondences taken out of it, as many times as
+ * asked, and reports what the method finds in nothing.
+ *
+ * The shuffled runs carry no search charge at all. That is deliberate: what
+ * they measure is how high an unpriced search can reach by chance, and
+ * charging them would hide exactly that. The level their rules reach becomes
+ * `null_search_margin`, and a real rule at or under it was findable in data
+ * with no correspondences left in it. */
+
+static int double_ascending(const void *a, const void *b) {
+    double x = *(const double *)a;
+    double y = *(const double *)b;
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+static rg_status run_permutation_baseline(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const char *const *lect_ids,
+    size_t lect_count,
+    permutation_baseline *out
+) {
+    size_t n = options->permutation_count > 0 ? (size_t)options->permutation_count : 0;
+    size_t total_forms = 0;
+    size_t c;
+    rg_cognate_set *sets;
+    rg_cognate_form *forms;
+    size_t *slots;
+    double *costs;
+    double *margins = 0;
+    size_t margin_count = 0;
+    size_t margin_cap = 0;
+    rg_train_options nested = *options;
+    uint64_t rng = (uint64_t)(unsigned int)options->permutation_seed * 6364136223846793005ULL
+        + 1442695040888963407ULL;
+    double uncond = 0.0;
+    double cond = 0.0;
+    size_t completed = 0;
+    size_t i;
+    rg_status status = RG_OK;
+
+    memset(out, 0, sizeof(*out));
+    out->search_margin_quantile = 0.95;
+    if (n == 0) {
+        return RG_OK;
+    }
+    for (c = 0; c < cognate_count; c++) {
+        total_forms += cognates[c].form_count;
+    }
+    sets = (rg_cognate_set *)calloc(cognate_count == 0 ? 1 : cognate_count, sizeof(*sets));
+    forms = (rg_cognate_form *)calloc(total_forms == 0 ? 1 : total_forms, sizeof(*forms));
+    slots = (size_t *)calloc(total_forms == 0 ? 1 : total_forms, sizeof(*slots));
+    costs = (double *)calloc(n, sizeof(*costs));
+    if (sets == 0 || forms == 0 || slots == 0 || costs == 0) {
+        free(sets); free(forms); free(slots); free(costs);
+        return RG_ERR_OOM;
+    }
+    nested.permutation_count = 0;
+    nested.tune_search_penalty = 0;
+    nested.progress = 0;
+    nested.progress_user_data = 0;
+    nested.bic.search_penalty_gamma = 0.0;
+    for (i = 0; i < n && status == RG_OK; i++) {
+        rg_multi_model *shuffled = 0;
+        double cost = 0.0;
+        size_t scored = 0;
+        size_t k;
+        status = permute_cognate_sets(cognates, cognate_count, lect_ids, lect_count,
+                                      &rng, sets, forms, slots);
+        if (status != RG_OK) {
+            break;
+        }
+        status = rg_train_model(ctx, sets, cognate_count, &nested, &shuffled);
+        if (status != RG_OK) {
+            break;
+        }
+        status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count, &cost, &scored);
+        if (status == RG_OK && scored > 0) {
+            costs[completed] = cost;
+            uncond += (double)rg_multi_model_unconditioned_class_count(shuffled);
+            cond += (double)rg_multi_model_conditioned_class_count(shuffled);
+            completed++;
+        }
+        for (k = 0; k < rg_multi_model_conditioned_class_count(shuffled) && status == RG_OK; k++) {
+            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(shuffled, k);
+            if (margin_count == margin_cap) {
+                size_t next_cap = margin_cap == 0 ? 64 : margin_cap * 2;
+                double *next = (double *)realloc(margins, next_cap * sizeof(*next));
+                if (next == 0) {
+                    status = RG_ERR_OOM;
+                    break;
+                }
+                margins = next;
+                margin_cap = next_cap;
+            }
+            margins[margin_count++] = row->search_margin;
+        }
+        rg_multi_model_free(shuffled);
+    }
+    if (status == RG_OK && completed > 0) {
+        double mean = 0.0;
+        double variance = 0.0;
+        for (i = 0; i < completed; i++) {
+            mean += costs[i];
+        }
+        mean /= (double)completed;
+        for (i = 0; i < completed; i++) {
+            double d = costs[i] - mean;
+            variance += d * d;
+        }
+        out->runs = completed;
+        out->cost_mean = mean;
+        out->cost_sd = completed > 1 ? sqrt(variance / (double)(completed - 1)) : 0.0;
+        out->unconditioned_mean = uncond / (double)completed;
+        out->conditioned_mean = cond / (double)completed;
+        if (margin_count > 0) {
+            size_t index;
+            qsort(margins, margin_count, sizeof(*margins), double_ascending);
+            index = (size_t)(out->search_margin_quantile * (double)margin_count);
+            if (index >= margin_count) {
+                index = margin_count - 1;
+            }
+            out->search_margin = margins[index];
+        }
+    }
+    free(sets); free(forms); free(slots); free(costs); free(margins);
+    return status;
+}
+
+/* Fills in the model's fit summary from the observed corpus, plus whatever the
+ * shuffled baseline measured before the model was trained. */
+static rg_status compute_corpus_fit(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const permutation_baseline *baseline,
     rg_multi_model *model
 ) {
     rg_status status;
-    size_t n = options->permutation_count > 0 ? (size_t)options->permutation_count : 0;
-    size_t total_forms = 0;
-    size_t max_lect_slots = 0;
-    size_t c;
 
     model->fit.unconditioned_class_count = model->unconditioned_class_count;
     model->fit.conditioned_class_count = model->conditioned_class_count;
     status = corpus_cost_per_segment(ctx, model, options, cognates, cognate_count,
                                      &model->fit.cost_per_segment, &model->fit.scored_set_count);
-    if (status != RG_OK || n == 0) {
+    if (status != RG_OK || baseline->runs == 0) {
         return status;
     }
-    for (c = 0; c < cognate_count; c++) {
-        total_forms += cognates[c].form_count;
+    model->fit.permutation_count = baseline->runs;
+    model->fit.null_cost_per_segment_mean = baseline->cost_mean;
+    model->fit.null_cost_per_segment_sd = baseline->cost_sd;
+    model->fit.null_unconditioned_class_mean = baseline->unconditioned_mean;
+    model->fit.null_conditioned_class_mean = baseline->conditioned_mean;
+    model->fit.null_search_margin = baseline->search_margin;
+    model->fit.null_search_margin_quantile = baseline->search_margin_quantile;
+    if (baseline->cost_sd > 0.0) {
+        model->fit.cost_per_segment_z =
+            (model->fit.cost_per_segment - baseline->cost_mean) / baseline->cost_sd;
     }
-    max_lect_slots = total_forms;
-    {
-        rg_cognate_set *sets = (rg_cognate_set *)calloc(cognate_count == 0 ? 1 : cognate_count, sizeof(*sets));
-        rg_cognate_form *forms = (rg_cognate_form *)calloc(total_forms == 0 ? 1 : total_forms, sizeof(*forms));
-        size_t *slots = (size_t *)calloc(max_lect_slots == 0 ? 1 : max_lect_slots, sizeof(*slots));
-        double *costs = (double *)calloc(n, sizeof(*costs));
-        rg_train_options nested = *options;
-        uint64_t rng = (uint64_t)(unsigned int)options->permutation_seed * 6364136223846793005ULL
-            + 1442695040888963407ULL;
-        double uncond = 0.0;
-        double cond = 0.0;
-        double mean = 0.0;
-        size_t completed = 0;
-        size_t i;
-
-        if (sets == 0 || forms == 0 || slots == 0 || costs == 0) {
-            free(sets); free(forms); free(slots); free(costs);
-            return RG_ERR_OOM;
-        }
-        /* The baseline runs must not recurse, and their progress is not the
-         * caller's training run. */
-        nested.permutation_count = 0;
-        nested.progress = 0;
-        nested.progress_user_data = 0;
-        status = RG_OK;
-        for (i = 0; i < n && status == RG_OK; i++) {
-            rg_multi_model *shuffled = 0;
-            double cost = 0.0;
-            size_t scored = 0;
-            status = permute_cognate_sets(cognates, cognate_count,
-                                          (const char *const *)model->lect_ids, model->lect_count,
-                                          &rng, sets, forms, slots);
-            if (status != RG_OK) {
-                break;
-            }
-            status = rg_train_model(ctx, sets, cognate_count, &nested, &shuffled);
-            if (status != RG_OK) {
-                break;
-            }
-            status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count, &cost, &scored);
-            if (status == RG_OK && scored > 0) {
-                costs[completed] = cost;
-                uncond += (double)shuffled->unconditioned_class_count;
-                cond += (double)shuffled->conditioned_class_count;
-                completed++;
-            }
-            rg_multi_model_free(shuffled);
-        }
-        if (status == RG_OK && completed > 0) {
-            double variance = 0.0;
-            for (i = 0; i < completed; i++) {
-                mean += costs[i];
-            }
-            mean /= (double)completed;
-            for (i = 0; i < completed; i++) {
-                double d = costs[i] - mean;
-                variance += d * d;
-            }
-            /* Sample standard deviation; a single run has no spread to report. */
-            variance = completed > 1 ? variance / (double)(completed - 1) : 0.0;
-            model->fit.permutation_count = completed;
-            model->fit.null_cost_per_segment_mean = mean;
-            model->fit.null_cost_per_segment_sd = sqrt(variance);
-            model->fit.null_unconditioned_class_mean = uncond / (double)completed;
-            model->fit.null_conditioned_class_mean = cond / (double)completed;
-            if (model->fit.null_cost_per_segment_sd > 0.0) {
-                model->fit.cost_per_segment_z =
-                    (model->fit.cost_per_segment - mean) / model->fit.null_cost_per_segment_sd;
-            }
-        }
-        free(sets); free(forms); free(slots); free(costs);
-    }
-    return status;
+    return RG_OK;
 }
 
 static rg_status score_cognate_set(

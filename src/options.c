@@ -17,6 +17,7 @@ void rg_bic_config_init_defaults(rg_bic_config *config) {
     config->cross_dim_delta_bic_threshold = -1.0;
     config->multi_lect_bic_small_sample_correction = 1;
     config->multi_lect_min_commit_scale = 0.5;
+    config->search_penalty_gamma = RG_SEARCH_PENALTY_GAMMA;
 }
 
 void rg_train_options_init_defaults(rg_train_options *options) {
@@ -37,6 +38,7 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     options->bootstrap_n = 0;
     options->bootstrap_seed = 0;
     options->permutation_count = 0;
+    options->tune_search_penalty = 0;
     options->permutation_seed = 20260815;
     options->progress = 0;
     options->progress_user_data = 0;

@@ -439,6 +439,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             builder_appendf(&builder,
                             "  the same shuffles give %.1f unconditioned and %.1f conditioned classes\n",
                             fit->null_unconditioned_class_mean, fit->null_conditioned_class_mean);
+            builder_appendf(&builder,
+                            "  noise reaches search margin %.2f (p%.0f); a rule at or under that\n"
+                            "  was findable in data with no correspondences left in it\n",
+                            fit->null_search_margin, fit->null_search_margin_quantile * 100.0);
         } else {
             builder_append(&builder,
                            "shuffled baseline:   not run (--permutations <n>)\n"
@@ -477,7 +481,8 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
-        builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->delta_bic);
+        builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f  ",
+                        row->confidence, row->delta_bic, row->search_margin);
         append_class_segments(&builder, row);
         append_class_contexts(&builder, row);
         builder_append(&builder, "\n");

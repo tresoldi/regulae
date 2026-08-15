@@ -131,76 +131,137 @@ for each source grapheme by phonological context.
 
 ### Feature inventory
 
-The vocabulary a context can be stated in is `rg_context_feature_names` in
-`src/context.c` — every feature name merkmal's system reports, 65 of them.
-Which of those are *searched* is decided per corpus, by
+There is no list of feature names in regulae. A grapheme's features are
+whatever the merkmal system in use reports for it, and the searchable
+vocabulary is derived from the corpus's own inventory by
 `rg_feature_vocabulary_build_internal`, on two tests:
 
-- **Contrastive.** Some segment in the corpus carries the feature and some does
-  not. A feature nothing carries is dead weight; a feature everything carries is
-  the predicate that partitions nothing, which is a documented way to commit a
-  rule on no evidence.
-- **Distinct.** No two features that separate this corpus's inventory
+- **Contrastive.** Some segment in the corpus carries the predicate and some
+  does not. A predicate nothing carries is dead weight; one everything carries
+  partitions nothing, which is a documented way to commit a rule on no
+  evidence.
+- **Distinct.** No two predicates that separate this corpus's inventory
   identically both survive. merkmal's vocabulary is not orthogonal — `vowel`,
-  `vocoid` and `syllabic` coincide in most corpora, `stop` and `non-continuant`
-  almost always — and keeping every synonym widens the argmax without widening
-  what can be found, then reports the environment under whichever one the search
-  reached first. Equivalence is a fact about the corpus: features that coincide
-  in Latin come apart in a language contrasting syllabic consonants, and there
-  they are kept apart.
+  `vocoid` and `syllabic` coincide in most corpora — and keeping every synonym
+  widens the argmax without widening what can be found. Equivalence is a fact
+  about the corpus: features that coincide in Latin come apart in a language
+  contrasting syllabic consonants, and there they are kept apart.
 
-The survivor of a tie is the earliest in the list, which is ordered so that the
-feature claiming *less* wins: `coronal` before `alveolar`, `labial` before
-`bilabial`. When a corpus cannot tell two environments apart, the honest report
-is the weaker one, and the linguist supplies the specificity from knowledge the
-corpus does not contain.
+Ties are broken toward the name claiming *less* — `coronal` before `alveolar`,
+`labial` before `bilabial` — because when a corpus cannot distinguish two
+environments the weaker report is the honest one. That preference is a
+readability table over the categorical systems' names and decides nothing
+about what is findable; a system whose vocabulary it does not cover loses
+readability and no capability.
 
-In practice this lands at 22–31 features for the fixtures here, against a fixed
-27 before, and the difference is *which* 27.
+In practice this lands at 22–31 predicates for the fixtures here.
+
+#### Any system, including the valued ones
+
+merkmal's systems report two shapes. The categorical ones — `distinctive`
+(the default), `descriptive`, `broad` — name the features a segment *has*:
+`bilabial`, `nasal`. The valued ones — `phoible`, the `pbase-*` family — name
+every feature with its value: `anterior=+`, `approximant=-`,
+`advancedTongueRoot=.`. Splitting on the sign reads both as the same
+(feature, value) pair, so one code path serves all of them.
+
+On a valued system this also gives negative environments for nothing: "not
+anterior" is `anterior=-`, which is in the data rather than something the
+candidate list has to invent, and the contrastive filter drops it where the
+corpus does not use it.
+
+The same rounding-conditioned change, found under five systems:
+
+| system | environment reported |
+| --- | --- |
+| `distinctive` / `descriptive` / `broad` | `fol[rounded=+]` |
+| `phoible` | `fol[labial=+]` |
+| `pbase-spe` | `fol[round=+]` |
+| `pbase-hc` | `fol[labial=+]` |
+
+Under the hand-written list this replaced, the three valued systems found
+**zero** conditioned classes and said nothing about it.
 
 #### Why it is not a fixed list
 
 It was one until 2026-08-15: 27 names, hand-picked, by someone writing about
-Latin. It carried no rounding, no vowel nasalisation, no lateral, trill, tap or
-retroflex, no ejective, implosive or click, no breathy or creaky, no
-syllabicity, and no vowel height between close and open. Affricates received no
-manner feature at all.
-
-The cost was not subtle. `testdata/soundlaws/rounding_harmony.tsv` is a
-perfectly regular change — proto `p` answers daughter `f` before a front rounded
-vowel and stays `p` before a front unrounded one, twenty-four instances each
-side, the environments differing in rounding alone. Under the fixed list it
-produced **zero** conditioned classes. Not a weak rule or a wrong environment:
-silence, because the search had no word for the thing doing the conditioning.
-Rounding harmony organises the Turkic and Uralic vowel systems and this
-repository ships a Turkish–Azerbaijani corpus.
-
-A vocabulary that fits one family is a claim about the others.
+Latin. No rounding, no vowel nasalisation, no lateral, trill, tap or retroflex,
+no ejective, implosive or click, no breathy or creaky, no syllabicity, and no
+vowel height between close and open; affricates received no manner feature at
+all. `testdata/soundlaws/rounding_harmony.tsv` — twenty-four regular instances,
+environments differing in rounding alone — produced nothing under it. A
+vocabulary that fits one family is a claim about the others.
 
 ### Pricing the search, not only the parameter
 
 Widening the vocabulary widens the argmax, and BIC does not price an argmax. It
 charges for one added term against the likelihood it buys; the term that
 survives a split step is the best of *m* of them, and the maximum of a hundred
-candidates clears its bar by chance far more often than one candidate does.
+candidates clears its bar by chance far more often than one does.
 
 So the split penalty carries `γ · 2 · ln(m)` alongside it — the standard
 extended-BIC shape for a large model space, in the same currency as the BIC
-term. `γ` is `RG_SEARCH_PENALTY_GAMMA`, and 0.5 is not a taste: it is the
-largest value at which no sound law in `testdata/soundlaws/` is lost. At 0.75
-the multi-lect stage stops committing on the palatalization corpus; at 1.0
-lenition finds only two of its three stops. Below 0.25 the spurious commits the
-term exists to stop come back.
+term. `bic.search_penalty_gamma` defaults to 0.5, which is the largest fixed
+value at which no sound law in `testdata/soundlaws/` is lost: at 0.75 the
+multi-lect stage stops committing on the palatalization corpus, at 1.0 lenition
+finds only two of its three stops.
 
-What it buys, on Grassmann's law: five conditioned classes before, of which one
-was the law and four were environments that fit the same partition, against one
-class after — the law, correctly stated as *an aspirate somewhere later*.
+On Grassmann's law this takes the output from five conditioned classes — one
+the law, four environments fitting the same partition — to one, correctly
+stated as *an aspirate somewhere later*.
 
-What it does **not** buy: the class count still rises on shuffled data at every
-γ tried. A uniform penalty cannot fix that, because shuffled data has more
-unconditioned mass to split and the penalty applies to both alike. The count is
-not a relatedness statistic and no gate will make it one; that is what the
-shuffled baseline above is for.
+#### The margin a rule clears, and the level noise reaches
+
+Every conditioned rule publishes `search_margin`: the γ its evidence could
+carry and still commit. It is comparable across corpora, and it is comparable
+against the same number measured on the corpus **shuffled** — which
+`--permutations` reports as `null_search_margin`, the p95 of what the search
+reaches in data with no correspondences left in it.
+
+That comparison is the per-rule verdict, and it agrees with linguistic
+expectation wherever the answer is known:
+
+| corpus | strongest rule | noise reaches | reading |
+| --- | --- | --- | --- |
+| `rounding_harmony` | 7.75 | 0.62 | the law towers over its noise |
+| `place_assimilation` | 5.77 | 1.68 | clear |
+| `rhotacism` | 3.11 | 1.07 | clear |
+| `grimm` (unconditioned) | 0.91 | 0.79 | near-noise, which is correct |
+| `verner` | 1.54 | 1.80 | **below** — see below |
+| unrelated pseudo-words | 1.48 | 1.15 | indistinguishable, correctly |
+
+Verner is the instructive one. Its stress-conditioned rules are real and its
+corpus is forty sets, and on forty sets the search finds artefacts stronger
+than the law. The margin does not hide that; it reports it.
+
+#### Tuning the charge from the corpus
+
+`tune_search_penalty` (CLI `--tune-search`, requires `--permutations`) sets γ to
+`null_search_margin` instead of the default: what the shuffles reached becomes
+what a rule has to beat. The shuffled runs are trained with **no** charge at
+all, because what they measure is how high an unpriced search can reach.
+
+This buys precision with recall, and the trade is steep. Conditioned classes,
+default charge against tuned:
+
+| corpus | default | tuned |
+| --- | --- | --- |
+| unrelated pseudo-words | 26 | 2 |
+| `grimm` (unconditioned) | 4 | 0 |
+| `ppn_hawaiian` | 4 | 0 |
+| `rhotacism` | 3 | 3 |
+| `rounding_harmony` | 1 | 1 |
+| `place_assimilation` | 2 | 2 |
+| `verner` | 5 | **0** |
+| `lenition` | 4 | 1 |
+| `latin_spanish` | 20 | 3 |
+
+The first three rows are the case for it: noise collapses, an unconditioned law
+stops being given conditioning, and a corpus whose rules sit below its own
+noise says so. The `verner` row is the case against: a real law, entirely
+suppressed, on a corpus too small for it to stand above the search. It is off
+by default for that reason, and it is a per-corpus decision a reader can make
+from the margins the default run already prints.
 
 ### What a committed split publishes
 
