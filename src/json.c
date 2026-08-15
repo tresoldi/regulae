@@ -131,6 +131,10 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     cJSON_AddNumberToObject(out, "id", row->class_id);
     cJSON_AddNumberToObject(out, "count", row->count);
     cJSON_AddNumberToObject(out, "confidence", row->confidence);
+    /* The comparison the split was measured against. Zero on an unconditioned
+     * class, which has no environment and so no complement. */
+    cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
+    cJSON_AddNumberToObject(out, "delta_bic", row->delta_bic);
 
     segments = cJSON_CreateArray();
     if (segments == 0) {

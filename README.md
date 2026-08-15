@@ -55,7 +55,11 @@ carrying:
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy
-  BIC-driven search over a feature vocabulary.
+  BIC-driven search over a feature vocabulary. Every committed
+  rule publishes the contrast it was measured against — the same
+  correspondence where the environment does not hold — and the
+  ΔBIC it scored, because a conditioning claim without its
+  complement cannot be read.
 - **Long-range conditioning.** A second split loop looks for
   conditioning environments beyond the immediate neighbours —
   distance-bounded, existential (*somewhere preceding /

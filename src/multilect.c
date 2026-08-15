@@ -520,6 +520,11 @@ typedef struct committed_split {
     size_t sister_index;
     double count;
     double bucket_size;
+    /* The same sister where the environment does not hold, and what the split
+     * scored. A conditioning claim is a comparison; without these the class is
+     * a number with no denominator. */
+    double contrast_count;
+    double delta_bic;
     /* The observations that justified this split, so the class it merges into
      * can name its own evidence. */
     size_t *observation_indices;
@@ -539,6 +544,8 @@ typedef struct merged_class {
     double confidence;
     double bucket_size;
     double winning_count;
+    double contrast_count;
+    double delta_bic;
 } merged_class;
 
 typedef struct discovery_state {
@@ -961,6 +968,8 @@ static rg_status append_committed_split(
     size_t sister_index,
     double count,
     double bucket_size,
+    double contrast_count,
+    double delta_bic,
     const size_t *observation_indices,
     size_t observation_count
 ) {
@@ -977,6 +986,8 @@ static rg_status append_committed_split(
     }
     slot = &state->committed[state->committed_count];
     memset(slot, 0, sizeof(*slot));
+    slot->contrast_count = contrast_count;
+    slot->delta_bic = delta_bic;
     slot->pivot_lect = rg_strdup_internal(pivot_lect);
     slot->pivot_grapheme = rg_strdup_internal(pivot_grapheme);
     if (slot->pivot_lect == 0 || slot->pivot_grapheme == 0) {
@@ -1020,21 +1031,30 @@ static rg_status emit_sister_classes(
     const rg_context_spec *yes_context,
     const pivot_obs *yes_obs,
     size_t yes_count,
+    const pivot_obs *no_obs,
+    size_t no_count,
+    double delta_bic,
     double min_commit,
     double n_total
 ) {
     double *masses;
+    double *contrast_masses;
     size_t *order;
     size_t used = 0;
     size_t i;
     rg_status status = RG_OK;
 
     masses = (double *)calloc(state->sister_count, sizeof(*masses));
+    contrast_masses = (double *)calloc(state->sister_count, sizeof(*contrast_masses));
     order = (size_t *)calloc(state->sister_count, sizeof(*order));
-    if (masses == 0 || order == 0) {
+    if (masses == 0 || contrast_masses == 0 || order == 0) {
         free(masses);
+        free(contrast_masses);
         free(order);
         return RG_ERR_OOM;
+    }
+    for (i = 0; i < no_count; i++) {
+        contrast_masses[no_obs[i].sister_index] += no_obs[i].weight;
     }
     for (i = 0; i < yes_count; i++) {
         if (masses[yes_obs[i].sister_index] == 0.0) {
@@ -1076,12 +1096,15 @@ static rg_status emit_sister_classes(
             order[i],
             masses[order[i]],
             n_total,
+            contrast_masses[order[i]],
+            delta_bic,
             evidence,
             evidence_count
         );
         free(evidence);
     }
     free(masses);
+    free(contrast_masses);
     free(order);
     return status;
 }
@@ -1105,7 +1128,8 @@ static int pivot_best_split(
     pivot_obs *best_no,
     size_t *best_yes_count,
     size_t *best_no_count,
-    size_t *best_candidate
+    size_t *best_candidate,
+    double *best_delta_bic
 ) {
     double baseline = group_cost(state, rows, count);
     double best_margin = 0.0;
@@ -1137,8 +1161,11 @@ static int pivot_best_split(
         split_cost = group_cost(state, yes, yes_count) + group_cost(state, no, no_count);
         delta_bic = -2.0 * (baseline - split_cost) + penalty;
         margin = gates[ci].delta_threshold - delta_bic;
-        if (margin > best_margin) {
+        /* Ties go to candidate order, which is the same everywhere, rather
+         * than to the last bit of a log. */
+        if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
+            *best_delta_bic = delta_bic;
             *best_candidate = ci;
             memcpy(best_yes, yes, yes_count * sizeof(*yes));
             memcpy(best_no, no, no_count * sizeof(*no));
@@ -1175,6 +1202,7 @@ static rg_status refine_pivot_split(
     size_t best_yes_count = 0;
     size_t best_no_count = 0;
     size_t best_candidate = 0;
+    double delta_bic = 0.0;
     rg_status status = RG_OK;
 
     if (depth >= max_depth || count == 0) {
@@ -1190,12 +1218,13 @@ static rg_status refine_pivot_split(
     }
     if (pivot_best_split(state, rows, count, state->all, gates, state->all_count,
                          penalty, yes, no, best_yes, best_no,
-                         &best_yes_count, &best_no_count, &best_candidate)) {
+                         &best_yes_count, &best_no_count, &best_candidate, &delta_bic)) {
         rg_context_spec narrowed;
         status = rg_context_extend_internal(base_context, &state->all[best_candidate], &narrowed);
         if (status == RG_OK) {
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                          &narrowed, best_yes, best_yes_count,
+                                         best_no, best_no_count, delta_bic,
                                          min_commit, n_total);
             if (status == RG_OK) {
                 status = refine_pivot_split(state, bucket, &narrowed, best_yes,
@@ -1253,10 +1282,12 @@ static rg_status commit_splits_for_pivot(
         size_t best_candidate = 0;
         size_t best_yes_count = 0;
         size_t best_no_count = 0;
+        double delta_bic = 0.0;
 
         if (!pivot_best_split(state, remaining, remaining_count, candidates, gates,
                               candidate_count, penalty, yes, no, best_yes, best_no,
-                              &best_yes_count, &best_no_count, &best_candidate)) {
+                              &best_yes_count, &best_no_count, &best_candidate,
+                              &delta_bic)) {
             break;
         }
         {
@@ -1270,6 +1301,9 @@ static rg_status commit_splits_for_pivot(
                     &yes_context,
                     best_yes,
                     best_yes_count,
+                    best_no,
+                    best_no_count,
+                    delta_bic,
                     min_commit,
                     n_total
                 );
@@ -1489,6 +1523,11 @@ static rg_status merge_committed_splits(
                 entry->confidence = coverage;
                 entry->bucket_size = split->bucket_size;
                 entry->winning_count = split->count;
+                /* The contrast and the score belong to the split whose
+                 * coverage the class is reporting, not to whichever pivot
+                 * merged in last. */
+                entry->contrast_count = split->contrast_count;
+                entry->delta_bic = split->delta_bic;
             }
             for (slot = 0; slot < entry->segment_count; slot++) {
                 if (strcmp(entry->lects[slot], split->pivot_lect) != 0) {
@@ -1530,6 +1569,8 @@ static rg_status merge_committed_splits(
         merged[count].confidence = coverage;
         merged[count].bucket_size = split->bucket_size;
         merged[count].winning_count = split->count;
+        merged[count].contrast_count = split->contrast_count;
+        merged[count].delta_bic = split->delta_bic;
         if (merged_class_add_evidence(&merged[count], split->observation_indices,
                                       split->observation_count) != RG_OK) {
             merged_classes_free(merged, count + 1);
@@ -1807,6 +1848,8 @@ static rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].view.segment_count = merged[i].segment_count;
                 model->conditioned_classes[i].view.count = merged[i].count;
                 model->conditioned_classes[i].view.confidence = merged[i].confidence;
+                model->conditioned_classes[i].view.contrast_count = merged[i].contrast_count;
+                model->conditioned_classes[i].view.delta_bic = merged[i].delta_bic;
                 model->conditioned_classes[i].view.uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 merged[i].lects = 0;

@@ -24,7 +24,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 9
+#define RG_ABI_VERSION 10
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -272,6 +272,15 @@ typedef struct rg_tonal_count_row {
  * source and there is nothing to condition. Looking from one side only leaves
  * half of every pair's conditioning unreachable, and which half depends on
  * which lect happened to sort first. */
+/* A conditioned correspondence, and the comparison that bought it.
+ *
+ * A conditioning claim is a comparison: this environment against its
+ * complement. Publishing the environment's own count without the complement's
+ * makes the row unreadable -- "s ~ r between vowels, count 14" says nothing
+ * until you know what s does elsewhere. contrast_count is the same
+ * correspondence in the observations where the environment does not hold, and
+ * contrast_total is that side's denominator. delta_bic is what the split
+ * scored: negative means it paid for its parameter. */
 typedef struct rg_conditioned_segment_count_row {
     const char *source;
     const char *target;
@@ -279,6 +288,9 @@ typedef struct rg_conditioned_segment_count_row {
     int context_is_target;
     double count;
     double source_total;
+    double contrast_count;
+    double contrast_total;
+    double delta_bic;
     rg_uncertainty_estimate uncertainty;
 } rg_conditioned_segment_count_row;
 
@@ -340,6 +352,11 @@ typedef struct rg_multi_class_row {
     size_t segment_count;
     double count;
     double confidence;
+    /* The same segment tuple where the environment does not hold, and the
+     * delta-BIC the split scored. Zero on an unconditioned class, which has no
+     * environment and so no complement to compare against. */
+    double contrast_count;
+    double delta_bic;
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;

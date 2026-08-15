@@ -216,6 +216,84 @@ static void test_rhotacism(rg_context *ctx) {
  * alphabetically had those stages align each pair in the opposite direction
  * from the one its model was trained in. Reading a model of P(b|a) as P(a|b)
  * misses nearly every lookup and falls back to the untrained prior. */
+/* AGENTS.md states the invariant: "a rule published without the contrast it was
+ * measured against cannot be read". The cross-dimensional rows honoured it and
+ * the conditioned classes did not, which is the block the human report leads
+ * with. "s ~ r between vowels, count 14" says nothing until you know what /s/
+ * does elsewhere; on the rhotacism fixture the answer is 0, and on the same
+ * corpus a second rule turns out to have 6 observations in its environment and
+ * 26 outside it. One of those is a sound law and the other is noise, and the
+ * count alone does not tell them apart. */
+static void test_a_conditioned_class_publishes_its_contrast(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int found_rhotacism = 0;
+
+    assert(rg_multi_model_conditioned_class_count(model) > 0);
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_r = 0;
+        int seen_s = 0;
+        /* Every committed split beat its bar, so every published class carries
+         * the score that says so. */
+        assert(row->delta_bic < 0.0);
+        assert(row->contrast_count >= 0.0);
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], "r") == 0) {
+                seen_r = 1;
+            }
+            if (strcmp(row->graphemes[j], "s") == 0) {
+                seen_s = 1;
+            }
+        }
+        if (seen_r && seen_s) {
+            /* Latin /r/ answering old Latin /s/ happens between vowels and
+             * nowhere else, so the complement is empty. */
+            assert(row->count > 0.0);
+            assert(row->contrast_count == 0.0);
+            found_rhotacism = 1;
+        }
+    }
+    assert(found_rhotacism);
+
+    /* An unconditioned class has no environment, so it has no complement to
+     * report and no split to score. */
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        assert(row->contrast_count == 0.0);
+        assert(row->delta_bic == 0.0);
+    }
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The same commitment one level down, where the split is actually made. */
+static void test_a_conditioned_row_publishes_its_contrast(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_pairwise_model *pair = rg_multi_model_pair_model_at(model, 0)->model;
+    size_t i;
+    int checked = 0;
+
+    assert(rg_pairwise_model_conditioned_segment_count_row_count(pair) > 0);
+    for (i = 0; i < rg_pairwise_model_conditioned_segment_count_row_count(pair); i++) {
+        const rg_conditioned_segment_count_row *row =
+            rg_pairwise_model_conditioned_segment_count_row_at(pair, i);
+        assert(row->delta_bic < 0.0);
+        assert(row->contrast_count >= 0.0);
+        assert(row->contrast_total >= row->contrast_count);
+        /* The environment has to have a complement, or it partitions nothing
+         * and is not an environment. */
+        assert(row->contrast_total > 0.0);
+        checked++;
+    }
+    assert(checked > 0);
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* The class counts are not a measure of relatedness, and a reader who takes
  * them for one will be badly misled: shuffling a corpus's pairings removes
  * every correspondence there is to find and the counts go *up*, because greedy
@@ -631,6 +709,8 @@ int main(void) {
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
+    test_a_conditioned_class_publishes_its_contrast(ctx);
+    test_a_conditioned_row_publishes_its_contrast(ctx);
     test_class_counts_are_not_evidence_but_the_fit_is(ctx);
     test_the_shuffled_baseline_is_reproducible(ctx);
     test_the_analysis_does_not_depend_on_which_lect_is_named_first(ctx);

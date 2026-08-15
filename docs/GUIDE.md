@@ -113,6 +113,28 @@ conditioned ones. That is not a contradiction: the conditioned entry is the
 more specific statement, and the unconditioned one is what applies everywhere
 else.
 
+### Reading a rule against its complement
+
+A conditioning claim is a comparison. "Latin `r` answers old Latin `s` between
+vowels, count 14" is not a claim until you know what `s` does when it is *not*
+between vowels — so every conditioned class reports that too:
+
+```
+count=14 elsewhere=0  cov=0.74 dBIC=-11.5   latin:r ~ old_latin:s  [between vowels]
+count=6  elsewhere=26 cov=0.13 dBIC=-28.2   latin:s ~ old_latin:s  [before a vowel]
+```
+
+The first is a sound law: fourteen times in the environment, never outside it.
+The second is not: six times in its stated environment and twenty-six times
+outside it, which means the environment is not what is doing the work. Both
+were committed by the same BIC gate, and before `elsewhere` was printed they
+differed only in a count you had nothing to weigh against.
+
+`dBIC` is what the split scored — how much better the model got, charged for
+the parameter the split added. More negative is a stronger split. It is a
+within-corpus comparison, not a p-value, and it does not price the search that
+found the environment; that is what the shuffled baseline above is for.
+
 ## More than two lects
 
 With three or more lects, regulae aligns each pair, then reconciles those

@@ -456,7 +456,10 @@ static rg_status add_conditioned_segment_count(
     const rg_context_spec *context,
     int context_is_target,
     double weight,
-    double source_total
+    double source_total,
+    double contrast_count,
+    double contrast_total,
+    double delta_bic
 ) {
     size_t i;
     rg_conditioned_segment_count_row *next;
@@ -471,6 +474,9 @@ static rg_status add_conditioned_segment_count(
             a_subset_b && b_subset_a) {
             (*rows)[i].count += weight;
             (*rows)[i].source_total = source_total;
+            (*rows)[i].contrast_count = contrast_count;
+            (*rows)[i].contrast_total = contrast_total;
+            (*rows)[i].delta_bic = delta_bic;
             (*rows)[i].uncertainty = rg_wilson_default_internal((*rows)[i].count, source_total);
             return RG_OK;
         }
@@ -490,6 +496,9 @@ static rg_status add_conditioned_segment_count(
     (*rows)[*count].context_is_target = context_is_target;
     (*rows)[*count].count = weight;
     (*rows)[*count].source_total = source_total;
+    (*rows)[*count].contrast_count = contrast_count;
+    (*rows)[*count].contrast_total = contrast_total;
+    (*rows)[*count].delta_bic = delta_bic;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(weight, source_total);
     if ((*rows)[*count].source == 0 || (*rows)[*count].target == 0) {
         conditioned_segment_count_row_clear(&(*rows)[*count]);
@@ -1552,9 +1561,16 @@ static rg_status commit_observation_group(
     size_t count,
     const rg_context_spec *context,
     int target_side,
-    double bucket_total
+    double bucket_total,
+    const context_observation *const *contrast_rows,
+    size_t contrast_row_count,
+    double delta_bic
 ) {
     target_mass *targets = 0;
+    target_mass *contrast_targets = 0;
+    size_t contrast_target_count = 0;
+    size_t contrast_target_cap = 0;
+    double contrast_total = 0.0;
     size_t target_count = 0;
     size_t target_cap = 0;
     size_t conditioned_cap = model->conditioned_segment_count_count;
@@ -1573,9 +1589,28 @@ static rg_status commit_observation_group(
             return status;
         }
     }
+    /* The same correspondence where the environment does not hold. A rule
+     * published without it cannot be read. */
+    for (i = 0; i < contrast_row_count; i++) {
+        status = add_target_mass(&contrast_targets, &contrast_target_count, &contrast_target_cap,
+                                 contrast_rows[i]->target, contrast_rows[i]->weight);
+        if (status != RG_OK) {
+            free(targets);
+            free(contrast_targets);
+            return status;
+        }
+        contrast_total += contrast_rows[i]->weight;
+    }
     for (i = 0; i < target_count && status == RG_OK; i++) {
         size_t existing;
         int replaced = 0;
+        double contrast_count = 0.0;
+        for (existing = 0; existing < contrast_target_count; existing++) {
+            if (strcmp(contrast_targets[existing].target, targets[i].target) == 0) {
+                contrast_count = contrast_targets[existing].mass;
+                break;
+            }
+        }
         for (existing = 0; existing < model->conditioned_segment_count_count; existing++) {
             rg_conditioned_segment_count_row *row = &model->conditioned_segment_counts[existing];
             int a_subset_b = 0;
@@ -1592,6 +1627,9 @@ static rg_status commit_observation_group(
                 a_subset_b && b_subset_a) {
                 row->count = targets[i].mass;
                 row->source_total = source_total;
+                row->contrast_count = contrast_count;
+                row->contrast_total = contrast_total;
+                row->delta_bic = delta_bic;
                 row->uncertainty = rg_wilson_default_internal(row->count, source_total);
                 replaced = 1;
                 break;
@@ -1612,10 +1650,14 @@ static rg_status commit_observation_group(
             context,
             target_side,
             targets[i].mass,
-            source_total
+            source_total,
+            contrast_count,
+            contrast_total,
+            delta_bic
         );
     }
     free(targets);
+    free(contrast_targets);
     return status;
 }
 
@@ -1664,7 +1706,8 @@ static int find_best_split(
     double penalty,
     split_candidate *best_candidate,
     size_t *best_yes_count,
-    size_t *best_no_count
+    size_t *best_no_count,
+    double *best_delta_bic
 ) {
     double baseline = observation_group_cost(rows, count);
     /* Each candidate is measured against its own bar, so the best split is the
@@ -1708,6 +1751,7 @@ static int find_best_split(
          * the same everywhere, rather than to the last bit of a log. */
         if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
+            *best_delta_bic = delta_bic;
             *best_candidate = candidates[ci];
             memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
             memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
@@ -1757,6 +1801,7 @@ static rg_status refine_split(
     size_t yes_count = 0;
     size_t no_count = 0;
     rg_context_spec yes_context;
+    double delta_bic = 0.0;
     rg_status status;
 
     (void)stress;
@@ -1768,14 +1813,15 @@ static rg_status refine_split(
         return status;
     }
     if (!find_best_split(&search, rows, count, candidates, gates, candidate_count,
-                         penalty, &best, &yes_count, &no_count)) {
+                         penalty, &best, &yes_count, &no_count, &delta_bic)) {
         split_search_clear(&search);
         return RG_OK;
     }
     status = rg_context_extend_internal(base_context, &best, &yes_context);
     if (status == RG_OK) {
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
-                                          target_side, bucket_total);
+                                          target_side, bucket_total,
+                                          search.best_no, no_count, delta_bic);
         if (status == RG_OK) {
             status = refine_split(
                 model,
@@ -1844,11 +1890,13 @@ static rg_status commit_splits_for_source(
         split_candidate best;
         size_t yes_count = 0;
         size_t no_count = 0;
+        double delta_bic = 0.0;
         rg_context_spec yes_context;
         rg_context_spec empty;
 
         if (!find_best_split(&search, remaining, remaining_count, top_candidates, top_gates,
-                             top_candidate_count, penalty, &best, &yes_count, &no_count)) {
+                             top_candidate_count, penalty, &best, &yes_count, &no_count,
+                             &delta_bic)) {
             break;
         }
         rg_context_spec_init_empty(&empty);
@@ -1858,7 +1906,8 @@ static rg_status commit_splits_for_source(
             break;
         }
         status = commit_observation_group(model, source, search.best_yes, yes_count, &yes_context,
-                                          target_side, observation_total_weight(rows, count));
+                                          target_side, observation_total_weight(rows, count),
+                                          search.best_no, no_count, delta_bic);
         if (status == RG_OK) {
             status = refine_split(
                 model,

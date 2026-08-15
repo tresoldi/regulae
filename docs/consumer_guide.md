@@ -65,6 +65,13 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   enumeration order, which the exchange does not preserve — on a
   corpus small enough for a tie to decide an alignment, the two
   directions can still differ.
+- **A conditioned class is a comparison, and reports one.**
+  `contrast_count` is the same correspondence where the
+  environment does not hold, and `delta_bic` is what the split
+  scored. A class with more mass outside its stated environment
+  than inside it is not evidence that the environment conditions
+  anything, whatever its `count` says. Consumers presenting a
+  conditioned rule should carry both numbers or neither.
 - **No claim of relatedness.** A trained model is a description of
   whatever correspondences the search found, not evidence that the
   lects are related. The class counts in particular are not that

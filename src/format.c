@@ -365,7 +365,13 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
             rg_pairwise_model_conditioned_segment_count_row_at(model, i);
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
-        builder_appendf(&builder, "  %s ~ %s", row->source, row->target);
+        builder_append(&builder, "/");
+        append_count(&builder, row->source_total);
+        builder_append(&builder, "  elsewhere=");
+        append_count(&builder, row->contrast_count);
+        builder_append(&builder, "/");
+        append_count(&builder, row->contrast_total);
+        builder_appendf(&builder, "  dBIC=%.1f  %s ~ %s", row->delta_bic, row->source, row->target);
         append_context(&builder, &row->context);
         builder_append(&builder, "\n");
         shown++;
@@ -469,7 +475,9 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
-        builder_appendf(&builder, " cov=%.2f  ", row->confidence);
+        builder_append(&builder, " elsewhere=");
+        append_count(&builder, row->contrast_count);
+        builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->delta_bic);
         append_class_segments(&builder, row);
         append_class_contexts(&builder, row);
         builder_append(&builder, "\n");
@@ -540,7 +548,9 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
             if (strcmp(row->lect_ids[j], lect_id) == 0 && strcmp(row->graphemes[j], grapheme) == 0) {
                 builder_append(&builder, "  count=");
                 append_count(&builder, row->count);
-                builder_appendf(&builder, " cov=%.2f  ", row->confidence);
+                builder_append(&builder, " elsewhere=");
+                append_count(&builder, row->contrast_count);
+                builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->delta_bic);
                 append_class_segments(&builder, row);
                 append_class_contexts(&builder, row);
                 builder_append(&builder, "\n");

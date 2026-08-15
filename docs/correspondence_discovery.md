@@ -163,6 +163,21 @@ candidate space makes a spurious partition more likely to cross BIC —
 is real, is not priced by BIC, and is what the permutation baseline
 exists to expose.
 
+### What a committed split publishes
+
+Every conditioned row carries the comparison that produced it, not just its own
+side of it: `contrast_count` (the same correspondence in the observations where
+the environment does not hold), `contrast_total` (that side's denominator, on
+the pairwise row), and `delta_bic` (what the split scored). The complement is
+already in hand at commit time — it is `best_no` — so this costs nothing beyond
+carrying it.
+
+This is what makes a row readable. `latin:s ~ old_latin:s` before a vowel, with
+count 6, looks like a rule until the complement shows 26 of the same
+correspondence outside that environment. It cleared the BIC gate; it is still
+not a statement about conditioning, and no reader could have seen that from the
+count.
+
 ### Why BIC, not mutual information or chi-square
 
 BIC has the complexity penalty built in: committing a context split
