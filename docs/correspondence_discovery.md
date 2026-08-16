@@ -7,9 +7,25 @@ predicates, and multi-lect reconciliation. This document covers
 the *discovery mechanisms*; the *pipeline ordering* rationale lives
 in `docs/training_pipeline.md`.
 
-Implementation: `src/regulae/src/regulae/training.py` (discovery),
-`src/regulae/src/regulae/scoring.py` (scoring overlay),
-`src/regulae/src/regulae/anomaly.py` (residual-MI engine).
+Implementation, in the C core:
+
+- `src/model.c` — the pairwise driver: vocabulary, initial prior,
+  segment EM, aggregation.
+- `src/model_context.c`, `src/model_chunks.c`, `src/model_crossdim.c` —
+  the discovery stages, behind `model_internal.h`.
+- `src/split_search.c` — the greedy BIC split search itself, shared by
+  the pairwise and multi-lect stages.
+- `src/multilect_classes.c` — class-level discovery across lects.
+- `src/scoring.c`, `src/search_cost.c` — what a scored alignment costs,
+  including the cross-dimensional adjustment (§ "Scoring overlay").
+- `src/vocabulary.c` — the searchable feature vocabulary, derived per
+  corpus.
+
+The residual-MI anomaly engine described in places below was never
+ported; the same phenomena are reached by candidate enumeration plus a
+BIC comparison against the complement. The paths given here until
+2026-08-16 pointed at the archived Python tree under `python/`, which is
+not built or supported.
 
 ## 1. Segment correspondences via Dirichlet update
 

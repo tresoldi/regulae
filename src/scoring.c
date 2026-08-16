@@ -501,49 +501,6 @@ static double segment_source_total(const rg_pairwise_model *model, const char *s
     return 0.0;
 }
 
-/* P(target | source, context) under the most specific matching correspondence:
- * (alpha + n) / (beta + N(source)). Returns 0 when the pair is unknown to both
- * the counts and the prior, which is the caller's cue to fall back to the bare
- * merkmal distance. */
-int rg_segment_posterior_internal(
-    const rg_pairwise_model *model,
-    const char *source,
-    const char *target,
-    const rg_context_spec *link_context,
-    const rg_context_spec *target_context,
-    double *out
-) {
-    const rg_conditioned_segment_count_row *conditioned;
-    const rg_segment_count_row *unconditioned;
-    double alpha;
-    double n;
-    double denominator;
-
-    *out = 0.0;
-    if (model == 0 || source == 0 || target == 0) {
-        return 0;
-    }
-    conditioned = find_conditioned_segment_count(model, source, target, link_context, target_context);
-    unconditioned = find_segment_count(model, source, target);
-    if (conditioned != 0) {
-        /* Conditioned keys carry no prior mass of their own. */
-        alpha = 0.0;
-        n = conditioned->count;
-    } else if (segment_prior_lookup(model, source, target, &alpha)) {
-        n = unconditioned == 0 ? 0.0 : unconditioned->count;
-    } else if (unconditioned != 0) {
-        alpha = 0.0;
-        n = unconditioned->count;
-    } else {
-        return 0;
-    }
-    denominator = model->concentration + segment_source_total(model, source);
-    if (denominator <= 0.0) {
-        return 0;
-    }
-    *out = (alpha + n) / denominator;
-    return 1;
-}
 
 static double segment_target_total(const rg_pairwise_model *model, const char *target) {
     size_t low = 0;

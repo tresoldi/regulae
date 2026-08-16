@@ -232,13 +232,16 @@ rg_train_options_init_defaults(&options);
 rg_train_model(ctx, rg_corpus_cognates(corpus),
                rg_corpus_cognate_count(corpus), &options, &model);
 
-/* Read the reconciled classes. Rows are borrowed from the model. */
-for (size_t i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-    const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
-    for (size_t j = 0; j < row->segment_count; j++) {
-        printf("%s%s:%s", j ? " ~ " : "", row->lect_ids[j], row->graphemes[j]);
+/* Read the reconciled classes. A table is handed out whole, and the rows are
+ * borrowed from the model. */
+size_t count = 0;
+const rg_multi_class_row *classes = rg_multi_model_unconditioned_classes(model, &count);
+for (size_t i = 0; i < count; i++) {
+    for (size_t j = 0; j < classes[i].segment_count; j++) {
+        printf("%s%s:%s", j ? " ~ " : "",
+               classes[i].lect_ids[j], classes[i].graphemes[j]);
     }
-    printf("  count=%.0f\n", row->count);
+    printf("  count=%.0f\n", classes[i].count);
 }
 
 char *text = rg_format_multi_model(model, NULL);   /* caller-owned */
@@ -260,9 +263,16 @@ lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
 moves on any layout, signature or ownership change. It is at
-22: booleans in the public header are `bool` rather than `int`,
-and each loader reports its own failure into a caller-supplied
-`rg_load_diagnosis` instead of a process-wide buffer.
+**24**. The most recent breaks, and `docs/consumer_guide.md` §7
+has the full list with reasons:
+
+- Each published table is handed out whole — the rows and a count
+  — rather than through a count function and an index function.
+- What a search decided about a rule (delta-BIC, decision index,
+  search margin, standing) is one `evidence` member on the row
+  rather than four separate fields.
+- `rg_corpus_fit` reports the per-pair verdict separately from the
+  multi-lect one, because the two are counted differently.
 
 ## Documentation
 
@@ -281,9 +291,20 @@ and each loader reports its own failure into a caller-supplied
   `docs/alignment_details.md` — rationale for the staged
   training pipeline, discovery mechanisms, and data types
   (language-agnostic; written against the original design).
-- **Consumer guide** at `docs/consumer_guide.md`.
+- **Consumer guide** at [`docs/consumer_guide.md`](docs/consumer_guide.md) —
+  the external contract: what each published field means, what it does not
+  mean, how to read a table, and the ABI stability rules. Start here if you
+  are building on regulae rather than changing it.
+- **Why the modules are shaped this way** at
+  [`docs/architecture_plan.md`](docs/architecture_plan.md) — the structural
+  pass of 2026-08-15/16, what each phase was allowed to change, and the
+  decisions deliberately left open.
+- **Static analysis** at `docs/static_analysis.md` — the clang-tidy baseline
+  and why each suppression exists.
 - The original Python implementation is archived under
-  `python/` for reference.
+  `python/` for reference. It is not built, tested or supported, and the
+  tutorials under `docs/tutorials/` were written against it — see that
+  directory's README.
 
 ## Licence
 

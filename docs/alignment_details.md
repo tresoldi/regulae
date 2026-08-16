@@ -157,12 +157,18 @@ Workflow:
 Complex patterns (tonogenesis, harmony, context-dependent splits) require
 simpler patterns to be established first. The training pipeline is
 therefore staged: each stage reduces the residual structure that the
-next stage has to explain. By the time anomaly detection runs for
-cross-dimensional rule discovery, most systematic segmental
-correspondences and feature-level regularities have already been
-captured — anomaly detection then focuses on what's left, which is
-exactly the kind of phenomenon where residual-MI tests are most
-useful.
+next stage has to explain. By the time cross-dimensional rule discovery
+runs, most systematic segmental correspondences and feature-level
+regularities have already been captured, so that stage sees what is
+left — which is exactly the kind of phenomenon it is for.
+
+**Note on this document.** It describes the original design, and the
+residual-MI anomaly detection it was written around was never ported to
+the C core: cross-dimensional discovery reaches the same phenomena by
+enumerating candidate environments and gating each on a BIC comparison
+against its complement. `docs/correspondence_discovery.md` is the
+description of what runs. See `AGENTS.md` for the full list of designed
+but unported machinery.
 
 The full staging and its rationale live in `docs/training_pipeline.md`.
 The discovery mechanisms for each kind of correspondence

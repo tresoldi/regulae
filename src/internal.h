@@ -365,14 +365,6 @@ rg_status rg_compute_syllable_breaks_internal(
     size_t *out_count,
     int *out_inferred
 );
-int rg_segment_posterior_internal(
-    const rg_pairwise_model *model,
-    const char *source,
-    const char *target,
-    const rg_context_spec *link_context,
-    const rg_context_spec *target_context,
-    double *out
-);
 double rg_segment_log_normalizer_internal(const rg_pairwise_model *model, const char *source);
 
 /* How readable a promoted chunk is as a single historical process, in [0, 1].

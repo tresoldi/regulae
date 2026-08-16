@@ -188,8 +188,53 @@ stated environments, formatted exactly like the ones above. The fit statistic
 is what tells them apart, and it costs one training run per shuffle.
 
 This is a statement about the corpus, not about any one rule. It answers
-"is there a relationship here", which has to be answered first. It does not
-tell you that a particular environment is real.
+"is there a relationship here", which has to be answered first.
+
+## Does *this* rule stand?
+
+The same shuffles answer the per-rule question too, and they are printed on the
+same run.
+
+A rule is committed because it beat a bar. But the rule that gets committed is
+the best of however many environments were searched, and the best of a hundred
+candidates clears its bar by chance far more often than one candidate does. So
+each rule records how heavy a search charge its evidence could carry and still
+commit — its **margin** — and the shuffled corpus gives the level the same
+search reaches with nothing to find:
+
+```
+  noise reaches search margin 1.13 (p95); a rule at or under that
+  was findable in data with no correspondences left in it
+verdict:             3 of 3 conditioned rules stand above it
+                     3 of 5 per-pair conditioned correspondences, counted per pair
+```
+
+and every rule then carries its own verdict:
+
+```
+  count=14 elsewhere=0  #0 STANDS cov=0.74 dBIC=-7.3 margin=1.26 ...
+```
+
+`STANDS` means the margin cleared the noise level; `within-noise` means it did
+not. **Without `--permutations` there is no verdict at all** — every rule reads
+`unmeasured`, which is not a pass. It says the comparison was never made.
+
+`within-noise` does not mean the rule is false. It means that on this corpus,
+with this much data, it is not distinguishable from something the search would
+have turned up in noise. Small corpora produce a lot of these, and the answer is
+usually more data rather than a different reading.
+
+Two verdicts are printed because regulae works at two levels, and they are
+counted differently. The first counts the multi-lect rules — the classes
+reconciled across every lect. The second counts the conditioned correspondences
+each *pair* of lects carries in its own model, and those are counted per pair,
+so a rule visible in every pair of a four-lect corpus is six there and one
+above. They are not added together for that reason.
+
+**Read both.** On the Grassmann fixture the first line says 0 of 4 — nothing
+distinguishable from having looked — while the rule that *is* Grassmann's Law,
+Greek `t` answering Proto-Indo-European `tʰ` where an aspirate follows, stands
+in the second. A corpus's only real finding can be in either.
 
 ## Confidence and outliers
 

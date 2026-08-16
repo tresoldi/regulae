@@ -59,11 +59,15 @@ a leak on the out-of-memory path, of the same shape as the one the fuzzer found
 in M14 — and one no fuzzer would have found, because fuzzing does not produce
 allocation failures. `loader_row_clear` now exists and both callers use it.
 
-## The five annotations
+## The five suppressions
 
-Five sites carry a `NOLINTNEXTLINE` with the reason on the line above. Four of
-them are one root cause, and it is worth stating plainly because it is a cost of
-a decision taken deliberately elsewhere:
+Five findings are suppressed, each with the reason on the line above the first
+annotation. They span eleven `NOLINTNEXTLINE` lines, because a finding reported
+at several points in one function needs one per point; the reason is written
+once, at the first.
+
+Two of the three in library code are one root cause, worth stating plainly
+because it is a cost of a decision taken deliberately elsewhere:
 
 **`rg_free_owned_internal` is opaque to the analyzer.** It removes the `const`
 from library-owned storage by copying the pointer value with `memcpy`, which is
@@ -71,16 +75,26 @@ what keeps the conversion defined and `-Wcast-qual` clean. The analyzer does not
 follow the allocation's identity across that copy, so every free that goes
 through it reads as a leak. Writing the copy as a union instead was tried and
 changes nothing. The alternative is ninety-odd unexplained casts, which is the
-thing the helper exists to prevent, so the four findings are annotated rather
-than the helper being unwound.
+thing the helper exists to prevent, so it is annotated rather than unwound:
+`src/model_chunks.c` in the chunk promoter, and `src/search_features.c` where
+the feature matrix is released on an error path.
 
-The fifth is an ownership transfer: `cognate_append_form` takes the form on
-success, and the analyzer reads the transfer as a leak.
+The third, in `src/vocabulary.c`, is a correlation the analyzer does not carry:
+the entry array is null only when the count is zero, and the loop it guards then
+does not run. The two are set together by the append helper and it does not
+follow that far.
 
-Two more annotations live in the tests, for deliberate behaviour: an `assert`
-with a side effect, in the file whose whole purpose is to detect a build where
-`NDEBUG` deleted the assertions, and a cast of an out-of-range value to an enum,
-in the test that the library refuses one.
+Two more live in the tests, for deliberate behaviour: an `assert` with a side
+effect, in the file whose whole purpose is to detect a build where `NDEBUG`
+deleted the assertions, and a cast of an out-of-range value to an enum, in the
+test that the library refuses one.
+
+**A suppression is not the first resort.** A `clang-analyzer-core.NullDereference`
+on the feature cache's entry lookup was fixed on 2026-08-16 by changing the
+function to return the entry rather than write it through an out-param, so
+"no entry" and "the lookup failed" became one condition the analyzer can see,
+instead of a postcondition that held only by inspection. Annotating it would
+have hidden a contract that genuinely was not enforced.
 
 ## Two measurement errors worth remembering
 

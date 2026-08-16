@@ -16,6 +16,14 @@ accessors, `find_cognate_outliers` is
 `rg_corpus_load_*`. What each field *means*, and what it does not
 mean, is the point of this document.
 
+**Two things changed shape on 2026-08-16, and this document has been
+brought with them.** Every published table is now handed out whole
+rather than through a count function and an index function
+(§4.7), and the four fields that say what a search decided about a
+rule moved into one `evidence` member on the rows that carry them
+(§4.6). `RG_ABI_VERSION` is 24. Both are source-level breaks for a
+C consumer, and §7 is the contract that governs them.
+
 This document said until 2026-08-15 that the meanings were
 "unchanged", and it was wrong in four places: a cross-dimensional
 rule's environment is a whole `Context` rather than one feature at
@@ -243,7 +251,9 @@ had no shared cognate data in the corpus.
 
 In C this is `rg_multi_model_pair_model_at`, which returns an
 `rg_multi_pair_model_row` carrying `lect_a`, `lect_b` and the
-model. The row *is* ordered — reconciliation walks lect pairs in
+model. It is the one table still read a row at a time (§4.7): it
+holds each pair's owned strings alongside the published row, so
+there is no array of rows to hand out. The row *is* ordered — reconciliation walks lect pairs in
 ascending lect-id order, which fixes the direction each pair is
 aligned in — but the analysis it holds is not: training A against
 B and B against A produce mirror models, and the tests assert it.
@@ -411,12 +421,21 @@ so it has to be read against that corpus's own baseline.
   reading as a proportion: a high one means the lect sample, not
   the method, is deciding the result.
 
-Every conditioned rule and every conditioned class carries four
-fields that belong together:
+Every conditioned rule and every conditioned class carries what
+the search decided about it, in one `evidence` member:
 
-- `standing` — the verdict, `above-noise`, `within-noise`, or
-  `unmeasured` when no baseline was run. **`unmeasured` is not a
-  pass.** It says the comparison was never made.
+```c
+typedef struct rg_rule_evidence {
+    double           delta_bic;       /* what the split scored */
+    int              decision_index;  /* where in the decision list */
+    double           search_margin;   /* how heavy a charge it carries */
+    rg_rule_standing standing;        /* the verdict */
+} rg_rule_evidence;
+```
+
+- `standing` — `above-noise`, `within-noise`, or `unmeasured`
+  when no baseline was run. **`unmeasured` is not a pass.** It
+  says the comparison was never made.
 - `search_margin` — the number that verdict is computed from,
   against `rg_corpus_fit.null_search_margin`.
 - `decision_index` — discovery is greedy, so the rules form a
@@ -424,10 +443,26 @@ fields that belong together:
   unsettled. Published tables are sorted by key so lookups can
   binary-search them, which destroys that order; this preserves
   it. `-1` means the row was not decided by a search.
-- `contrast_count` and `delta_bic` — a conditioning claim is a
-  comparison, and these are the other side of it. A rule
-  published without the contrast it was measured against cannot
-  be read.
+- `delta_bic` — what the split scored, negative where it paid for
+  its parameter.
+
+These four were separate fields on each row until 2026-08-16,
+copied into four row types. A C consumer reads
+`row->evidence.standing` where it used to read `row->standing`.
+
+`contrast_count` and its denominators stay **on the row**, not in
+the evidence, because their shape differs per row type — a
+conditioned correspondence contrasts against a total, a
+cross-dimensional rule against a source count and a confidence. A
+conditioning claim is a comparison, and these are the other side
+of it: a rule published without the contrast it was measured
+against cannot be read.
+
+`uncertainty` also stays on the row. How well a rate is pinned is
+a different question from whether the environment is real, and it
+is asked of every row including the aggregated tables, which
+carry no evidence at all — a segment, displacement, tonal or
+chunk row is counted, not decided.
 
 Intervals say what they were computed from.
 `rg_uncertainty_estimate.method` distinguishes a closed-form
@@ -446,6 +481,58 @@ contributed more than one reflex to a set. A doublet is a fact
 about a language, not an error in a file, and the corpus carries
 one set per combination of reflexes with a share of the
 confidence each.
+
+### 4.7 How a table is read
+
+Every published table is handed out whole — the rows and how many,
+borrowed and valid while the model that owns them lives:
+
+```c
+size_t n = 0;
+const rg_multi_class_row *rows = rg_multi_model_conditioned_classes(model, &n);
+for (size_t i = 0; i < n; i++) {
+    printf("%d  %s\n", rows[i].class_id,
+           rg_rule_standing_string(rows[i].evidence.standing));
+}
+```
+
+The tables, and what each yields:
+
+| Accessor | Row |
+|---|---|
+| `rg_multi_model_lects` | `const char *const *` |
+| `rg_multi_model_unconditioned_classes` | `rg_multi_class_row` |
+| `rg_multi_model_conditioned_classes` | `rg_multi_class_row` |
+| `rg_multi_model_cross_dimensional_rows` | `rg_multi_cross_dimensional_row` |
+| `rg_pairwise_model_segment_counts` | `rg_segment_count_row` |
+| `rg_pairwise_model_conditioned_segment_counts` | `rg_conditioned_segment_count_row` |
+| `rg_pairwise_model_chunks` | `rg_chunk_row` |
+| `rg_pairwise_model_cross_dimensional_rows` | `rg_cross_dimensional_row` |
+| `rg_pairwise_model_displacements` | `rg_displacement_row` |
+| `rg_pairwise_model_tonal_counts` | `rg_tonal_count_row` |
+
+Passing `NULL` for the count is allowed; passing a `NULL` model
+yields a `NULL` table and a zero count.
+
+Until 2026-08-16 these were a count function and an index
+function each, twenty-two of them, so a consumer wrote a loop
+calling a function per row. If you want the old shape back it is
+four lines over the new one — `tests/c/table_access.h` in this
+repository is exactly that, and is the recommended way to keep
+per-row assertions readable:
+
+```c
+static inline const rg_multi_class_row *conditioned_at(
+    const rg_multi_model *m, size_t i) {
+    size_t n = 0;
+    const rg_multi_class_row *rows = rg_multi_model_conditioned_classes(m, &n);
+    return i < n ? &rows[i] : 0;
+}
+```
+
+**A table is sorted by a stable key**, so a consumer may
+binary-search it. That is not the order the rules were decided
+in, which is on each row's `evidence.decision_index` (§4.6).
 
 ## 5. The conditioning environment: `Context`
 
@@ -535,10 +622,7 @@ class CrossDimensionalLink:            # C: rg_cross_dimensional_row
     contrast_count:      float         # matches outside the environment
     contrast_src_count:  float         # observations outside it
     contrast_confidence: float         # contrast_count / contrast_src_count
-    delta_bic:           float         # score for the environment
-    decision_index:      int           # where in the decision list (§4.6)
-    search_margin:       float         # search charge the evidence carries
-    standing:            str           # the verdict (§4.6)
+    evidence:            RuleEvidence   # what the search decided (§4.6)
     uncertainty:         UncertaintyEstimate
 ```
 
@@ -573,11 +657,31 @@ tonogenesis signature — onset voicing predicting tone on the
 following vowel, for example.
 
 These live on the per-pair model
-(`rg_pairwise_model_cross_dimensional_row_at`), because discovery
-commits them per pair. The multi-lect model lifts them with
-explicit `source_lect` / `target_lect` labels
-(`rg_multi_model_cross_dimensional_row_at`), and the lifted row
-carries the same fields.
+(`rg_pairwise_model_cross_dimensional_rows`), because discovery
+commits them per pair. The multi-lect model lifts every one of
+them into a single table
+(`rg_multi_model_cross_dimensional_rows`), and the lifted row *is*
+the pairwise row plus the pair it was found in:
+
+```c
+typedef struct rg_multi_cross_dimensional_row {
+    const char *source_lect;
+    const char *target_lect;
+    rg_cross_dimensional_row rule;   /* the whole pairwise row */
+} rg_multi_cross_dimensional_row;
+```
+
+So a multi-lect cross-dimensional rule is read as
+`row->rule.confidence`, `row->rule.evidence.standing`, and so on.
+Until 2026-08-16 the two structs were separate declarations that
+happened to share fifteen of seventeen fields in the same order,
+and the lift copied them across one at a time.
+
+**Because every pairwise rule is lifted, `rg_corpus_fit`'s
+`rules_measured` counts each of them exactly once** — through the
+multi-lect table. Counting the per-pair copies as well would count
+them twice. The *conditioned correspondences* are the ones not
+lifted, which is why they have their own pair of counts (§4.6).
 
 ## 7. Public API stability contract
 
@@ -605,22 +709,40 @@ Adding a field to a public struct changes its layout, so it moves
 the ABI version whether or not it breaks a source-level consumer.
 The rule is: `RG_ABI_VERSION` moves on any exported struct
 layout, enum, signature or ownership change, and the reason is
-recorded in `docs/c_conversion_roadmap.md`. It is at **22**.
+recorded in `docs/c_conversion_roadmap.md`. It is at **24**.
 
-Two changes landed at 22, and are the kind to expect: public
-booleans became `bool` rather than `int`, and every loader now
-reports its own failure into a caller-supplied
-`rg_load_diagnosis` instead of a process-wide buffer that was
-neither thread-safe nor cleared between calls. Both break a
-consumer at compile time rather than silently, which is the
-intent.
+What has landed, most recent first, as a guide to the kind of
+break to expect. Every one of them fails a consumer at compile
+time rather than silently, which is the intent.
+
+- **24** — `rg_corpus_fit` gained `pairwise_rules_above_noise` and
+  `pairwise_rules_measured` (§4.6). Additive, but a struct layout
+  change.
+- **23** — the four fields saying what a search decided moved into
+  one `evidence` member (§4.6); `rg_multi_cross_dimensional_row`
+  became the pairwise row plus two lect names (§6); the
+  twenty-two per-row table accessors became eleven that hand out
+  a table whole (§4.7); `rg_format_multi_model_summary` and
+  `rg_format_pairwise_tables` were added, so the CLI's two
+  machine-readable renderings are library functions.
+- **22** — public booleans became `bool` rather than `int`, and
+  every loader now reports its own failure into a caller-supplied
+  `rg_load_diagnosis` instead of a process-wide buffer that was
+  neither thread-safe nor cleared between calls.
+
+Nothing outside this repository links regulae today, which is why
+23 could be as wide as it was. That will stop being true, and the
+cost of a break will rise with it.
 
 **Not public API**:
 
-- Anything starting with `_` in any module. Names like the
-  internal discovery helpers, the per-link context builder,
-  the class-level split committer — these are implementation
-  and will change without notice.
+- Anything ending in `_internal`, and anything not declared in
+  `include/regulae.h`. The private headers — `internal.h`,
+  `environment.h`, `split_search.h`, `model_internal.h`,
+  `search_internal.h`, `loader_internal.h`,
+  `multilect_internal.h` — are implementation and change without
+  notice. The discovery helpers, the per-link context builders and
+  the class-level split committer live behind them.
 - The specific numeric values of BIC thresholds, dominance
   floors, and similar tuning constants. These are tuned
   empirically and will move.
@@ -635,23 +757,39 @@ version-gated and announced in `framework/00_overview.md`.
 
 ## 8. Determinism and reproducibility invariants
 
-These are **guaranteed** and covered by `test_invariants.py`:
+These are **guaranteed**, and each names the thing that checks it.
 
-- `train_model(corpus) == train_model(corpus)` bitwise, in the
-  same process.
-- `train_model(corpus) == train_model(corpus)` bitwise, across
-  separate Python processes, given the same merkmal version.
-- Corpus reordering (shuffling `list[CognateSet]`) produces
-  classes and pairwise models with the same content; only sort
-  order and internal provenance tuples may differ. Multi-lect
-  class `class_id`s are stable.
-- Per-lect first-seen ordering for `cognate_sets_from_pairs`:
-  `cognate_sets_from_pairs(pairs, ("A", "B"))` trains the
-  pair model in the A→B direction, regardless of which lect
-  appeared first in `pairs`.
+- `rg_train_model` on the same corpus gives a bitwise-identical
+  model, in the same process and across processes, given the same
+  merkmal version. Anything iterating a set to produce output
+  sorts first, and float sums over a set are taken in sorted key
+  order.
+- The same holds **across builds**: the native and WebAssembly
+  builds must produce byte-identical JSON for the same corpus,
+  which the `wasm_smoke` test asserts by training real corpora in
+  both. This is what caught a comparator that was not a total
+  order, where `qsort` returned equal-comparing rows in different
+  orders on the two targets and moved every class id downstream.
+- The same holds **across compilers**: the model every corpus in
+  the tree trains to is hashed in `testdata/model_hashes.txt` and
+  those hashes are identical under GCC and clang.
+- Corpus reordering produces classes and pairwise models with the
+  same content; only sort order may differ. Multi-lect `class_id`s
+  are stable.
+- Pairwise training is symmetric: training A against B and B
+  against A produce mirror models, asserted in
+  `tests/c/test_sound_laws.c`.
 
-Breaking any of these is considered a bug. Historical inference
-can rely on them for reproducible posterior computation.
+Breaking any of these is a bug. `scripts/model_hashes.py` is the
+mechanism a consumer can borrow: it trains every corpus through
+`regulae train --json` and compares a hash per corpus against a
+committed baseline, and `scripts/check.sh` fails when any moves.
+That is what makes "this change was a refactor" checkable rather
+than asserted — a passing test suite is compatible with a great
+many changed models.
+
+Historical inference can rely on all of this for reproducible
+posterior computation.
 
 ## 9. What the historical-inference layer should consume
 
@@ -775,27 +913,128 @@ for report in find_cognate_outliers(corpus, model, top_k=10):
     print(f"z={report.z_score:+.2f}  {report.cognate_id}")
 ```
 
-The public `format_*` and `describe_*` helpers are designed for
-human debugging, not for machine consumption — they return
-strings. Downstream packages should walk the frozen dataclasses
-directly.
+### 11.1 The same thing in C
+
+The above is the Python spelling this document uses throughout. Since
+the implementation is a C99 core and there is no Python surface
+(§2), here is what a consumer actually writes. It compiles clean
+under the warning set `scripts/check.sh` enforces.
+
+```c
+#include "regulae.h"
+#include <stdio.h>
+
+int main(void) {
+    rg_context *ctx = 0;
+    rg_corpus *corpus = 0;
+    rg_multi_model *model = 0;
+    rg_train_options options;
+    rg_load_diagnosis diagnosis;
+    const rg_multi_class_row *classes;
+    const rg_corpus_fit *fit;
+    size_t count = 0;
+    size_t i;
+    char *text;
+
+    if (rg_context_new_builtin(&ctx) != RG_OK) {
+        return 1;
+    }
+    if (rg_corpus_load_tsv("corpus.tsv", 0, &corpus, &diagnosis) != RG_OK) {
+        fprintf(stderr, "line %lu: %s\n", (unsigned long)diagnosis.line, diagnosis.message);
+        rg_context_free(ctx);
+        return 1;
+    }
+
+    rg_train_options_init_defaults(&options);
+    /* Without this every `standing` is RG_RULE_STANDING_UNMEASURED, which is
+     * not a pass -- it says the comparison was never made. Costs one training
+     * run per permutation. */
+    options.permutation_count = 30;
+    if (rg_train_model(ctx, rg_corpus_cognates(corpus),
+                       rg_corpus_cognate_count(corpus), &options, &model) != RG_OK) {
+        const char *grapheme = 0;
+        const char *system = 0;
+        rg_context_last_error(ctx, &grapheme, &system);
+        fprintf(stderr, "training: %s in %s\n", grapheme ? grapheme : "?", system);
+        rg_corpus_free(corpus);
+        rg_context_free(ctx);
+        return 1;
+    }
+
+    /* Does the corpus have signal at all? Class counts do not answer this and
+     * move the wrong way; cost_per_segment does. */
+    fit = rg_multi_model_fit(model);
+    printf("cost/segment %.4f   %lu of %lu rules stand, %lu of %lu per-pair\n",
+           fit->cost_per_segment,
+           (unsigned long)fit->rules_above_noise, (unsigned long)fit->rules_measured,
+           (unsigned long)fit->pairwise_rules_above_noise,
+           (unsigned long)fit->pairwise_rules_measured);
+
+    /* A table is handed out whole. It is sorted by key, not by the order the
+     * rules were decided in -- that is on each row's evidence. */
+    classes = rg_multi_model_conditioned_classes(model, &count);
+    for (i = 0; i < count; i++) {
+        const rg_multi_class_row *row = &classes[i];
+        size_t j;
+        printf("#%d  count=%.1f  %s\n", row->class_id, row->count,
+               rg_rule_standing_string(row->evidence.standing));
+        for (j = 0; j < row->segment_count; j++) {
+            printf("    %s: %s\n", row->lect_ids[j], row->graphemes[j]);
+        }
+    }
+
+    text = rg_format_multi_model(model, 0);   /* human-readable */
+    if (text != 0) {
+        fputs(text, stdout);
+        rg_string_free(text);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+    rg_context_free(ctx);
+    return 0;
+}
+```
+
+Four things in it are the parts consumers get wrong:
+
+- **`permutation_count` is not set by default**, so `standing`
+  reads `unmeasured` on every rule and the fit's `null_` fields are
+  zero. `unmeasured` is not a pass.
+- **`cost_per_segment`, not class counts**, answers "does this
+  corpus have signal" — counts move the wrong way (§4.6).
+- **`rg_context_last_error`** names the grapheme a refusal was
+  about; the status code alone is unactionable on a real corpus.
+- **Everything borrowed is valid only while its owner lives.** The
+  rows point into the model, the graphemes into the rows. Free the
+  model and they are gone. Only `char *` returned by `rg_format_*`
+  and `rg_model_to_json` is caller-owned, and it is freed with
+  `rg_string_free`.
+
+The `rg_format_*` and `rg_describe_*` helpers return strings for
+human debugging. For machine consumption use `rg_model_to_json`, or
+walk the tables directly as above — the CLI's own machine-readable
+summary is `rg_format_multi_model_summary`, so a consumer wanting
+exactly that output can call it rather than parse the CLI.
 
 ## 12. Where to look next
 
 - `framework/00_overview.md` — the whole framework's architecture.
-- the `framework/03_alignment.md` doc, `docs/alignment_details.md` — conceptual
+- `framework/03_alignment.md`, `docs/alignment_details.md` — conceptual
   overview of the alignment layer.
 - `docs/training_pipeline.md` — staged training rationale.
 - `docs/correspondence_discovery.md` — discovery mechanisms.
-- `07_historical_inference.md` — the design spec for the
+- `framework/07_historical_inference.md` — the design spec for the
   downstream package. Read alongside this document.
-- `04_relatedness.md` — relatedness as a marginal over the
+- `framework/04_relatedness.md` — relatedness as a marginal over the
   historical-inference posterior, decomposed into six
   competing causal processes. The "why does regulae stop
   where it stops" argument.
 - `README.md` — install instructions, test commands,
   a quick API tour, the list of shipped experiments.
-- `experiments/SUMMARY*.md` — development-history notes
-  tracking what each implementation round changed on real
-  data. These are written for framework developers, not
-  downstream consumers.
+- `experiments/<name>/findings.md` — what each experiment found on
+  real data. Written for framework developers, not downstream
+  consumers, but they are the closest thing to worked results.
+- `docs/architecture_plan.md` — why the modules are shaped the way
+  they are, and which decisions were deliberately left open. Read
+  it before proposing a change to the published shape.

@@ -6,8 +6,14 @@ each stage establishes, and why certain non-obvious design choices
 (the log-normalizer offset, the two cost scales, BIC gates at every
 commit) are in the code.
 
-The implementation lives in `src/regulae/src/regulae/training.py`.
-Conceptual overview in the `framework/03_alignment.md` doc, technical detail in
+The implementation is the C core: `src/model.c` drives the pairwise
+pipeline, `src/model_context.c`, `src/model_chunks.c` and
+`src/model_crossdim.c` are the discovery stages, `src/split_search.c` is
+the split search they share, and `src/multilect_*.c` is the multi-lect
+layer. The path given here until 2026-08-16 pointed at the archived
+Python tree under `python/`, which is not built or supported.
+
+Conceptual overview in `framework/03_alignment.md`, technical detail in
 `docs/alignment_details.md`, discovery mechanisms in
 `docs/correspondence_discovery.md`.
 
@@ -200,11 +206,29 @@ environment raises that value relative to the contrast and the rise
 passes its own 2×2 BIC test. Both sides of the split are published, the
 complement under `source_value = "-"`.
 
-**What it produces.** A `CrossDimensionalLinkTable` used by the scoring
-overlay. Every row carries the contrast it was measured against, because
+**What it produces.** A `CrossDimensionalLinkTable` the alignment cost
+consults. Every row carries the contrast it was measured against, because
 a conditional probability without its baseline is not evidence of
 conditioning. See `docs/correspondence_discovery.md` for the criterion
 and for what the original Python design had that this does not.
+
+**Where it is charged, and why that is a stage-order fact.** As of
+2026-08-16 the DP charges for these rules while it searches, rather than
+the rules re-scoring an alignment already chosen. The adjustment is local
+to a DP transition — its source predicate reads the source form at the
+link's start and its target value the target form at that position plus
+the rule's offset, and both forms are fixed input — so the DP can price
+it, and the alignment returned is now the one minimising the function
+that reports its cost.
+
+The consequence lands on the *next* stage. Long-range context discovery
+runs after this one and re-aligns, so it now sees alignments chosen in
+knowledge of the cross-dimensional rules. That is a change in what that
+stage is shown, not only in what a caller is told an alignment cost, and
+it is why stage order is load-bearing here as elsewhere. Measured over
+every corpus in the tree it moved two — both tonal, both improving their
+`cost_per_segment` — and left every `testdata/soundlaws/` fixture
+bit-identical.
 
 **Why the environment is tested against its complement rather than
 scored on its own.** The stage answers "does this feature condition this
