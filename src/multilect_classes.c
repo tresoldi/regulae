@@ -725,14 +725,14 @@ static rg_status refine_pivot_split(
     int depth,
     int max_depth,
     const rg_split_gate *gates,
-    double penalty,
-    double search_gamma,
+    const rg_split_score_config *score_config,
     double min_commit,
     double n_total
 ) {
     rg_split_search search;
     rg_split_result best;
     rg_status status = RG_OK;
+    int found = 0;
 
     if (depth >= max_depth || count == 0) {
         return RG_OK;
@@ -741,20 +741,21 @@ static rg_status refine_pivot_split(
     if (status != RG_OK) {
         return status;
     }
-    if (rg_split_find_best(&search, rows, count, state->all, gates, state->all_count,
-                           penalty, search_gamma, &best)) {
+    status = rg_split_find_best(&search, rows, count, state->all, gates, state->all_count,
+                                score_config, &best, &found);
+    if (status == RG_OK && found) {
         rg_context_spec narrowed;
         status = rg_context_extend_internal(base_context, &best.candidate, &narrowed);
         if (status == RG_OK) {
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                          &narrowed, search.best_yes, best.yes_count,
-                                         search.best_no, best.no_count, best.delta_bic,
+                                         search.best_no, best.no_count, best.delta_score,
                                          best.search_margin,
                                          state->decision_count++, min_commit, n_total);
             if (status == RG_OK) {
                 status = refine_pivot_split(state, bucket, &narrowed, search.best_yes,
                                             best.yes_count, depth + 1, max_depth,
-                                            gates, penalty, search_gamma, min_commit, n_total);
+                                            gates, score_config, min_commit, n_total);
             }
             rg_context_spec_clear_internal(&narrowed);
         }
@@ -772,8 +773,7 @@ static rg_status commit_splits_for_pivot(
     const rg_split_gate *all_gates,
     double min_obs,
     int max_depth,
-    double penalty,
-    double search_gamma,
+    const rg_split_score_config *score_config,
     double min_commit,
     double n_total
 ) {
@@ -805,9 +805,11 @@ static rg_status commit_splits_for_pivot(
 
     while (committed_count < RG_SPLIT_MAX_COMMITS(max_depth) && rg_split_total_weight(remaining, remaining_count) >= min_obs) {
         rg_split_result best;
+        int found = 0;
 
-        if (!rg_split_find_best(&search, remaining, remaining_count, candidates, gates,
-                                candidate_count, penalty, search_gamma, &best)) {
+        status = rg_split_find_best(&search, remaining, remaining_count, candidates, gates,
+                                    candidate_count, score_config, &best, &found);
+        if (status != RG_OK || !found) {
             break;
         }
         {
@@ -823,7 +825,7 @@ static rg_status commit_splits_for_pivot(
                     best.yes_count,
                     search.best_no,
                     best.no_count,
-                    best.delta_bic,
+                    best.delta_score,
                     best.search_margin,
                     state->decision_count++,
                     min_commit,
@@ -835,7 +837,7 @@ static rg_status commit_splits_for_pivot(
                 if (status == RG_OK) {
                     status = refine_pivot_split(state, bucket, &yes_context, search.best_yes,
                                                 best.yes_count, 1, max_depth, all_gates,
-                                                penalty, search_gamma, min_commit, n_total);
+                                                score_config, min_commit, n_total);
                 }
                 rg_context_spec_clear_internal(&yes_context);
             }
@@ -1141,7 +1143,7 @@ static rg_status merge_committed_splits(
 }
 
 /* Class-level context discovery: for each (pivot lect, pivot grapheme) that
- * appears across more than one sister tuple, a greedy BIC-driven split on the
+ * appears across more than one sister tuple, a greedy score-driven split on the
  * pivot's own phonological context. Committed splits become conditioned
  * classes, deduplicated across pivots by their full segment tuple. */
 rg_status multi_lect_context_discovery(
@@ -1309,7 +1311,8 @@ rg_status multi_lect_context_discovery(
         size_t distinct = 0;
         size_t j;
         double n_total;
-        double penalty;
+        rg_split_score_config immediate_score;
+        rg_split_score_config long_score;
         double min_commit;
 
         for (j = 0; j < bucket->obs_count; j++) {
@@ -1330,11 +1333,16 @@ rg_status multi_lect_context_discovery(
         }
 
         n_total = mass;
-        penalty = log(n_total);
-        if (options->bic.multi_lect_bic_small_sample_correction) {
-            double denom = n_total - 1.0 < 1.0 ? 1.0 : n_total - 1.0;
-            penalty += 2.0 / denom;
-        }
+        immediate_score.scorer = options->bic.split_scorer;
+        immediate_score.dirichlet_concentration = options->bic.split_prior_concentration;
+        immediate_score.bic_log_sample_size = log(n_total);
+        immediate_score.bic_extra_penalty = options->bic.multi_lect_bic_small_sample_correction
+            ? 2.0 / (n_total - 1.0 < 1.0 ? 1.0 : n_total - 1.0)
+            : 0.0;
+        immediate_score.candidate_count = 0;
+        immediate_score.search_gamma = options->bic.search_penalty_gamma;
+        long_score = immediate_score;
+        long_score.bic_extra_penalty = 0.0;
         min_commit = (double)multi_lect_min_commit_count(n_total, options->bic.multi_lect_min_commit_scale);
         if (n_total >= 4.0) {
             status = commit_splits_for_pivot(
@@ -1346,8 +1354,7 @@ rg_status multi_lect_context_discovery(
                 all_gates,
                 (double)options->bic.min_split_observations,
                 options->bic.max_split_depth,
-                penalty,
-                options->bic.search_penalty_gamma,
+                &immediate_score,
                 min_commit,
                 n_total
             );
@@ -1369,8 +1376,7 @@ rg_status multi_lect_context_discovery(
                 all_gates,
                 (double)options->bic.long_range_min_split_observations,
                 options->bic.max_split_depth,
-                log(n_total),
-                options->bic.search_penalty_gamma,
+                &long_score,
                 long_min_commit,
                 n_total
             );
@@ -1446,4 +1452,3 @@ rg_status multi_lect_context_discovery(
     free(all_gates);
     return status;
 }
-

@@ -3,6 +3,7 @@
 #include "environment.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -100,11 +101,17 @@ static rg_status collect_key_mass(
     }
     *out_items = items;
     *out_count = item_count;
-    *out_total = total;
+    if (out_total != 0) {
+        *out_total = total;
+    }
     return RG_OK;
 }
 
-double rg_split_group_cost(const rg_split_observation *rows, size_t count) {
+static double split_group_cost(
+    const rg_split_observation *rows,
+    size_t count,
+    size_t *out_key_count
+) {
     key_mass *items = 0;
     size_t item_count = 0;
     double total = 0.0;
@@ -112,7 +119,13 @@ double rg_split_group_cost(const rg_split_observation *rows, size_t count) {
     size_t i;
 
     if (collect_key_mass(rows, count, &items, &item_count, &total) != RG_OK) {
+        if (out_key_count != 0) {
+            *out_key_count = 0;
+        }
         return 0.0;
+    }
+    if (out_key_count != 0) {
+        *out_key_count = item_count;
     }
     if (total <= 0.0) {
         free(items);
@@ -126,6 +139,10 @@ double rg_split_group_cost(const rg_split_observation *rows, size_t count) {
     }
     free(items);
     return cost;
+}
+
+double rg_split_group_cost(const rg_split_observation *rows, size_t count) {
+    return split_group_cost(rows, count, 0);
 }
 
 double rg_split_total_weight(const rg_split_observation *rows, size_t count) {
@@ -156,37 +173,143 @@ double rg_split_dominant_fraction(const rg_split_observation *rows, size_t count
     return total > 0.0 ? mode / total : 0.0;
 }
 
-int rg_split_find_best(
+static void masses_in_alphabet(
+    const key_mass *alphabet,
+    size_t alphabet_count,
+    const key_mass *items,
+    size_t item_count,
+    double *out
+) {
+    size_t a;
+    size_t i = 0;
+    for (a = 0; a < alphabet_count; a++) {
+        out[a] = 0.0;
+        while (i < item_count && strcmp(items[i].key, alphabet[a].key) < 0) {
+            i++;
+        }
+        if (i < item_count && strcmp(items[i].key, alphabet[a].key) == 0) {
+            out[a] = items[i].mass;
+        }
+    }
+}
+
+static int candidates_same_split(
+    const rg_split_observation *rows,
+    size_t count,
+    const rg_split_candidate *a,
+    const rg_split_candidate *b
+) {
+    size_t i;
+    int same = 1;
+    int opposite = 1;
+    for (i = 0; i < count; i++) {
+        int a_holds = rg_predicate_holds_internal(rows[i].context, a) != 0;
+        int b_holds = rg_predicate_holds_internal(rows[i].context, b) != 0;
+        same = same && a_holds == b_holds;
+        opposite = opposite && a_holds != b_holds;
+    }
+    return same || opposite;
+}
+
+static rg_status distinct_partition_count(
+    const rg_split_observation *rows,
+    size_t count,
+    const rg_split_candidate *candidates,
+    size_t candidate_count,
+    size_t *out
+) {
+    uint64_t *hashes;
+    size_t distinct = 0;
+    size_t c;
+    hashes = (uint64_t *)calloc(candidate_count == 0 ? 1 : candidate_count, sizeof(*hashes));
+    if (hashes == 0) {
+        return RG_ERR_OOM;
+    }
+    for (c = 0; c < candidate_count; c++) {
+        uint64_t hash = UINT64_C(1469598103934665603);
+        uint64_t complement_hash = UINT64_C(1469598103934665603);
+        size_t i;
+        int duplicate = 0;
+        for (i = 0; i < count; i++) {
+            uint64_t holds = (uint64_t)(rg_predicate_holds_internal(
+                rows[i].context, &candidates[c]) != 0);
+            hash ^= holds;
+            hash *= UINT64_C(1099511628211);
+            complement_hash ^= UINT64_C(1) - holds;
+            complement_hash *= UINT64_C(1099511628211);
+        }
+        hash = hash < complement_hash ? hash : complement_hash;
+        for (i = 0; i < c; i++) {
+            if (hashes[i] == hash &&
+                candidates_same_split(rows, count, &candidates[c], &candidates[i])) {
+                duplicate = 1;
+                break;
+            }
+        }
+        hashes[c] = hash;
+        if (!duplicate) {
+            distinct++;
+        }
+    }
+    free(hashes);
+    *out = distinct;
+    return RG_OK;
+}
+
+rg_status rg_split_find_best(
     rg_split_search *search,
     const rg_split_observation *rows,
     size_t count,
     const rg_split_candidate *candidates,
     const rg_split_gate *gates,
     size_t candidate_count,
-    double penalty,
-    double search_gamma,
-    rg_split_result *out
+    const rg_split_score_config *score_config,
+    rg_split_result *out,
+    int *found
 ) {
-    double baseline = rg_split_group_cost(rows, count);
-    /* Charge for the search, not only for the parameter.
-     *
-     * BIC prices one added term against the likelihood it buys. The term that
-     * survives here is not one term: it is the best of candidate_count of them,
-     * and the maximum of a hundred candidates beats its bar by chance far more
-     * often than one candidate does. Permuting a corpus's pairings -- which
-     * removes every correspondence there is to find -- used to *raise* the
-     * number of committed rules, which is what an unpriced argmax looks like.
-     *
-     * 2*ln(candidates) is the same currency as the BIC penalty and is the
-     * standard extended-BIC shape for a large model space. It is not a
-     * substitute for the shuffled baseline, which measures the inflation this
-     * only models. */
-    double search_penalty = candidate_count > 1 ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
+    key_mass *pooled_items = 0;
+    size_t outcome_count = 0;
+    double *pooled_mass = 0;
+    double *yes_mass = 0;
+    double *no_mass = 0;
     double best_margin = 0.0;
-    int found = 0;
+    rg_status status;
+    size_t partition_count = 0;
     size_t ci;
 
+    if (search == 0 || rows == 0 || candidates == 0 || gates == 0 ||
+        score_config == 0 || out == 0 || found == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    *found = 0;
+    status = distinct_partition_count(rows, count, candidates, candidate_count, &partition_count);
+    if (status != RG_OK) {
+        return status;
+    }
+    status = collect_key_mass(rows, count, &pooled_items, &outcome_count, 0);
+    if (status != RG_OK) {
+        return status;
+    }
+    if (outcome_count < 2) {
+        free(pooled_items);
+        return RG_OK;
+    }
+    pooled_mass = (double *)calloc(outcome_count, sizeof(*pooled_mass));
+    yes_mass = (double *)calloc(outcome_count, sizeof(*yes_mass));
+    no_mass = (double *)calloc(outcome_count, sizeof(*no_mass));
+    if (pooled_mass == 0 || yes_mass == 0 || no_mass == 0) {
+        free(pooled_items);
+        free(pooled_mass);
+        free(yes_mass);
+        free(no_mass);
+        return RG_ERR_OOM;
+    }
+    masses_in_alphabet(pooled_items, outcome_count, pooled_items, outcome_count, pooled_mass);
     for (ci = 0; ci < candidate_count; ci++) {
+        key_mass *yes_items = 0;
+        key_mass *no_items = 0;
+        size_t yes_item_count = 0;
+        size_t no_item_count = 0;
         double min_obs = gates[ci].min_obs;
         double delta_threshold = gates[ci].delta_threshold;
         double min_dominant_fraction = gates[ci].min_dominant_fraction;
@@ -194,8 +317,8 @@ int rg_split_find_best(
         size_t yes_count = 0;
         size_t no_count = 0;
         size_t i;
-        double split_cost;
-        double delta_bic;
+        rg_split_score_config candidate_config = *score_config;
+        rg_split_score_result scored;
         for (i = 0; i < count; i++) {
             if (rg_predicate_holds_internal(rows[i].context, &candidates[ci])) {
                 search->yes[yes_count++] = rows[i];
@@ -211,17 +334,34 @@ int rg_split_find_best(
             rg_split_dominant_fraction(search->yes, yes_count) < min_dominant_fraction) {
             continue;
         }
-        split_cost = rg_split_group_cost(search->yes, yes_count) +
-                     rg_split_group_cost(search->no, no_count);
-        delta_bic = -2.0 * (baseline - split_cost) + penalty + search_penalty;
-        margin = delta_threshold - delta_bic;
+        status = collect_key_mass(search->yes, yes_count, &yes_items, &yes_item_count, 0);
+        if (status == RG_OK) {
+            status = collect_key_mass(search->no, no_count, &no_items, &no_item_count, 0);
+        }
+        if (status != RG_OK) {
+            free(yes_items);
+            free(no_items);
+            break;
+        }
+        masses_in_alphabet(pooled_items, outcome_count, yes_items, yes_item_count, yes_mass);
+        masses_in_alphabet(pooled_items, outcome_count, no_items, no_item_count, no_mass);
+        free(yes_items);
+        free(no_items);
+        candidate_config.candidate_count = partition_count;
+        status = rg_categorical_split_score_internal(pooled_mass, yes_mass, no_mass,
+                                                     outcome_count, &candidate_config, &scored);
+        if (status != RG_OK) {
+            break;
+        }
+        margin = delta_threshold - scored.delta;
         /* Two predicates can carve the same partition and so clear their bar by
          * the same amount. Requiring a later candidate to beat the incumbent by
          * more than the tie epsilon hands the tie to candidate order, which is
          * the same everywhere, rather than to the last bit of a log. */
         if (margin > best_margin + RG_TIE_EPSILON) {
             best_margin = margin;
-            out->delta_bic = delta_bic;
+            out->scorer = score_config->scorer;
+            out->delta_score = scored.delta;
             /* How heavy a search charge this split's evidence could carry and
              * still commit. The charge is gamma * 2 * ln(candidates), so the
              * gamma at which this split stops clearing its bar is a
@@ -229,16 +369,21 @@ int rg_split_find_best(
              * the search that found it -- and it can be compared against the
              * same number computed on the corpus shuffled, which is what the
              * fit summary reports. */
-            out->search_margin = candidate_count > 1
-                ? (delta_threshold - (delta_bic - search_penalty)) / (2.0 * log((double)candidate_count))
+            out->search_margin = partition_count > 1
+                ? (delta_threshold - (scored.delta - scored.search_charge)) /
+                  (2.0 * log((double)partition_count))
                 : 0.0;
             out->candidate = candidates[ci];
             memcpy(search->best_yes, search->yes, yes_count * sizeof(*search->yes));
             memcpy(search->best_no, search->no, no_count * sizeof(*search->no));
             out->yes_count = yes_count;
             out->no_count = no_count;
-            found = 1;
+            *found = 1;
         }
     }
-    return found;
+    free(pooled_items);
+    free(pooled_mass);
+    free(yes_mass);
+    free(no_mass);
+    return status;
 }

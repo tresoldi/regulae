@@ -41,6 +41,8 @@ typedef struct loader_form {
 
 typedef struct loader_cognate {
     char *cognate_id;
+    char *etymon_group;
+    char *source_group;
     loader_form *forms;
     size_t form_count;
     size_t form_cap;
@@ -95,6 +97,8 @@ rg_status loader_form_from(const rg_form *src, const char *lect_id, loader_form 
 loader_cognate *corpus_ensure_cognate(rg_corpus *corpus, const char *cognate_id);
 loader_cognate *corpus_append_cognate(rg_corpus *corpus, const char *base_id);
 rg_status cognate_append_form(loader_cognate *cognate, loader_form *form);
+rg_status cognate_set_groups(loader_cognate *cognate, const char *etymon_group,
+                             const char *source_group);
 rg_status corpus_publish(rg_corpus *corpus, int min_lects);
 void loader_cognate_clear(loader_cognate *cognate);
 

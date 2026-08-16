@@ -63,6 +63,7 @@ static void test_model_rendering(rg_context *ctx) {
     char *text;
     size_t i;
 
+    memset(cognates, 0, sizeof(cognates));
     source[0] = seg("p");
     source[1] = seg("a");
     source[2] = seg("t");

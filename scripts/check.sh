@@ -92,6 +92,9 @@ python3 scripts/guide.py >/dev/null || fail "scripts/guide.py"
 python3 scripts/graded.py >/dev/null || fail "scripts/graded.py"
 python3 scripts/restraint.py >/dev/null || fail "scripts/restraint.py"
 python3 scripts/diagnostics.py >/dev/null || fail "scripts/diagnostics.py"
+python3 scripts/linguistic_probes.py >/dev/null || fail "scripts/linguistic_probes.py"
+python3 scripts/evaluate_m2.py >/dev/null || fail "scripts/evaluate_m2.py"
+python3 scripts/evaluate_m3.py --verify >/dev/null || fail "scripts/evaluate_m3.py"
 
 # A second compiler, because every assumption GCC happens to be lenient about
 # is otherwise untested -- and until 2026-08-15 the string "clang" appeared

@@ -100,10 +100,19 @@ static void test_options_reader(void) {
     rg_train_options options;
     char detail[256];
 
-    assert(rg_json_read_train_options_internal("{\"max_chunk_size\":2,\"temperature\":0.5}",
+    assert(rg_json_read_train_options_internal(
+                                               "{\"max_chunk_size\":2,\"temperature\":0.5,"
+                                               "\"bootstrap_unit\":\"source_group\","
+                                               "\"split_scorer\":\"dirichlet_marginal\","
+                                               "\"split_prior_concentration\":2.0,"
+                                               "\"search_penalty_gamma\":1.0}",
                                                &options, detail, sizeof(detail)) == RG_OK);
     assert(options.max_chunk_size == 2);
     assert(options.temperature == 0.5);
+    assert(options.bootstrap_unit == RG_OBSERVATION_UNIT_SOURCE_GROUP);
+    assert(options.bic.split_scorer == RG_SPLIT_SCORER_DIRICHLET_MARGINAL);
+    assert(options.bic.split_prior_concentration == 2.0);
+    assert(options.bic.search_penalty_gamma == 1.0);
     /* Untouched fields keep their defaults. */
     assert(options.concentration == 5.0);
 

@@ -180,6 +180,8 @@ rg_status load_tsv(
     long segments_col;
     long alignment_col = -1;
     long confidence_col = -1;
+    long etymon_group_col = -1;
+    long source_group_col = -1;
     long tone_col = -1;
     long breaks_col = -1;
     long syllables_col = -1;
@@ -211,6 +213,12 @@ rg_status load_tsv(
     if (opts.stress_column == 0) {
         opts.stress_column = "stress";
     }
+    if (opts.etymon_group_column == 0) {
+        opts.etymon_group_column = "etymon_group";
+    }
+    if (opts.source_group_column == 0) {
+        opts.source_group_column = "source_group";
+    }
 
     status = read_table_source(path, text, '\t', &table);
     if (status != RG_OK) {
@@ -237,6 +245,8 @@ rg_status load_tsv(
     if (opts.confidence_column != 0) {
         confidence_col = column_index(&table, opts.confidence_column);
     }
+    etymon_group_col = column_index(&table, opts.etymon_group_column);
+    source_group_col = column_index(&table, opts.source_group_column);
     tone_col = column_index(&table, opts.tone_column);
     /* Morpheme boundaries, as indices into the segment sequence, the same
      * shape the wide loader's <lect>_breaks column carries. Without a column
@@ -259,12 +269,16 @@ rg_status load_tsv(
         const loader_row *row = &table.rows[r];
         char *cognate_id = trim_copy(cell(row, cognate_col));
         char *lect_id = trim_copy(cell(row, lect_col));
+        char *etymon_group = etymon_group_col < 0 ? 0 : trim_copy(cell(row, etymon_group_col));
+        char *source_group = source_group_col < 0 ? 0 : trim_copy(cell(row, source_group_col));
         loader_cognate *cognate;
         loader_form form;
 
         memset(&form, 0, sizeof(form));
 
-        if (cognate_id == 0 || lect_id == 0) {
+        if (cognate_id == 0 || lect_id == 0 ||
+            (etymon_group_col >= 0 && etymon_group == 0) ||
+            (source_group_col >= 0 && source_group == 0)) {
             status = RG_ERR_OOM;
             goto row_done;
         }
@@ -317,6 +331,10 @@ rg_status load_tsv(
         cognate = corpus_ensure_cognate(corpus, cognate_id);
         if (cognate == 0) {
             status = RG_ERR_OOM;
+            goto row_done;
+        }
+        status = cognate_set_groups(cognate, etymon_group, source_group);
+        if (status != RG_OK) {
             goto row_done;
         }
         /* The form takes the lect id, and then the cognate takes the form.
@@ -374,6 +392,8 @@ rg_status load_tsv(
         loader_form_clear(&form);
         free(cognate_id);
         free(lect_id);
+        free(etymon_group);
+        free(source_group);
         if (status != RG_OK) {
             break;
         }
@@ -389,4 +409,3 @@ rg_status load_tsv(
     *out = corpus;
     return RG_OK;
 }
-

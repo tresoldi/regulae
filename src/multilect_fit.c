@@ -254,6 +254,7 @@ rg_status run_permutation_baseline(
 );
 rg_status bootstrap_class_intervals(
     rg_multi_model *model,
+    const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options
 );
@@ -263,8 +264,80 @@ rg_status bootstrap_class_intervals(
  * it that has a trained model. This is the corpus's goodness of fit read one
  * set at a time: the outlier diagnostic z-scores it across sets, and the fit
  * summary averages it. */
+static rg_observation_unit resolve_bootstrap_unit(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_observation_unit requested
+) {
+    size_t i;
+    if (requested != RG_OBSERVATION_UNIT_AUTO) {
+        return requested;
+    }
+    for (i = 0; i < cognate_count; i++) {
+        if (cognates[i].etymon_group != 0 && cognates[i].etymon_group[0] != '\0') {
+            return RG_OBSERVATION_UNIT_ETYMON_GROUP;
+        }
+    }
+    return RG_OBSERVATION_UNIT_COGNATE_SET;
+}
+
+static int same_observation_group(
+    const rg_cognate_set *left,
+    const rg_cognate_set *right,
+    rg_observation_unit unit
+) {
+    const char *a = 0;
+    const char *b = 0;
+    if (unit == RG_OBSERVATION_UNIT_ETYMON_GROUP) {
+        a = left->etymon_group;
+        b = right->etymon_group;
+    } else if (unit == RG_OBSERVATION_UNIT_SOURCE_GROUP) {
+        a = left->source_group;
+        b = right->source_group;
+    }
+    if (a != 0 && a[0] != '\0' && b != 0 && b[0] != '\0') {
+        return strcmp(a, b) == 0;
+    }
+    if ((a != 0 && a[0] != '\0') || (b != 0 && b[0] != '\0')) {
+        return 0;
+    }
+    return left->cognate_id != 0 && right->cognate_id != 0 &&
+           strcmp(left->cognate_id, right->cognate_id) == 0;
+}
+
+static rg_status observation_groups(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_observation_unit unit,
+    size_t **out_group_of,
+    size_t *out_group_count
+) {
+    size_t *group_of;
+    size_t count = 0;
+    size_t i;
+    group_of = (size_t *)calloc(cognate_count == 0 ? 1 : cognate_count, sizeof(*group_of));
+    if (group_of == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < cognate_count; i++) {
+        size_t j;
+        for (j = 0; j < i; j++) {
+            if (same_observation_group(&cognates[i], &cognates[j], unit)) {
+                group_of[i] = group_of[j];
+                break;
+            }
+        }
+        if (j == i) {
+            group_of[i] = count++;
+        }
+    }
+    *out_group_of = group_of;
+    *out_group_count = count;
+    return RG_OK;
+}
+
 /* Replaces the closed-form intervals on the multi-lect classes with ones
- * resampled over whole cognate sets.
+ * resampled over caller-named observational groups.
  *
  * The Wilson interval's denominator counts aligned positions, and positions
  * from one word pair are not independent observations of anything: a
@@ -279,26 +352,39 @@ rg_status bootstrap_class_intervals(
  * table that exists. */
 rg_status bootstrap_class_intervals(
     rg_multi_model *model,
+    const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options
 ) {
     size_t draws = options->bootstrap_n > 0 ? (size_t)options->bootstrap_n : 0;
     size_t class_count = model->unconditioned_class_count + model->conditioned_class_count;
     size_t *multiplicity;
+    size_t *group_multiplicity;
+    size_t *group_of = 0;
+    size_t group_count = 0;
     double *rates;
     double *counts;
     uint64_t rng;
     size_t b;
     size_t i;
+    rg_observation_unit unit = resolve_bootstrap_unit(cognates, cognate_count,
+                                                       options->bootstrap_unit);
 
     if (draws == 0 || class_count == 0 || cognate_count == 0) {
         return RG_OK;
     }
+    if (observation_groups(cognates, cognate_count, unit, &group_of, &group_count) != RG_OK) {
+        return RG_ERR_OOM;
+    }
     multiplicity = (size_t *)calloc(cognate_count, sizeof(*multiplicity));
+    group_multiplicity = (size_t *)calloc(group_count == 0 ? 1 : group_count,
+                                           sizeof(*group_multiplicity));
     counts = (double *)calloc(class_count, sizeof(*counts));
     rates = (double *)calloc(class_count * draws, sizeof(*rates));
-    if (multiplicity == 0 || counts == 0 || rates == 0) {
+    if (multiplicity == 0 || group_multiplicity == 0 || counts == 0 || rates == 0) {
+        free(group_of);
         free(multiplicity);
+        free(group_multiplicity);
         free(counts);
         free(rates);
         return RG_ERR_OOM;
@@ -307,11 +393,15 @@ rg_status bootstrap_class_intervals(
         + 1442695040888963407ULL;
     for (b = 0; b < draws; b++) {
         double total = 0.0;
-        for (i = 0; i < cognate_count; i++) {
-            multiplicity[i] = 0;
+        for (i = 0; i < group_count; i++) {
+            group_multiplicity[i] = 0;
+        }
+        for (i = 0; i < group_count; i++) {
+            group_multiplicity[(size_t)(permutation_next(&rng) %
+                (uint64_t)(unsigned long)group_count)]++;
         }
         for (i = 0; i < cognate_count; i++) {
-            multiplicity[(size_t)(permutation_next(&rng) % (uint64_t)(unsigned long)cognate_count)]++;
+            multiplicity[i] = group_multiplicity[group_of[i]];
         }
         for (i = 0; i < class_count; i++) {
             counts[i] = 0.0;
@@ -350,9 +440,13 @@ rg_status bootstrap_class_intervals(
             continue;
         }
         estimate.post_selection = post;
+        estimate.observation_unit = unit;
+        estimate.effective_n = (double)group_count;
         owned->uncertainty = estimate;
     }
+    free(group_of);
     free(multiplicity);
+    free(group_multiplicity);
     free(counts);
     free(rates);
     return RG_OK;
@@ -501,11 +595,44 @@ rg_status compute_corpus_fit(
     rg_multi_model *model
 ) {
     rg_status status;
+    size_t *groups = 0;
+    size_t c;
 
     model->fit.unconditioned_class_count = model->unconditioned_class_count;
     model->fit.conditioned_class_count = model->conditioned_class_count;
+    model->fit.split_scorer = options->bic.split_scorer;
+    model->fit.split_prior_concentration = options->bic.split_prior_concentration;
+    model->fit.bootstrap_unit = resolve_bootstrap_unit(cognates, cognate_count,
+                                                       options->bootstrap_unit);
+    for (c = 0; c < cognate_count; c++) {
+        if (cognates[c].etymon_group == 0 || cognates[c].etymon_group[0] == '\0') {
+            model->fit.sets_without_etymon_group++;
+        }
+        if (cognates[c].source_group == 0 || cognates[c].source_group[0] == '\0') {
+            model->fit.sets_without_source_group++;
+        }
+    }
+    status = observation_groups(cognates, cognate_count, RG_OBSERVATION_UNIT_ETYMON_GROUP,
+                                &groups, &model->fit.etymon_group_count);
+    free(groups);
+    groups = 0;
+    if (status != RG_OK) {
+        return status;
+    }
+    status = observation_groups(cognates, cognate_count, RG_OBSERVATION_UNIT_SOURCE_GROUP,
+                                &groups, &model->fit.source_group_count);
+    free(groups);
+    groups = 0;
+    if (status != RG_OK) {
+        return status;
+    }
+    status = observation_groups(cognates, cognate_count, model->fit.bootstrap_unit,
+                                &groups, &model->fit.bootstrap_effective_unit_count);
+    free(groups);
+    if (status != RG_OK) {
+        return status;
+    }
     {
-        size_t c;
         for (c = 0; c < cognate_count; c++) {
             size_t f;
             for (f = 0; f < cognates[c].form_count; f++) {

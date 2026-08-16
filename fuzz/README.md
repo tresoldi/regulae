@@ -34,7 +34,7 @@ a proof.
 
 ## What the first run found
 
-Within a minute, two defects in `loaders.c`, both fixed and both now regression
+Within the first runs, three defects in the loaders, all fixed and now regression
 tests in `tests/c/test_loaders.c` rather than something only a fuzzer reaches:
 
 - **A read past the end of a truncated stress mark.** `lift_stress_mark`
@@ -44,6 +44,11 @@ tests in `tests/c/test_loaders.c` rather than something only a fuzzer reaches:
 - **A leak on a refused row.** A stress column with fewer values than the row
   has segments is correctly refused, and that one branch of eight in the row
   loop had been written without the two `free` calls the other seven have.
+- **A leak on a stressed tone-only token.** Tone lifting attaches a standalone
+  Chao digit to the previous segment and removes its token. A malformed token
+  carrying both a stress mark and only tone also owned the lifted stress value;
+  removing it abandoned that allocation. Such a token is now retained for
+  diagnosis rather than guessed away.
 
 After the fixes, 3.2 million executions across the four targets found nothing
 further.

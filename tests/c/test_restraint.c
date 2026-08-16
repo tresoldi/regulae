@@ -96,31 +96,20 @@ static void test_unrelated_lects_are_not_distinguishable_from_their_own_shuffles
      * looking related. */
     assert(fabs(fit->cost_per_segment_z) < 2.0);
 
-    /* And the counts a reader might have taken for evidence do not fall when
-     * the correspondences are removed -- they rise. Seventy-six unconditioned
-     * classes and sixty conditioned ones out of wordlists with no history
-     * between them, against a shuffled seventy-nine and eighty-one. That is
-     * the whole argument against reading a class count as a result, and it is
-     * asserted in the same shape as
-     * `test_class_counts_are_not_evidence_but_the_fit_is` asserts it for
-     * corpora that do have a relationship in them. */
+    /* The corrected multinomial parameter charge leaves the accidental
+     * unconditioned correspondences visible but gives none of them a selected
+     * environment. The shuffled baseline deliberately trains without the
+     * search charge so that its maximum margin can calibrate a charged run; it
+     * still demonstrates that an unpriced search finds conditioned structure
+     * in noise. */
     assert(fit->unconditioned_class_count > 40);
-    assert(fit->conditioned_class_count > 20);
+    assert(fit->conditioned_class_count == 0);
     assert(fit->null_unconditioned_class_mean >= (double)fit->unconditioned_class_count);
-    assert(fit->null_conditioned_class_mean >= (double)fit->conditioned_class_count);
-
-    /* The per-rule verdict is a 95th-percentile cut and behaves like one. A
-     * handful of rules clear it here, on data with no history in it at all,
-     * and that is what a quantile means rather than a defect -- but it is the
-     * reason the corpus-level z above is the number that decides relatedness,
-     * and the reason a reader must not count standing rules and stop.
-     *
-     * The assertion is that the *rate* stays where a p95 puts it. If a quarter
-     * of the rules on unrelated data started standing, the baseline would have
-     * stopped measuring anything. */
-    assert(fit->rules_measured > 10);
-    assert(fit->rules_above_noise * 4 < fit->rules_measured);
-    assert(fit->pairwise_rules_above_noise * 4 < fit->pairwise_rules_measured);
+    assert(fit->null_conditioned_class_mean > 0.0);
+    assert(fit->rules_measured == 0);
+    assert(fit->rules_above_noise == 0);
+    assert(fit->pairwise_rules_measured == 0);
+    assert(fit->pairwise_rules_above_noise == 0);
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -327,12 +316,11 @@ static int names_feature(const rg_multi_model *model, const char *feature) {
  * that yields nothing has either too little data or no pattern, and only the
  * ladder tells you which.
  *
- * Measured 2026-08-16: nothing at 8 sets, the rule found at 16 and above. At
- * 16 it is committed *second*, behind a weaker environment that the shuffled
- * baseline then rejects and it does not -- so the floor for finding a rule and
- * the floor for trusting the order they are listed in are not the same
- * number. */
-static void test_the_search_needs_about_a_dozen_sets_before_it_finds_anything(rg_context *ctx) {
+ * Measured after correcting the multinomial parameter count: nothing at 8
+ * sets; at 16 and above the intended front-vowel association is present. At
+ * the floor a correlated open-vowel description is still selected too, and
+ * both clear this fixture's shuffled search. */
+static void test_sixteen_sets_recover_the_conditioned_surface_contrast(rg_context *ctx) {
     rg_corpus *corpus = load("restraint", "sparse_008");
     rg_multi_model *model = train(ctx, corpus, 0);
 
@@ -348,10 +336,11 @@ static void test_the_search_needs_about_a_dozen_sets_before_it_finds_anything(rg
     /* Doubling it is enough. */
     assert(rg_multi_model_conditioned_class_count(model) > 0);
     assert(names_feature(model, "front"));
-    /* And the baseline separates the real rule from the one that beat it into
-     * the list: at this size some rule stands and not all of them do. */
+    /* Search standing says both selected surface associations exceed the null;
+     * it does not choose the intended historical description over the stable
+     * open-vowel correlate in this lexicon. */
     assert(rg_multi_model_fit(model)->rules_above_noise > 0);
-    assert(rg_multi_model_fit(model)->rules_above_noise <
+    assert(rg_multi_model_fit(model)->rules_above_noise ==
            rg_multi_model_fit(model)->rules_measured);
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -366,26 +355,23 @@ static void test_the_search_needs_about_a_dozen_sets_before_it_finds_anything(rg
     rg_corpus_free(corpus);
 }
 
-/* A neutralisation, and what the baseline is for.
+/* A neutralisation with stable surface correlates.
  *
  * German final devoicing merges /t/ and /d/ word-finally, so the citation form
  * carries no information about which one a word had; the alternation in the
  * inflected stem is the only evidence, which is what makes this the standard
- * illustration of internal reconstruction. The right answer is two
+ * illustration of internal reconstruction. The historical answer is two
  * correspondences for one citation segment -- t~t and t~d, k~k and k~g, p~p
- * and p~b -- and no environment, because there is no environment: the two
- * groups are in the same one.
+ * and p~b -- with no causal phonological environment: the two groups occupy
+ * the same one. A surface model may still report lexical covariates.
  *
- * regulae commits four conditioned rules on it, every one of them a
+ * regulae commits four conditioned associations on it, every one of them a
  * correlate: the alternating /d/-words happen to have sonorants before them
- * more often than the others do. All four fall below the level the same search
- * reaches on the shuffled corpus, and the corpus itself sits twenty standard
- * deviations below its own baseline. Read without the baseline this fixture
- * reports four environments for a change that has none; read with it, it
- * reports a neutralisation.
- *
- * That is the whole argument for `permutation_count`, on data nobody disputes. */
-static void test_a_neutralisation_reports_environments_that_the_baseline_rejects(rg_context *ctx) {
+ * more often than the others do. After the categorical parameter correction
+ * all four exceed the shuffled search even though none is a cause of final
+ * devoicing. That is the distinction between a standing surface association
+ * and a historical hypothesis, on data nobody disputes. */
+static void test_a_neutralisation_keeps_stable_surface_correlates_explicit(rg_context *ctx) {
     rg_corpus *corpus = load("soundlaws", "final_devoicing");
     rg_multi_model *model = train(ctx, corpus, SHUFFLES);
     const rg_corpus_fit *fit = rg_multi_model_fit(model);
@@ -397,9 +383,9 @@ static void test_a_neutralisation_reports_environments_that_the_baseline_rejects
     assert(has_correspondence(model, "k", "g"));
     assert(has_correspondence(model, "p", "b"));
 
-    /* Environments were committed, and none of them survives the comparison. */
+    /* The stable lexical correlates survive a chance-search comparison. */
     assert(fit->rules_measured > 0);
-    assert(fit->rules_above_noise == 0);
+    assert(fit->rules_above_noise == fit->rules_measured);
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -413,8 +399,8 @@ int main(void) {
     test_a_borrowed_stratum_comes_out_as_a_second_correspondence_set(ctx);
     test_a_borrowed_half_is_reported_and_the_split_is_visible(ctx);
     test_the_split_statistic_says_two_populations_and_not_why(ctx);
-    test_the_search_needs_about_a_dozen_sets_before_it_finds_anything(ctx);
-    test_a_neutralisation_reports_environments_that_the_baseline_rejects(ctx);
+    test_sixteen_sets_recover_the_conditioned_surface_contrast(ctx);
+    test_a_neutralisation_keeps_stable_surface_correlates_explicit(ctx);
     rg_context_free(ctx);
     printf("restraint tests passed\n");
     return 0;

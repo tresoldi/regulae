@@ -28,7 +28,7 @@
  * looks identical to a corpus whose conditioning has been suppressed. Below
  * 0.25 the spurious commits the term exists to stop come back. */
 #ifndef RG_SEARCH_PENALTY_GAMMA
-#define RG_SEARCH_PENALTY_GAMMA 0.5
+#define RG_SEARCH_PENALTY_GAMMA 1.0
 #endif
 /* Stages the pairwise pipeline reports: initial prior, segment EM, displacement
  * aggregation, context discovery, chunk promotion, tonal aggregation,

@@ -1141,12 +1141,10 @@ static void test_conditioning_works_in_any_feature_system(void) {
  * the same search reaches on the corpus with its correspondences shuffled out,
  * and the fit summary counts them.
  *
- * The two fixtures here are the two answers. Rounding harmony is a regular
- * change on a corpus large enough to show it, and its rule towers over the
- * noise. Verner's law is real and its corpus is forty sets, and on forty sets
- * the search finds artefacts stronger than the law -- which is a fact about the
- * evidence, and the tool now says it rather than leaving the reader to work it
- * out. */
+ * Rounding harmony and Verner's law are regular changes on corpora large enough
+ * to show them. Their selected associations clear the current shuffled
+ * baseline; the row-by-row assertions below are the regression for both
+ * possible verdicts whenever a future fixture falls within noise. */
 static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
     static const char *fixtures[] = { "rounding_harmony", "verner" };
     size_t f;
@@ -1169,18 +1167,14 @@ static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
             /* A measured rule has a verdict, and it agrees with the numbers it
              * was computed from. */
             assert(row->evidence.standing != RG_RULE_STANDING_UNMEASURED);
+            assert(row->evidence.standing_null == RG_NULL_MODEL_PAIRING_SHUFFLE);
             if (row->evidence.search_margin > fit->null_search_margin) {
                 assert(row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE);
             } else {
                 assert(row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
             }
         }
-        if (strcmp(fixtures[f], "rounding_harmony") == 0) {
-            assert(fit->rules_above_noise == fit->rules_measured);
-        } else {
-            /* Not every real law clears its own corpus's noise. */
-            assert(fit->rules_above_noise < fit->rules_measured);
-        }
+        assert(fit->rules_above_noise == fit->rules_measured);
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
@@ -1266,6 +1260,8 @@ static void test_no_baseline_means_no_verdict(rg_context *ctx) {
     for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
         assert(rg_multi_model_conditioned_class_at(model, i)->evidence.standing ==
                RG_RULE_STANDING_UNMEASURED);
+        assert(rg_multi_model_conditioned_class_at(model, i)->evidence.standing_null ==
+               RG_NULL_MODEL_NONE);
     }
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -1273,16 +1269,11 @@ static void test_no_baseline_means_no_verdict(rg_context *ctx) {
 
 
 /* The multi-lect verdict is not the whole verdict, and Grassmann is the corpus
- * that proves it.
- *
- * Every conditioned class on it sits within noise, so `rules_above_noise` of
- * `rules_measured` reads 0 of 4: the corpus found nothing distinguishable from
- * having looked. But the law itself -- Greek t answering PIE tʰ where an
- * aspirate follows somewhere -- is a conditioned correspondence in the pair's
- * own model, and it stands. Counting it into the multi-lect pair would have
- * made the ratio depend on how many lects the corpus samples, because these are
- * counted per pair; reporting nothing about it left a corpus whose one real
- * finding stands looking like a corpus that had none. */
+ * that proves it. After the categorical parameter correction, one of three
+ * multi-lect associations and both per-pair associations stand with thirty
+ * shuffles. The unequal denominators are the point: counting the pairwise rows
+ * into the multi-lect ratio would make it depend on how many lect pairs the
+ * corpus samples. */
 static void test_the_per_pair_verdict_is_reported_separately(rg_context *ctx) {
     char path[1024];
     rg_corpus *corpus = 0;
@@ -1301,10 +1292,9 @@ static void test_the_per_pair_verdict_is_reported_separately(rg_context *ctx) {
                           rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
     fit = rg_multi_model_fit(model);
 
-    /* The multi-lect verdict on this corpus, and the reason the other one has
-     * to exist. */
+    /* The multi-lect verdict is measured independently. */
     assert(fit->rules_measured > 0);
-    assert(fit->rules_above_noise == 0);
+    assert(fit->rules_above_noise > 0);
 
     /* The per-pair verdict counts every conditioned correspondence every pair
      * carries, and at least one of them stands. */

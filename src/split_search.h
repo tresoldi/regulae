@@ -2,14 +2,15 @@
 #define REGULAE_SPLIT_SEARCH_H
 
 #include "internal.h"
+#include "split_score.h"
 
-/* The greedy BIC split search, once.
+/* The greedy categorical split search, once.
  *
  * Two stages look for conditioning by partitioning observations on a candidate
  * predicate and asking whether the split pays for itself: the pairwise stage
  * over target graphemes, and the multi-lect stage over sister tuples. They had
  * the same search written out twice at full length -- the same baseline, the
- * same search charge, the same two gates, the same delta-BIC line character for
+ * same search charge, the same two gates, the same score line character for
  * character, the same tie epsilon, the same search-margin formula, even the
  * same undocumented `max_depth * 4` bound -- differing only in what an
  * observation is.
@@ -67,22 +68,24 @@ typedef struct rg_split_result {
     rg_split_candidate candidate;
     size_t yes_count;
     size_t no_count;
-    double delta_bic;
+    rg_split_scorer scorer;
+    double delta_score;
     double search_margin;
 } rg_split_result;
 
-/* The BIC-best split of `rows` over `candidates`. Returns 1 when one beats its
- * gate, filling `out` and leaving the partition in search->best_yes/best_no. */
-int rg_split_find_best(
+/* The best split of `rows` under the configured categorical criterion.
+ * Returns RG_OK and writes `found`; when found is true, `out` is filled and
+ * the partition is in search->best_yes/best_no. */
+rg_status rg_split_find_best(
     rg_split_search *search,
     const rg_split_observation *rows,
     size_t count,
     const rg_split_candidate *candidates,
     const rg_split_gate *gates,
     size_t candidate_count,
-    double penalty,
-    double search_gamma,
-    rg_split_result *out
+    const rg_split_score_config *score_config,
+    rg_split_result *out,
+    int *found
 );
 
 #endif

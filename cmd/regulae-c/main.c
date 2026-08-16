@@ -1,5 +1,6 @@
 #include "regulae.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,6 +19,19 @@ static char *dup_string(const char *value) {
         memcpy(copy, value, length);
     }
     return copy;
+}
+
+static int parse_split_scorer(const char *value, rg_split_scorer *out) {
+    if (strcmp(value, "corrected-bic") == 0 || strcmp(value, "corrected_bic") == 0) {
+        *out = RG_SPLIT_SCORER_CORRECTED_BIC;
+    } else if (strcmp(value, "nml") == 0 || strcmp(value, "multinomial-nml") == 0) {
+        *out = RG_SPLIT_SCORER_MULTINOMIAL_NML;
+    } else if (strcmp(value, "dirichlet") == 0 || strcmp(value, "dirichlet-marginal") == 0) {
+        *out = RG_SPLIT_SCORER_DIRICHLET_MARGINAL;
+    } else {
+        return 0;
+    }
+    return 1;
 }
 
 static int usage(void) {
@@ -44,6 +58,7 @@ static int usage(void) {
     printf("  --json                             machine-readable model, with\n");
     printf("                                     alignments and outliers\n");
     printf("  --permutations <n>                 calibrate the fit against <n>\n");
+    printf("  --permutation-seed <n>             reproducible shuffle seed\n");
     printf("                                     trainings on shuffled pairings.\n");
     printf("                                     Costs one training run each,\n");
     printf("                                     and is the only way to read\n");
@@ -51,6 +66,15 @@ static int usage(void) {
     printf("  --tune-search                      set the search charge from that\n");
     printf("                                     baseline instead of the default.\n");
     printf("                                     Buys precision with recall\n");
+    printf("  --feature-system <name>            merkmal feature system for training\n");
+    printf("  --scorer <corrected-bic|nml|dirichlet>\n");
+    printf("                                     conditioned-split criterion\n");
+    printf("  --split-prior <mass>               symmetric Dirichlet total mass\n");
+    printf("  --search-gamma <value>             adaptive-search charge multiplier\n");
+    printf("  --split-threshold <value>          immediate split score threshold\n");
+    printf("  --long-split-threshold <value>     long-range split score threshold\n");
+    printf("  --no-multilect-small-sample        remove the legacy BIC-only addition\n");
+    printf("  --multilect-small-sample           enable it for compatibility experiments\n");
     return 0;
 }
 
@@ -391,7 +415,12 @@ static void report_load_failure(
     report_failure(ctx, "loading corpus", status);
 }
 
-static int command_train(const char *path, const char *format, int pairwise, int human, int json, int permutations, int tune_search) {
+static int command_train(const char *path, const char *format, int pairwise, int human,
+                         int json, int permutations, int tune_search,
+                         int permutation_seed, const char *feature_system,
+                         rg_split_scorer scorer, double split_prior,
+                         double search_gamma, double split_threshold,
+                         double long_split_threshold, int small_sample) {
     rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
@@ -402,6 +431,13 @@ static int command_train(const char *path, const char *format, int pairwise, int
     status = rg_context_new_builtin(&ctx);
     if (status != RG_OK) {
         return fail("creating context", status);
+    }
+    if (feature_system != 0) {
+        status = rg_context_use_system(ctx, feature_system);
+        if (status != RG_OK) {
+            rg_context_free(ctx);
+            return fail("selecting feature system", status);
+        }
     }
     status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
     if (status != RG_OK) {
@@ -417,7 +453,27 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     rg_train_options_init_defaults(&options);
     options.permutation_count = permutations;
+    if (permutation_seed >= 0) {
+        options.permutation_seed = permutation_seed;
+    }
     options.tune_search_penalty = tune_search;
+    options.bic.split_scorer = scorer;
+    if (split_prior > 0.0) {
+        options.bic.split_prior_concentration = split_prior;
+    }
+    if (search_gamma >= 0.0) {
+        options.bic.search_penalty_gamma = search_gamma;
+    }
+    if (isfinite(split_threshold)) {
+        options.bic.delta_bic_threshold = split_threshold;
+        options.bic.cross_dim_delta_bic_threshold = split_threshold;
+    }
+    if (isfinite(long_split_threshold)) {
+        options.bic.long_range_delta_bic_threshold = long_split_threshold;
+    }
+    if (small_sample >= 0) {
+        options.bic.multi_lect_bic_small_sample_correction = small_sample != 0;
+    }
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
         report_failure(ctx, "training", status);
@@ -690,7 +746,15 @@ int main(int argc, char **argv) {
     int human = 0;
     int json = 0;
     int permutations = 0;
+    int permutation_seed = -1;
     int tune_search = 0;
+    const char *feature_system = 0;
+    rg_split_scorer scorer = RG_SPLIT_SCORER_CORRECTED_BIC;
+    double split_prior = -1.0;
+    double search_gamma = -1.0;
+    double split_threshold = NAN;
+    double long_split_threshold = NAN;
+    int small_sample = -1;
     int i;
 
     if (argc < 2 || strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -707,6 +771,27 @@ int main(int argc, char **argv) {
             top_k = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--permutations") == 0 && i + 1 < argc) {
             permutations = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--permutation-seed") == 0 && i + 1 < argc) {
+            permutation_seed = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--feature-system") == 0 && i + 1 < argc) {
+            feature_system = argv[++i];
+        } else if (strcmp(argv[i], "--scorer") == 0 && i + 1 < argc) {
+            if (!parse_split_scorer(argv[++i], &scorer)) {
+                fprintf(stderr, "regulae: unknown split scorer: %s\n", argv[i]);
+                return 2;
+            }
+        } else if (strcmp(argv[i], "--split-prior") == 0 && i + 1 < argc) {
+            split_prior = strtod(argv[++i], 0);
+        } else if (strcmp(argv[i], "--search-gamma") == 0 && i + 1 < argc) {
+            search_gamma = strtod(argv[++i], 0);
+        } else if (strcmp(argv[i], "--split-threshold") == 0 && i + 1 < argc) {
+            split_threshold = strtod(argv[++i], 0);
+        } else if (strcmp(argv[i], "--long-split-threshold") == 0 && i + 1 < argc) {
+            long_split_threshold = strtod(argv[++i], 0);
+        } else if (strcmp(argv[i], "--no-multilect-small-sample") == 0) {
+            small_sample = 0;
+        } else if (strcmp(argv[i], "--multilect-small-sample") == 0) {
+            small_sample = 1;
         } else if (strcmp(argv[i], "--tune-search") == 0) {
             tune_search = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
@@ -733,7 +818,10 @@ int main(int argc, char **argv) {
         return 2;
     }
     if (strcmp(argv[1], "train") == 0) {
-        return command_train(path, format, pairwise, human, json, permutations, tune_search);
+        return command_train(path, format, pairwise, human, json, permutations,
+                             tune_search, permutation_seed, feature_system,
+                             scorer, split_prior, search_gamma, split_threshold,
+                             long_split_threshold, small_sample);
     }
     if (strcmp(argv[1], "outliers") == 0) {
         return command_outliers(path, format, top_k);

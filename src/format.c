@@ -101,6 +101,19 @@ static void append_count(string_builder *builder, double count) {
     }
 }
 
+static const char *score_label(rg_split_scorer scorer) {
+    switch (scorer) {
+    case RG_SPLIT_SCORER_CORRECTED_BIC:
+        return "dBIC";
+    case RG_SPLIT_SCORER_MULTINOMIAL_NML:
+        return "dNML";
+    case RG_SPLIT_SCORER_DIRICHLET_MARGINAL:
+        return "dDir";
+    default:
+        return "score";
+    }
+}
+
 static void append_segments(string_builder *builder, const rg_segment *segments, size_t count) {
     size_t i;
     if (count == 0) {
@@ -417,7 +430,8 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         append_count(&builder, row->contrast_count);
         builder_append(&builder, "/");
         append_count(&builder, row->contrast_total);
-        builder_appendf(&builder, "  dBIC=%.1f  [%.2f,%.2f]%s  %s ~ %s", row->evidence.delta_bic,
+        builder_appendf(&builder, "  %s=%.1f  [%.2f,%.2f]%s  %s ~ %s",
+                        score_label(row->evidence.scorer), row->evidence.delta_score,
                         row->uncertainty.lower, row->uncertainty.upper,
                         row->uncertainty.post_selection ? "*" : "",
                         row->source, row->target);
@@ -493,6 +507,19 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_corpus_fit *fit = rg_multi_model_fit(model);
         builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
                         fit->cost_per_segment, (unsigned long)fit->scored_set_count);
+        builder_appendf(&builder,
+                        "observation units:   %lu etymon, %lu source; bootstrap=%s (%lu units)\n",
+                        (unsigned long)fit->etymon_group_count,
+                        (unsigned long)fit->source_group_count,
+                        rg_observation_unit_string(fit->bootstrap_unit),
+                        (unsigned long)fit->bootstrap_effective_unit_count);
+        if (fit->sets_without_etymon_group > 0 || fit->sets_without_source_group > 0) {
+            builder_appendf(&builder,
+                            "  missing group labels are treated as separate cognate sets"
+                            " (etymon %lu, source %lu)\n",
+                            (unsigned long)fit->sets_without_etymon_group,
+                            (unsigned long)fit->sets_without_source_group);
+        }
         /* Printed only where it is worth a second look. A mean says nothing
          * about shape, and 4 is where the corpora in this repository that are
          * one thing stop and the ones that are two begin. Not a threshold in
@@ -519,7 +546,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         }
         if (fit->permutation_count > 0) {
             builder_appendf(&builder,
-                            "shuffled baseline:   %.4f +/- %.4f over %lu shuffles, z = %.1f\n",
+                            "pairing-shuffle null: %.4f +/- %.4f over %lu shuffles, z = %.1f\n",
                             fit->null_cost_per_segment_mean, fit->null_cost_per_segment_sd,
                             (unsigned long)fit->permutation_count, fit->cost_per_segment_z);
             builder_appendf(&builder,
@@ -596,8 +623,9 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             builder_appendf(&builder, " %s",
                             row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "STANDS" : "within-noise");
         }
-        builder_appendf(&builder, " cov=%.2f dBIC=%.1f margin=%.2f [%.2f,%.2f]%s  ",
-                        row->confidence, row->evidence.delta_bic, row->evidence.search_margin,
+        builder_appendf(&builder, " cov=%.2f %s=%.1f margin=%.2f [%.2f,%.2f]%s  ",
+                        row->confidence, score_label(row->evidence.scorer),
+                        row->evidence.delta_score, row->evidence.search_margin,
                         row->uncertainty.lower, row->uncertainty.upper,
                         row->uncertainty.post_selection ? "*" : "");
         append_class_segments(&builder, row);
@@ -628,8 +656,9 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset);
         append_count(&builder, row->rule.count);
-        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere%s\n",
+        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere %s=%.1f%s\n",
                         row->rule.confidence, row->rule.contrast_confidence,
+                        score_label(row->rule.evidence.scorer), row->rule.evidence.delta_score,
                         row->rule.evidence.standing == RG_RULE_STANDING_UNMEASURED ? ""
                             : (row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "  STANDS" : "  within-noise"));
     }
@@ -689,7 +718,8 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
                 append_count(&builder, row->count);
                 builder_append(&builder, " elsewhere=");
                 append_count(&builder, row->contrast_count);
-                builder_appendf(&builder, " cov=%.2f dBIC=%.1f  ", row->confidence, row->evidence.delta_bic);
+                builder_appendf(&builder, " cov=%.2f %s=%.1f  ", row->confidence,
+                                score_label(row->evidence.scorer), row->evidence.delta_score);
                 append_class_segments(&builder, row);
                 append_class_contexts(&builder, row);
                 builder_append(&builder, "\n");

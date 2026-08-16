@@ -183,7 +183,7 @@ nasal vowels and tone systems. It is here because the alignment is the part
 that could go wrong: the nasal has to be absorbed into a chunk with the vowel
 rather than aligned against the fricative that follows it.
 
-### `final_devoicing.tsv` — a neutralisation, and what a baseline is for
+### `final_devoicing.tsv` — a neutralisation with surface correlates
 
 German *Rad/Räder*, *Tag/Tage*, *Kind/Kinder* against *Wort/Worte*,
 *Blut/Blutes*, *Licht/Lichter*. Two "lects" that are two slots of one
@@ -194,17 +194,16 @@ one language to work with.
 Word-final /t/ has two sources and nothing in the citation form says which, so
 the right answer is two correspondences and no environment: `t ~ t` and
 `t ~ d`, `k ~ k` and `k ~ g`, `p ~ p` and `p ~ b`. regulae commits four
-conditioned rules, every one of them a correlate of the alternation rather
-than a cause of it — the alternating /d/-words happen to have sonorants before
-them more often than the others do — and **all four fall below the level the
-same search reaches on the shuffled corpus**, while the corpus itself sits
-twenty standard deviations below its own baseline.
+conditioned associations, every one of them a correlate of the alternation
+rather than a cause of it — the alternating /d/-words happen to have sonorants
+before them more often than the others do. After correcting the multinomial
+parameter charge, all four exceed the shuffled search. The chance baseline can
+reject adaptive-search noise; it cannot reject a stable lexical association.
 
-Read without the baseline it reports four environments for a change that has
-none. Read with it, it reports a neutralisation. That is the argument for
-`permutation_count`, made on data nobody disputes, and it is why the
-`tests/c/test_restraint.c` assertions for this fixture live with the restraint
-suite rather than here.
+The surface account is therefore four observed environments plus the
+neutralising correspondences. Calling none of those environments the cause of
+final devoicing is the downstream historical analysis. This is the fixture
+that keeps `standing` from being misread as “sound law.”
 
 The file was in this directory for a week before any test read it, and it
 wrote length with an ASCII colon. Both are fixed; the second is the sort of

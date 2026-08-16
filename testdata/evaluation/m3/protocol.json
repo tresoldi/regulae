@@ -1,0 +1,223 @@
+{
+  "amendments": [
+    {
+      "reason": "The discarded first run put confidence_weights in holdout, so the required fractional-mass gate could not observe it; it also failed to make the roadmap's un-derived small-sample term ineligible. No scorer formula, threshold, prior, gamma, or result-dependent metric changed.",
+      "version": 2
+    },
+    {
+      "reason": "The second run omitted the repository's pre-existing restraint fixtures and selected a configuration that failed chance.tsv. The three established no-environment fixtures are now a mandatory development gate. Candidate formulas and all existing thresholds, metrics, partitions, and results remain unchanged.",
+      "version": 3
+    }
+  ],
+  "base_manifest": "testdata/evaluation/m2/manifest.tsv",
+  "base_manifest_sha256": "2a164942dfc8ac7d6e0b483bd9f165c85a12c4d40d604a624e11b0ab398527a5",
+  "candidates": [
+    {
+      "gamma": 0.5,
+      "id": "bic_current",
+      "prior": 1.0,
+      "scorer": "corrected-bic",
+      "small_sample": true,
+      "threshold": -1.0
+    },
+    {
+      "gamma": 0.5,
+      "id": "bic_without_aicc",
+      "prior": 1.0,
+      "scorer": "corrected-bic",
+      "small_sample": false,
+      "threshold": -1.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "bic_full_model_code",
+      "prior": 1.0,
+      "scorer": "corrected-bic",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 0.5,
+      "id": "nml_half_search",
+      "prior": 1.0,
+      "scorer": "nml",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "nml_full_model_code",
+      "prior": 1.0,
+      "scorer": "nml",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "dirichlet_0_5",
+      "prior": 0.5,
+      "scorer": "dirichlet",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "dirichlet_1",
+      "prior": 1.0,
+      "scorer": "dirichlet",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "dirichlet_2",
+      "prior": 2.0,
+      "scorer": "dirichlet",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 1.0,
+      "id": "dirichlet_5",
+      "prior": 5.0,
+      "scorer": "dirichlet",
+      "small_sample": false,
+      "threshold": 0.0
+    },
+    {
+      "gamma": 0.5,
+      "id": "dirichlet_1_half_search",
+      "prior": 1.0,
+      "scorer": "dirichlet",
+      "small_sample": false,
+      "threshold": 0.0
+    }
+  ],
+  "claim": "selected surface associations, not sound laws or histories",
+  "development_cases": [
+    "sets_8",
+    "sets_16",
+    "sets_32",
+    "positions_1",
+    "positions_2",
+    "etymon_cluster_1",
+    "etymon_cluster_4",
+    "outcome_k_2",
+    "outcome_k_3",
+    "imbalance_0_25",
+    "imbalance_0_5",
+    "structural_zero",
+    "counter_0_0",
+    "counter_0_1",
+    "interaction_1",
+    "interaction_2",
+    "decision_list_1",
+    "decision_list_2",
+    "confounded_two_vowels",
+    "deconfounded_four_vowels",
+    "insertion",
+    "deletion",
+    "chunk",
+    "confidence_weights",
+    "doublets",
+    "taxon_2",
+    "taxon_3",
+    "subgroup_conservative_heavy",
+    "missing_lects",
+    "inventory_2",
+    "inventory_4",
+    "word_shape_cv",
+    "word_shape_cvc",
+    "word_shape_ccvc"
+  ],
+  "development_restraint_cases": [
+    "chance",
+    "diffusion",
+    "stratum"
+  ],
+  "development_seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20
+  ],
+  "format": 3,
+  "gates": {
+    "established_restraint_abstention": true,
+    "negative_abstention_min": 0.95,
+    "null_fwer_max": 0.05,
+    "power_n16_plus_min": 0.9,
+    "predictive_log_loss_gain_min": 0.0,
+    "required_cells_supported": true,
+    "runtime_ratio_max": 2.0
+  },
+  "held_back_cases": [
+    "sets_64",
+    "positions_4",
+    "etymon_cluster_8",
+    "outcome_k_5",
+    "imbalance_0_8",
+    "rare_outcome",
+    "counter_0_25",
+    "interaction_3",
+    "decision_list_3",
+    "reordering",
+    "partial_cognacy",
+    "taxon_4",
+    "subgroup_innovator_heavy",
+    "tone_representation",
+    "inventory_8",
+    "transcription_mixture",
+    "contact_layers",
+    "unconditioned_negative"
+  ],
+  "held_back_seeds": [
+    1001,
+    1002,
+    1003,
+    1004,
+    1005,
+    1006,
+    1007,
+    1008,
+    1009,
+    1010,
+    1011,
+    1012,
+    1013,
+    1014,
+    1015,
+    1016,
+    1017,
+    1018,
+    1019,
+    1020
+  ],
+  "legacy_small_sample_term": "comparator only; ineligible until derived",
+  "nml_fractional_mass": "unsupported, counted as a failed required-cell gate",
+  "outcome_alphabet": "pooled observed outcomes, fixed across both sides of a split",
+  "predictive_scope": "fixed-position p~f synthetic panel; full nested prediction is M4",
+  "selection_order": [
+    "all gates",
+    "mean predictive log-loss gain",
+    "power at n >= 16",
+    "negative abstention",
+    "candidate order in this file"
+  ]
+}

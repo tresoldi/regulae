@@ -12,15 +12,18 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 25);
+    assert(rg_abi_version() == 27);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
-    assert(fabs(bic.delta_bic_threshold - -1.0) < 1e-12);
+    assert(bic.split_scorer == RG_SPLIT_SCORER_CORRECTED_BIC);
+    assert(strcmp(rg_split_scorer_string(bic.split_scorer), "corrected_bic") == 0);
+    assert(fabs(bic.split_prior_concentration - 1.0) < 1e-12);
+    assert(fabs(bic.delta_bic_threshold) < 1e-12);
     assert(bic.min_split_observations == 2);
     assert(bic.max_split_depth == 3);
     assert(bic.min_chunk_observations == 2);
-    assert(fabs(bic.long_range_delta_bic_threshold - -5.0) < 1e-12);
+    assert(fabs(bic.long_range_delta_bic_threshold) < 1e-12);
     assert(bic.long_range_min_split_observations == 5);
     assert(fabs(bic.long_range_min_dominant_fraction - 0.6) < 1e-12);
     assert(bic.cross_dim_max_iterations == 5);
@@ -28,8 +31,9 @@ int main(void) {
     /* 0.0 on purpose: a fixed fraction does not measure conditioning, so the
      * decision belongs to the BIC gate against the complementary environment. */
     assert(fabs(bic.cross_dim_min_rule_confidence - 0.0) < 1e-12);
-    assert(fabs(bic.cross_dim_delta_bic_threshold - -1.0) < 1e-12);
-    assert(bic.multi_lect_bic_small_sample_correction == 1);
+    assert(fabs(bic.cross_dim_delta_bic_threshold) < 1e-12);
+    assert(fabs(bic.search_penalty_gamma - 1.0) < 1e-12);
+    assert(bic.multi_lect_bic_small_sample_correction == 0);
     assert(fabs(bic.multi_lect_min_commit_scale - 0.5) < 1e-12);
 
     rg_train_options_init_defaults(&options);
@@ -44,6 +48,9 @@ int main(void) {
     assert(fabs(options.chunk_min_transparency - 0.0) < 1e-12);
     assert(options.bootstrap_n == 0);
     assert(options.bootstrap_seed == 0);
+    assert(options.bootstrap_unit == RG_OBSERVATION_UNIT_AUTO);
+    assert(strcmp(rg_observation_unit_string(RG_OBSERVATION_UNIT_ETYMON_GROUP),
+                  "etymon_group") == 0);
 
     rg_bic_config_init_defaults(0);
     rg_train_options_init_defaults(0);

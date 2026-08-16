@@ -117,6 +117,7 @@ add_library(regulae
     src/search_context.c
     src/search_cost.c
     src/syllabification.c
+    src/split_score.c
     src/split_search.c
     src/vocabulary.c
     src/types.c
@@ -277,6 +278,26 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_scoring PRIVATE regulae::regulae)
     add_test(NAME scoring COMMAND test_scoring)
 
+    add_executable(test_split_search tests/c/test_split_search.c)
+    target_include_directories(test_split_search PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test_split_search PRIVATE regulae::regulae)
+    add_test(NAME split_complexity COMMAND test_split_search)
+
+    add_executable(test_split_score tests/c/test_split_score.c)
+    target_include_directories(test_split_score PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(test_split_score PRIVATE regulae::regulae)
+    add_test(NAME split_scorers COMMAND test_split_score)
+
+    add_executable(test_evaluation_m2 tests/c/test_evaluation_m2.c)
+    target_compile_definitions(test_evaluation_m2 PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_evaluation_m2 PRIVATE regulae::regulae)
+    add_test(NAME evaluation_m2 COMMAND test_evaluation_m2)
+
+    add_executable(test_evaluation_m3 tests/c/test_evaluation_m3.c)
+    target_compile_definitions(test_evaluation_m3 PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_evaluation_m3 PRIVATE regulae::regulae)
+    add_test(NAME evaluation_m3 COMMAND test_evaluation_m3)
+
     add_executable(test_align tests/c/test_align.c)
     target_link_libraries(test_align PRIVATE regulae::regulae)
     add_test(NAME align COMMAND test_align)
@@ -368,6 +389,13 @@ if(REGULAE_BUILD_TESTS)
                 COMMAND ${Python3_EXECUTABLE}
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/corpora.py"
                         --check --cli $<TARGET_FILE:regulae_cli>)
+
+            add_test(NAME evaluation_m2_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m2.py" --verify)
+            add_test(NAME evaluation_m3_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m3.py" --verify)
         endif()
 
         add_test(NAME web_page

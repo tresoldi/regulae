@@ -4,18 +4,20 @@ void rg_bic_config_init_defaults(rg_bic_config *config) {
     if (config == 0) {
         return;
     }
-    config->delta_bic_threshold = -1.0;
+    config->split_scorer = RG_SPLIT_SCORER_CORRECTED_BIC;
+    config->split_prior_concentration = 1.0;
+    config->delta_bic_threshold = 0.0;
     config->min_split_observations = 2;
     config->max_split_depth = 3;
     config->min_chunk_observations = 2;
-    config->long_range_delta_bic_threshold = -5.0;
+    config->long_range_delta_bic_threshold = 0.0;
     config->long_range_min_split_observations = 5;
     config->long_range_min_dominant_fraction = 0.6;
     config->cross_dim_max_iterations = 5;
     config->cross_dim_min_rule_count = 3;
     config->cross_dim_min_rule_confidence = 0.0;
-    config->cross_dim_delta_bic_threshold = -1.0;
-    config->multi_lect_bic_small_sample_correction = 1;
+    config->cross_dim_delta_bic_threshold = 0.0;
+    config->multi_lect_bic_small_sample_correction = 0;
     config->multi_lect_min_commit_scale = 0.5;
     config->search_penalty_gamma = RG_SEARCH_PENALTY_GAMMA;
 }
@@ -36,6 +38,7 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     rg_bic_config_init_defaults(&options->bic);
     options->bootstrap_n = 0;
     options->bootstrap_seed = 0;
+    options->bootstrap_unit = RG_OBSERVATION_UNIT_AUTO;
     options->permutation_count = 0;
     options->tune_search_penalty = 0;
     options->permutation_seed = 20260815;

@@ -9,6 +9,8 @@ static void test_wilson_brackets_the_rate(void) {
     rg_uncertainty_estimate e;
 
     assert(rg_wilson_interval(5.0, 10.0, RG_DEFAULT_ALPHA, &e) == RG_OK);
+    assert(e.observation_unit == RG_OBSERVATION_UNIT_ALIGNED_POSITION);
+    assert(e.effective_n == 10.0);
     assert(fabs(e.estimate - 0.5) < 1e-12);
     assert(e.lower < 0.5);
     assert(e.upper > 0.5);
@@ -125,6 +127,8 @@ static void test_method_names_are_stable(void) {
     assert(strcmp(rg_uncertainty_method_string(RG_UNCERTAINTY_NONE), "none") == 0);
     assert(strcmp(rg_uncertainty_method_string(RG_UNCERTAINTY_WILSON), "wilson") == 0);
     assert(strcmp(rg_uncertainty_method_string(RG_UNCERTAINTY_BOOTSTRAP), "bootstrap") == 0);
+    assert(strcmp(rg_null_model_string(RG_NULL_MODEL_PAIRING_SHUFFLE),
+                  "pairing_shuffle") == 0);
 }
 
 /* bootstrap_n was accepted, JSON-round-tripped, and did nothing: the
@@ -158,6 +162,9 @@ static void test_bootstrap_resamples_cognate_sets(void) {
         const rg_multi_class_row *boot = rg_multi_model_unconditioned_class_at(resampled, i);
         assert(plain->uncertainty.method == RG_UNCERTAINTY_WILSON);
         assert(boot->uncertainty.method == RG_UNCERTAINTY_BOOTSTRAP);
+        assert(boot->uncertainty.observation_unit == RG_OBSERVATION_UNIT_COGNATE_SET);
+        assert(boot->uncertainty.effective_n ==
+               (double)rg_corpus_cognate_count(corpus));
         assert(boot->uncertainty.lower <= boot->uncertainty.estimate + 1e-9);
         assert(boot->uncertainty.upper + 1e-9 >= boot->uncertainty.estimate);
         if (boot->uncertainty.lower != plain->uncertainty.lower) {
@@ -180,6 +187,43 @@ static void test_bootstrap_resamples_cognate_sets(void) {
     }
     rg_multi_model_free(closed_form);
     rg_multi_model_free(resampled);
+    rg_corpus_free(corpus);
+    rg_context_free(ctx);
+}
+
+static void test_bootstrap_names_and_uses_etymon_groups(void) {
+    rg_context *ctx = 0;
+    rg_corpus *corpus = 0;
+    rg_multi_model *grouped = 0;
+    rg_multi_model *sets = 0;
+    rg_train_options options;
+    const rg_corpus_fit *fit;
+
+    assert(rg_context_new_builtin(&ctx) == RG_OK);
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/linguistic/repeated_etymon.tsv",
+                              0, &corpus, 0) == RG_OK);
+    rg_train_options_init_defaults(&options);
+    options.bootstrap_n = 40;
+    options.bootstrap_seed = 9;
+    assert(rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                          &options, &grouped) == RG_OK);
+    fit = rg_multi_model_fit(grouped);
+    assert(fit->bootstrap_unit == RG_OBSERVATION_UNIT_ETYMON_GROUP);
+    assert(fit->bootstrap_effective_unit_count == 2);
+    assert(fit->etymon_group_count == 2);
+    assert(fit->source_group_count == 1);
+    assert(fit->sets_without_etymon_group == 0);
+    assert(rg_multi_model_unconditioned_class_at(grouped, 0)->uncertainty.observation_unit ==
+           RG_OBSERVATION_UNIT_ETYMON_GROUP);
+    assert(rg_multi_model_unconditioned_class_at(grouped, 0)->uncertainty.effective_n == 2.0);
+
+    options.bootstrap_unit = RG_OBSERVATION_UNIT_COGNATE_SET;
+    assert(rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                          &options, &sets) == RG_OK);
+    assert(rg_multi_model_fit(sets)->bootstrap_effective_unit_count == 16);
+
+    rg_multi_model_free(grouped);
+    rg_multi_model_free(sets);
     rg_corpus_free(corpus);
     rg_context_free(ctx);
 }
@@ -224,6 +268,7 @@ int main(void) {
     test_no_samples_is_unconstrained();
     test_method_names_are_stable();
     test_bootstrap_resamples_cognate_sets();
+    test_bootstrap_names_and_uses_etymon_groups();
     test_conditioned_intervals_say_they_are_post_selection();
     return 0;
 }

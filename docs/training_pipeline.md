@@ -132,11 +132,14 @@ the DP, but the BIC comparison uses unoffset `−log P`.
 
 **What it does.** For each source grapheme with at least two observed
 targets, runs a greedy feature-based split search. Candidate splits
-come from a small inventory of feature predicates on the immediate
-preceding and following segments (`{vowel+, front+, back+, voiced+,
-voiceless+, consonant+, …}`) plus word position (initial / medial /
-final). A split is committed when the BIC delta beats
-`DELTA_BIC_THRESHOLD` (= −1.0), up to `MAX_SPLIT_DEPTH` levels.
+come from the contrastive vocabulary derived from the corpus's merkmal
+feature system, on the immediate preceding and following segments,
+plus word position. A split is committed when the configured score is negative,
+up to `MAX_SPLIT_DEPTH` levels.
+Splitting a pooled `K`-outcome multinomial in two adds `K−1` parameters,
+so the default corrected-BIC complexity charge is `(K−1)·ln(N)`, not a
+fixed `ln(N)`. Exact NML and a symmetric-Dirichlet marginal likelihood use
+the same search through `split_score.c`.
 
 **What it produces.** New entries in the segment correspondence table
 with non-empty `Context` fields. The unconditioned entries from stage
@@ -146,18 +149,18 @@ conditioned entry falls through to the unconditioned version.
 **Why feature-based and not grapheme-based.** Splitting on "the
 following segment is `/i/`" is specific and fragile; splitting on
 "the following segment is `[+front]`" generalizes across natural
-classes. The feature inventory is deliberately small — around a
-dozen predicates — which keeps the candidate space manageable
-(~14 candidates per split step) and lets BIC have a real signal
-margin on modest corpora.
+classes. The vocabulary is contrastive in the inventory rather than a
+hand-written list. Exact duplicate partitions count once in the adaptive
+search charge, so synonymous feature encodings cannot change selection.
 
-**Why BIC and not mutual information / chi-square.** BIC has the
+**Why corrected BIC remains the default.** BIC has the
 complexity penalty built in. Mutual information does not penalize
 splits by how many parameters they add, so it would over-commit on
-small data. The `−1.0` threshold is a safety buffer above zero:
-splits with `ΔBIC ∈ (−1, 0)` were reliably spurious in early
-experiments (same dominant target either way, just slightly
-different minority mass), so the margin pushes them out.
+small data. M3 selected the full model-space charge, `γ = 1`, and a zero
+threshold after the earlier half charge admitted a conditioned class in the
+pre-existing unrelated-lect restraint fixture. Corrected BIC survived the
+recorded comparison with exact NML and Dirichlet marginal likelihoods; see ADR
+0001.
 
 **Why after chunk promotion.** See the design choice discussion
 at the top — chunks are a kind of compressed correspondence, and
@@ -284,15 +287,13 @@ specific match.
 **Why separate from immediate-neighbour context discovery.**
 Immediate-neighbour context discovery enumerates about fourteen
 candidates per split step; long-range enumerates about fifty-four
-(six features × nine slots). Running them in a single loop would mean
-the immediate-neighbour candidates have to clear a BIC threshold
-calibrated for the larger long-range candidate space, suppressing
-genuine immediate-neighbour signal. Keeping them separate lets each
-loop have its own calibrated threshold.
+(six features × nine slots). Keeping them separate lets the scorer charge each
+loop for its own distinct observed partitions and lets the long-range loop keep
+its higher support floor without suppressing immediate-neighbour signal.
 
-**Calibrated thresholds.** Long-range uses
-`_LONG_RANGE_DELTA_BIC_THRESHOLD = −5.0` (vs. −1.0 for
-immediate-neighbour), a minimum split observation count of 5 (vs. 2),
+**Calibrated gates.** Long-range uses the same zero score threshold as
+immediate-neighbour discovery because the score now prices the distinct
+partitions searched. It retains a minimum split observation count of 5 (vs. 2)
 and a trimmed feature inventory that drops tautological predicates
 (`vowel`/`consonant`) on syllable-structural slots where they apply
 by definition. Without these, the larger candidate space surfaces
@@ -341,8 +342,8 @@ Short version:
    with observation counts aggregated across the corpus.
 3. **Class-level context discovery.** A multi-lect version of stage 4,
    iterating over pivot lects and committing splits at the class
-   level. Uses adaptive BIC (AICc correction + sample-size-scaled
-   min-commit floor) because the per-pivot sample sizes vary.
+   level. It uses the same categorical scorer and a sample-size-scaled
+   min-commit floor. M3 removed the un-derived AICc-shaped addition.
 4. **Cross-dimensional rule lifting.** Per-pair cross-dimensional
    commits are surfaced at the multi-lect level with explicit
    `src_lect`/`tgt_lect` labels. No new discovery runs at this
@@ -395,6 +396,27 @@ itself, and the `align_corpus` function is memoized over the batch.
 The only stage that re-aligns *during* its own work is stage 1
 (segment-level EM) — that's what makes it EM rather than a one-pass
 count.
+
+## Evaluation nulls are not interchangeable
+
+The production fit baseline is a **pairing shuffle**: it retains every lect's
+wordlist and set-membership pattern while breaking which forms answer one
+another, then retrains the whole pipeline. It supports the corpus-fit z-score
+and, today, the published per-rule standing threshold.
+
+M2's evaluation harness adds two conditioned-selection nulls without changing
+that default. A **within-source-bucket outcome shuffle** retains the source
+segment, its environment and weights while permuting target outcomes inside
+the source bucket. A **parametric unconditioned null** samples those outcomes
+from the fitted unconditioned bucket distribution. They ask how often adaptive
+environment selection invents a conditioned association when the
+correspondence bucket itself is retained. Their fixed-position implementation
+is deliberately limited to clean equal-length synthetic forms; it is an
+evaluation instrument, not another production verdict hidden in the model.
+
+The null name appears in JSON for both corpus fit and conditioned standing.
+`docs/m2_evaluation.md` records the factorial snapshot and permutation-count
+convergence.
 
 ## What's not in the pipeline (and why)
 

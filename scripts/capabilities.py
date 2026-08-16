@@ -43,6 +43,12 @@ CAPABILITIES = [
         "`testdata/corpora/conditioned_multilect.tsv`",
     ),
     (
+        "conditioned-split scorers",
+        "corrected BIC default; exact NML and Dirichlet marginal experimental",
+        "C options, JSON options, or `--scorer`",
+        "`tests/c/test_split_score.c`, `docs/m3_evaluation.md`, ADR 0001",
+    ),
+    (
         "long-range conditioning",
         "supported",
         "every loader",
@@ -91,10 +97,16 @@ CAPABILITIES = [
         "`testdata/soundlaws/graded_5_distance_two.tsv`",
     ),
     (
+        "observation-group metadata",
+        "supported",
+        "TSV and wide (`etymon_group`, `source_group`)",
+        "`tests/c/test_evaluation_m2.c`",
+    ),
+    (
         "bootstrap uncertainty",
-        "**not ported**",
-        "n/a",
-        "never ported; `bootstrap_n` is accepted and ignored",
+        "supported",
+        "`bootstrap_n`; cognate, etymon, or source groups",
+        "`tests/c/test_uncertainty.c`: resamples named groups",
     ),
     (
         "chunk transparency screening",
@@ -127,7 +139,7 @@ CAPABILITIES = [
         "`testdata/soundlaws/compensatory_lengthening.tsv`",
     ),
     (
-        "a verdict on whether two lects are related at all",
+        "a verdict on whether supplied pairings carry structure beyond a shuffle",
         "supported",
         "`permutation_count`, or `--permutations`",
         "`testdata/restraint/chance.tsv`",
@@ -136,7 +148,7 @@ CAPABILITIES = [
         "restraint on a change with no environment",
         "supported",
         "every loader",
-        "`testdata/restraint/diffusion.tsv`, `stratum.tsv`, `soundlaws/final_devoicing.tsv`",
+        "`testdata/restraint/diffusion.tsv`, `stratum.tsv`",
     ),
     (
         "ranking cognate sets worst-first, for triage",

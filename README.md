@@ -36,8 +36,10 @@ carrying:
   positions, with observation counts aggregated across the
   corpus via union-find reconciliation.
 - **Conditioned multi-lect classes** carrying per-lect
-  phonological context environments, discovered via BIC-gated
-  context splitting at the class level.
+  phonological context environments, discovered via a shared
+  categorical split criterion at the class level. Corrected BIC is
+  the M3-selected default; exact NML and a Dirichlet marginal
+  likelihood are available for controlled comparisons.
 - **Multi-lect cross-dimensional rules** where a segmental
   feature on one lect conditions a suprasegmental value on
   another (the classic case being tonogenesis: voicing on the
@@ -61,7 +63,7 @@ carrying:
 - **Context conditioning.** Immediate-neighbour splits
   (preceding / following segment feature constraints, word
   position) are discovered automatically by a greedy
-  BIC-driven search over a vocabulary derived from the corpus
+  criterion-driven search over a vocabulary derived from the corpus
   itself. regulae holds no list of feature names: a segment's
   features are whatever the merkmal system in use reports, so
   the categorical systems and the valued ones (`phoible`,
@@ -71,21 +73,18 @@ carrying:
   heavy a search charge its evidence carries, and — with
   `--permutations` — whether that clears what the same search
   reaches on the corpus shuffled. `--tune-search` turns the
-  comparison into a gate. On German final devoicing
-  (`testdata/soundlaws/final_devoicing.tsv`) the search commits
-  four environments for a change that has none, and the baseline
-  rejects all four — which is the whole case for running it.
-  It is a 95th-percentile cut and behaves like one: on wordlists
-  with no history between them
-  (`testdata/restraint/chance.tsv`) about one rule in ten still
-  clears it, so the corpus-level statistic below is what answers
-  "related or not", never the count of standing rules.
+  comparison into a gate. The default categorical charge prices
+  all `K−1` parameters added when a `K`-outcome distribution is
+  split. On unrelated wordlists from one inventory
+  (`testdata/restraint/chance.tsv`) that correction leaves no
+  selected conditioned correspondence; the shuffled runs still
+  measure how high an unpriced search can reach.
 - **A decision list, not a bag of rules.** Discovery is greedy,
   so a later rule refines what an earlier one left unsettled.
   That order is published and the reports render it. Every committed
   rule publishes the contrast it was measured against — the same
   correspondence where the environment does not hold — and the
-  ΔBIC it scored, because a conditioning claim without its
+  named-criterion score, because a conditioning claim without its
   complement cannot be read.
 - **Long-range conditioning.** A second split loop looks for
   conditioning environments beyond the immediate neighbours —
@@ -94,7 +93,7 @@ carrying:
   harmony, and related phenomena.
 - **Tonal correspondences** and **cross-dimensional rules**
   (segmental features predicting suprasegmental values, with a
-  BIC-gated search, joint-predictor support, and a
+  shared categorical-score gate, joint-predictor support, and a
   non-interaction guard).
 - **Multi-lect reconciliation.** Union-find over pairwise
   alignment positions, yielding multi-lect classes that bind
@@ -104,14 +103,14 @@ carrying:
 - **A fit statistic, and a baseline to read it against.** Every model
   carries `rg_multi_model_fit`: the mean alignment cost per segment,
   and — with `--permutations <n>` — the same statistic over trainings
-  on a corpus whose pairings have been shuffled. This is the only
-  thing in the output that answers "is there a relationship here at
-  all". The class counts do not: shuffling removes every
-  correspondence there is to find and the counts go **up**.
-  Measured, on two wordlists drawn from one inventory with no
-  history between them: 76 correspondences and 47 conditioned
-  classes, against a shuffled 79 and 48, and `z = -0.6`. The
-  same statistic on a corpus with a real change in it is `-33`.
+  on a corpus whose pairings have been shuffled. This measures
+  whether the supplied pairings contain more cross-lect structure
+  than their shuffled alternative; it is not a genealogical
+  verdict. Measured with twelve shuffles on two wordlists drawn
+  from one inventory with no history between them: 79
+  unconditioned and zero conditioned classes, against a shuffled
+  80 and 5.8, and `z = -0.1`. A corpus with a regular surface
+  relationship is tens of standard deviations from its shuffles.
 - **Determinism.** Same input, same output across runs and
   processes.
 
@@ -164,8 +163,16 @@ regulae outliers --top-k 10 <corpus.tsv>
 `--format tsv|wide|gled|arcaverborum` selects the input format
 (default `tsv`). The generic TSV reader expects `cognate_id`,
 `lect_id` and `segments` columns, with optional `confidence`,
-`breaks` (morpheme boundaries) and `syllables`; a cognate set
+`breaks` (morpheme boundaries), `syllables`, `etymon_group` and
+`source_group`; a cognate set
 takes the lowest confidence any of its rows reports.
+
+`etymon_group` names paradigm cells or records that repeat one lexical
+history; `source_group` names a publication or transcription batch. regulae
+never infers either from identifiers or forms. The bootstrap uses etymon groups
+automatically when they are supplied and otherwise reports that cognate sets
+are being treated as independent. Source-level resampling is explicit because
+collapsing a whole publication to one draw is usually too coarse.
 
 Tone, stress and length can each be given per segment — `tone`,
 `stress` and `length` columns in the long format, `<lect>_tone`,
@@ -294,7 +301,7 @@ has the full list with reasons:
 
 - Each published table is handed out whole — the rows and a count
   — rather than through a count function and an index function.
-- What a search decided about a rule (delta-BIC, decision index,
+- What a search decided about a rule (scorer and delta-score, decision index,
   search margin, standing) is one `evidence` member on the row
   rather than four separate fields.
 - `rg_corpus_fit` reports the per-pair verdict separately from the
@@ -302,6 +309,11 @@ has the full list with reasons:
 
 ## Documentation
 
+- **Scientific roadmap** at
+  [`docs/surface_relationship_roadmap.md`](docs/surface_relationship_roadmap.md)
+  — the product boundary, statistical correction, evaluation programme and
+  milestone gates for a calibrated surface relationship model. Its domain
+  terms are fixed in [`CONTEXT.md`](CONTEXT.md).
 - **Guide** at [`docs/GUIDE.md`](docs/GUIDE.md) — what the output means and
   how to read a conditioned environment. Also the source for the in-page
   walkthrough.

@@ -172,7 +172,8 @@ static rg_status lift_tone_marks(rg_segment *segments, size_t *count) {
             /* Nothing but tone. */
             mk_string_free(base);
             mk_string_free(tone);
-            if (write > 0 && segments[write - 1].tone == 0) {
+            if (write > 0 && segments[write - 1].tone == 0 &&
+                segments[read].stress == 0 && segments[read].length == 0) {
                 segments[write - 1].tone = segments[read].grapheme;
                 segments[read].grapheme = 0;
                 continue;
@@ -322,4 +323,3 @@ long alignment_token_count(const char *raw) {
     }
     return count;
 }
-

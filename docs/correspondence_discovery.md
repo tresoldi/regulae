@@ -13,8 +13,9 @@ Implementation, in the C core:
   segment EM, aggregation.
 - `src/model_context.c`, `src/model_chunks.c`, `src/model_crossdim.c` —
   the discovery stages, behind `model_internal.h`.
-- `src/split_search.c` — the greedy BIC split search itself, shared by
-  the pairwise and multi-lect stages.
+- `src/split_search.c` — the greedy partition search shared by the pairwise and
+  multi-lect stages; `src/split_score.c` is the one categorical-scoring seam
+  used there and by cross-dimensional discovery.
 - `src/multilect_classes.c` — class-level discovery across lects.
 - `src/scoring.c`, `src/search_cost.c` — what a scored alignment costs,
   including the cross-dimensional adjustment (§ "Scoring overlay").
@@ -23,7 +24,7 @@ Implementation, in the C core:
 
 The residual-MI anomaly engine described in places below was never
 ported; the same phenomena are reached by candidate enumeration plus a
-BIC comparison against the complement. The paths given here until
+scored comparison against the complement. The paths given here until
 2026-08-16 pointed at the archived Python tree under `python/`, which is
 not built or supported.
 
@@ -255,8 +256,11 @@ stated on the row itself.
 aligned positions, and positions from one word pair are not
 independent observations: Latin–Spanish has 413 of them over 97
 cognate sets, 4.3 per set. Setting `bootstrap_n` replaces the closed
-form with a percentile interval resampled over whole **cognate sets** —
-the unit the corpus actually samples — which handles the clustering
+form with a percentile interval resampled over a named observation unit.
+`AUTO` uses caller-supplied `etymon_group` labels when present and otherwise
+treats whole **cognate sets** as independent; `source_group` is an explicit
+alternative. Missing labels become separate set-level groups and are counted
+in `rg_corpus_fit`, rather than inferred from ids or forms. This handles the clustering
 and the confidence weighting together, and needs no realignment
 because `class_positions` already records which cognate each
 reconciled position came from.
@@ -284,7 +288,8 @@ row types computed one and surfaced it nowhere until 2026-08-15.
 Does something about the source form condition a suprasegmental value on the
 target? The claim is a conditioned split and is tested as one: the complement
 must be attested, and modelling the dimension separately inside and outside must
-beat modelling it once, under BIC plus the search charge.
+beat modelling it once under the configured categorical score plus the search
+charge.
 
 **The environment is an `rg_context_spec`** — the same type a conditioned
 correspondence uses. It has to be, because one predicate is not always enough.
@@ -309,8 +314,9 @@ suprasegmentals are features named `tone`, `length` and `stress`.
 
 **Pairs are searched, and paid for.** P predicates give P(P-1)/2 pairs and P is
 in the hundreds, so conjunctions are formed among the best sixteen singles by
-ΔBIC, and the whole candidate count enters the split penalty as
-`γ · 2 · ln(m)`, the same charge the context splitter pays.
+the configured score. The number of distinct partitions enters the search
+charge as `γ · 2 · ln(m)`, the same charge the context splitter pays. Different
+predicate spellings that divide these observations identically count once.
 
 Three rules keep the output readable, each of which was a real failure first:
 
@@ -377,17 +383,29 @@ since 2026-08-15, the long loader's `breaks` column.
 
 ### Pricing the search, not only the parameter
 
-Widening the vocabulary widens the argmax, and BIC does not price an argmax. It
-charges for one added term against the likelihood it buys; the term that
-survives a split step is the best of *m* of them, and the maximum of a hundred
-candidates clears its bar by chance far more often than one does.
+Under the default corrected-BIC scorer, splitting one pooled `K`-outcome
+multinomial into two adds `K−1` parameters, so pairwise, multi-lect and
+cross-dimensional discovery charge `(K−1) · ln(n)`. A fixed `ln(n)` charge,
+used until M1, under-priced every split with more than two outcomes.
 
-So the split penalty carries `γ · 2 · ln(m)` alongside it — the standard
-extended-BIC shape for a large model space, in the same currency as the BIC
-term. `bic.search_penalty_gamma` defaults to 0.5, which is the largest fixed
-value at which no sound law in `testdata/soundlaws/` is lost: at 0.75 the
-multi-lect stage stops committing on the palatalization corpus, at 1.0 lenition
-finds only two of its three stops.
+That parameter charge does not price the argmax. Widening the vocabulary means
+the surviving environment is the best of *m* candidates, and the maximum of a
+hundred candidates clears its bar by chance far more often than one does.
+
+So every scorer carries `γ · 2 · ln(m)` alongside its within-sample comparison,
+where `m` is the number of distinct observed partitions, not the number of
+predicate names. The M3 bake-off selected `γ = 1` with corrected BIC: corrected
+BIC at half charge failed the pre-existing no-environment restraint fixtures,
+while every NML and Dirichlet candidate failed established restraint and most
+also exceeded the generated null envelope. ADR 0001 records the selection and
+its limitations.
+
+Exact multinomial NML replaces the asymptotic parameter term with the exact
+normalizing regret for the pooled observed alphabet and refuses fractional
+mass. The Dirichlet marginal replaces both the maximum-likelihood fit and
+parameter term with an integrated likelihood under a symmetric total prior;
+that prior is separate from alignment EM's feature-shaped prior. Both remain
+experimental options behind the same scoring seam.
 
 On Grassmann's law this takes the output from five conditioned classes — one
 the law, four environments fitting the same partition — to one, correctly
@@ -409,37 +427,21 @@ judging the tool exists for.
 
 | corpus | noise ceiling | rules standing |
 | --- | --- | --- |
-| `rounding_harmony` | 1.00 | **1 of 1** |
-| `place_assimilation` | 1.69 | **2 of 2** |
-| `rhotacism` | 1.18 | **3 of 3** |
-| `verner` | 1.73 | **0 of 5** |
-| `ppn_hawaiian` | 1.59 | **0 of 4** |
-| unrelated pseudo-words | 1.76 | **1 of 32** |
+| `rounding_harmony` | 0.37 | **1 of 1** |
+| `place_assimilation` | 1.11 | **2 of 2** |
+| `rhotacism` | 0.45 | **3 of 3** |
+| `verner` | 0.55 | **4 of 5** |
+| `ppn_hawaiian` | 0.56 | **2 of 2** |
+| unrelated pseudo-words | 0.96 | **0 of 0** |
 
-The last row is the one to keep in mind: on data with no relationship in it, a
-run still produces thirty-two conditioned rules with stated environments, and
-thirty-one of them are now marked as findable in noise. The `verner` row is the
-honest cost — a real law on forty cognate sets does not clear the artefacts its
-own corpus's search can produce, and saying so is better than not knowing.
+These are twelve-shuffle measurements after the `K−1` correction. The last row
+is the restraint result to keep in mind: 79 accidental unconditioned
+correspondences remain, but the charged search selects no environment. Its
+shuffled runs, trained without the search charge so that their maximum margin
+can calibrate the real run, still average 5.8 conditioned classes.
 
 `standing` is `unmeasured` without `--permutations`. It is not a verdict then,
 and does not pretend to be one.
-
-The underlying comparison agrees with linguistic expectation wherever the
-answer is known:
-
-| corpus | strongest rule | noise reaches | reading |
-| --- | --- | --- | --- |
-| `rounding_harmony` | 7.75 | 0.62 | the law towers over its noise |
-| `place_assimilation` | 5.77 | 1.68 | clear |
-| `rhotacism` | 3.11 | 1.07 | clear |
-| `grimm` (unconditioned) | 0.91 | 0.79 | near-noise, which is correct |
-| `verner` | 1.54 | 1.80 | **below** — see below |
-| unrelated pseudo-words | 1.48 | 1.15 | indistinguishable, correctly |
-
-Verner is the instructive one. Its stress-conditioned rules are real and its
-corpus is forty sets, and on forty sets the search finds artefacts stronger
-than the law. The margin does not hide that; it reports it.
 
 #### Tuning the charge from the corpus
 
@@ -448,27 +450,11 @@ than the law. The margin does not hide that; it reports it.
 what a rule has to beat. The shuffled runs are trained with **no** charge at
 all, because what they measure is how high an unpriced search can reach.
 
-This buys precision with recall, and the trade is steep. Conditioned classes,
-default charge against tuned:
-
-| corpus | default | tuned |
-| --- | --- | --- |
-| unrelated pseudo-words | 26 | 2 |
-| `grimm` (unconditioned) | 4 | 0 |
-| `ppn_hawaiian` | 4 | 0 |
-| `rhotacism` | 3 | 3 |
-| `rounding_harmony` | 1 | 1 |
-| `place_assimilation` | 2 | 2 |
-| `verner` | 5 | **0** |
-| `lenition` | 4 | 1 |
-| `latin_spanish` | 20 | 3 |
-
-The first three rows are the case for it: noise collapses, an unconditioned law
-stops being given conditioning, and a corpus whose rules sit below its own
-noise says so. The `verner` row is the case against: a real law, entirely
-suppressed, on a corpus too small for it to stand above the search. It is off
-by default for that reason, and it is a per-corpus decision a reader can make
-from the margins the default run already prints.
+This buys precision with recall and remains off by default. The corrected
+categorical parameter charge removes much of the earlier permissiveness before
+this option is considered; tuning still asks the stricter question of whether
+a selected environment clears the maximum reached by this corpus's full
+unpriced search.
 
 ### The rules are a sequence, and it is published
 
@@ -510,27 +496,31 @@ accounted for.
 Every conditioned row carries the comparison that produced it, not just its own
 side of it: `contrast_count` (the same correspondence in the observations where
 the environment does not hold), `contrast_total` (that side's denominator, on
-the pairwise row), and `delta_bic` (what the split scored). The complement is
-already in hand at commit time — it is `best_no` — so this costs nothing beyond
-carrying it.
+the pairwise row), and named `score_kind`/`delta_score`. `delta_bic` remains a
+compatibility alias. The complement is already in hand at commit time — it is
+`best_no` — so this costs nothing beyond carrying it.
 
 This is what makes a row readable. `latin:s ~ old_latin:s` before a vowel, with
 count 6, looks like a rule until the complement shows 26 of the same
-correspondence outside that environment. It cleared the BIC gate; it is still
+correspondence outside that environment. It cleared the score gate; it is still
 not a statement about conditioning, and no reader could have seen that from the
 count.
 
-### Why BIC, not mutual information or chi-square
+### Why corrected BIC remains the default
 
-BIC has the complexity penalty built in: committing a context split
-costs `k · ln(N)` parameters, so splits survive only when the
-likelihood gain exceeds the penalty. Mutual information or
-chi-square would require a separate significance threshold and an
-adjustment for multiple comparisons. BIC does both in one formula.
+Corrected BIC has a model-complexity penalty built in: splitting a `K`-outcome
+distribution costs `(K−1) · ln(N)`, so a split survives only when its likelihood
+gain exceeds the added dimension. Mutual information has no such penalty.
+Neither BIC nor an ordinary chi-square threshold prices selection of the best
+environment from the adaptive candidate search; the separate search charge and
+shuffled baseline address that problem.
 
-The `DELTA_BIC_THRESHOLD = −1.0` safety buffer is tuned empirically:
-splits with `ΔBIC ∈ (−1, 0)` on tested corpora were uniformly
-spurious (same dominant target, slightly different minority mass).
+M3 compared it with exact NML and symmetric-Dirichlet marginal likelihoods
+under a recorded protocol. Corrected BIC with the full model-space charge was
+the only candidate to satisfy fractional-input coverage, generated null and
+power gates, and all three pre-existing no-environment restraint fixtures. The
+zero threshold and `γ = 1` are empirical defaults, not probability cutoffs or
+universal linguistic constants.
 
 ### Subset-match scoring
 
@@ -603,7 +593,7 @@ complement it is diluted below its own threshold.
 **The environment must move the distribution.** The target dimension is modelled
 once over all observations, and again separately inside and outside the
 environment; the second model is accepted only when its likelihood gain beats
-what its extra parameters cost under BIC. This is the criterion, and the code
+what its configured categorical criterion charges. This is the comparison, and the code
 shape, that context discovery already uses for segmental splits — the same
 question is being asked, so it gets the same test.
 
@@ -611,7 +601,7 @@ question is being asked, so it gets the same test.
 says the distribution changed, not which value changed, and on a dimension with
 several values most of them did not. Each candidate value is therefore tested on
 its own 2×2 table — value against not-value, inside against outside — with its
-own BIC penalty, and a value is reported only if it is *raised* inside the
+own score, and a value is reported only if it is *raised* inside the
 environment relative to the contrast. Requiring a rise is what stops a
 two-valued dimension from publishing both of its values for the same
 environment, which is a frequency table pretending to be a pair of rules.
@@ -626,7 +616,7 @@ own right, under `source_value = "-"`.
 
 ### Greedy commit against the residue
 
-Environments are committed one at a time, best ΔBIC first, and each committed
+Environments are committed one at a time, best score first, and each committed
 rule retires the observations it accounts for. What a rule mispredicts stays
 live, so a later rule can still explain the residue — which is the whole point
 of running this stage after the segmental and tonal baselines.
@@ -745,17 +735,16 @@ of that is ported.
 The claim that "the permutation null and the BIC gate answer the same question
 by different means, and the loop above keeps the cheaper one" stood here until
 2026-08-15 and was wrong. They answer different questions. BIC prices
-*parameters*: one added term against the likelihood it buys. The permutation
-null prices the *search* — and the search is large, since `find_best_split`
-takes the argmax over ~55 immediate or 135 long-range candidates, greedily,
-recursively. A gate that charges for one parameter while the argmax ranges over
-a hundred is not measuring what it appears to measure.
+*parameters*: the `K−1` dimensions added by splitting a `K`-outcome
+distribution. The permutation null prices the *search* — and the search is
+large, since `find_best_split` takes the argmax over ~55 immediate or 135
+long-range candidates, greedily, recursively.
 
-Measured: permuting a corpus's pairings — every wordlist intact, only which
-form answers to which destroyed — *raises* the class counts on every corpus
-tried. Latin–Spanish goes from 62 unconditioned and 25 conditioned to about 133
-and 41; Proto-Polynesian–Hawaiian from 23 and 7 to about 75 and 34. A corpus of
-unrelated pseudo-words yields 78 and 34 with no relationship in it at all.
+Those observations exposed two distinct under-charges. The adaptive search
+charge addressed the candidate argmax; the later `K−1` correction addressed
+the categorical dimension. With both in place, the unrelated restraint corpus
+publishes no conditioned class under the default charge, while the deliberately
+unpriced shuffled runs continue to expose the search's null margins.
 
 The null is back, as a calibration layer rather than a candidate filter — see
 "Reading a model against its own noise" below. Dual-framing dedup is
@@ -923,12 +912,12 @@ shape predicate is a generalisation over that, not new evidence, and
 it wins only where no bounded segmental description coincides with
 it.
 
-### Calibrated thresholds
+### Calibrated gates
 
-The larger candidate space (~54 per step) requires tighter thresholds
-than the immediate-neighbour case:
+The larger candidate space (~54 per step) is priced by the scorer's
+distinct-partition charge. Long range therefore uses:
 
-- `ΔBIC ≤ −5.0` (vs. −1.0)
+- the same zero score threshold as immediate-neighbour discovery
 - Minimum 5 observations per split branch (vs. 2)
 - Feature inventory: `{front, back, close, open, voiced, voiceless}`
   — dropped `vowel` and `consonant` because they are tautological on
@@ -972,15 +961,10 @@ the corpus. These are the unconditioned multi-lect classes.
 Multi-lect context discovery mirrors per-pair context discovery
 (stage 4) but operates at the class level. It iterates over pivot
 lects: for each pivot, it gathers all observations where that lect
-participates, and runs greedy BIC splits exactly as in the pairwise
+participates, and runs greedy categorical splits exactly as in the pairwise
 case.
 
-Two adaptive knobs:
-
-- **AICc correction.** The standard BIC formula assumes large `N`.
-  On small multi-lect corpora (typical for under-documented
-  language families), the AICc correction penalises model complexity
-  more heavily, preventing over-splitting.
+One adaptive support knob:
 - **Min-commit floor scaling.** The minimum observation count for
   a split branch scales with the corpus size: `floor = max(2, total × scale)`.
   This prevents committing a split on one or two observations in a
@@ -1001,8 +985,10 @@ filters (support floors, dual-framing dedup) from the per-pair pass.
 
 ## Threshold calibration summary
 
-Thresholds throughout the pipeline are not arbitrary constants.
-They were calibrated on a combination of synthetic fixtures
+Thresholds throughout the pipeline are empirical settings, not probability
+cutoffs. M3 compared the scorer, prior, threshold, search charge and legacy
+small-sample addition on development and held-back panels. Earlier values were
+calibrated on a combination of synthetic fixtures
 (tonogenesis, umlaut, harmony) and real-data experiments
 (Latin–Spanish, Latin–French, Proto-Polynesian–Hawaiian, Old English–
 Modern English, GLED Romance, GLED Polynesian). The calibration
@@ -1015,13 +1001,13 @@ Key calibration points:
 
 | Threshold | Value | Scope | Why this value |
 |-----------|-------|-------|----------------|
-| `DELTA_BIC_THRESHOLD` | −1.0 | immediate-neighbour splits | Rejects near-zero splits that are spurious |
-| `_LONG_RANGE_DELTA_BIC_THRESHOLD` | −5.0 | long-range splits | Larger candidate space needs tighter margin |
+| `DELTA_BIC_THRESHOLD` | 0.0 | immediate-neighbour splits | Commit only when the full charged score improves |
+| `_LONG_RANGE_DELTA_BIC_THRESHOLD` | 0.0 | long-range splits | The distinct-partition charge prices the larger search |
 | `MIN_SPLIT_OBSERVATIONS` | 2 | immediate-neighbour splits | Allows minority targets (e.g. 3 obs. of `k → θ` vs. 11 `k → k`) |
 | `_LONG_RANGE_MIN_SPLIT_OBS` | 5 | long-range splits | Prevents chance partitions in large candidate space |
 | `MAX_SPLIT_DEPTH` | 3 | both context loops | Caps runaway multi-level splits |
 | `_CROSS_DIM_MIN_RULE_COUNT` | 3 | cross-dimensional commit | Rejects 1/N noise rules |
 | `_CROSS_DIM_MIN_RULE_CONFIDENCE` | 0.0 | cross-dimensional commit | Off: a fixed fraction does not measure conditioning |
 | `_CROSS_DIM_MAX_ITERATIONS` | 5 | cross-dimensional loop | Safety valve; typical corpora exit after 1–2 |
-| `_CROSS_DIM_DELTA_BIC_THRESHOLD` | −1.0 | cross-dimensional commit | The environment, and each value, must beat its parameters |
+| `_CROSS_DIM_DELTA_BIC_THRESHOLD` | 0.0 | cross-dimensional commit | The environment, and each value, must improve the charged score |
 | `MIN_CHUNK_OBSERVATIONS` | 2 | chunk promotion | Rejects singleton chunks BIC can't filter |

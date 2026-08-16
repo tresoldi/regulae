@@ -30,6 +30,8 @@ void loader_cognate_clear(loader_cognate *cognate) {
         return;
     }
     free(cognate->cognate_id);
+    free(cognate->etymon_group);
+    free(cognate->source_group);
     for (i = 0; i < cognate->form_count; i++) {
         loader_form_clear(&cognate->forms[i]);
     }
@@ -122,6 +124,30 @@ rg_status cognate_append_form(loader_cognate *cognate, loader_form *form) {
     cognate->forms[cognate->form_count] = *form;
     cognate->form_count++;
     return RG_OK;
+}
+
+static rg_status set_group(char **owned, const char *value) {
+    if (value == 0 || value[0] == '\0' || strcmp(value, "-") == 0) {
+        return RG_OK;
+    }
+    if (*owned != 0) {
+        return strcmp(*owned, value) == 0 ? RG_OK : RG_ERR_PARSE;
+    }
+    *owned = rg_strdup_internal(value);
+    return *owned == 0 ? RG_ERR_OOM : RG_OK;
+}
+
+rg_status cognate_set_groups(loader_cognate *cognate, const char *etymon_group,
+                             const char *source_group) {
+    rg_status status;
+    if (cognate == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    status = set_group(&cognate->etymon_group, etymon_group);
+    if (status != RG_OK) {
+        return status;
+    }
+    return set_group(&cognate->source_group, source_group);
 }
 
 int string_list_contains(const char *const *items, size_t count, const char *value) {
@@ -268,6 +294,8 @@ rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
                 forms[g].form.syllable_break_count = source->syllable_break_count;
             }
             corpus->view[kept].cognate_id = cognate->cognate_id;
+            corpus->view[kept].etymon_group = cognate->etymon_group;
+            corpus->view[kept].source_group = cognate->source_group;
             corpus->view[kept].forms = forms;
             corpus->view[kept].form_count = group_count;
             /* Each reading carries its share, so a doublet is not two votes. */
@@ -345,4 +373,3 @@ const rg_cognate_set *rg_corpus_cognate_at(const rg_corpus *corpus, size_t index
     }
     return &corpus->view[index];
 }
-

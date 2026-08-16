@@ -16,13 +16,14 @@ accessors, `find_cognate_outliers` is
 `rg_corpus_load_*`. What each field *means*, and what it does not
 mean, is the point of this document.
 
-**Two things changed shape on 2026-08-16, and this document has been
-brought with them.** Every published table is now handed out whole
+**The public surface changed shape on 2026-08-16, and this document has been
+brought with it.** Every published table is now handed out whole
 rather than through a count function and an index function
 (§4.9), and the four fields that say what a search decided about a
 rule moved into one `evidence` member on the rows that carry them
-(§4.6). `RG_ABI_VERSION` is 25. Both are source-level breaks for a
-C consumer, and §7 is the contract that governs them.
+(§4.6). `RG_ABI_VERSION` is 27. Named split scorers and generic score evidence
+are the newest source-level break; observation-group metadata remains governed
+by §7.
 
 This document said until 2026-08-15 that the meanings were
 "unchanged", and it was wrong in four places: a cross-dimensional
@@ -98,9 +99,12 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   positions, which are not independent observations — a
   Latin–Spanish corpus has 413 of them over 97 cognate sets.
   Setting `bootstrap_n` replaces it with a percentile interval
-  resampled over whole **cognate sets**, which is the unit the
-  corpus actually samples, and carries the confidence weighting
-  with it. Measured, the resampled interval is *narrower* on
+  resampled over the named observation group. `bootstrap_unit=AUTO`
+  uses `etymon_group` when supplied and otherwise treats whole
+  **cognate sets** as independent; source-publication grouping is
+  opt-in. `rg_corpus_fit` publishes the chosen unit, its effective
+  count and how many sets lacked each optional label. Measured, the
+  resampled interval is *narrower* on
   most rows, not wider: the rate is a ratio whose numerator and
   denominator move together under resampling, which the
   fixed-denominator binomial model does not capture.
@@ -115,7 +119,7 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   of looking, however large its count.
 - **A conditioned class is a comparison, and reports one.**
   `contrast_count` is the same correspondence where the
-  environment does not hold, and `delta_bic` is what the split
+  environment does not hold, and `score_kind`/`delta_score` say what the split
   scored. A class with more mass outside its stated environment
   than inside it is not evidence that the environment conditions
   anything, whatever its `count` says. Consumers presenting a
@@ -441,16 +445,24 @@ so it has to be read against that corpus's own baseline.
   than two forms and so contributed no correspondence. Worth
   reading as a proportion: a high one means the lect sample, not
   the method, is deciding the result.
+- `etymon_group_count`, `source_group_count`, their missing-label counts,
+  `bootstrap_unit` and `bootstrap_effective_unit_count`: the dependence
+  structure supplied by the caller and the level actually resampled. A
+  missing label falls back to that cognate set as its own group; it is never
+  inferred from spelling or form similarity.
 
 Every conditioned rule and every conditioned class carries what
 the search decided about it, in one `evidence` member:
 
 ```c
 typedef struct rg_rule_evidence {
-    double           delta_bic;       /* what the split scored */
+    rg_split_scorer  scorer;          /* criterion that selected it */
+    double           delta_score;     /* authoritative score */
+    double           delta_bic;       /* compatibility alias */
     int              decision_index;  /* where in the decision list */
     double           search_margin;   /* how heavy a charge it carries */
     rg_rule_standing standing;        /* the verdict */
+    rg_null_model    standing_null;   /* comparison supporting it */
 } rg_rule_evidence;
 ```
 
@@ -464,8 +476,10 @@ typedef struct rg_rule_evidence {
   unsettled. Published tables are sorted by key so lookups can
   binary-search them, which destroys that order; this preserves
   it. `-1` means the row was not decided by a search.
-- `delta_bic` — what the split scored, negative where it paid for
-  its parameter.
+- `scorer` and `delta_score` — the criterion and its score, negative where the
+  split paid for its complexity. `delta_bic` is numerically identical for
+  source compatibility, but is not a BIC value when `scorer` names NML or the
+  Dirichlet marginal likelihood.
 
 These four were separate fields on each row until 2026-08-16,
 copied into four row types. A C consumer reads
@@ -728,8 +742,8 @@ merger as a one-way change.
 P(value | environment), and a rule holding at 0.9 where the
 contrast also holds at 0.9 is the ambient distribution rather
 than a conditioning effect. The contrast fields are what make the
-row a claim; `delta_bic` scores the environment as a whole and is
-negative for every published row.
+row a claim; `evidence.delta_score` scores the environment as a whole under
+`evidence.scorer` and is negative for every published row.
 
 The rule reads: "where the source form satisfies
 `source_environment`, the target form's `tgt_dimension` carries
@@ -790,12 +804,26 @@ Adding a field to a public struct changes its layout, so it moves
 the ABI version whether or not it breaks a source-level consumer.
 The rule is: `RG_ABI_VERSION` moves on any exported struct
 layout, enum, signature or ownership change, and the reason is
-recorded in `docs/c_conversion_roadmap.md`. It is at **25**.
+recorded in `docs/c_conversion_roadmap.md`. It is at **27**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **27** — `rg_split_scorer` selects corrected BIC, exact multinomial NML or a
+  symmetric-Dirichlet marginal likelihood; `rg_rule_evidence` names its scorer
+  and authoritative `delta_score`; `rg_corpus_fit` reports the selected scorer
+  and prior mass. Exact NML refuses fractional mass. The selected default also
+  removes the un-derived multi-lect small-sample addition, charges the full
+  distinct-partition model space and uses a zero score threshold.
+- **26** — `rg_cognate_set` gained optional `etymon_group` and
+  `source_group`; TSV and wide loader options can name those columns;
+  `rg_train_options.bootstrap_unit` selects cognate, etymon or source
+  clustering; `rg_uncertainty_estimate` names its observation unit and
+  effective count; `rg_rule_evidence` names the null supporting its verdict;
+  and `rg_corpus_fit` reports the supplied and effective units.
+  The loader owns its copies, while programmatic input remains borrowed for
+  training.
 - **25** — `rg_find_transcription_drift`,
   `rg_transcription_drift_rows_free`, `rg_transcription_drift_row`
   and `rg_drift_kind` are new (§4.8). Additive, and it moves the

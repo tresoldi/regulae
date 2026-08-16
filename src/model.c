@@ -47,6 +47,24 @@ static int grapheme_is_known(const rg_context *ctx, const char *grapheme) {
     return rg_context_features_internal(ctx, grapheme, &features) == RG_OK;
 }
 
+static void stamp_split_scorer(rg_pairwise_model *model, rg_split_scorer scorer) {
+    size_t i;
+    for (i = 0; i < model->conditioned_segment_count_count; i++) {
+        rg_rule_evidence *evidence = &model->conditioned_segment_counts[i].evidence;
+        if (evidence->decision_index >= 0) {
+            evidence->scorer = scorer;
+            evidence->delta_score = evidence->delta_bic;
+        }
+    }
+    for (i = 0; i < model->cross_dimensional_count; i++) {
+        rg_rule_evidence *evidence = &model->cross_dimensional_rows[i].evidence;
+        if (evidence->decision_index >= 0) {
+            evidence->scorer = scorer;
+            evidence->delta_score = evidence->delta_bic;
+        }
+    }
+}
+
 /* Builds the starting model: no counts, a merkmal-derived Dirichlet prior over
  * the corpus grapheme inventory, and empty displacement, chunk and tonal
  * tables. The vocabulary is sorted so the softmax sums in a fixed order;
@@ -542,6 +560,7 @@ rg_status rg_train_pairwise_internal(
 #undef RUN_STAGE
 
     rg_feature_vocabulary_clear_internal(&vocabulary);
+    stamp_split_scorer(model, opts->bic.split_scorer);
     *out = model;
     return RG_OK;
 }

@@ -16,6 +16,7 @@ the engine changed to allow it.
 | --- | --- | --- | --- |
 | segment correspondences | supported | every loader | `testdata/corpora/*` (13 corpora) |
 | conditioned environments | supported | every loader | `testdata/corpora/conditioned_multilect.tsv` |
+| conditioned-split scorers | corrected BIC default; exact NML and Dirichlet marginal experimental | C options, JSON options, or `--scorer` | `tests/c/test_split_score.c`, `docs/m3_evaluation.md`, ADR 0001 |
 | long-range conditioning | supported | every loader | `testdata/corpora/long_range.tsv` |
 | multi-lect reconciliation | supported | every loader | `testdata/corpora/real_romance_4lect.tsv` (4 lects) |
 | confidence weighting and outliers | supported | TSV and wide (`confidence` column) | `testdata/corpora/real_contaminated.tsv` |
@@ -24,14 +25,15 @@ the engine changed to allow it.
 | tone | supported | every loader, from Chao superscripts in the transcription or a tone column | `tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c` |
 | stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
 | manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
-| bootstrap uncertainty | **not ported** | n/a | never ported; `bootstrap_n` is accepted and ignored |
+| observation-group metadata | supported | TSV and wide (`etymon_group`, `source_group`) | `tests/c/test_evaluation_m2.c` |
+| bootstrap uncertainty | supported | `bootstrap_n`; cognate, etymon, or source groups | `tests/c/test_uncertainty.c`: resamples named groups |
 | chunk transparency screening | supported | `chunk_min_transparency`; every chunk row carries its score | `testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c` |
 | anomaly detection | **not ported** | n/a | never ported |
 | opaque conditioning (the daughter lost the trigger) | supported | every loader | `testdata/soundlaws/graded_9_lost_trigger.tsv`, `opaque_umlaut.tsv` |
 | chain shifts kept apart from mergers | supported | every loader | `testdata/soundlaws/great_vowel_shift.tsv` |
 | compensatory lengthening | supported | every loader | `testdata/soundlaws/compensatory_lengthening.tsv` |
-| a verdict on whether two lects are related at all | supported | `permutation_count`, or `--permutations` | `testdata/restraint/chance.tsv` |
-| restraint on a change with no environment | supported | every loader | `testdata/restraint/diffusion.tsv`, `stratum.tsv`, `soundlaws/final_devoicing.tsv` |
+| a verdict on whether supplied pairings carry structure beyond a shuffle | supported | `permutation_count`, or `--permutations` | `testdata/restraint/chance.tsv` |
+| restraint on a change with no environment | supported | every loader | `testdata/restraint/diffusion.tsv`, `stratum.tsv` |
 | ranking cognate sets worst-first, for triage | supported | every loader | `testdata/diagnostics/contaminated.tsv`, `partial.tsv` |
 | disjunctive trigger sets (RUKI's shape) | supported, as a decision list | every loader | `testdata/soundlaws/graded_7_disjunction.tsv`: one rule per trigger, all with one outcome |
 | syllable shape and weight | supported | every loader | `testdata/soundlaws/graded_8_weight.tsv`: `prev-syl[syllable_weight:heavy]`, Sievers' shape in one rule |
@@ -46,22 +48,22 @@ Trained through the wide loader with default options.
 
 | corpus | lects | classes | conditioned |
 | --- | --- | --- | --- |
-| arabic_hebrew | arabic, hebrew | 33 | 4 |
+| arabic_hebrew | arabic, hebrew | 33 | 5 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
-| finnish_estonian | estonian, finnish | 36 | 4 |
-| georgian_svan | georgian, svan | 51 | 8 |
+| finnish_estonian | estonian, finnish | 36 | 3 |
+| georgian_svan | georgian, svan | 51 | 3 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 82 | 25 |
-| latin_italian | italian, latin | 68 | 18 |
-| latin_spanish | latin, spanish | 64 | 24 |
+| latin_french | french, latin | 79 | 2 |
+| latin_italian | italian, latin | 69 | 11 |
+| latin_spanish | latin, spanish | 65 | 10 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
-| mandarin_historical | mandarin, middle_chinese | 48 | 7 |
-| navajo_chipewyan | chipewyan, navajo | 53 | 2 |
-| oe_english | modern_english, old_english | 60 | 11 |
-| ppn_hawaiian | hawaiian, ppn | 22 | 3 |
-| swahili_zulu | swahili, zulu | 41 | 2 |
+| mandarin_historical | mandarin, middle_chinese | 50 | 3 |
+| navajo_chipewyan | chipewyan, navajo | 53 | 1 |
+| oe_english | modern_english, old_english | 61 | 12 |
+| ppn_hawaiian | hawaiian, ppn | 22 | 2 |
+| swahili_zulu | swahili, zulu | 41 | 0 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 50 | 16 |
+| tone_chinese_like | cantonese, mandarin | 51 | 8 |
 | tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |

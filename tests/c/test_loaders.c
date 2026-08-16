@@ -88,6 +88,47 @@ static void test_tsv_without_confidence_column(void) {
     rg_corpus_free(corpus);
 }
 
+static void test_observation_groups_are_loaded_and_consistent(void) {
+    const char *text =
+        "cognate_id\tlect_id\tsegments\tetymon_group\tsource_group\n"
+        "c1\tone\tp a\tstem-1\tpublication-a\n"
+        "c1\ttwo\tf a\tstem-1\tpublication-a\n"
+        "c2\tone\tt a\t\tpublication-b\n"
+        "c2\ttwo\td a\t\tpublication-b\n";
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *first;
+    const rg_cognate_set *second;
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
+    first = rg_corpus_cognate_at(corpus, 0);
+    second = rg_corpus_cognate_at(corpus, 1);
+    assert(strcmp(first->etymon_group, "stem-1") == 0);
+    assert(strcmp(first->source_group, "publication-a") == 0);
+    assert(second->etymon_group == 0);
+    assert(strcmp(second->source_group, "publication-b") == 0);
+    rg_corpus_free(corpus);
+
+    assert(rg_corpus_parse_tsv(
+        "cognate_id\tlect_id\tsegments\tetymon_group\n"
+        "c1\tone\tp a\tstem-1\n"
+        "c1\ttwo\tf a\tstem-2\n", 0, &corpus, 0) == RG_ERR_PARSE);
+}
+
+static void test_wide_observation_groups_are_metadata(rg_context *ctx) {
+    const char *text =
+        "gloss\tetymon_group\tsource_group\tone\ttwo\n"
+        "hand\troot-hand\tpublication-a\tmano\tmain\n";
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+    assert(rg_corpus_parse_wide_tsv(ctx, text, 0, &corpus, 0) == RG_OK);
+    assert(rg_corpus_cognate_count(corpus) == 1);
+    set = rg_corpus_cognate_at(corpus, 0);
+    assert(set->form_count == 2);
+    assert(strcmp(set->etymon_group, "root-hand") == 0);
+    assert(strcmp(set->source_group, "publication-a") == 0);
+    rg_corpus_free(corpus);
+}
+
 static void test_arcaverborum_morpheme_boundaries(void) {
     rg_corpus *corpus = 0;
     const rg_cognate_set *set;
@@ -711,6 +752,16 @@ static void test_a_refused_row_releases_what_it_read(void) {
     assert(corpus == 0);
 }
 
+static void test_a_stressed_tone_token_keeps_its_ownership(void) {
+    rg_corpus *corpus = 0;
+    const char *text =
+        "cognate_id\tlect_id\tsegments\n"
+        "c1\tone\tp ˌ⁵\n"
+        "c1\ttwo\tp a\n";
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
+    rg_corpus_free(corpus);
+}
+
 /* "parse error" names neither the line nor the reason, on a file that may have
  * ten thousand rows. */
 static void test_load_failure_names_the_reason(void) {
@@ -763,6 +814,7 @@ int main(void) {
     test_wide_breaks_and_column_conventions(ctx);
     test_wide_carries_tone(ctx);
     test_wide_confidence_and_bad_input(ctx);
+    test_wide_observation_groups_are_metadata(ctx);
     test_parse_matches_load(ctx);
     rg_context_free(ctx);
     test_tsv_grouping_and_order();
@@ -773,6 +825,7 @@ int main(void) {
     test_tsv_without_tone_column_is_untoned();
     test_tsv_confidence_is_the_minimum();
     test_tsv_without_confidence_column();
+    test_observation_groups_are_loaded_and_consistent();
     test_arcaverborum_morpheme_boundaries();
     test_missing_file_and_columns();
     test_corpus_from_pairs();
@@ -782,6 +835,7 @@ int main(void) {
     test_a_diagnosis_belongs_to_its_own_call();
     test_a_truncated_stress_mark_is_not_read_past();
     test_a_refused_row_releases_what_it_read();
+    test_a_stressed_tone_token_keeps_its_ownership();
     printf("loader tests passed\n");
     return 0;
 }

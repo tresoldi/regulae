@@ -555,8 +555,7 @@ static rg_status refine_split(
     const split_candidate *candidates,
     const rg_split_gate *gates,
     size_t candidate_count,
-    double penalty,
-    double search_gamma,
+    const rg_split_score_config *score_config,
     size_t observation_capacity,
     int target_side,
     double bucket_total
@@ -565,6 +564,7 @@ static rg_status refine_split(
     rg_split_result best;
     rg_context_spec yes_context;
     rg_status status;
+    int found = 0;
 
     if (depth >= max_depth || rg_split_total_weight(rows, count) < min_obs) {
         return RG_OK;
@@ -573,16 +573,17 @@ static rg_status refine_split(
     if (status != RG_OK) {
         return status;
     }
-    if (!rg_split_find_best(&search, rows, count, candidates, gates, candidate_count,
-                            penalty, search_gamma, &best)) {
+    status = rg_split_find_best(&search, rows, count, candidates, gates, candidate_count,
+                                score_config, &best, &found);
+    if (status != RG_OK || !found) {
         rg_split_search_clear(&search);
-        return RG_OK;
+        return status;
     }
     status = rg_context_extend_internal(base_context, &best.candidate, &yes_context);
     if (status == RG_OK) {
         status = commit_observation_group(model, source, search.best_yes, best.yes_count, &yes_context,
                                           target_side, bucket_total,
-                                          search.best_no, best.no_count, best.delta_bic,
+                                          search.best_no, best.no_count, best.delta_score,
                                           best.search_margin, model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
@@ -597,8 +598,7 @@ static rg_status refine_split(
                 candidates,
                 gates,
                 candidate_count,
-                penalty,
-                search_gamma,
+                score_config,
                 observation_capacity,
                 target_side,
                 bucket_total
@@ -627,8 +627,7 @@ static rg_status commit_splits_for_source(
     size_t all_candidate_count,
     int max_depth,
     double min_obs,
-    double penalty,
-    double search_gamma,
+    const rg_split_score_config *score_config,
     int target_side
 ) {
     rg_split_search search;
@@ -652,9 +651,11 @@ static rg_status commit_splits_for_source(
         rg_split_result best;
         rg_context_spec yes_context;
         rg_context_spec empty;
+        int found = 0;
 
-        if (!rg_split_find_best(&search, remaining, remaining_count, top_candidates, top_gates,
-                                top_candidate_count, penalty, search_gamma, &best)) {
+        status = rg_split_find_best(&search, remaining, remaining_count, top_candidates, top_gates,
+                                    top_candidate_count, score_config, &best, &found);
+        if (status != RG_OK || !found) {
             break;
         }
         rg_context_spec_init_empty(&empty);
@@ -665,7 +666,7 @@ static rg_status commit_splits_for_source(
         }
         status = commit_observation_group(model, source, search.best_yes, best.yes_count, &yes_context,
                                           target_side, rg_split_total_weight(rows, count),
-                                          search.best_no, best.no_count, best.delta_bic,
+                                          search.best_no, best.no_count, best.delta_score,
                                           best.search_margin, model->decision_count++);
         if (status == RG_OK) {
             status = refine_split(
@@ -680,8 +681,7 @@ static rg_status commit_splits_for_source(
                 all_candidates,
                 all_gates,
                 all_candidate_count,
-                penalty,
-                search_gamma,
+                score_config,
                 count,
                 target_side,
                 rg_split_total_weight(rows, count)
@@ -883,9 +883,9 @@ static rg_status discover_context_counts(
     rg_split_gate *all_gates = 0;
     size_t all_count = 0;
     double immediate_min_obs = 2.0;
-    double immediate_delta = -1.0;
+    double immediate_delta = 0.0;
     double long_min_obs = 5.0;
-    double long_delta = -5.0;
+    double long_delta = 0.0;
     double long_dominant = 0.6;
 
     if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
@@ -1038,8 +1038,14 @@ static rg_status discover_context_counts(
             all_count,
             max_depth,
             long_range ? long_min_obs : immediate_min_obs,
-            log(n_total),
-            options->bic.search_penalty_gamma,
+            &(rg_split_score_config){
+                options->bic.split_scorer,
+                options->bic.split_prior_concentration,
+                log(n_total),
+                0.0,
+                0,
+                options->bic.search_penalty_gamma
+            },
             target_side
         );
     }
@@ -1148,5 +1154,3 @@ rg_status discover_long_range_context_counts(
 ) {
     return discover_both_sides(ctx, pairs, pair_count, options, model, vocabulary, 1);
 }
-
-

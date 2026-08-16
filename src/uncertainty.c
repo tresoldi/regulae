@@ -36,6 +36,8 @@ static rg_uncertainty_estimate unconstrained(double estimate, double total, doub
     out.n = total > 0.0 ? total : 0.0;
     out.alpha = alpha;
     out.method = RG_UNCERTAINTY_NONE;
+    out.observation_unit = RG_OBSERVATION_UNIT_AUTO;
+    out.effective_n = out.n;
     out.post_selection = 0;
     return out;
 }
@@ -76,6 +78,8 @@ rg_status rg_wilson_interval(
         out->n = total;
         out->alpha = alpha;
         out->method = RG_UNCERTAINTY_WILSON;
+        out->observation_unit = RG_OBSERVATION_UNIT_ALIGNED_POSITION;
+        out->effective_n = total;
         out->post_selection = 0;
     }
     return RG_OK;
@@ -160,6 +164,8 @@ rg_status rg_percentile_interval(
     out->n = total > 0.0 ? total : 0.0;
     out->alpha = alpha;
     out->method = RG_UNCERTAINTY_BOOTSTRAP;
+    out->observation_unit = RG_OBSERVATION_UNIT_AUTO;
+    out->effective_n = total > 0.0 ? total : 0.0;
     out->post_selection = 0;
     free(ordered);
     return RG_OK;
@@ -199,10 +205,28 @@ const char *rg_rule_standing_string(rg_rule_standing standing) {
     }
 }
 
+const char *rg_null_model_string(rg_null_model model) {
+    switch (model) {
+    case RG_NULL_MODEL_NONE:
+        return "none";
+    case RG_NULL_MODEL_PAIRING_SHUFFLE:
+        return "pairing_shuffle";
+    case RG_NULL_MODEL_WITHIN_BUCKET_SHUFFLE:
+        return "within_bucket_shuffle";
+    case RG_NULL_MODEL_PARAMETRIC_UNCONDITIONED:
+        return "parametric_unconditioned";
+    case RG_NULL_MODEL_REAL_NEGATIVE_PANEL:
+        return "real_negative_panel";
+    default:
+        return "unknown";
+    }
+}
+
 void rg_rule_evidence_judge_internal(rg_rule_evidence *evidence, double null_search_margin) {
     if (evidence == 0) {
         return;
     }
     evidence->standing = evidence->search_margin > null_search_margin
         ? RG_RULE_STANDING_ABOVE_NOISE : RG_RULE_STANDING_WITHIN_NOISE;
+    evidence->standing_null = RG_NULL_MODEL_PAIRING_SHUFFLE;
 }

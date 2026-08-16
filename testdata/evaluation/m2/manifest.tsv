@@ -1,0 +1,53 @@
+case_id	path	axis	axis_value	expected_signal	outcome_k	candidate_partitions	expected_rate	sha256	note
+sets_8	testdata/evaluation/m2/generated/sets_8.tsv	cognate_set_count	8	1	2	2	0.5	d1df146a7406d2765d978f04292af686fa49129533639da68daeb269c420e115	
+sets_16	testdata/evaluation/m2/generated/sets_16.tsv	cognate_set_count	16	1	2	2	0.5	c1470a63c831dcee399629f86fcadd02a573c5fa36c2680ce0a352b528fafb6e	
+sets_32	testdata/evaluation/m2/generated/sets_32.tsv	cognate_set_count	32	1	2	2	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	
+sets_64	testdata/evaluation/m2/generated/sets_64.tsv	cognate_set_count	64	1	2	2	0.5	dcf0e04cabde5ecef8c517057c7a41ae16d1d28f79fbc56dff1f83f20dcc6688	
+positions_1	testdata/evaluation/m2/generated/positions_1.tsv	positions_per_set	1	1	2	2	0.5	29fa04c3948c58697d4924b90fc8cdf3eafdb7238431daff7ac0dd963a4e842a	
+positions_2	testdata/evaluation/m2/generated/positions_2.tsv	positions_per_set	2	1	2	2	0.5	b59af47014521d8d5a628904c7f2bbdb41216716ce89970b4ec2b3d201d390ca	
+positions_4	testdata/evaluation/m2/generated/positions_4.tsv	positions_per_set	4	1	2	2	0.5	08202a8c7f026948e8debd1b12758e4acb582bf4fc571391478258b94ddee85c	
+etymon_cluster_1	testdata/evaluation/m2/generated/etymon_cluster_1.tsv	repeated_etymon_cluster	1	1	2	2	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	
+etymon_cluster_4	testdata/evaluation/m2/generated/etymon_cluster_4.tsv	repeated_etymon_cluster	4	1	2	2	0.5	65cbd99da2a81472d3c2ddef92b9f8e0ca7a3cbf31da1962edd1e2fe2c85a0b7	
+etymon_cluster_8	testdata/evaluation/m2/generated/etymon_cluster_8.tsv	repeated_etymon_cluster	8	1	2	2	0.5	ca5bbbacf630bbe6adb39197edf5e39cb3d027846157a65fea12772bb4f5636b	
+outcome_k_2	testdata/evaluation/m2/generated/outcome_k_2.tsv	outcome_alphabet	2	1	2	2	0.5	d568a0e0b148bca827d9fc3019e1130ba16a8d96d4db4beb5480557b6e4e396a	
+outcome_k_3	testdata/evaluation/m2/generated/outcome_k_3.tsv	outcome_alphabet	3	1	3	2	0.5	d25c3387af8352a602e2625f801b88e4546f9d9901c70686c11cadc8a12848eb	
+outcome_k_5	testdata/evaluation/m2/generated/outcome_k_5.tsv	outcome_alphabet	5	1	5	2	0.5	3fd73bc5b14b065f47baf0163978cb5aa32ff5a16db1ec84db362ef8879a0c10	
+imbalance_0_25	testdata/evaluation/m2/generated/imbalance_0_25.tsv	outcome_imbalance	0.25	1	2	2	0.25	c7e03f1a1aa051ba623b2cd6e0f47030908f8f59e257e5aba39d69f3ab819ac9	
+imbalance_0_5	testdata/evaluation/m2/generated/imbalance_0_5.tsv	outcome_imbalance	0.5	1	2	2	0.5	d568a0e0b148bca827d9fc3019e1130ba16a8d96d4db4beb5480557b6e4e396a	
+imbalance_0_8	testdata/evaluation/m2/generated/imbalance_0_8.tsv	outcome_imbalance	0.8	1	2	2	0.8	21de1e5bdbf3dd30d815e4e6194e648b7ebd74709cc75dac45d4c1e0eae7dc2b	
+rare_outcome	testdata/evaluation/m2/generated/rare_outcome.tsv	rare_outcome	0.05	1	2	2	0.05	9807d7821863bbc2fdfc61dac1443430006e8b53aaebe5d2284fa2724a9fd555	
+structural_zero	testdata/evaluation/m2/generated/structural_zero.tsv	structural_zero	True	1	2	2	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	f absent outside trigger
+counter_0_0	testdata/evaluation/m2/generated/counter_0_0.tsv	counter_support	0.0	1	2	2	0.5	d568a0e0b148bca827d9fc3019e1130ba16a8d96d4db4beb5480557b6e4e396a	
+counter_0_1	testdata/evaluation/m2/generated/counter_0_1.tsv	counter_support	0.1	1	2	2	0.5	c8beae0bf5b93f33f02f77adb7bcacb11eb4a143c61fa239193de3a596af092c	
+counter_0_25	testdata/evaluation/m2/generated/counter_0_25.tsv	counter_support	0.25	1	2	2	0.5	fc7abc4f2c651868f956376dff1e5817af81e8e9a7fc46a27ff16c42f36058b5	
+interaction_1	testdata/evaluation/m2/generated/interaction_1.tsv	interaction_depth	1	1	2	8	0.5	f052c7b658c785b47d2c5ed2b8fa66786ce5370bcb28b2b9aecb26ad6f3a6937	
+interaction_2	testdata/evaluation/m2/generated/interaction_2.tsv	interaction_depth	2	1	2	8	0.25	5c080bb6a41550957eb1ec98aca408fff07a0239e3dd5c075708be0ef51ea033	
+interaction_3	testdata/evaluation/m2/generated/interaction_3.tsv	interaction_depth	3	1	2	8	0.125	720e728267d6366926cb82652f83747f96c5b0e1f23af81be1b5c2b535979ce3	
+decision_list_1	testdata/evaluation/m2/generated/decision_list_1.tsv	decision_list_length	1	1	2	8	0.25	c410ce513cdca1b0ddc6f7fca12e7be8f5dfb41ebce992872b7de92f49444e64	
+decision_list_2	testdata/evaluation/m2/generated/decision_list_2.tsv	decision_list_length	2	1	2	8	0.4	87988eed0823ac0273ce3d69ee5add8ed3f208612e1b90cf98bc55861d0ccbaa	
+decision_list_3	testdata/evaluation/m2/generated/decision_list_3.tsv	decision_list_length	3	1	2	8	0.5	84b436987efd1d6406015b51e99d364017556befa67ba97c5ea5210560fcfc34	
+confounded_two_vowels	testdata/evaluation/m2/generated/confounded_two_vowels.tsv	candidate_partition_correlation	complete	1	2	6	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	
+deconfounded_four_vowels	testdata/evaluation/m2/generated/deconfounded_four_vowels.tsv	candidate_partition_correlation	reduced	0	3	10		a52367441991a8e3760ac7d484028559152c468034fc7aadf4b5d609a6c20297	
+insertion	testdata/evaluation/m2/generated/insertion.tsv	alignment_structure	insertion	1	2	2	0.5	b1a1ebab4607b86d39fa4490ca5d33ee1f633cfe992ce5125c0319fb7f96775a	
+deletion	testdata/evaluation/m2/generated/deletion.tsv	alignment_structure	deletion	1	2	2	0.5	e1b410e9f0f7edb8e9217e62eb77623eb5747b3805822cd38bec692ecb411de5	
+chunk	testdata/evaluation/m2/generated/chunk.tsv	alignment_structure	chunk	1	2	2	0.5	25cfd956a5c1faf3af9a3eb8ffbe5560bb1b4a632601dc8d1dcbc6f4587ea146	
+reordering	testdata/evaluation/m2/generated/reordering.tsv	alignment_structure	reordering	1	2	2	0.5	7f326fea12b0ab036a59194b12db32405d734783f65c96c3f7082403afe1d860	
+partial_cognacy	testdata/evaluation/m2/generated/partial_cognacy.tsv	alignment_structure	partial_cognacy	1	2	2	0.5	a05df3d2ba569d9d567ef6701a458cab951f1bddcd2c62c17cab05985c50a540	partial cognacy is represented as whole-form input
+confidence_weights	testdata/evaluation/m2/generated/confidence_weights.tsv	confidence_weights	0.2/1	1	2	2	0.5	7a847f83138e0d6f00db6d0941efca09f90af84c0c275ca136c14ff54070de1f	
+doublets	testdata/evaluation/m2/generated/doublets.tsv	doublets	every_fourth_set	1	2	2	0.5	8009460bd5d34dbd9540689d0e218b3166119fe7a63cf9becbe9740b3df52b9e	
+taxon_2	testdata/evaluation/m2/generated/taxon_2.tsv	lect_count	2	1	2	2	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	
+taxon_3	testdata/evaluation/m2/generated/taxon_3.tsv	lect_count	3	1	2	2	0.5	ca2468f876af0cae323239cb626068f8019cef2389a1d3752f4aa234a2a8978f	
+taxon_4	testdata/evaluation/m2/generated/taxon_4.tsv	lect_count	4	1	2	2	0.5	971f179136a12d7bb83ef991484ba45a0e3844899d8b11ed9962131cb0da3f04	
+subgroup_conservative_heavy	testdata/evaluation/m2/generated/subgroup_conservative_heavy.tsv	subgroup_balance	3:1	1	2	2	0.5	bd3549076ea67fd8e817dcfce89025b48e2ef460c2c3a522d7a90694be175094	
+subgroup_innovator_heavy	testdata/evaluation/m2/generated/subgroup_innovator_heavy.tsv	subgroup_balance	1:3	1	2	2	0.5	a84235d1ce6cc2366d77ff6dc8135e1f1bc8e53ee7c3f2ad0e7fe07db242ad87	
+missing_lects	testdata/evaluation/m2/generated/missing_lects.tsv	missing_lects	one_in_four	1	2	2	0.5	c30c1d3cbf9f6f82bc7bb0174f9fa2639f50e6e632e8d86d149bb0be51905910	
+tone_representation	testdata/evaluation/m2/generated/tone_representation.tsv	prosodic_representation	tone_column	1	2	2	0.5	5871d41bd2b66283efdaa0bc03fd2fc083cecab5738e56806db6010c1b0781c2	
+inventory_2	testdata/evaluation/m2/generated/inventory_2.tsv	inventory_size	2	1	2	4	0.5	094be7cb16dbbb76d3045926d859d258322db2d6c7a2e9bbdadba1fcf6f94bd4	
+inventory_4	testdata/evaluation/m2/generated/inventory_4.tsv	inventory_size	4	1	2	6	0.5	2e65823c49c80a04877b79175693aa82538e20d109a4996e66d2c5453e1d5678	
+inventory_8	testdata/evaluation/m2/generated/inventory_8.tsv	inventory_size	8	1	2	10	0.5	cbf9b91d5bbf2e9a58d2a04462642f722e1cd1962fdcbf346938f3c9b50acbd0	
+word_shape_cv	testdata/evaluation/m2/generated/word_shape_cv.tsv	word_shape	CV	1	2	2	0.5	0659dd950c4d7fdf9f944b2744c50f0e685149fc8eece1de6884c5685d112918	
+word_shape_cvc	testdata/evaluation/m2/generated/word_shape_cvc.tsv	word_shape	CVC	1	2	2	0.5	722dd2f509461106608a476d0ee58d31af27b76311a98a38ef34b66c79f2d2e2	
+word_shape_ccvc	testdata/evaluation/m2/generated/word_shape_ccvc.tsv	word_shape	CCVC	1	2	2	0.5	c44e1140567ebb8f58cf3d784af290ba578ab391893acbd9a82849658afb33c8	
+transcription_mixture	testdata/evaluation/m2/generated/transcription_mixture.tsv	source_mixture	two_publications	1	2	2	0.5	9ac288407ee74dc53e0694904ea50f068fc8e3e80921872cb5bd37f578c903d2	
+contact_layers	testdata/evaluation/m2/generated/contact_layers.tsv	contact_layers	two_surface_populations	1	2	2	0.5	66385b2c11b07f110a068b47be1abc8169c464a62e9ad33ef4a81c6e9e284055	
+unconditioned_negative	testdata/evaluation/m2/generated/unconditioned_negative.tsv	null_control	independent	0	3	10		16068e71b725d45233345af59f49ba4bf5c75e857ada2a4108a11d8c64b6294f	

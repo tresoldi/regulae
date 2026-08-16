@@ -119,6 +119,7 @@ static void test_conditioned_palatalization(rg_context *ctx, const rg_train_opti
     size_t i;
     int found = 0;
 
+    memset(cognates, 0, sizeof(cognates));
     local_options.max_chunk_size = 1;
 
     for (i = 0; i < 16; i++) {
@@ -184,6 +185,8 @@ int main(void) {
     int saw_ac = 0;
     int saw_bc = 0;
 
+    memset(cognates, 0, sizeof(cognates));
+    memset(&invalid, 0, sizeof(invalid));
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     rg_train_options_init_defaults(&options);
     test_conditioned_palatalization(ctx, &options);
@@ -274,6 +277,7 @@ int main(void) {
     {
         rg_cognate_form paired_forms[2];
         rg_cognate_set mixed[2];
+        memset(mixed, 0, sizeof(mixed));
         paired_forms[0].lect_id = "A";
         paired_forms[0].form = form("A", a1, 2);
         paired_forms[1].lect_id = "B";

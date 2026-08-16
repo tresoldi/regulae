@@ -91,7 +91,9 @@ environments, and regulae looks for those rather than making you spot them.
 
 The search is a greedy split: for each segment with more than one outcome, it
 tries conditioning the choice on the surrounding phonology and keeps a split
-only when it pays for itself under a BIC criterion. That last part matters. It
+only when it pays for itself under the configured categorical criterion. The
+default is corrected BIC; exact multinomial NML and a symmetric-Dirichlet
+marginal likelihood are experimental alternatives. That gate matters. It
 is easy to explain away every exception by adding enough conditions, and the
 criterion is what stops the tool doing that: a split has to buy more in
 explained variation than it costs in added complexity, or it is discarded.
@@ -124,16 +126,19 @@ count=14 elsewhere=0  cov=0.74 dBIC=-11.5   latin:r ~ old_latin:s  [between vowe
 count=6  elsewhere=26 cov=0.13 dBIC=-28.2   latin:s ~ old_latin:s  [before a vowel]
 ```
 
-The first is a sound law: fourteen times in the environment, never outside it.
-The second is not: six times in its stated environment and twenty-six times
-outside it, which means the environment is not what is doing the work. Both
-were committed by the same BIC gate, and before `elsewhere` was printed they
+The first is the clean surface association expected from the rhotacism
+challenge: fourteen times in the environment, never outside it. It is still
+not, by itself, a historical event claim. The second does not support its stated
+conditioning: the same correspondence occurs twenty-six times outside. Both
+were committed by the same split gate, and before `elsewhere` was printed they
 differed only in a count you had nothing to weigh against.
 
-`dBIC` is what the split scored — how much better the model got, charged for
-the parameter the split added. More negative is a stronger split. It is a
-within-corpus comparison, not a p-value, and it does not price the search that
-found the environment; that is what the shuffled baseline above is for.
+`dBIC` is the default scorer's value — how much better the model got, charged
+for the `K−1` outcome parameters and the distinct candidate partitions searched.
+More negative is a stronger split. Alternative runs label this `dNML` or
+`dDir`; machine output publishes `score_kind` and `delta_score`. None is a
+p-value. The shuffled baseline separately measures what the adaptive search
+reaches after cross-lect pairings are broken.
 
 ## More than two lects
 
@@ -180,12 +185,12 @@ the shuffled data produced **more** classes than the real data — 58 against 20
 12 against 3.
 
 That second line is the one to take to heart. **The number of classes is not
-evidence of relatedness.** Search over a large inventory of possible
-environments will always find some that fit, and it finds more of them in noise
-than in signal, because noise has no structure to constrain the search. A run
-on two genuinely unrelated wordlists will report dozens of correspondences with
-stated environments, formatted exactly like the ones above. The fit statistic
-is what tells them apart, and it costs one training run per shuffle.
+evidence of relatedness.** An under-charged search over a large inventory of
+possible environments finds more of them in noise than in signal. The current
+categorical charge makes the unrelated restraint corpus publish no conditioned
+classes, while its unpriced shuffled searches still find several. The fit
+statistic measures whether the supplied pairings contain structure beyond that
+comparison, and it costs one training run per shuffle.
 
 This is a statement about the corpus, not about any one rule. It answers
 "is there a relationship here", which has to be answered first.
@@ -231,10 +236,11 @@ each *pair* of lects carries in its own model, and those are counted per pair,
 so a rule visible in every pair of a four-lect corpus is six there and one
 above. They are not added together for that reason.
 
-**Read both.** On the Grassmann fixture the first line says 0 of 4 — nothing
-distinguishable from having looked — while the rule that *is* Grassmann's Law,
-Greek `t` answering Proto-Indo-European `tʰ` where an aspirate follows, stands
-in the second. A corpus's only real finding can be in either.
+**Read both.** With thirty shuffles the Grassmann fixture reports 1 of 3
+multi-lect associations and 2 of 2 per-pair associations above noise. The
+Greek `t` correspondence with Proto-Indo-European `tʰ` where an aspirate
+follows is visible in both views, but their denominators and evidence units are
+different. A corpus's strongest surface association can be in either.
 
 ## How much data do I need?
 
@@ -243,9 +249,9 @@ About **eight examples of a change and eight counterexamples**, measured.
 `testdata/restraint/sparse_008` … `sparse_128` is one conditioned change — /p/ answering /f/
 before a front vowel — at 8, 16, 32, 64 and 128 cognate sets, each corpus a
 prefix of the next so that the only thing that varies is size. At 8 sets
-nothing at all is committed. At 16 the rule is found, and it is committed
-*second*, behind a weaker environment that the shuffled baseline then rejects.
-From 32 up it leads and everything committed stands.
+nothing at all is committed. At 16 the two sides of the intended contrast are
+the only committed classes and both stand above the shuffled search. The same
+holds from 32 upward.
 
 Two readings, and the second is the one people miss.
 
@@ -254,10 +260,11 @@ search stays quiet rather than guessing, which is what you want it to do, and
 it means a run that reports nothing on thirty cognates has told you about your
 corpus and not about your languages.
 
-**The floor for finding a rule and the floor for trusting the order is not the
-same number.** Rules are listed in the order they were decided and that order
-carries meaning — a later rule refines what an earlier one left. Near the
-floor the order is noise, and `--permutations` is what separates them.
+**Discovery at the floor still needs a baseline.** Rules are listed in the
+order they were decided and that order carries meaning — a later rule refines
+what an earlier one left. At 16 sets the corrected model is already stable on
+this clean fixture, but a real corpus may contain stronger correlated
+predicates, and `--permutations` is what measures the search they create.
 
 One more thing changes the arithmetic, and it catches people out. **A change
 that applies to a whole class of segments is divided by the size of that class
@@ -271,7 +278,7 @@ chain shift have this shape. If a change you know is there comes out
 unconditioned, count how many segments it applies to before concluding
 anything.
 
-## Two correspondences, no environment
+## Two correspondences, with or without a surface environment
 
 Sometimes one proto segment answers two daughter segments and the search
 commits no environment. That is an answer, not a failure, and there are at
@@ -283,15 +290,17 @@ least four different things it can mean:
   once, not just one.
 - **A neutralisation.** German word-final /t/ has two sources and nothing in
   the citation form says which; the alternation in the inflected stem is the
-  only evidence. This is what internal reconstruction is for.
+  only evidence. The fixture contains stable lexical correlates that regulae
+  reports as environments, but those associations are not causes. This is what
+  internal reconstruction is for.
 - **Lexical diffusion, or a change still in progress.** No environment because
   there is none: which words changed is a fact about the words.
 - **An environment regulae cannot state.** Syllable weight is the clearest
   case — see `docs/capabilities.md` for the standing list of these.
 
-Distinguishing them is your job, and the distributions will not do it. What
-regulae owes you is not inventing a fifth possibility, and on all three of the
-fixtures above it commits no environment.
+Distinguishing them is your job, and the distributions will not do it. A
+selected environment explains a surface distribution; it does not decide
+which historical interpretation produced that distribution.
 
 ## What the answer cannot tell you
 
@@ -345,6 +354,18 @@ sources disagreeing.
 side changed is reconstruction, and regulae does not do reconstruction.
 
 ## Confidence and outliers
+
+Rows are not always independent lexical histories. Eight paradigm cells can
+repeat one etymon, and a transcription assembled from two publications can
+carry a source-wide convention. Optional `etymon_group` and `source_group`
+columns name those dependencies. regulae never guesses them from a shared id
+prefix or similar forms.
+
+With bootstrap intervals enabled through the API, `AUTO` resamples etymon
+groups when supplied and otherwise treats cognate sets as independent. The fit
+report prints that unit and its effective count. Source-publication resampling
+is explicit because one publication often contains the entire corpus; treating
+it as one automatic draw would erase rather than quantify the evidence.
 
 Not every cognate set deserves equal weight. A confidence column carries that:
 

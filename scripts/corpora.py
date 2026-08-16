@@ -46,8 +46,8 @@ LADDER = [
     # cannot tell success from output.
     ("testdata/restraint/chance.tsv",
      "Two unrelated lects",
-     "76 classes and 47 environments, from wordlists with no history between them. "
-     "Run the shuffled baseline and the corpus is indistinguishable from its own noise."),
+     "79 accidental correspondences and no selected environment, from wordlists "
+     "with no history between them. The pairings match their shuffled baseline."),
     ("testdata/soundlaws/final_devoicing.tsv",
      "German final devoicing",
      "A neutralisation: /t/ and /d/ merge word-finally, so the four environments "

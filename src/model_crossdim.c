@@ -1,6 +1,8 @@
 #include "model_internal.h"
+#include "split_score.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -140,92 +142,64 @@ static rg_status append_cross_dimensional_row(
     return RG_OK;
 }
 
-/* Negative log-likelihood of a tone distribution, in nats. Summed in sorted
- * tone order so the total does not depend on which tone was seen first. */
-static double tone_group_cost(const tone_mass *items, size_t count) {
-    double total = 0.0;
-    double cost = 0.0;
+static void tone_masses_sort(tone_mass *items, size_t count) {
     size_t i;
-    size_t *order;
-
-    for (i = 0; i < count; i++) {
-        total += items[i].count;
-    }
-    if (total <= 0.0) {
-        return 0.0;
-    }
-    order = (size_t *)malloc(count * sizeof(*order));
-    if (order == 0) {
-        return 0.0;
-    }
-    for (i = 0; i < count; i++) {
-        order[i] = i;
-    }
     for (i = 1; i < count; i++) {
-        size_t key = order[i];
+        tone_mass key = items[i];
         size_t j = i;
-        while (j > 0 && strcmp(items[order[j - 1]].tone, items[key].tone) > 0) {
-            order[j] = order[j - 1];
+        while (j > 0 && strcmp(items[j - 1].tone, key.tone) > 0) {
+            items[j] = items[j - 1];
             j--;
         }
-        order[j] = key;
+        items[j] = key;
     }
-    for (i = 0; i < count; i++) {
-        double mass = items[order[i]].count;
-        if (mass > 0.0) {
-            cost += -mass * log(mass / total);
-        }
-    }
-    free(order);
-    return cost;
 }
 
-/* BIC for "this value's rate differs between the two sides", on the 2x2 table
+/* Scores whether this value's rate differs between the two sides, on the 2x2 table
  * of (value, not-value) by (inside, outside). The environment passing its own
  * test says the distribution moved; it does not say which value moved, and on
  * a dimension with several values most of them did not. Without this, an
  * environment that genuinely conditions one tone also publishes every other
  * tone that drifted upward inside it. Negative means the difference is worth
  * its parameter. */
-static double value_split_delta_bic(
+static rg_status value_split_delta_score(
     double here_mass,
     double here_total,
     double there_mass,
-    double there_total
+    double there_total,
+    const rg_split_score_config *base_config,
+    double *out
 ) {
     double total = here_total + there_total;
     double pooled = (here_mass + there_mass) / total;
-    double gain;
+    double pooled_mass[2];
+    double here[2];
+    double there[2];
+    rg_split_score_config config = *base_config;
+    rg_split_score_result scored;
     if (total <= 0.0 || here_total <= 0.0 || there_total <= 0.0) {
-        return 0.0;
+        *out = 0.0;
+        return RG_OK;
     }
     if (pooled <= 0.0 || pooled >= 1.0) {
-        return 0.0;
+        *out = 0.0;
+        return RG_OK;
     }
-    /* Binomial log-likelihood, one rate per side against one rate pooled.
-     * 0 * log(0) is 0, which is why each term is guarded rather than summed
-     * blind. */
-    gain = 0.0;
-    {
-        double sides[2][2];
-        size_t i;
-        sides[0][0] = here_mass;
-        sides[0][1] = here_total;
-        sides[1][0] = there_mass;
-        sides[1][1] = there_total;
-        for (i = 0; i < 2; i++) {
-            double mass = sides[i][0];
-            double side_total = sides[i][1];
-            double rate = mass / side_total;
-            if (mass > 0.0) {
-                gain += mass * (log(rate) - log(pooled));
-            }
-            if (side_total - mass > 0.0) {
-                gain += (side_total - mass) * (log(1.0 - rate) - log(1.0 - pooled));
-            }
-        }
+    pooled_mass[0] = here_mass + there_mass;
+    pooled_mass[1] = total - pooled_mass[0];
+    here[0] = here_mass;
+    here[1] = here_total - here_mass;
+    there[0] = there_mass;
+    there[1] = there_total - there_mass;
+    config.bic_log_sample_size = log(total);
+    config.bic_extra_penalty = 0.0;
+    config.candidate_count = 1;
+    config.search_gamma = 0.0;
+    if (rg_categorical_split_score_internal(pooled_mass, here, there, 2, &config, &scored) != RG_OK) {
+        return RG_ERR_UNSUPPORTED_OPTION;
     }
-    return -2.0 * gain + log(total);
+    *out = scored.delta;
+    return RG_OK;
 }
 
 static double tone_mass_of(const tone_mass *items, size_t count, const char *tone) {
@@ -286,7 +260,8 @@ typedef struct xdim_observation {
 } xdim_observation;
 
 typedef struct xdim_scored {
-    double delta_bic;
+    double delta_score;
+    double search_charge;
     tone_mass *inside;
     size_t inside_count;
     tone_mass *outside;
@@ -311,6 +286,8 @@ static int xdim_holds(const xdim_observation *observation, const xdim_environmen
     }
     return environment->conjoined ? observation->holds[environment->second] : 1;
 }
+
+static int xdim_defined(const xdim_observation *observation, const xdim_environment *environment);
 
 /* Whether the second predicate of a conjunction excludes anything the first
  * one admits. A conjunct that excludes nothing has not narrowed the
@@ -343,17 +320,20 @@ static int xdim_conjunction_narrows(
     return 0;
 }
 
-/* Whether two environments select the same observations. Different predicates
+/* How two environments divide the observations: 1 for the same orientation,
+ * -1 when they exchange inside and outside, and 0 for different splits. Different predicates
  * often carve one corpus identically -- `tone:2` and `tone:2 and not close-mid`
  * where nothing left is close-mid -- and committing each in turn republishes
  * one finding as several. */
-static int xdim_same_partition(
+static int xdim_partition_relation(
     const xdim_observation *observations,
     size_t observation_count,
     const xdim_environment *a,
     const xdim_environment *b
 ) {
     size_t i;
+    int same = 1;
+    int opposite = 1;
     for (i = 0; i < observation_count; i++) {
         const xdim_observation *observation = &observations[i];
         int a_defined;
@@ -369,11 +349,65 @@ static int xdim_same_partition(
         if (!a_defined) {
             continue;
         }
-        if (xdim_holds(observation, a) != xdim_holds(observation, b)) {
-            return 0;
+        same = same && xdim_holds(observation, a) == xdim_holds(observation, b);
+        opposite = opposite && xdim_holds(observation, a) != xdim_holds(observation, b);
+    }
+    return same ? 1 : (opposite ? -1 : 0);
+}
+
+static rg_status xdim_distinct_partition_count(
+    const xdim_observation *observations,
+    size_t observation_count,
+    const xdim_environment *candidates,
+    size_t candidate_count,
+    size_t *out
+) {
+    uint64_t *hashes;
+    size_t distinct = 0;
+    size_t c;
+    hashes = (uint64_t *)calloc(candidate_count == 0 ? 1 : candidate_count, sizeof(*hashes));
+    if (hashes == 0) {
+        return RG_ERR_OOM;
+    }
+    for (c = 0; c < candidate_count; c++) {
+        uint64_t hash = UINT64_C(1469598103934665603);
+        uint64_t complement_hash = UINT64_C(1469598103934665603);
+        size_t i;
+        int duplicate = 0;
+        for (i = 0; i < observation_count; i++) {
+            unsigned int state = 0;
+            if (observations[i].live) {
+                state = xdim_defined(&observations[i], &candidates[c])
+                    ? (unsigned int)(2 + xdim_holds(&observations[i], &candidates[c]))
+                    : 1u;
+            }
+            hash ^= (uint64_t)state;
+            hash *= UINT64_C(1099511628211);
+            if (state == 2u) {
+                state = 3u;
+            } else if (state == 3u) {
+                state = 2u;
+            }
+            complement_hash ^= (uint64_t)state;
+            complement_hash *= UINT64_C(1099511628211);
+        }
+        hash = hash < complement_hash ? hash : complement_hash;
+        for (i = 0; i < c; i++) {
+            if (hashes[i] == hash &&
+                xdim_partition_relation(observations, observation_count,
+                                        &candidates[c], &candidates[i]) != 0) {
+                duplicate = 1;
+                break;
+            }
+        }
+        hashes[c] = hash;
+        if (!duplicate) {
+            distinct++;
         }
     }
-    return 1;
+    free(hashes);
+    *out = distinct;
+    return RG_OK;
 }
 
 static int xdim_defined(const xdim_observation *observation, const xdim_environment *environment) {
@@ -415,7 +449,8 @@ static rg_status xdim_score_environment(
     size_t observation_count,
     const xdim_environment *environment,
     double min_count,
-    double search_charge,
+    size_t candidate_count,
+    const rg_split_score_config *base_config,
     xdim_scored *out
 ) {
     tone_mass *pooled = 0;
@@ -455,18 +490,38 @@ static rg_status xdim_score_environment(
      * test: a predicate holding of every segment partitions nothing. */
     if (out->inside_total >= min_count && out->outside_total >= min_count && pooled_count > 1) {
         double pooled_total = out->inside_total + out->outside_total;
-        double baseline = tone_group_cost(pooled, pooled_count);
-        double split = tone_group_cost(out->inside, out->inside_count) +
-                       tone_group_cost(out->outside, out->outside_count);
-        /* The parameter cost, plus the cost of having looked. Conjoining adds
-         * a predicate, not a distribution: the two sides are still two
-         * distributions however many predicates picked them out, so the
-         * parameter term does not double. What a conjunction really costs is
-         * the size of the argmax it was chosen from, and that is the search
-         * charge. */
-        out->delta_bic = -2.0 * (baseline - split) +
-                         (double)(pooled_count - 1) * log(pooled_total) +
-                         search_charge;
+        double *pooled_mass;
+        double *inside_mass;
+        double *outside_mass;
+        rg_split_score_config config = *base_config;
+        rg_split_score_result scored;
+        tone_masses_sort(pooled, pooled_count);
+        pooled_mass = (double *)calloc(pooled_count * 3, sizeof(*pooled_mass));
+        if (pooled_mass == 0) {
+            tone_masses_clear(pooled, pooled_count);
+            xdim_scored_clear(out);
+            return RG_ERR_OOM;
+        }
+        inside_mass = pooled_mass + pooled_count;
+        outside_mass = inside_mass + pooled_count;
+        for (i = 0; i < pooled_count; i++) {
+            pooled_mass[i] = pooled[i].count;
+            inside_mass[i] = tone_mass_of(out->inside, out->inside_count, pooled[i].tone);
+            outside_mass[i] = tone_mass_of(out->outside, out->outside_count, pooled[i].tone);
+        }
+        config.bic_log_sample_size = log(pooled_total);
+        config.bic_extra_penalty = 0.0;
+        config.candidate_count = candidate_count;
+        status = rg_categorical_split_score_internal(pooled_mass, inside_mass, outside_mass,
+                                                     pooled_count, &config, &scored);
+        free(pooled_mass);
+        if (status != RG_OK) {
+            tone_masses_clear(pooled, pooled_count);
+            xdim_scored_clear(out);
+            return status;
+        }
+        out->delta_score = scored.delta;
+        out->search_charge = scored.search_charge;
         out->usable = 1;
     }
     tone_masses_clear(pooled, pooled_count);
@@ -678,10 +733,10 @@ rg_status discover_cross_dimensional_rows(
     rg_status status = RG_OK;
     double min_count = 3.0;
     double min_confidence = 0.0;
-    double delta_threshold = -1.0;
+    double delta_threshold = 0.0;
     int max_iterations = 5;
     int max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
-    double search_gamma = RG_SEARCH_PENALTY_GAMMA;
+    rg_split_score_config score_config;
     size_t dimension_i;
 
     if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
@@ -694,17 +749,23 @@ rg_status discover_cross_dimensional_rows(
         if (options->bic.cross_dim_min_rule_confidence > 0.0) {
             min_confidence = options->bic.cross_dim_min_rule_confidence;
         }
-        if (options->bic.cross_dim_delta_bic_threshold != 0.0) {
-            delta_threshold = options->bic.cross_dim_delta_bic_threshold;
-        }
+        delta_threshold = options->bic.cross_dim_delta_bic_threshold;
         if (options->bic.cross_dim_max_iterations > 0) {
             max_iterations = options->bic.cross_dim_max_iterations;
         }
         if (options->max_chunk_size > 0) {
             max_chunk_size = options->max_chunk_size;
         }
-        search_gamma = options->bic.search_penalty_gamma;
     }
+    score_config.scorer = options == 0
+        ? RG_SPLIT_SCORER_CORRECTED_BIC : options->bic.split_scorer;
+    score_config.dirichlet_concentration = options == 0
+        ? 1.0 : options->bic.split_prior_concentration;
+    score_config.bic_log_sample_size = 0.0;
+    score_config.bic_extra_penalty = 0.0;
+    score_config.candidate_count = 0;
+    score_config.search_gamma = options == 0
+        ? RG_SEARCH_PENALTY_GAMMA : options->bic.search_penalty_gamma;
 
     /* One pass per target dimension. The scorer has handled length and stress
      * as targets since the port; this stage only ever proposed tone. */
@@ -866,13 +927,14 @@ rg_status discover_cross_dimensional_rows(
                 xdim_scored scored;
                 size_t slot_i;
                 status = xdim_score_environment(observations, observation_count,
-                                                &candidates[i], min_count, 0.0, &scored);
+                                                &candidates[i], min_count, 1,
+                                                &score_config, &scored);
                 if (status != RG_OK) {
                     break;
                 }
                 if (scored.usable) {
                     slot_i = base_count;
-                    while (slot_i > 0 && base_score[slot_i - 1] > scored.delta_bic) {
+                    while (slot_i > 0 && base_score[slot_i - 1] > scored.delta_score) {
                         if (slot_i < RG_XDIM_MAX_PAIR_BASE) {
                             base[slot_i] = base[slot_i - 1];
                             base_score[slot_i] = base_score[slot_i - 1];
@@ -881,7 +943,7 @@ rg_status discover_cross_dimensional_rows(
                     }
                     if (slot_i < RG_XDIM_MAX_PAIR_BASE) {
                         base[slot_i] = i;
-                        base_score[slot_i] = scored.delta_bic;
+                        base_score[slot_i] = scored.delta_score;
                         if (base_count < RG_XDIM_MAX_PAIR_BASE) {
                             base_count++;
                         }
@@ -932,10 +994,12 @@ rg_status discover_cross_dimensional_rows(
             int decision_index = model->decision_count;
             double best_margin = 0.0;
             size_t env_i;
-            double search_charge = candidate_count > 1
-                ? search_gamma * 2.0 * log((double)candidate_count) : 0.0;
+            size_t partition_count = 0;
 
             memset(&best, 0, sizeof(best));
+            status = xdim_distinct_partition_count(observations, observation_count,
+                                                   candidates, candidate_count,
+                                                   &partition_count);
             for (env_i = 0; env_i < candidate_count && status == RG_OK; env_i++) {
                 xdim_scored scored;
                 size_t seen_i;
@@ -947,8 +1011,9 @@ rg_status discover_cross_dimensional_rows(
                     if (!committed[seen_i]) {
                         continue;
                     }
-                    duplicate = xdim_same_partition(observations, observation_count,
-                                                    &candidates[env_i], &candidates[seen_i]) ||
+                    duplicate = xdim_partition_relation(observations, observation_count,
+                                                        &candidates[env_i],
+                                                        &candidates[seen_i]) == 1 ||
                         (determined[seen_i] &&
                          xdim_inside_subset(observations, observation_count,
                                             &candidates[env_i], &candidates[seen_i]));
@@ -957,7 +1022,8 @@ rg_status discover_cross_dimensional_rows(
                     continue;
                 }
                 status = xdim_score_environment(observations, observation_count, &candidates[env_i],
-                                                min_count, search_charge, &scored);
+                                                min_count, partition_count,
+                                                &score_config, &scored);
                 if (status != RG_OK) {
                     break;
                 }
@@ -973,11 +1039,11 @@ rg_status discover_cross_dimensional_rows(
                     (committed_predicate[candidates[env_i].first] ||
                      committed_predicate[candidates[env_i].second]) &&
                     xdim_conjunction_narrows(observations, observation_count, &candidates[env_i]);
-                if (scored.usable && scored.delta_bic < delta_threshold &&
+                if (scored.usable && scored.delta_score < delta_threshold &&
                     (!found ||
-                     scored.delta_bic < best.delta_bic - RG_TIE_EPSILON ||
+                     scored.delta_score < best.delta_score - RG_TIE_EPSILON ||
                      (restates_residue && !candidates[best_env].conjoined &&
-                      scored.delta_bic < best.delta_bic + RG_TIE_EPSILON))) {
+                      scored.delta_score < best.delta_score + RG_TIE_EPSILON))) {
                     if (found) {
                         xdim_scored_clear(&best);
                     }
@@ -986,9 +1052,9 @@ rg_status discover_cross_dimensional_rows(
                     /* How heavy a search charge this rule's evidence carries,
                      * in the same units the context splitter reports, so it
                      * can be read against the corpus's shuffled ceiling. */
-                    best_margin = candidate_count > 1
-                        ? (delta_threshold - (scored.delta_bic - search_charge)) /
-                          (2.0 * log((double)candidate_count))
+                    best_margin = partition_count > 1
+                        ? (delta_threshold - (scored.delta_score - scored.search_charge)) /
+                          (2.0 * log((double)partition_count))
                         : 0.0;
                     found = 1;
                 } else {
@@ -1045,8 +1111,11 @@ rg_status discover_cross_dimensional_rows(
                         if (here_mass / here_total <= there_mass / there_total) {
                             continue;
                         }
-                        if (value_split_delta_bic(here_mass, here_total, there_mass, there_total) >=
-                            delta_threshold) {
+                        double value_score;
+                        status = value_split_delta_score(here_mass, here_total,
+                                                         there_mass, there_total,
+                                                         &score_config, &value_score);
+                        if (status != RG_OK || value_score >= delta_threshold) {
                             continue;
                         }
                         raised++;
@@ -1062,15 +1131,18 @@ rg_status discover_cross_dimensional_rows(
                         if (confidence <= contrast) {
                             continue;
                         }
-                        if (value_split_delta_bic(here_mass, here_total, there_mass, there_total) >=
-                            delta_threshold) {
+                        double value_score;
+                        status = value_split_delta_score(here_mass, here_total,
+                                                         there_mass, there_total,
+                                                         &score_config, &value_score);
+                        if (status != RG_OK || value_score >= delta_threshold) {
                             continue;
                         }
                         status = append_cross_dimensional_row(
                             &rows, &row_count, &row_cap,
                             &environment, target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
-                            best.delta_bic, decision_index, best_margin);
+                            best.delta_score, decision_index, best_margin);
                         if (status == RG_OK) {
                             size_t obs_i;
                             /* Retire what this rule accounts for. An
@@ -1167,4 +1239,3 @@ rg_status discover_cross_dimensional_rows(
     model->cross_dimensional_count = row_count;
     return RG_OK;
 }
-

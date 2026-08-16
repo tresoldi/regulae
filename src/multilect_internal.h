@@ -50,6 +50,7 @@ rg_status run_permutation_baseline(
 );
 rg_status bootstrap_class_intervals(
     rg_multi_model *model,
+    const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_train_options *options
 );

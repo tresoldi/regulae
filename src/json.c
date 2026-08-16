@@ -28,6 +28,9 @@ static cJSON *json_uncertainty(rg_uncertainty_estimate value) {
     cJSON_AddNumberToObject(out, "n", value.n);
     cJSON_AddNumberToObject(out, "alpha", value.alpha);
     cJSON_AddStringToObject(out, "method", rg_uncertainty_method_string(value.method));
+    cJSON_AddStringToObject(out, "observation_unit",
+                            rg_observation_unit_string(value.observation_unit));
+    cJSON_AddNumberToObject(out, "effective_n", value.effective_n);
     if (value.post_selection) {
         cJSON_AddBoolToObject(out, "post_selection", 1);
     }
@@ -128,6 +131,10 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     /* The comparison the split was measured against. Zero on an unconditioned
      * class, which has no environment and so no complement. */
     cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
+    if (row->evidence.decision_index >= 0) {
+        cJSON_AddStringToObject(out, "score_kind", rg_split_scorer_string(row->evidence.scorer));
+        cJSON_AddNumberToObject(out, "delta_score", row->evidence.delta_score);
+    }
     cJSON_AddNumberToObject(out, "delta_bic", row->evidence.delta_bic);
     cJSON_AddNumberToObject(out, "search_margin", row->evidence.search_margin);
     /* Where this rule sits in the decision list. Sorting the table by key
@@ -135,6 +142,8 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
      * meaning: a later rule refines what an earlier one left. */
     cJSON_AddNumberToObject(out, "decision_index", row->evidence.decision_index);
     cJSON_AddStringToObject(out, "standing", rg_rule_standing_string(row->evidence.standing));
+    cJSON_AddStringToObject(out, "standing_null",
+                            rg_null_model_string(row->evidence.standing_null));
 
     segments = cJSON_CreateArray();
     if (segments == 0) {
@@ -473,6 +482,15 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddItemToObject(root, "fit", fit);
         cJSON_AddNumberToObject(fit, "cost_per_segment", f->cost_per_segment);
         cJSON_AddNumberToObject(fit, "scored_set_count", (double)f->scored_set_count);
+        cJSON_AddStringToObject(fit, "split_scorer", rg_split_scorer_string(f->split_scorer));
+        cJSON_AddNumberToObject(fit, "split_prior_concentration", f->split_prior_concentration);
+        cJSON_AddNumberToObject(fit, "etymon_group_count", (double)f->etymon_group_count);
+        cJSON_AddNumberToObject(fit, "source_group_count", (double)f->source_group_count);
+        cJSON_AddNumberToObject(fit, "sets_without_etymon_group", (double)f->sets_without_etymon_group);
+        cJSON_AddNumberToObject(fit, "sets_without_source_group", (double)f->sets_without_source_group);
+        cJSON_AddStringToObject(fit, "bootstrap_unit", rg_observation_unit_string(f->bootstrap_unit));
+        cJSON_AddNumberToObject(fit, "bootstrap_effective_unit_count",
+                               (double)f->bootstrap_effective_unit_count);
         cJSON_AddNumberToObject(fit, "unconditioned_class_count", (double)f->unconditioned_class_count);
         cJSON_AddNumberToObject(fit, "conditioned_class_count", (double)f->conditioned_class_count);
         cJSON_AddNumberToObject(fit, "permutation_count", (double)f->permutation_count);
@@ -481,6 +499,8 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(fit, "cost_split_separation", f->cost_split_separation);
         cJSON_AddNumberToObject(fit, "cost_split_fraction", f->cost_split_fraction);
         if (f->permutation_count > 0) {
+            cJSON_AddStringToObject(fit, "corpus_fit_null", "pairing_shuffle");
+            cJSON_AddStringToObject(fit, "conditioned_standing_null", "pairing_shuffle");
             cJSON_AddNumberToObject(fit, "null_cost_per_segment_mean", f->null_cost_per_segment_mean);
             cJSON_AddNumberToObject(fit, "null_cost_per_segment_sd", f->null_cost_per_segment_sd);
             cJSON_AddNumberToObject(fit, "cost_per_segment_z", f->cost_per_segment_z);
@@ -555,10 +575,15 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(entry, "contrast_count", row->rule.contrast_count);
         cJSON_AddNumberToObject(entry, "contrast_source_count", row->rule.contrast_source_count);
         cJSON_AddNumberToObject(entry, "contrast_confidence", row->rule.contrast_confidence);
+        cJSON_AddStringToObject(entry, "score_kind",
+                               rg_split_scorer_string(row->rule.evidence.scorer));
+        cJSON_AddNumberToObject(entry, "delta_score", row->rule.evidence.delta_score);
         cJSON_AddNumberToObject(entry, "delta_bic", row->rule.evidence.delta_bic);
         cJSON_AddNumberToObject(entry, "decision_index", row->rule.evidence.decision_index);
         cJSON_AddNumberToObject(entry, "search_margin", row->rule.evidence.search_margin);
         cJSON_AddStringToObject(entry, "standing", rg_rule_standing_string(row->rule.evidence.standing));
+        cJSON_AddStringToObject(entry, "standing_null",
+                                rg_null_model_string(row->rule.evidence.standing_null));
         cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->rule.uncertainty));
         cJSON_AddItemToArray(array, entry);
     }
@@ -618,6 +643,34 @@ char *rg_json_error_internal(rg_status status, const char *detail) {
     text = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return text;
+}
+
+static int parse_observation_unit(const char *value, rg_observation_unit *out) {
+    if (strcmp(value, "auto") == 0) {
+        *out = RG_OBSERVATION_UNIT_AUTO;
+    } else if (strcmp(value, "cognate_set") == 0) {
+        *out = RG_OBSERVATION_UNIT_COGNATE_SET;
+    } else if (strcmp(value, "etymon_group") == 0) {
+        *out = RG_OBSERVATION_UNIT_ETYMON_GROUP;
+    } else if (strcmp(value, "source_group") == 0) {
+        *out = RG_OBSERVATION_UNIT_SOURCE_GROUP;
+    } else {
+        return 0;
+    }
+    return 1;
+}
+
+static int parse_split_scorer(const char *value, rg_split_scorer *out) {
+    if (strcmp(value, "corrected_bic") == 0 || strcmp(value, "bic") == 0) {
+        *out = RG_SPLIT_SCORER_CORRECTED_BIC;
+    } else if (strcmp(value, "multinomial_nml") == 0 || strcmp(value, "nml") == 0) {
+        *out = RG_SPLIT_SCORER_MULTINOMIAL_NML;
+    } else if (strcmp(value, "dirichlet_marginal") == 0 || strcmp(value, "dirichlet") == 0) {
+        *out = RG_SPLIT_SCORER_DIRICHLET_MARGINAL;
+    } else {
+        return 0;
+    }
+    return 1;
 }
 
 /* Reads a flat options object. Unknown keys are rejected rather than ignored:
@@ -688,6 +741,7 @@ rg_status rg_json_read_train_options_internal(
         NUMBER_FIELD("chunk_min_transparency", chunk_min_transparency, double)
         NUMBER_FIELD("bootstrap_n", bootstrap_n, int)
         NUMBER_FIELD("bootstrap_seed", bootstrap_seed, int)
+        NUMBER_FIELD("split_prior_concentration", bic.split_prior_concentration, double)
         NUMBER_FIELD("delta_bic_threshold", bic.delta_bic_threshold, double)
         NUMBER_FIELD("min_split_observations", bic.min_split_observations, int)
         NUMBER_FIELD("max_split_depth", bic.max_split_depth, int)
@@ -696,6 +750,37 @@ rg_status rg_json_read_train_options_internal(
         NUMBER_FIELD("long_range_min_split_observations", bic.long_range_min_split_observations, int)
         NUMBER_FIELD("long_range_min_dominant_fraction", bic.long_range_min_dominant_fraction, double)
         NUMBER_FIELD("multi_lect_min_commit_scale", bic.multi_lect_min_commit_scale, double)
+        NUMBER_FIELD("search_penalty_gamma", bic.search_penalty_gamma, double)
+
+        if (strcmp(key, "split_scorer") == 0) {
+            if (!cJSON_IsString(item) ||
+                !parse_split_scorer(item->valuestring, &out->bic.split_scorer)) {
+                status = RG_ERR_PARSE;
+            }
+            if (status != RG_OK && error_detail != 0 && error_detail_size > 0) {
+                snprintf(error_detail, error_detail_size,
+                         "option \"split_scorer\" must name a supported scorer");
+            }
+            if (status != RG_OK) {
+                break;
+            }
+            continue;
+        }
+
+        if (strcmp(key, "bootstrap_unit") == 0) {
+            if (!cJSON_IsString(item) ||
+                !parse_observation_unit(item->valuestring, &out->bootstrap_unit)) {
+                status = RG_ERR_PARSE;
+            }
+            if (status != RG_OK && error_detail != 0 && error_detail_size > 0) {
+                snprintf(error_detail, error_detail_size,
+                         "option \"bootstrap_unit\" must name a supported observation unit");
+            }
+            if (status != RG_OK) {
+                break;
+            }
+            continue;
+        }
 
 #undef NUMBER_FIELD
 

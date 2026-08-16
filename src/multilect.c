@@ -254,6 +254,34 @@ const rg_form *form_for_lect(const rg_cognate_set *cognate, const char *lect_id)
     return 0;
 }
 
+static void evidence_uses_scorer(rg_rule_evidence *evidence, rg_split_scorer scorer) {
+    if (evidence->decision_index < 0) {
+        return;
+    }
+    evidence->scorer = scorer;
+    evidence->delta_score = evidence->delta_bic;
+}
+
+static void stamp_split_scorer(rg_multi_model *model, rg_split_scorer scorer) {
+    size_t i;
+    for (i = 0; i < model->pair_model_count; i++) {
+        rg_pairwise_model *pair = model->pair_models[i].model;
+        size_t j;
+        for (j = 0; j < pair->conditioned_segment_count_count; j++) {
+            evidence_uses_scorer(&pair->conditioned_segment_counts[j].evidence, scorer);
+        }
+        for (j = 0; j < pair->cross_dimensional_count; j++) {
+            evidence_uses_scorer(&pair->cross_dimensional_rows[j].evidence, scorer);
+        }
+    }
+    for (i = 0; i < model->conditioned_class_count; i++) {
+        evidence_uses_scorer(&model->conditioned_classes[i].evidence, scorer);
+    }
+    for (i = 0; i < model->cross_dimensional_count; i++) {
+        evidence_uses_scorer(&model->cross_dimensional_rows[i].rule.evidence, scorer);
+    }
+}
+
 rg_status rg_train_model(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
@@ -309,6 +337,24 @@ rg_status rg_train_model(
         resolved_options = *options;
     }
     options = &resolved_options;
+    if ((options->bic.split_scorer != RG_SPLIT_SCORER_CORRECTED_BIC &&
+         options->bic.split_scorer != RG_SPLIT_SCORER_MULTINOMIAL_NML &&
+         options->bic.split_scorer != RG_SPLIT_SCORER_DIRICHLET_MARGINAL) ||
+        !isfinite(options->bic.split_prior_concentration) ||
+        options->bic.split_prior_concentration <= 0.0 ||
+        !isfinite(options->bic.search_penalty_gamma) ||
+        options->bic.search_penalty_gamma < 0.0) {
+        rg_multi_model_free(model);
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    if (options->bic.split_scorer == RG_SPLIT_SCORER_MULTINOMIAL_NML) {
+        for (c = 0; c < cognate_count; c++) {
+            if (fabs(cognates[c].confidence - floor(cognates[c].confidence + 0.5)) > 1e-12) {
+                rg_multi_model_free(model);
+                return RG_ERR_UNSUPPORTED_OPTION;
+            }
+        }
+    }
     /* The baseline runs before the model, not after, because it is what sets
      * the search charge when the caller asks for a tuned one. Its own runs
      * recurse into this function with permutation_count cleared. */
@@ -408,12 +454,15 @@ rg_status rg_train_model(
     if (status == RG_OK) {
         status = lift_cross_dimensional_rows(model);
     }
+    if (status == RG_OK) {
+        stamp_split_scorer(model, options->bic.split_scorer);
+    }
     if (status == RG_OK && rg_progress_step_internal(&progress, "cross-dimensional lifting")) {
         status = RG_ERR_CANCELLED;
     }
     reconciled_observations_free(observations, observation_count);
     if (status == RG_OK) {
-        status = bootstrap_class_intervals(model, cognate_count, options);
+        status = bootstrap_class_intervals(model, cognates, cognate_count, options);
     }
     if (status == RG_OK) {
         status = compute_corpus_fit(ctx, cognates, cognate_count, options, &baseline, model);
@@ -484,4 +533,3 @@ void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count) {
     }
     free(rows);
 }
-

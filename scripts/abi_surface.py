@@ -119,7 +119,9 @@ def refused_options(text):
     return {
         match.group(1)
         for match in re.finditer(
-            r"if\s*\(\s*options->(\w+)[^)]*\)\s*\{[^}]*RG_ERR_UNSUPPORTED_OPTION", text, re.S
+            r"if\s*\(\s*options->(\w+)\b(?!\s*\.)[^)]*\)\s*\{[^}]*RG_ERR_UNSUPPORTED_OPTION",
+            text,
+            re.S,
         )
     }
 

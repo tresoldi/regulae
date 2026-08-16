@@ -70,7 +70,7 @@ const CORPUS_LIST = [
   {
     "path": "testdata/restraint/chance.tsv",
     "label": "Two unrelated lects",
-    "description": "76 classes and 47 environments, from wordlists with no history between them. Run the shuffled baseline and the corpus is indistinguishable from its own noise.",
+    "description": "79 accidental correspondences and no selected environment, from wordlists with no history between them. The pairings match their shuffled baseline.",
     "group": "Start here",
     "format": "tsv",
     "readable": true

@@ -74,6 +74,8 @@ rg_status load_wide_tsv(
     rg_wide_load_options opts;
     long id_col = -1;
     long confidence_col = -1;
+    long etymon_group_col = -1;
+    long source_group_col = -1;
     long *lect_cols = 0;
     long *break_cols = 0;
     long *syllable_cols = 0;
@@ -111,6 +113,10 @@ rg_status load_wide_tsv(
         return RG_ERR_PARSE;
     }
     confidence_col = column_index(&table, opts.confidence_column == 0 ? "confidence" : opts.confidence_column);
+    etymon_group_col = column_index(&table, opts.etymon_group_column == 0
+                                    ? "etymon_group" : opts.etymon_group_column);
+    source_group_col = column_index(&table, opts.source_group_column == 0
+                                    ? "source_group" : opts.source_group_column);
 
     lect_cols = (long *)calloc(table.column_count, sizeof(*lect_cols));
     break_cols = (long *)calloc(table.column_count, sizeof(*break_cols));
@@ -147,7 +153,8 @@ rg_status load_wide_tsv(
         /* Every column is a lect except the id, the confidence, and the
          * companion "_breaks" and "_tone" columns. */
         for (c = 0; c < table.column_count; c++) {
-            if ((long)c == id_col || (long)c == confidence_col) {
+            if ((long)c == id_col || (long)c == confidence_col ||
+                (long)c == etymon_group_col || (long)c == source_group_col) {
                 continue;
             }
             if (has_suffix(table.header[c], "_breaks") ||
@@ -214,6 +221,23 @@ rg_status load_wide_tsv(
         if (cognate == 0) {
             status = RG_ERR_OOM;
             break;
+        }
+        {
+            char *etymon_group = etymon_group_col < 0 ? 0 : trim_copy(cell(row, etymon_group_col));
+            char *source_group = source_group_col < 0 ? 0 : trim_copy(cell(row, source_group_col));
+            if ((etymon_group_col >= 0 && etymon_group == 0) ||
+                (source_group_col >= 0 && source_group == 0)) {
+                free(etymon_group);
+                free(source_group);
+                status = RG_ERR_OOM;
+                break;
+            }
+            status = cognate_set_groups(cognate, etymon_group, source_group);
+            free(etymon_group);
+            free(source_group);
+            if (status != RG_OK) {
+                break;
+            }
         }
         for (c = 0; c < lect_count && status == RG_OK; c++) {
             const char *lect_id = table.header[lect_cols[c]];
@@ -319,4 +343,3 @@ rg_status load_wide_tsv(
     *out = corpus;
     return RG_OK;
 }
-

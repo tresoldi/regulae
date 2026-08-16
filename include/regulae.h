@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 25
+#define RG_ABI_VERSION 27
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -68,7 +68,27 @@ typedef bool (*rg_progress_fn)(
     void *user_data
 );
 
+typedef enum rg_split_scorer {
+    RG_SPLIT_SCORER_CORRECTED_BIC = 0,
+    /* Exact for integer categorical counts. Training returns
+     * RG_ERR_UNSUPPORTED_OPTION if a scored split carries fractional mass. */
+    RG_SPLIT_SCORER_MULTINOMIAL_NML = 1,
+    RG_SPLIT_SCORER_DIRICHLET_MARGINAL = 2
+} rg_split_scorer;
+
+RG_API const char *rg_split_scorer_string(rg_split_scorer scorer);
+
 typedef struct rg_bic_config {
+    /* The criterion used to compare one pooled categorical distribution with
+     * the two distributions induced by an environment. The struct keeps its
+     * historical name because its remaining fields are source-compatible
+     * BIC-era discovery gates; `split_scorer` names what is actually scored. */
+    rg_split_scorer split_scorer;
+    /* Total mass of the symmetric Dirichlet prior used only by
+     * DIRICHLET_MARGINAL. It is divided equally over the pooled observed
+     * outcome alphabet and is deliberately separate from the feature-shaped
+     * alignment-EM concentration. */
+    double split_prior_concentration;
     double delta_bic_threshold;
     int min_split_observations;
     int max_split_depth;
@@ -88,20 +108,34 @@ typedef struct rg_bic_config {
      * Set this only to suppress weak rules in a report. */
     double cross_dim_min_rule_confidence;
     double cross_dim_delta_bic_threshold;
+    /* Legacy BIC-only `2/(n-1)` addition. Off by default after M3 because it
+     * has no derivation in the selected criterion; retained only to reproduce
+     * earlier experimental models. Ignored by the other scorers. */
     bool multi_lect_bic_small_sample_correction;
     double multi_lect_min_commit_scale;
-    /* How much of the search a split is charged for, on top of its parameter.
-     * The penalty gains `search_penalty_gamma * 2 * ln(candidates)`: BIC prices
-     * one added term, but the term that survives is the best of many, and the
-     * maximum of a hundred candidates clears its bar by chance far more often
-     * than one does.
+    /* How much of the search a split is charged for, on top of its K-1 added
+     * outcome parameters. The penalty gains
+     * `search_penalty_gamma * 2 * ln(distinct_partitions)`: the environment
+     * that survives is the best of many, while two predicate names that make
+     * the same unordered two-way division are one search opportunity.
      *
-     * 0.5 is the largest fixed value at which no sound law in
-     * testdata/soundlaws/ is lost. Setting `permutation_count` and
+     * M3 selected 1.0 under its recorded restraint, null, power and predictive
+     * protocol; it remains an empirical setting, not a probability cutoff. Setting `permutation_count` and
      * `tune_search_penalty` replaces it with a value measured from the corpus
      * itself. */
     double search_penalty_gamma;
 } rg_bic_config;
+
+typedef enum rg_observation_unit {
+    RG_OBSERVATION_UNIT_AUTO = 0,
+    RG_OBSERVATION_UNIT_COGNATE_SET = 1,
+    RG_OBSERVATION_UNIT_ETYMON_GROUP = 2,
+    RG_OBSERVATION_UNIT_SOURCE_GROUP = 3,
+    RG_OBSERVATION_UNIT_ALIGNED_SPAN = 4,
+    RG_OBSERVATION_UNIT_ALIGNED_POSITION = 5
+} rg_observation_unit;
+
+RG_API const char *rg_observation_unit_string(rg_observation_unit unit);
 
 /* The feature system is not here. It belongs to the context -- see
  * rg_context_use_system -- because it decides what a grapheme means before any
@@ -121,6 +155,11 @@ typedef struct rg_train_options {
     rg_bic_config bic;
     int bootstrap_n;
     int bootstrap_seed;
+    /* Unit resampled by the bootstrap. AUTO uses etymon groups when at least
+     * one is supplied and otherwise treats cognate sets as independent.
+     * SOURCE_GROUP is opt-in: a publication is provenance, and automatically
+     * collapsing a whole publication to one draw would usually be too coarse. */
+    rg_observation_unit bootstrap_unit;
     /* Shuffled-baseline runs for the fit summary. Each one is a full training
      * run on a corpus whose pairings have been permuted, so this multiplies
      * training time; 0 (the default) skips it. */
@@ -235,7 +274,7 @@ typedef enum rg_uncertainty_method {
 /* Whether a rule stands above what the search finds in this corpus with the
  * correspondences taken out of it.
  *
- * Every conditioned rule already reports a count, a contrast, a delta-BIC, a
+ * Every conditioned rule already reports a count, a contrast, a split score, a
  * search margin and an interval, and the corpus reports what its own shuffles
  * reach. Putting those together was left to the reader, which is a synthesis
  * a reader should not have to do on twenty-five rules -- and is exactly the
@@ -253,6 +292,16 @@ typedef enum rg_rule_standing {
 } rg_rule_standing;
 
 RG_API const char *rg_rule_standing_string(rg_rule_standing standing);
+
+typedef enum rg_null_model {
+    RG_NULL_MODEL_NONE = 0,
+    RG_NULL_MODEL_PAIRING_SHUFFLE = 1,
+    RG_NULL_MODEL_WITHIN_BUCKET_SHUFFLE = 2,
+    RG_NULL_MODEL_PARAMETRIC_UNCONDITIONED = 3,
+    RG_NULL_MODEL_REAL_NEGATIVE_PANEL = 4
+} rg_null_model;
+
+RG_API const char *rg_null_model_string(rg_null_model model);
 
 /* What a search decided, and how the decision stands.
  *
@@ -272,7 +321,14 @@ RG_API const char *rg_rule_standing_string(rg_rule_standing standing);
  * row including the aggregated ones, and rg_uncertainty_estimate already names
  * it. */
 typedef struct rg_rule_evidence {
-    /* What the split scored. Negative means it paid for its parameter. */
+    /* Criterion that selected the split. */
+    rg_split_scorer scorer;
+    /* What the named criterion scored, in twice-negative-log-probability or
+     * code-length units. Negative means the split paid for its complexity. */
+    double delta_score;
+    /* Compatibility alias for delta_score. New consumers must read
+     * `scorer` and `delta_score`; under NML or a marginal likelihood this is
+     * not a BIC value despite the historical field name. */
     double delta_bic;
     /* Where this rule sits in the decision list.
      *
@@ -295,6 +351,8 @@ typedef struct rg_rule_evidence {
     double search_margin;
     /* Set once the shuffled baseline has been measured; see rg_rule_standing. */
     rg_rule_standing standing;
+    /* The comparison that supports `standing`; NONE when unmeasured. */
+    rg_null_model standing_null;
 } rg_rule_evidence;
 
 typedef struct rg_uncertainty_estimate {
@@ -304,6 +362,11 @@ typedef struct rg_uncertainty_estimate {
     double n;
     double alpha;
     rg_uncertainty_method method;
+    /* Sampling level and independent-unit count used for the interval. `n`
+     * remains the weighted rate denominator; it need not be an effective
+     * sample size. AUTO means a standalone interval caller did not name one. */
+    rg_observation_unit observation_unit;
+    double effective_n;
     /* Set when the row's environment was chosen by the same data the interval
      * is computed from. The interval then says how well the rate is pinned
      * *given* that environment, and not whether the environment is real -- for
@@ -335,6 +398,11 @@ typedef struct rg_cognate_form {
 
 typedef struct rg_cognate_set {
     const char *cognate_id;
+    /* Optional caller-supplied dependence groups. The model never infers
+     * either from ids or forms. Borrowed for the duration of training; a
+     * loaded rg_corpus owns its copies. */
+    const char *etymon_group;
+    const char *source_group;
     const rg_cognate_form *forms;
     size_t form_count;
     double confidence;
@@ -390,8 +458,9 @@ typedef struct rg_tonal_count_row {
  * makes the row unreadable -- "s ~ r between vowels, count 14" says nothing
  * until you know what s does elsewhere. contrast_count is the same
  * correspondence in the observations where the environment does not hold, and
- * contrast_total is that side's denominator. delta_bic is what the split
- * scored: negative means it paid for its parameter. */
+ * contrast_total is that side's denominator. `evidence.delta_score` is what
+ * the named scorer assigned the split: negative means it paid for its
+ * complexity and search. */
 typedef struct rg_conditioned_segment_count_row {
     const char *source;
     const char *target;
@@ -443,10 +512,10 @@ typedef struct rg_chunk_row {
  * distribution, not a conditioned split. The row is published only when the
  * environment raises the value above its contrast.
  *
- * `delta_bic` is for the environment as a whole, not for this value: the
- * likelihood gain from modelling the target dimension separately inside and
- * outside the environment, penalised by the parameters that costs. It is
- * negative for every published row, and more negative is stronger. */
+ * `evidence.delta_score` is for the environment as a whole, not for this
+ * value: it compares modelling the target dimension separately inside and
+ * outside under the named scorer. It is negative for every published row, and
+ * more negative is stronger. */
 /* A rule where something about the source form conditions a suprasegmental
  * value on the target.
  *
@@ -585,6 +654,17 @@ typedef struct rg_cognate_outlier_row {
 typedef struct rg_corpus_fit {
     double cost_per_segment;
     size_t scored_set_count;
+    rg_split_scorer split_scorer;
+    double split_prior_concentration;
+    /* The observational hierarchy actually present in the input. A missing
+     * group label makes that cognate set its own group; the missing counts
+     * state that assumption instead of silently inventing membership. */
+    size_t etymon_group_count;
+    size_t source_group_count;
+    size_t sets_without_etymon_group;
+    size_t sets_without_source_group;
+    rg_observation_unit bootstrap_unit;
+    size_t bootstrap_effective_unit_count;
     size_t unconditioned_class_count;
     size_t conditioned_class_count;
     size_t permutation_count;
@@ -908,6 +988,10 @@ typedef struct rg_tsv_load_options {
     const char *segments_column;
     const char *alignment_column;
     const char *confidence_column;
+    /* Optional dependence metadata, defaulting to columns named
+     * "etymon_group" and "source_group" when present. */
+    const char *etymon_group_column;
+    const char *source_group_column;
     /* Per-segment tone, whitespace-separated and positionally parallel to the
      * segments cell: "1 0 3" tones the first, second and third segment. "-" or
      * an empty token leaves that segment untoned, which is how a tone-bearing
@@ -949,6 +1033,8 @@ typedef struct rg_tsv_load_options {
 typedef struct rg_wide_load_options {
     const char *cognate_id_column;
     const char *confidence_column;
+    const char *etymon_group_column;
+    const char *source_group_column;
     const char *const *lect_columns;
     size_t lect_column_count;
 } rg_wide_load_options;

@@ -25,35 +25,31 @@ one. Languages of a region share phonotactics whether or not they share an
 ancestor — that is what an areal feature *is* — and a method that only rejects
 unrelatedness when the inventories differ has not rejected unrelatedness.
 
-Trained with 30 shuffles it reports:
+Trained with 12 shuffles after correcting the multinomial parameter count, it
+reports:
 
 ```
-cost/segment      -0.286      shuffled  -0.261 ± 0.042     z = -0.6
-unconditioned     76          shuffled  79.0
-conditioned       60          shuffled  77.7
-rules above noise 6 of 60
+cost/segment      -0.333      shuffled  -0.331 ± 0.022     z = -0.1
+unconditioned     79          shuffled  80.0
+conditioned       0           shuffled   5.8
+rules above noise 0 of 0
 ```
 
 Two things to read off it, and they point in opposite directions.
 
-**The corpus-level verdict works.** `z = -0.60` says this wordlist aligns no
+**The corpus-level comparison works.** `z = -0.12` says this wordlist aligns no
 better than its own shuffles, against `-33` on the fixture next door that has a
-real change in it. That is the number that distinguishes relatedness from
-chance, and there is no seed at which unrelated wordlists come out looking
-related.
+real change in it. That is evidence about structure in these supplied pairings,
+not a genealogical verdict.
 
-**Seventy-six correspondences and sixty conditioned classes were published
-anyway.** The shuffles report *more* of both, which is the whole argument
-against reading a class count as a result: greedy splitting over a large
-candidate inventory finds more environments in noise than in signal, and a
-report of sixty rules on data with no history in it looks exactly like a report
-of sixty rules on data with some.
+**Seventy-nine accidental unconditioned correspondences are still published.**
+The class count is therefore still not evidence by itself. The corrected
+`(K−1) ln(n)` charge publishes no conditioned environment on top of them.
 
-**And six of the sixty stand above the baseline.** The standing verdict
-is a 95th-percentile cut and behaves like one; about one rule in ten clearing
-it on unrelated data is what a quantile means, not a defect. It is the reason
-the test asserts a *rate* rather than a zero, and the reason no reader should
-count standing rules and stop.
+**The shuffled searches still find environments.** They train with the search
+charge disabled so their maximum margin can calibrate the real run. Their mean
+of 5.8 conditioned classes is the remaining demonstration that an adaptive,
+unpriced search finds structure in noise.
 
 ## `diffusion.tsv` — a real change, spread over the lexicon
 
@@ -178,43 +174,42 @@ either too little data or no pattern in it, and only the ladder says which.
 | sets | rules found | the intended rule | its margin | above noise |
 | ---: | ---: | --- | ---: | ---: |
 | 8 | 0 | — | — | 0 of 0 |
-| 16 | 2 | found, as decision **#1** | 1.19 | 1 of 2 |
-| 32 | 2 | found, as decision #0 | 1.23 | 2 of 2 |
-| 64 | 2 | found, as decision #0 | 3.26 | 2 of 2 |
-| 128 | 2 | found, as decision #0 | 8.05 | 2 of 2 |
+| 16 | 2 | found, as decision **#1** | 1.09 | 2 of 2 |
+| 32 | 2 | found, as decision #0 | 1.12 | 2 of 2 |
+| 64 | 2 | found, as decision #0 | 2.99 | 2 of 2 |
+| 128 | 2 | found, as decision #0 | 7.38 | 2 of 2 |
 
-Measured 2026-08-16, with 30 shuffles.
+Measured after correcting the multinomial parameter count, with 12 shuffles.
 
 **Below the floor the search stays quiet rather than guessing.** Eight sets,
 four of them showing a perfectly regular change, and nothing is committed. That
 is the half of this that matters most: silence on a small corpus is not
 evidence of absence, and it is also not the tool inventing something to say.
 
-**Sixteen sets is enough — and at sixteen the right rule is committed
-second.** A weaker environment (`fol[open:+]`, margin 0.71) got into the list
-ahead of it, and the shuffled baseline then rejects that one and keeps the real
-one. So the floor for *finding* a rule and the floor for *trusting the order
-the rules are listed in* are different numbers, and only the baseline separates
-them.
+**Sixteen sets is enough to find the intended association, but not to identify
+one unique description.** A correlated environment (`fol[open:+]`, margin
+0.65) enters ahead of `fol[front:+]`, and both exceed this fixture's shuffled
+search. Search standing separates selected structure from the null; it does not
+choose a historical interpretation among stable correlates.
 
 Eight examples of a change and eight counterexamples, then. Below that, run
 the baseline and expect to be told nothing; above it, expect the search to be
 right about which rule is which but not yet about which came first.
 
-## The fixture in `soundlaws/` that belongs here in spirit
+## The fixture in `soundlaws/` that marks the surface/historical boundary
 
 `final_devoicing.tsv` — German *Rad/Räder*, *Tag/Tage*, *Kind/Kinder* against
 *Wort/Worte*, *Blut/Blutes*, *Licht/Lichter*. Word-final /t/ has two sources
 and nothing in the citation form says which, so the right answer is two
-correspondences and no environment. regulae commits four conditioned rules, all
-of them correlates of the alternation rather than causes of it, and **all four
-fall below the shuffled baseline** while the corpus itself sits twenty standard
-deviations below its own.
+historical correspondences with no causal environment. regulae commits four
+conditioned surface associations, all correlates of the alternation rather than
+causes of it, and after the `K−1` correction all four exceed the shuffled
+search.
 
-Read without the baseline it reports four environments for a change that has
-none. Read with it, it reports a neutralisation — which is the textbook
-analysis, and the reason `internal reconstruction` is a method with a name.
-That is the argument for `permutation_count`, made on data nobody disputes.
+This no longer serves as a restraint success. It serves as the sharper limit:
+search standing can distinguish an association from adaptive-search noise, but
+not a surface correlate from a historical cause. The neutralisation analysis
+still requires internal reconstruction.
 
 ## Adding one
 
