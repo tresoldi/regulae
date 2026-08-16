@@ -517,6 +517,15 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                             "verdict:             %lu of %lu conditioned rules stand above it\n",
                             (unsigned long)fit->rules_above_noise,
                             (unsigned long)fit->rules_measured);
+            /* Counted per lect pair, so not added to the line above: a rule
+             * visible in every pair of a four-lect corpus is six here and one
+             * there. Shown because the line above can read 0 of 4 on a corpus
+             * whose one standing rule is in this table. */
+            builder_appendf(&builder,
+                            "                     %lu of %lu per-pair conditioned"
+                            " correspondences, counted per pair\n",
+                            (unsigned long)fit->pairwise_rules_above_noise,
+                            (unsigned long)fit->pairwise_rules_measured);
         } else {
             builder_append(&builder,
                            "shuffled baseline:   not run (--permutations <n>)\n"

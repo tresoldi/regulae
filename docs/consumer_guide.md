@@ -383,7 +383,23 @@ so it has to be read against that corpus's own baseline.
 - `null_search_margin` at `null_search_margin_quantile`: the
   search charge a rule has to clear to be saying more than the
   search itself does.
-- `rules_above_noise` of `rules_measured`.
+- `rules_above_noise` of `rules_measured`: the multi-lect rules --
+  the conditioned classes and the cross-dimensional rules, which
+  already include every lect pair's, because the multi-lect table
+  is built by lifting them.
+- `pairwise_rules_above_noise` of `pairwise_rules_measured`: the
+  conditioned correspondences each lect pair carries in its own
+  model. Reported separately, and not added to the pair above,
+  because they are counted **per pair** -- a rule visible in every
+  pair of a four-lect corpus is six here and one there, so merging
+  them would make the ratio depend on how many lects the corpus
+  samples.
+
+  Do not read the multi-lect pair alone. On the Grassmann fixture
+  it says 0 of 4 -- nothing distinguishable from having looked --
+  while the rule that *is* Grassmann's Law, Greek `t` answering
+  PIE `tʰ` where an aspirate follows, stands in the per-pair
+  table. A corpus's only real finding can be in either.
 - `inferred_nucleus_form_count` and `syllabified_form_count`:
   forms with no vowel and no syllabic consonant, which were given
   a nucleus so the syllable predicates had something to hold of.

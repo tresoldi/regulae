@@ -467,6 +467,10 @@ rg_status compute_corpus_fit(
             for (j = 0; j < pair->conditioned_segment_count_count; j++) {
                 rg_conditioned_segment_count_row *row = &pair->conditioned_segment_counts[j];
                 rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
+                model->fit.pairwise_rules_measured++;
+                if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                    model->fit.pairwise_rules_above_noise++;
+                }
             }
             for (j = 0; j < pair->cross_dimensional_count; j++) {
                 rg_cross_dimensional_row *row = &pair->cross_dimensional_rows[j];

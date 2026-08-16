@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 23
+#define RG_ABI_VERSION 24
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -557,9 +557,30 @@ typedef struct rg_corpus_fit {
     size_t inferred_nucleus_form_count;
     size_t syllabified_form_count;
     /* How many conditioned rules stand above the shuffled baseline, of how
-     * many that were measured. Zero and zero when no baseline was run. */
+     * many that were measured. Zero and zero when no baseline was run.
+     *
+     * These count the multi-lect rules: the conditioned classes, and the
+     * cross-dimensional rules -- which already include every pair's, because
+     * the multi-lect table is built by lifting them. */
     size_t rules_above_noise;
     size_t rules_measured;
+    /* The same, for the conditioned correspondences each lect pair carries in
+     * its own model. Reported separately rather than added to the pair above,
+     * and the reason is that they are counted per pair.
+     *
+     * A rule visible in every pair of a four-lect corpus is six rules here and
+     * one above, so merging them would make the ratio depend on how many lects
+     * the corpus happens to sample -- on real_romance_4lect the denominator
+     * goes from 26 to 253. Kept apart, each ratio compares like with like.
+     *
+     * Reading only the pair above will still mislead, which is why these exist.
+     * On testdata/soundlaws/grassmann the multi-lect verdict is 0 of 4 -- and
+     * the rule that is Grassmann's Law, Greek t answering PIE tʰ where an
+     * aspirate follows, stands here at a margin of 1.57 against a baseline of
+     * 1.32. A corpus whose one real finding is in this table read as a corpus
+     * that had found nothing. */
+    size_t pairwise_rules_above_noise;
+    size_t pairwise_rules_measured;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);

@@ -488,6 +488,8 @@ char *rg_json_from_multi_model_internal(
             cJSON_AddNumberToObject(fit, "null_search_margin_quantile", f->null_search_margin_quantile);
             cJSON_AddNumberToObject(fit, "rules_above_noise", (double)f->rules_above_noise);
             cJSON_AddNumberToObject(fit, "rules_measured", (double)f->rules_measured);
+            cJSON_AddNumberToObject(fit, "pairwise_rules_above_noise", (double)f->pairwise_rules_above_noise);
+            cJSON_AddNumberToObject(fit, "pairwise_rules_measured", (double)f->pairwise_rules_measured);
         }
     }
 

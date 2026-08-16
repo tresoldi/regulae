@@ -872,6 +872,69 @@ static void test_no_baseline_means_no_verdict(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+
+/* The multi-lect verdict is not the whole verdict, and Grassmann is the corpus
+ * that proves it.
+ *
+ * Every conditioned class on it sits within noise, so `rules_above_noise` of
+ * `rules_measured` reads 0 of 4: the corpus found nothing distinguishable from
+ * having looked. But the law itself -- Greek t answering PIE tʰ where an
+ * aspirate follows somewhere -- is a conditioned correspondence in the pair's
+ * own model, and it stands. Counting it into the multi-lect pair would have
+ * made the ratio depend on how many lects the corpus samples, because these are
+ * counted per pair; reporting nothing about it left a corpus whose one real
+ * finding stands looking like a corpus that had none. */
+static void test_the_per_pair_verdict_is_reported_separately(rg_context *ctx) {
+    char path[1024];
+    rg_corpus *corpus = 0;
+    rg_multi_model *model = 0;
+    rg_train_options options;
+    const rg_corpus_fit *fit;
+    size_t p;
+    size_t counted = 0;
+    size_t standing = 0;
+
+    snprintf(path, sizeof(path), "%s/testdata/soundlaws/grassmann.tsv", REGULAE_SOURCE_DIR);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
+    rg_train_options_init_defaults(&options);
+    options.permutation_count = 30;
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+    fit = rg_multi_model_fit(model);
+
+    /* The multi-lect verdict on this corpus, and the reason the other one has
+     * to exist. */
+    assert(fit->rules_measured > 0);
+    assert(fit->rules_above_noise == 0);
+
+    /* The per-pair verdict counts every conditioned correspondence every pair
+     * carries, and at least one of them stands. */
+    for (p = 0; p < rg_multi_model_pair_model_count(model); p++) {
+        const rg_conditioned_segment_count_row *rows;
+        size_t n = 0;
+        size_t j;
+        rows = rg_pairwise_model_conditioned_segment_counts(
+            rg_multi_model_pair_model_at(model, p)->model, &n);
+        for (j = 0; j < n; j++) {
+            assert(rows[j].evidence.standing != RG_RULE_STANDING_UNMEASURED);
+            counted++;
+            if (rows[j].evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                standing++;
+            }
+        }
+    }
+    assert(fit->pairwise_rules_measured == counted);
+    assert(fit->pairwise_rules_above_noise == standing);
+    assert(fit->pairwise_rules_above_noise > 0);
+
+    /* The two are separate counts, not one split in two. */
+    assert(fit->pairwise_rules_measured != fit->rules_measured ||
+           fit->pairwise_rules_above_noise != fit->rules_above_noise);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* Discovery is greedy: each rule is committed against what the earlier ones
  * left unexplained, so the rules are ordered and the order carries meaning. The
  * Middle Chinese register split is three decisions in sequence -- source tone
@@ -1182,6 +1245,7 @@ int main(void) {
     test_rules_report_whether_they_stand_above_noise(ctx);
     test_cross_dimensional_rules_report_whether_they_stand(ctx);
     test_no_baseline_means_no_verdict(ctx);
+    test_the_per_pair_verdict_is_reported_separately(ctx);
     test_rules_carry_the_order_they_were_decided(ctx);
     test_metathesis(ctx);
     test_morphological_conditioning(ctx);
