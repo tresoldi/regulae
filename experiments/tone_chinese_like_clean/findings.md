@@ -6,6 +6,47 @@ loop on a rule-explicit synthetic corpus. The sibling
 signal, expected to commit very little under BIC); this clean
 fixture is the positive case.
 
+## Status, 2026-08-16: this does not reproduce as the corpus loads
+
+**The rules below are real and the engine still finds them — but not on this
+corpus in the direction it is read.** Loaded as a wide TSV, the pair is
+analysed `cantonese > mandarin`, because reconciliation walks lect pairs in
+ascending lect-id order and `cantonese` sorts first. The fixture encodes the
+opposite: *mandarin's* onset voicing determines *cantonese's* tone. Asked
+whether anything about cantonese predicts mandarin's tone, the answer is no —
+mandarin's tone is the free variable here, evenly spread over four values — so
+the stage commits nothing, correctly.
+
+Rename the columns so the source lect sorts first and the fixture produces
+exactly what this document claims:
+
+```
+  #0 a_mandarin>z_cantonese  pre[voiced:-] -> tone=¹¹@+0  count=40 conf=1.00 vs 0.00 elsewhere
+  #0 a_mandarin>z_cantonese  pre[voiced:+] -> tone=⁴⁴@+0  count=40 conf=1.00 vs 0.00 elsewhere
+```
+
+Two counts of 40 at confidence 1.00 against 0.00 elsewhere, which is the whole
+of what the fixture encodes.
+
+**Cross-dimensional discovery looks from one side of a pair only.** Conditioned
+correspondences look from both — that is what `context_is_target` is for, and
+the header comment on `rg_conditioned_segment_count_row` argues the case at
+length: a change is only visible from the side that has the split, and which
+side that is depends on which lect happens to sort first. The same argument
+applies here and has not been applied. The sibling synthetic fixtures
+(`umlaut_synthetic`, `harmony_synthetic`, `length_conditioned_synthetic`) all
+still reproduce precisely because their rules come back as *target-side*
+conditioned correspondences.
+
+This was true before the 2026-08-15/16 structural work and is unchanged by it:
+the pre-pass build produces the same zero. The notation also moved — a
+cross-dimensional environment is a whole `rg_context_spec` now, printed
+`pre[voiced:+]`, not the `voiced=+@relative_-1` pair this document was written
+against.
+
+Nothing here has been changed to match the engine, because the engine is what
+looks wrong.
+
 ## Setup
 
 - **80 pairs** generated deterministically from a grid:

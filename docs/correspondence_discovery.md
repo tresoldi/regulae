@@ -774,6 +774,47 @@ and `confidence` describe the environment, `contrast_count`,
 mislead — a rule holding at 0.9 where the contrast also holds at 0.9 is not a
 rule — which is why the human formatter prints both.
 
+### One direction only, and what that costs
+
+Cross-dimensional discovery runs over one direction of a lect pair: the pair is
+ordered by ascending lect id, and the stage asks what about the source predicts
+a dimension on the target. It does not ask the reverse.
+
+Conditioned correspondences do ask both. `rg_conditioned_segment_count_row`
+carries `context_is_target` for exactly that reason, and the argument is on the
+struct: a sound change is conditioned by an environment that lives in the
+ancestor, regulae refuses to decide which lect that is, and a change is only
+*visible* from the side that has the split. Looking from one side leaves half of
+every pair's conditioning unreachable, and which half depends on which lect
+happened to sort first.
+
+That argument applies here too and has not been acted on. It is not theoretical:
+`experiments/tone_chinese_like_clean/` encodes a voicing-to-tone rule at
+confidence 1.00 by construction and the stage commits nothing on it, because
+`cantonese` sorts before `mandarin` and the rule runs the other way. Renaming
+the lects so the source sorts first recovers both rules exactly. The same
+happens on `experiments/mandarin_historical/`. See those two findings documents
+and `experiments/README.md`.
+
+It is worth stating as what it is. `src/multilect.c` sorts lects into ascending
+id order and explains why in a comment ending **"a name is metadata, and no
+analysis may turn on it"** -- an invariant added after renaming a lect changed a
+quarter of the published classes on real data. Cross-dimensional discovery turns
+on it. On `experiments/tone_chinese_like_clean/`, renaming a lect without
+changing which one sorts first changes nothing, and renaming one so that the
+other sorts first changes the model:
+
+```
+original            (cantonese first): 0 rules
+cantonese renamed   (cantonese first): 0 rules
+mandarin  renamed   (mandarin  first): 2 rules
+```
+
+Fixing it means searching both directions, which changes what is discovered on
+every corpus with a cross-dimensional rule, so it is a linguistic decision and
+not a tidy-up. Until it is made, a corpus whose ancestor lect sorts second gets
+no cross-dimensional rules, silently.
+
 ### Scoring overlay
 
 At alignment-cost time, committed cross-dimensional rules are

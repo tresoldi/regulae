@@ -8,6 +8,18 @@ wordlist from arcaverborum that includes **Tongan**, which
 preserves the Proto-Polynesian `*k` distinction. The merger
 disambiguation manifests cleanly.
 
+## Status, 2026-08-16: the corpus is not in the repository
+
+This directory holds findings only. The Arca Verborum data is not vendored -- those
+datasets carry their own licences -- so the run below cannot be reproduced from
+a checkout, and the source paths in it are wherever the data sat on the machine
+that produced it.
+
+`scripts/lexibank.py` is the supported route from a CLDF wordlist with expert
+cognate judgements to a regulae corpus, and `regulae check <corpus>` reports
+what a given dataset costs in graphemes the feature system cannot read before
+training on it.
+
 ## Setup
 
 - **Source**: `arcaverborum A-corecog-20251008` (Zenodo DOI

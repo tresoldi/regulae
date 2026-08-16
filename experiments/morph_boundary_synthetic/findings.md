@@ -2,6 +2,33 @@
 
 Synthetic fixture validating the morpheme-boundary chunk filter.
 
+## Status, 2026-08-16: this corpus does not load
+
+`regulae train --format wide experiments/morph_boundary_synthetic/cognates.tsv`
+refuses it:
+
+```
+regulae: training: "+" is CLDF/CLTS markup, not a transcribed sound.
+The gap is in the source data, not in the feature system.
+```
+
+The corpus writes the morpheme boundary twice: inline in the transcription
+(`pat+a`) and as a segment index in the `proto_breaks` / `derived_breaks`
+columns (`3`). The loaders read the columns and refuse the inline `+`, which is
+the documented behaviour -- CLDF/CLTS markup is refused separately from an
+unknown grapheme precisely so a reader can tell a gap in the source data from a
+gap in the feature system. `docs/capabilities.md` lists this corpus under what
+the loaders cannot yet express, with `+` named as the blocker.
+
+The results below were produced by a per-experiment Python driver that parsed
+the inline notation itself. That tooling is archived under `python/` and is not
+built or supported, so this document records a real result that no shipped
+command reproduces.
+
+Making it reproducible means dropping the inline `+` and relying on the
+`_breaks` columns the corpus already carries. That is a change to the fixture,
+not to this note, and has not been made.
+
 ## Setup
 
 24 cognate pairs, 16 stem+suffix and 8 monomorphemic controls.

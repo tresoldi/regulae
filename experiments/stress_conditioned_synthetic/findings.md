@@ -2,6 +2,30 @@
 
 Synthetic fixture validating stress-conditioned context discovery.
 
+## Status, 2026-08-16: this corpus does not load
+
+`regulae train --format wide experiments/stress_conditioned_synthetic/cognates.tsv`
+refuses it:
+
+```
+regulae: training: unknown grapheme "-" in feature system "distinctive".
+```
+
+The corpus writes syllable boundaries as `-` inside the transcription
+(`ˈpe-ta`), which no feature system covers. `docs/capabilities.md` lists this
+corpus under what the loaders cannot yet express, with `-` named as the blocker.
+
+The results below came from a per-experiment Python driver -- the `parse_form`
+this document mentions -- which stripped the separator and attached the stress
+mark itself. That tooling is archived under `python/` and is not built or
+supported, so this document records a real result that no shipped command
+reproduces.
+
+The engine's stress conditioning is not in question: `testdata/soundlaws/graded_3_stress.tsv`
+exercises it through the loaders and `tests/c/test_sound_laws.c` asserts it.
+What is missing is a syllable-boundary notation the loaders accept -- the wide
+loader takes a `<lect>_syllables` column for exactly this.
+
 ## Setup
 
 36 CVCV cognate pairs with two stress-conditioned 1-to-1 rules:
