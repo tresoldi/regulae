@@ -26,6 +26,7 @@ the engine changed to allow it.
 | stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
 | manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
 | observation-group metadata | supported | TSV and wide (`etymon_group`, `source_group`) | `tests/c/test_evaluation_m2.c` |
+| group-held-out predictive evidence | supported; opt-in because it retrains per fold and orientation | `predictive_folds`, JSON options, or `--predictive-folds` | `tests/c/test_evaluation_m4.c`, `docs/m4_evaluation.md` |
 | bootstrap uncertainty | supported | `bootstrap_n`; cognate, etymon, or source groups | `tests/c/test_uncertainty.c`: resamples named groups |
 | chunk transparency screening | supported | `chunk_min_transparency`; every chunk row carries its score | `testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c` |
 | anomaly detection | **not ported** | n/a | never ported |

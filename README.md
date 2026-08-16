@@ -154,6 +154,7 @@ eight counterexamples, below which the search stays quiet rather than guessing.
 regulae train <corpus.tsv>              # machine-readable model summary
 regulae train --human <corpus.tsv>      # readable report
 regulae train --permutations 20 <corpus.tsv>   # calibrate against shuffled data
+regulae train --predictive-folds 5 <corpus.tsv> # group-held-out reflex evidence
 regulae train --pairwise <corpus.tsv>   # per-pair learned tables
 regulae align <corpus.tsv>              # alignments, prior-only
 regulae align --model <corpus.tsv>      # alignments under the trained model
@@ -296,7 +297,7 @@ lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
 moves on any layout, signature or ownership change. It is at
-**24**. The most recent breaks, and `docs/consumer_guide.md` §7
+**28**. The most recent breaks, and `docs/consumer_guide.md` §7
 has the full list with reasons:
 
 - Each published table is handed out whole — the rows and a count
@@ -306,6 +307,10 @@ has the full list with reasons:
   rather than four separate fields.
 - `rg_corpus_fit` reports the per-pair verdict separately from the
   multi-lect one, because the two are counted differently.
+- Predictive validation is a separate, opt-in evidence layer. Set
+  `predictive_folds` or pass `--predictive-folds <n>` to select environments
+  inside dependency-group training folds and score unseen reflexes. It never
+  changes an in-sample split score into a predictive claim.
 
 ## Documentation
 

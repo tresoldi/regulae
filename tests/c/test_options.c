@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 27);
+    assert(rg_abi_version() == 28);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -49,8 +49,17 @@ int main(void) {
     assert(options.bootstrap_n == 0);
     assert(options.bootstrap_seed == 0);
     assert(options.bootstrap_unit == RG_OBSERVATION_UNIT_AUTO);
+    assert(options.predictive_folds == 0);
+    assert(options.predictive_seed == 20260816);
+    assert(options.predictive_min_groups == 2);
+    assert(fabs(options.predictive_abstention_threshold - 0.5) < 1e-12);
+    assert(options.predictive_top_k == 3);
     assert(strcmp(rg_observation_unit_string(RG_OBSERVATION_UNIT_ETYMON_GROUP),
                   "etymon_group") == 0);
+    assert(strcmp(rg_observation_unit_string(RG_OBSERVATION_UNIT_DEPENDENCY_COMPONENT),
+                  "dependency_component") == 0);
+    assert(strcmp(rg_predictive_status_string(RG_PREDICTIVE_DESCRIPTIVE_ONLY),
+                  "descriptive_only") == 0);
 
     rg_bic_config_init_defaults(0);
     rg_train_options_init_defaults(0);

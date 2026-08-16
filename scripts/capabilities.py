@@ -103,6 +103,12 @@ CAPABILITIES = [
         "`tests/c/test_evaluation_m2.c`",
     ),
     (
+        "group-held-out predictive evidence",
+        "supported; opt-in because it retrains per fold and orientation",
+        "`predictive_folds`, JSON options, or `--predictive-folds`",
+        "`tests/c/test_evaluation_m4.c`, `docs/m4_evaluation.md`",
+    ),
+    (
         "bootstrap uncertainty",
         "supported",
         "`bootstrap_n`; cognate, etymon, or source groups",

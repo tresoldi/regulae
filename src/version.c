@@ -49,6 +49,23 @@ const char *rg_observation_unit_string(rg_observation_unit unit) {
         return "aligned_span";
     case RG_OBSERVATION_UNIT_ALIGNED_POSITION:
         return "aligned_position";
+    case RG_OBSERVATION_UNIT_DEPENDENCY_COMPONENT:
+        return "dependency_component";
+    default:
+        return "unknown";
+    }
+}
+
+const char *rg_predictive_status_string(rg_predictive_status status) {
+    switch (status) {
+    case RG_PREDICTIVE_UNMEASURED:
+        return "unmeasured";
+    case RG_PREDICTIVE_DESCRIPTIVE_ONLY:
+        return "descriptive_only";
+    case RG_PREDICTIVE_CONFIRMED:
+        return "confirmed";
+    case RG_PREDICTIVE_NOT_CONFIRMED:
+        return "not_confirmed";
     default:
         return "unknown";
     }

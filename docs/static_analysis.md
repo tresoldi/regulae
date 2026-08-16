@@ -59,10 +59,10 @@ a leak on the out-of-memory path, of the same shape as the one the fuzzer found
 in M14 — and one no fuzzer would have found, because fuzzing does not produce
 allocation failures. `loader_row_clear` now exists and both callers use it.
 
-## The five suppressions
+## The six suppressions
 
-Five findings are suppressed, each with the reason on the line above the first
-annotation. They span eleven `NOLINTNEXTLINE` lines, because a finding reported
+Six findings are suppressed, each with the reason on the line above the first
+annotation. They span twelve `NOLINTNEXTLINE` lines, because a finding reported
 at several points in one function needs one per point; the reason is written
 once, at the first.
 
@@ -83,6 +83,13 @@ The third, in `src/vocabulary.c`, is a correlation the analyzer does not carry:
 the entry array is null only when the count is zero, and the loop it guards then
 does not run. The two are set together by the append helper and it does not
 follow that far.
+
+The fourth, in `src/predictive.c`, is another lost correlation: a zeroed array
+of probability buffers is allocated by an indexed loop and released by an
+indexed loop over the same bounds. The analyzer treats a later index as though
+it could replace an earlier allocation, then no longer associates that
+allocation with the pointer passed to the clear helper. The full success and
+partial-failure paths both release every buffer that can have been allocated.
 
 Two more live in the tests, for deliberate behaviour: an `assert` with a side
 effect, in the file whose whole purpose is to detect a build where `NDEBUG`

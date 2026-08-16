@@ -39,11 +39,13 @@ static void test_model_json_shape(rg_context *ctx) {
     assert(strstr(text, "\"lects\":[\"alpha\",\"beta\",\"gamma\"]") != 0);
     assert(strstr(text, "\"unconditioned\"") != 0);
     assert(strstr(text, "\"conditioned\"") != 0);
+    assert(strstr(text, "\"pairwise\"") != 0);
     assert(strstr(text, "\"cross_dimensional\"") != 0);
     assert(strstr(text, "\"alignments\"") != 0);
     assert(strstr(text, "\"outliers\"") != 0);
     assert(strstr(text, "\"supporting_cognates\"") != 0);
     assert(strstr(text, "\"uncertainty\"") != 0);
+    assert(strstr(text, "\"predictive\":{\"status\":\"unmeasured\"") != 0);
     /* A conditioned class carries its per-lect environment. */
     assert(strstr(text, "\"context\"") != 0);
     rg_string_free(text);
@@ -103,6 +105,11 @@ static void test_options_reader(void) {
     assert(rg_json_read_train_options_internal(
                                                "{\"max_chunk_size\":2,\"temperature\":0.5,"
                                                "\"bootstrap_unit\":\"source_group\","
+                                               "\"predictive_folds\":4,"
+                                               "\"predictive_seed\":17,"
+                                               "\"predictive_min_groups\":3,"
+                                               "\"predictive_abstention_threshold\":0.6,"
+                                               "\"predictive_top_k\":5,"
                                                "\"split_scorer\":\"dirichlet_marginal\","
                                                "\"split_prior_concentration\":2.0,"
                                                "\"search_penalty_gamma\":1.0}",
@@ -110,6 +117,11 @@ static void test_options_reader(void) {
     assert(options.max_chunk_size == 2);
     assert(options.temperature == 0.5);
     assert(options.bootstrap_unit == RG_OBSERVATION_UNIT_SOURCE_GROUP);
+    assert(options.predictive_folds == 4);
+    assert(options.predictive_seed == 17);
+    assert(options.predictive_min_groups == 3);
+    assert(options.predictive_abstention_threshold == 0.6);
+    assert(options.predictive_top_k == 5);
     assert(options.bic.split_scorer == RG_SPLIT_SCORER_DIRICHLET_MARGINAL);
     assert(options.bic.split_prior_concentration == 2.0);
     assert(options.bic.search_penalty_gamma == 1.0);

@@ -1,0 +1,119 @@
+{
+  "milestone": "M4",
+  "claim": "Surface cloze prediction of a held-out reflex from another lect's held-out form and the reflex's surrounding surface context; not proto-form reconstruction or sound-law discovery.",
+  "selection_nesting": "Every outer training partition rebuilds its feature vocabulary, alignments and greedy environment decision list. The list is frozen before its held-out dependency components are aligned and scored.",
+  "split_unit": "Connected components under equal nonempty cognate_id, etymon_group or source_group. Alternate reflexes, paradigm cells and source-linked rows therefore cannot cross the split.",
+  "hyperparameters": "All training and predictive settings are fixed before the outer run; none is selected from held-out scores.",
+  "alignment": "Held-out forms are aligned anew under the fold-trained model. Prediction is decomposed to 1:1 reflexes so promoted chunks cannot remove hard changed segments from the denominator.",
+  "orientation": "Every observed lect pair is trained and scored in both directions.",
+  "multilect": "For at least three present lects, leave-one-lect-out predictions pool the other lects by an equal-weight geometric mean of categorical probabilities.",
+  "inventory": "Candidate reflexes come only from the training partition. Test-only reflexes use an explicit unknown category and count as uncovered.",
+  "baselines": {
+    "identity": "epsilon-smoothed identity mapping",
+    "inventory_frequency": "add-one target-inventory frequency",
+    "feature_distance": "softmax of negative merkmal segment distance",
+    "unconditioned": "Dirichlet-smoothed unconditioned correspondence table"
+  },
+  "metrics": {
+    "log_loss": "confidence-weighted categorical log loss",
+    "top_k": "exact reflex coverage; unknown reflexes are failures",
+    "calibration": "10-bin expected calibration error plus multiclass Brier score",
+    "abstention": "max probability below 0.5; log loss still includes the observation"
+  },
+  "confirmation": {
+    "corpus": "completed grouped validation and positive unconditioned-minus-conditioned log-loss gain",
+    "association": "exact association rediscovered in at least two folds, at least eight held-out observations, and positive gain",
+    "small_corpus": "descriptive_only when at least two train and two test dependency groups cannot be maintained"
+  },
+  "seed": 20260816,
+  "cases": [
+    {
+      "case_id": "synthetic_segmental",
+      "path": "testdata/evaluation/m4/conditioned_generalises.tsv",
+      "format": "tsv",
+      "folds": 4,
+      "stratum": "synthetic_positive",
+      "gate": "overall_positive"
+    },
+    {
+      "case_id": "synthetic_cross_dimensional",
+      "path": "testdata/evaluation/m4/cross_dimensional_generalises.tsv",
+      "format": "tsv",
+      "folds": 4,
+      "stratum": "synthetic_positive",
+      "gate": "association_positive"
+    },
+    {
+      "case_id": "synthetic_leave_one_lect_out",
+      "path": "testdata/evaluation/m4/leave_one_lect_out.tsv",
+      "format": "tsv",
+      "folds": 3,
+      "stratum": "synthetic_multilect",
+      "gate": "leave_one_lect_out_positive"
+    },
+    {
+      "case_id": "old_english_modern_english",
+      "path": "experiments/oe_english/cognates.tsv",
+      "format": "wide",
+      "folds": 5,
+      "stratum": "real_positive",
+      "gate": "overall_positive"
+    },
+    {
+      "case_id": "latin_spanish",
+      "path": "testdata/corpora/real_latin_spanish.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "real_survey",
+      "gate": "report_only"
+    },
+    {
+      "case_id": "chance",
+      "path": "testdata/restraint/chance.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "real_negative",
+      "gate": "no_gain"
+    },
+    {
+      "case_id": "contact",
+      "path": "testdata/restraint/contact.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "real_negative",
+      "gate": "no_gain"
+    },
+    {
+      "case_id": "stratum",
+      "path": "testdata/restraint/stratum.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "real_negative",
+      "gate": "no_gain"
+    },
+    {
+      "case_id": "diffusion",
+      "path": "testdata/restraint/diffusion.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "real_negative",
+      "gate": "no_gain"
+    },
+    {
+      "case_id": "small_corpus",
+      "path": "testdata/evaluation/m4/descriptive_only.tsv",
+      "format": "tsv",
+      "folds": 5,
+      "stratum": "small_corpus",
+      "gate": "descriptive_only"
+    }
+  ],
+  "gates": [
+    "segmental synthetic and Old/Modern English strata have positive overall gain",
+    "a cross-dimensional association has predictive confirmation",
+    "multi-lect conditioned pooling beats unconditioned pooling",
+    "every real-negative corpus has non-positive gain",
+    "the small corpus reports descriptive_only",
+    "the test-only x reflex remains unseen rather than entering the fold vocabulary"
+  ]
+}

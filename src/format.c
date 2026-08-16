@@ -436,6 +436,12 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
                         row->uncertainty.post_selection ? "*" : "",
                         row->source, row->target);
         append_context(&builder, &row->context);
+        if (row->evidence.predictive.status != RG_PREDICTIVE_UNMEASURED) {
+            builder_appendf(&builder, "  predictive=%s gain=%+.3f n=%lu",
+                            rg_predictive_status_string(row->evidence.predictive.status),
+                            row->evidence.predictive.log_loss_gain,
+                            (unsigned long)row->evidence.predictive.conditioned.observation_count);
+        }
         builder_append(&builder, "\n");
         shown++;
     }
@@ -576,6 +582,36 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                            "  in a corpus removes every correspondence and raises them. cost/segment\n"
                            "  is the number that falls, and the baseline is what makes it readable.\n");
         }
+        if (fit->predictive.status == RG_PREDICTIVE_UNMEASURED) {
+            builder_append(&builder,
+                           "predictive evidence: not run (--predictive-folds <n>)\n");
+        } else if (fit->predictive.status == RG_PREDICTIVE_DESCRIPTIVE_ONLY) {
+            builder_appendf(&builder,
+                            "predictive evidence: descriptive only; %lu dependency groups cannot\n"
+                            "  support the requested grouped validation without leakage\n",
+                            (unsigned long)fit->predictive_group_count);
+        } else {
+            builder_appendf(&builder,
+                            "predictive evidence: %s over %lu folds and %lu reflexes;\n"
+                            "  held-out log loss %.4f conditioned vs %.4f unconditioned"
+                            " (gain %+.4f), top-%d %.1f%%, abstention %.1f%%\n",
+                            rg_predictive_status_string(fit->predictive.status),
+                            (unsigned long)fit->predictive.folds,
+                            (unsigned long)fit->predictive.conditioned.observation_count,
+                            fit->predictive.conditioned.log_loss,
+                            fit->predictive.unconditioned.log_loss,
+                            fit->predictive.log_loss_gain, fit->predictive_top_k,
+                            100.0 * fit->predictive.conditioned.top_k_coverage,
+                            100.0 * fit->predictive.conditioned.abstention_rate);
+            if (fit->predictive_leave_one_lect_out_conditioned.observation_count > 0) {
+                builder_appendf(&builder,
+                                "  leave-one-lect-out: %lu reflexes, log loss %.4f"
+                                " vs %.4f unconditioned\n",
+                                (unsigned long)fit->predictive_leave_one_lect_out_conditioned.observation_count,
+                                fit->predictive_leave_one_lect_out_conditioned.log_loss,
+                                fit->predictive_leave_one_lect_out_unconditioned.log_loss);
+            }
+        }
         builder_append(&builder, "\n");
     }
 
@@ -630,6 +666,12 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                         row->uncertainty.post_selection ? "*" : "");
         append_class_segments(&builder, row);
         append_class_contexts(&builder, row);
+        if (row->evidence.predictive.status != RG_PREDICTIVE_UNMEASURED) {
+            builder_appendf(&builder, " predictive=%s gain=%+.3f n=%lu",
+                            rg_predictive_status_string(row->evidence.predictive.status),
+                            row->evidence.predictive.log_loss_gain,
+                            (unsigned long)row->evidence.predictive.conditioned.observation_count);
+        }
         builder_append(&builder, "\n");
     }
     if (total > (size_t)opts.top_classes) {
@@ -656,11 +698,18 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset);
         append_count(&builder, row->rule.count);
-        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere %s=%.1f%s\n",
+        builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere %s=%.1f%s",
                         row->rule.confidence, row->rule.contrast_confidence,
                         score_label(row->rule.evidence.scorer), row->rule.evidence.delta_score,
                         row->rule.evidence.standing == RG_RULE_STANDING_UNMEASURED ? ""
                             : (row->rule.evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "  STANDS" : "  within-noise"));
+        if (row->rule.evidence.predictive.status != RG_PREDICTIVE_UNMEASURED) {
+            builder_appendf(&builder, " predictive=%s gain=%+.3f n=%lu",
+                            rg_predictive_status_string(row->rule.evidence.predictive.status),
+                            row->rule.evidence.predictive.log_loss_gain,
+                            (unsigned long)row->rule.evidence.predictive.conditioned.observation_count);
+        }
+        builder_append(&builder, "\n");
     }
     free(decision_order);
     return builder_finish(&builder);
@@ -888,7 +937,9 @@ static void summary_class(
             builder_appendf(builder, "%s%s", i > 0 ? "," : "", class_row->supporting_cognates[i]);
         }
     }
-    builder_append(builder, "\n");
+    builder_appendf(builder, "\t%s\t%.6f\n",
+                    rg_predictive_status_string(class_row->evidence.predictive.status),
+                    class_row->evidence.predictive.log_loss_gain);
 }
 
 char *rg_format_multi_model_summary(const rg_multi_model *model) {
@@ -932,6 +983,27 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
                         row->rule.contrast_confidence,
                         row->rule.evidence.delta_bic);
     }
+    {
+        const rg_corpus_fit *fit = rg_multi_model_fit(model);
+        builder_appendf(&builder,
+                        "PREDICT\t%s\t%s\t%lu\t%lu\t%lu\t%.6f\t%.6f\t%.6f"
+                        "\t%.6f\t%.6f\t%.6f\t%.6f\t%lu\t%.6f\t%.6f\n",
+                        rg_predictive_status_string(fit->predictive.status),
+                        rg_observation_unit_string(fit->predictive.observation_unit),
+                        (unsigned long)fit->predictive.folds,
+                        (unsigned long)fit->predictive_group_count,
+                        (unsigned long)fit->predictive.conditioned.observation_count,
+                        fit->predictive.conditioned.log_loss,
+                        fit->predictive.unconditioned.log_loss,
+                        fit->predictive.log_loss_gain,
+                        fit->predictive.conditioned.top1_coverage,
+                        fit->predictive.conditioned.top_k_coverage,
+                        fit->predictive.conditioned.calibration_error,
+                        fit->predictive.conditioned.abstention_rate,
+                        (unsigned long)fit->predictive_leave_one_lect_out_conditioned.observation_count,
+                        fit->predictive_leave_one_lect_out_conditioned.log_loss,
+                        fit->predictive_leave_one_lect_out_unconditioned.log_loss);
+    }
     return builder_finish(&builder);
 }
 
@@ -970,13 +1042,17 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
             /* Which form's environment the rule names. Two rows can carry the
              * same context and mean different things: one says the source
              * looked like that, the other the target. */
-            builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\t[%.4f,%.4f]\t%s%s\n",
+            builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t%s%s\t%.6f\t[%.4f,%.4f]\t%s%s"
+                            "\t%s\t%lu\t%.6f\n",
                             row->lect_a, row->lect_b,
                             seg->source, seg->target,
                             seg->context_is_target ? "@target " : "", key, seg->count,
                             seg->uncertainty.lower, seg->uncertainty.upper,
                             rg_uncertainty_method_string(seg->uncertainty.method),
-                            seg->uncertainty.post_selection ? "/post-selection" : "");
+                            seg->uncertainty.post_selection ? "/post-selection" : "",
+                            rg_predictive_status_string(seg->evidence.predictive.status),
+                            (unsigned long)seg->evidence.predictive.conditioned.observation_count,
+                            seg->evidence.predictive.log_loss_gain);
         }
         chunk_rows = rg_pairwise_model_chunks(pm, &n);
         for (i = 0; i < n; i++) {

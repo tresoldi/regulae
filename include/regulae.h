@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 27
+#define RG_ABI_VERSION 28
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -132,7 +132,11 @@ typedef enum rg_observation_unit {
     RG_OBSERVATION_UNIT_ETYMON_GROUP = 2,
     RG_OBSERVATION_UNIT_SOURCE_GROUP = 3,
     RG_OBSERVATION_UNIT_ALIGNED_SPAN = 4,
-    RG_OBSERVATION_UNIT_ALIGNED_POSITION = 5
+    RG_OBSERVATION_UNIT_ALIGNED_POSITION = 5,
+    /* A connected component under caller-supplied etymon groups, source
+     * groups and cognate ids. Predictive validation uses this unit so no two
+     * rows that may describe one history can cross a train/test boundary. */
+    RG_OBSERVATION_UNIT_DEPENDENCY_COMPONENT = 6
 } rg_observation_unit;
 
 RG_API const char *rg_observation_unit_string(rg_observation_unit unit);
@@ -174,6 +178,23 @@ typedef struct rg_train_options {
      * genuine conditioning is weak relative to its own noise will lose rules
      * that the fixed 0.5 keeps. It is off by default for that reason. */
     bool tune_search_penalty;
+    /* Group-held-out predictive validation. Zero (the default) does not run
+     * it. A positive value requests that many folds; folds are dependency
+     * components, never aligned positions or expanded doublet rows. Every
+     * fold trains and selects its environments afresh, then freezes that
+     * decision list before aligning and scoring its held-out groups. */
+    int predictive_folds;
+    int predictive_seed;
+    /* A completed validation needs at least this many independent components
+     * in both the training and held-out partitions across the run. Smaller
+     * corpora are published as descriptive-only, not forced through an
+     * unstable estimate. */
+    int predictive_min_groups;
+    /* A reflex prediction whose largest categorical probability is below this
+     * value abstains. Log loss and top-k coverage still include it; selective
+     * top-1 coverage does not. */
+    double predictive_abstention_threshold;
+    int predictive_top_k;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -293,6 +314,45 @@ typedef enum rg_rule_standing {
 
 RG_API const char *rg_rule_standing_string(rg_rule_standing standing);
 
+/* Predictive evidence is deliberately not a second name for in-sample split
+ * evidence. A rule can describe the supplied corpus faithfully and still be
+ * unconfirmed on unseen etymon/source groups. */
+typedef enum rg_predictive_status {
+    RG_PREDICTIVE_UNMEASURED = 0,
+    RG_PREDICTIVE_DESCRIPTIVE_ONLY = 1,
+    RG_PREDICTIVE_CONFIRMED = 2,
+    RG_PREDICTIVE_NOT_CONFIRMED = 3
+} rg_predictive_status;
+
+RG_API const char *rg_predictive_status_string(rg_predictive_status status);
+
+/* Proper categorical scores over held-out reflexes. The inventory is learned
+ * from the training partition only; an unseen test reflex is scored through an
+ * explicit unknown category and counted below, never inserted into the
+ * candidate vocabulary. All rates are confidence-weighted. */
+typedef struct rg_predictive_score {
+    size_t observation_count;
+    size_t unseen_reflex_count;
+    double observation_weight;
+    double log_loss;
+    double top1_coverage;
+    double top_k_coverage;
+    double brier_score;
+    double calibration_error;
+    double abstention_rate;
+    double accepted_top1_coverage;
+} rg_predictive_score;
+
+typedef struct rg_predictive_evidence {
+    rg_predictive_status status;
+    rg_observation_unit observation_unit;
+    size_t folds;
+    rg_predictive_score conditioned;
+    rg_predictive_score unconditioned;
+    /* Positive means conditioning reduced held-out log loss. */
+    double log_loss_gain;
+} rg_predictive_evidence;
+
 typedef enum rg_null_model {
     RG_NULL_MODEL_NONE = 0,
     RG_NULL_MODEL_PAIRING_SHUFFLE = 1,
@@ -353,6 +413,7 @@ typedef struct rg_rule_evidence {
     rg_rule_standing standing;
     /* The comparison that supports `standing`; NONE when unmeasured. */
     rg_null_model standing_null;
+    rg_predictive_evidence predictive;
 } rg_rule_evidence;
 
 typedef struct rg_uncertainty_estimate {
@@ -754,6 +815,25 @@ typedef struct rg_corpus_fit {
      * and not an answer to this one. */
     double cost_split_separation;
     double cost_split_fraction;
+    /* Selection-nested, dependency-group-held-out evidence. Environment
+     * discovery, feature-vocabulary construction and alignment training all
+     * happen inside each training partition. `conditioned` is compared with
+     * four frozen baselines. Pairwise scores contain both orientations;
+     * leave-one-lect-out pools predictions from the other lects where at least
+     * two are present. */
+    rg_predictive_evidence predictive;
+    size_t predictive_group_count;
+    size_t predictive_folds_requested;
+    size_t predictive_pair_orientations;
+    size_t predictive_leave_one_lect_out_cases;
+    size_t predictive_unscored_span_count;
+    double predictive_abstention_threshold;
+    int predictive_top_k;
+    rg_predictive_score predictive_identity;
+    rg_predictive_score predictive_inventory_frequency;
+    rg_predictive_score predictive_feature_distance;
+    rg_predictive_score predictive_leave_one_lect_out_conditioned;
+    rg_predictive_score predictive_leave_one_lect_out_unconditioned;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);

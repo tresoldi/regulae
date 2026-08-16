@@ -343,7 +343,12 @@ rg_status rg_train_model(
         !isfinite(options->bic.split_prior_concentration) ||
         options->bic.split_prior_concentration <= 0.0 ||
         !isfinite(options->bic.search_penalty_gamma) ||
-        options->bic.search_penalty_gamma < 0.0) {
+        options->bic.search_penalty_gamma < 0.0 ||
+        options->predictive_folds < 0 || options->predictive_folds == 1 ||
+        options->predictive_min_groups < 1 || options->predictive_top_k < 1 ||
+        !isfinite(options->predictive_abstention_threshold) ||
+        options->predictive_abstention_threshold < 0.0 ||
+        options->predictive_abstention_threshold > 1.0) {
         rg_multi_model_free(model);
         return RG_ERR_INVALID_ARGUMENT;
     }
@@ -466,6 +471,9 @@ rg_status rg_train_model(
     }
     if (status == RG_OK) {
         status = compute_corpus_fit(ctx, cognates, cognate_count, options, &baseline, model);
+    }
+    if (status == RG_OK) {
+        status = rg_predictive_evaluate_internal(ctx, cognates, cognate_count, options, model);
     }
     if (status != RG_OK) {
         rg_multi_model_free(model);

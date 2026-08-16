@@ -124,4 +124,13 @@ rg_status train_pair_models(
 );
 rg_status lift_cross_dimensional_rows(rg_multi_model *model);
 
+/* predictive.c: selection-nested validation over dependency components. */
+rg_status rg_predictive_evaluate_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    rg_multi_model *model
+);
+
 #endif

@@ -37,6 +37,39 @@ static cJSON *json_uncertainty(rg_uncertainty_estimate value) {
     return out;
 }
 
+static cJSON *json_predictive_score(rg_predictive_score value) {
+    cJSON *out = cJSON_CreateObject();
+    if (out == 0) {
+        return 0;
+    }
+    cJSON_AddNumberToObject(out, "observations", (double)value.observation_count);
+    cJSON_AddNumberToObject(out, "unseen_reflexes", (double)value.unseen_reflex_count);
+    cJSON_AddNumberToObject(out, "observation_weight", value.observation_weight);
+    cJSON_AddNumberToObject(out, "log_loss", value.log_loss);
+    cJSON_AddNumberToObject(out, "top1_coverage", value.top1_coverage);
+    cJSON_AddNumberToObject(out, "top_k_coverage", value.top_k_coverage);
+    cJSON_AddNumberToObject(out, "brier_score", value.brier_score);
+    cJSON_AddNumberToObject(out, "calibration_error", value.calibration_error);
+    cJSON_AddNumberToObject(out, "abstention_rate", value.abstention_rate);
+    cJSON_AddNumberToObject(out, "accepted_top1_coverage", value.accepted_top1_coverage);
+    return out;
+}
+
+static cJSON *json_predictive_evidence(rg_predictive_evidence value) {
+    cJSON *out = cJSON_CreateObject();
+    if (out == 0) {
+        return 0;
+    }
+    cJSON_AddStringToObject(out, "status", rg_predictive_status_string(value.status));
+    cJSON_AddStringToObject(out, "observation_unit",
+                            rg_observation_unit_string(value.observation_unit));
+    cJSON_AddNumberToObject(out, "folds", (double)value.folds);
+    cJSON_AddNumberToObject(out, "log_loss_gain", value.log_loss_gain);
+    cJSON_AddItemToObject(out, "conditioned", json_predictive_score(value.conditioned));
+    cJSON_AddItemToObject(out, "unconditioned", json_predictive_score(value.unconditioned));
+    return out;
+}
+
 static cJSON *json_constraints(const rg_feature_constraint *items, size_t count) {
     cJSON *array = cJSON_CreateArray();
     size_t i;
@@ -144,6 +177,7 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     cJSON_AddStringToObject(out, "standing", rg_rule_standing_string(row->evidence.standing));
     cJSON_AddStringToObject(out, "standing_null",
                             rg_null_model_string(row->evidence.standing_null));
+    cJSON_AddItemToObject(out, "predictive", json_predictive_evidence(row->evidence.predictive));
 
     segments = cJSON_CreateArray();
     if (segments == 0) {
@@ -440,6 +474,7 @@ char *rg_json_from_multi_model_internal(
     cJSON *root;
     cJSON *lects;
     cJSON *classes;
+    cJSON *pairwise;
     cJSON *array;
     char *text;
     size_t i;
@@ -498,6 +533,32 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(fit, "syllabified_form_count", (double)f->syllabified_form_count);
         cJSON_AddNumberToObject(fit, "cost_split_separation", f->cost_split_separation);
         cJSON_AddNumberToObject(fit, "cost_split_fraction", f->cost_split_fraction);
+        {
+            cJSON *predictive = json_predictive_evidence(f->predictive);
+            cJSON_AddItemToObject(fit, "predictive", predictive);
+            cJSON_AddNumberToObject(predictive, "group_count", (double)f->predictive_group_count);
+            cJSON_AddNumberToObject(predictive, "folds_requested",
+                                    (double)f->predictive_folds_requested);
+            cJSON_AddNumberToObject(predictive, "pair_orientations",
+                                    (double)f->predictive_pair_orientations);
+            cJSON_AddNumberToObject(predictive, "leave_one_lect_out_cases",
+                                    (double)f->predictive_leave_one_lect_out_cases);
+            cJSON_AddNumberToObject(predictive, "unscored_spans",
+                                    (double)f->predictive_unscored_span_count);
+            cJSON_AddNumberToObject(predictive, "abstention_threshold",
+                                    f->predictive_abstention_threshold);
+            cJSON_AddNumberToObject(predictive, "top_k", f->predictive_top_k);
+            cJSON_AddItemToObject(predictive, "identity",
+                                  json_predictive_score(f->predictive_identity));
+            cJSON_AddItemToObject(predictive, "inventory_frequency",
+                                  json_predictive_score(f->predictive_inventory_frequency));
+            cJSON_AddItemToObject(predictive, "feature_distance",
+                                  json_predictive_score(f->predictive_feature_distance));
+            cJSON_AddItemToObject(predictive, "leave_one_lect_out_conditioned",
+                                  json_predictive_score(f->predictive_leave_one_lect_out_conditioned));
+            cJSON_AddItemToObject(predictive, "leave_one_lect_out_unconditioned",
+                                  json_predictive_score(f->predictive_leave_one_lect_out_unconditioned));
+        }
         if (f->permutation_count > 0) {
             cJSON_AddStringToObject(fit, "corpus_fit_null", "pairing_shuffle");
             cJSON_AddStringToObject(fit, "conditioned_standing_null", "pairing_shuffle");
@@ -521,6 +582,58 @@ char *rg_json_from_multi_model_internal(
         return 0;
     }
     cJSON_AddItemToObject(root, "classes", classes);
+
+    pairwise = cJSON_CreateArray();
+    if (pairwise == 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    cJSON_AddItemToObject(root, "pairwise", pairwise);
+    for (i = 0; i < rg_multi_model_pair_model_count(model); i++) {
+        const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, i);
+        const rg_conditioned_segment_count_row *rows;
+        size_t row_count = 0;
+        size_t row_i;
+        cJSON *pair_entry = cJSON_CreateObject();
+        cJSON *conditioned = cJSON_CreateArray();
+        if (pair_entry == 0 || conditioned == 0) {
+            cJSON_Delete(pair_entry);
+            cJSON_Delete(conditioned);
+            cJSON_Delete(root);
+            return 0;
+        }
+        cJSON_AddStringToObject(pair_entry, "source_lect", pair->lect_a);
+        cJSON_AddStringToObject(pair_entry, "target_lect", pair->lect_b);
+        cJSON_AddItemToObject(pair_entry, "conditioned", conditioned);
+        rows = rg_pairwise_model_conditioned_segment_counts(pair->model, &row_count);
+        for (row_i = 0; row_i < row_count; row_i++) {
+            const rg_conditioned_segment_count_row *row = &rows[row_i];
+            cJSON *entry = cJSON_CreateObject();
+            if (entry == 0) {
+                cJSON_Delete(root);
+                return 0;
+            }
+            cJSON_AddStringToObject(entry, "source", row->source);
+            cJSON_AddStringToObject(entry, "target", row->target);
+            cJSON_AddItemToObject(entry, "context", json_context(&row->context));
+            cJSON_AddBoolToObject(entry, "context_is_target", row->context_is_target);
+            cJSON_AddNumberToObject(entry, "count", row->count);
+            cJSON_AddNumberToObject(entry, "source_total", row->source_total);
+            cJSON_AddNumberToObject(entry, "contrast_count", row->contrast_count);
+            cJSON_AddNumberToObject(entry, "contrast_total", row->contrast_total);
+            cJSON_AddStringToObject(entry, "score_kind",
+                                    rg_split_scorer_string(row->evidence.scorer));
+            cJSON_AddNumberToObject(entry, "delta_score", row->evidence.delta_score);
+            cJSON_AddNumberToObject(entry, "decision_index", row->evidence.decision_index);
+            cJSON_AddStringToObject(entry, "standing",
+                                    rg_rule_standing_string(row->evidence.standing));
+            cJSON_AddItemToObject(entry, "predictive",
+                                  json_predictive_evidence(row->evidence.predictive));
+            cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->uncertainty));
+            cJSON_AddItemToArray(conditioned, entry);
+        }
+        cJSON_AddItemToArray(pairwise, pair_entry);
+    }
 
     array = cJSON_CreateArray();
     if (array == 0) {
@@ -584,6 +697,8 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddStringToObject(entry, "standing", rg_rule_standing_string(row->rule.evidence.standing));
         cJSON_AddStringToObject(entry, "standing_null",
                                 rg_null_model_string(row->rule.evidence.standing_null));
+        cJSON_AddItemToObject(entry, "predictive",
+                              json_predictive_evidence(row->rule.evidence.predictive));
         cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->rule.uncertainty));
         cJSON_AddItemToArray(array, entry);
     }
@@ -741,6 +856,11 @@ rg_status rg_json_read_train_options_internal(
         NUMBER_FIELD("chunk_min_transparency", chunk_min_transparency, double)
         NUMBER_FIELD("bootstrap_n", bootstrap_n, int)
         NUMBER_FIELD("bootstrap_seed", bootstrap_seed, int)
+        NUMBER_FIELD("predictive_folds", predictive_folds, int)
+        NUMBER_FIELD("predictive_seed", predictive_seed, int)
+        NUMBER_FIELD("predictive_min_groups", predictive_min_groups, int)
+        NUMBER_FIELD("predictive_abstention_threshold", predictive_abstention_threshold, double)
+        NUMBER_FIELD("predictive_top_k", predictive_top_k, int)
         NUMBER_FIELD("split_prior_concentration", bic.split_prior_concentration, double)
         NUMBER_FIELD("delta_bic_threshold", bic.delta_bic_threshold, double)
         NUMBER_FIELD("min_split_observations", bic.min_split_observations, int)

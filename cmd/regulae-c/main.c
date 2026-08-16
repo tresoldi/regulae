@@ -59,6 +59,9 @@ static int usage(void) {
     printf("                                     alignments and outliers\n");
     printf("  --permutations <n>                 calibrate the fit against <n>\n");
     printf("  --permutation-seed <n>             reproducible shuffle seed\n");
+    printf("  --predictive-folds <n>             dependency-group-held-out folds;\n");
+    printf("                                     selects rules inside training only\n");
+    printf("  --predictive-seed <n>              reproducible group-fold seed\n");
     printf("                                     trainings on shuffled pairings.\n");
     printf("                                     Costs one training run each,\n");
     printf("                                     and is the only way to read\n");
@@ -420,7 +423,8 @@ static int command_train(const char *path, const char *format, int pairwise, int
                          int permutation_seed, const char *feature_system,
                          rg_split_scorer scorer, double split_prior,
                          double search_gamma, double split_threshold,
-                         double long_split_threshold, int small_sample) {
+                         double long_split_threshold, int small_sample,
+                         int predictive_folds, int predictive_seed) {
     rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
     rg_corpus *corpus = 0;
@@ -457,6 +461,10 @@ static int command_train(const char *path, const char *format, int pairwise, int
         options.permutation_seed = permutation_seed;
     }
     options.tune_search_penalty = tune_search;
+    options.predictive_folds = predictive_folds;
+    if (predictive_seed >= 0) {
+        options.predictive_seed = predictive_seed;
+    }
     options.bic.split_scorer = scorer;
     if (split_prior > 0.0) {
         options.bic.split_prior_concentration = split_prior;
@@ -748,6 +756,8 @@ int main(int argc, char **argv) {
     int permutations = 0;
     int permutation_seed = -1;
     int tune_search = 0;
+    int predictive_folds = 0;
+    int predictive_seed = -1;
     const char *feature_system = 0;
     rg_split_scorer scorer = RG_SPLIT_SCORER_CORRECTED_BIC;
     double split_prior = -1.0;
@@ -773,6 +783,10 @@ int main(int argc, char **argv) {
             permutations = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--permutation-seed") == 0 && i + 1 < argc) {
             permutation_seed = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--predictive-folds") == 0 && i + 1 < argc) {
+            predictive_folds = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--predictive-seed") == 0 && i + 1 < argc) {
+            predictive_seed = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--feature-system") == 0 && i + 1 < argc) {
             feature_system = argv[++i];
         } else if (strcmp(argv[i], "--scorer") == 0 && i + 1 < argc) {
@@ -821,7 +835,8 @@ int main(int argc, char **argv) {
         return command_train(path, format, pairwise, human, json, permutations,
                              tune_search, permutation_seed, feature_system,
                              scorer, split_prior, search_gamma, split_threshold,
-                             long_split_threshold, small_sample);
+                             long_split_threshold, small_sample,
+                             predictive_folds, predictive_seed);
     }
     if (strcmp(argv[1], "outliers") == 0) {
         return command_outliers(path, format, top_k);

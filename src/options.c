@@ -42,6 +42,11 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     options->permutation_count = 0;
     options->tune_search_penalty = 0;
     options->permutation_seed = 20260815;
+    options->predictive_folds = 0;
+    options->predictive_seed = 20260816;
+    options->predictive_min_groups = 2;
+    options->predictive_abstention_threshold = 0.5;
+    options->predictive_top_k = 3;
     options->progress = 0;
     options->progress_user_data = 0;
 }

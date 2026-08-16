@@ -21,9 +21,9 @@ brought with it.** Every published table is now handed out whole
 rather than through a count function and an index function
 (§4.9), and the four fields that say what a search decided about a
 rule moved into one `evidence` member on the rows that carry them
-(§4.6). `RG_ABI_VERSION` is 27. Named split scorers and generic score evidence
-are the newest source-level break; observation-group metadata remains governed
-by §7.
+(§4.6). `RG_ABI_VERSION` is 28. Group-held-out predictive evidence is the
+newest source-level break; named split scorers and observation-group metadata
+remain governed by §7.
 
 This document said until 2026-08-15 that the meanings were
 "unchanged", and it was wrong in four places: a cross-dimensional
@@ -463,6 +463,7 @@ typedef struct rg_rule_evidence {
     double           search_margin;   /* how heavy a charge it carries */
     rg_rule_standing standing;        /* the verdict */
     rg_null_model    standing_null;   /* comparison supporting it */
+    rg_predictive_evidence predictive; /* held-out, not in-sample */
 } rg_rule_evidence;
 ```
 
@@ -480,6 +481,24 @@ typedef struct rg_rule_evidence {
   split paid for its complexity. `delta_bic` is numerically identical for
   source compatibility, but is not a BIC value when `scorer` names NML or the
   Dirichlet marginal likelihood.
+- `predictive` — a separate group-held-out result. `unmeasured` means no
+  predictive run was requested; `descriptive_only` means the corpus or the
+  exact association could not support confirmation without leakage;
+  `confirmed` means conditioning reduced held-out log loss; and
+  `not_confirmed` means it did not. This field never changes `delta_score` or
+  `standing`.
+
+Set `rg_train_options.predictive_folds` to at least two to run it. Fold units
+are connected components under the caller's cognate ids, etymon groups and
+source groups, so alternate reflexes and paradigm cells cannot cross the
+split. Every fold learns its feature vocabulary, alignments and environment
+decision list from training components only. `rg_corpus_fit.predictive`
+reports conditioned and unconditioned log loss, top-k coverage, Brier score,
+ten-bin calibration error and abstention; sibling fields report identity,
+inventory-frequency and feature-distance baselines. Pairwise scores include
+both orientations, and three-or-more-lect corpora additionally report
+leave-one-lect-out pooling. See `docs/m4_evaluation.md` for the frozen protocol
+and the real negative panel.
 
 These four were separate fields on each row until 2026-08-16,
 copied into four row types. A C consumer reads
@@ -804,16 +823,22 @@ Adding a field to a public struct changes its layout, so it moves
 the ABI version whether or not it breaks a source-level consumer.
 The rule is: `RG_ABI_VERSION` moves on any exported struct
 layout, enum, signature or ownership change, and the reason is
-recorded in `docs/c_conversion_roadmap.md`. It is at **27**.
+recorded in `docs/c_conversion_roadmap.md`. It is at **28**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **28** — `rg_train_options` gained opt-in grouped predictive-validation
+  settings; `rg_rule_evidence` and `rg_corpus_fit` gained predictive evidence;
+  `rg_predictive_status`, `rg_predictive_score`,
+  `rg_predictive_evidence` and dependency-component observation units are
+  public. Training with zero folds preserves the old execution path and
+  publishes `unmeasured`.
+
 - **27** — `rg_split_scorer` selects corrected BIC, exact multinomial NML or a
   symmetric-Dirichlet marginal likelihood; `rg_rule_evidence` names its scorer
   and authoritative `delta_score`; `rg_corpus_fit` reports the selected scorer
-  and prior mass. Exact NML refuses fractional mass. The selected default also
   removes the un-derived multi-lect small-sample addition, charges the full
   distinct-partition model space and uses a zero score threshold.
 - **26** — `rg_cognate_set` gained optional `etymon_group` and

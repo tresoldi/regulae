@@ -242,6 +242,41 @@ Greek `t` correspondence with Proto-Indo-European `tʰ` where an aspirate
 follows is visible in both views, but their denominators and evidence units are
 different. A corpus's strongest surface association can be in either.
 
+## Does it predict an unseen reflex?
+
+The shuffle asks whether a rule stands above adaptive search noise in this
+corpus. Prediction asks a different question: whether an association selected
+from some histories helps on histories the search did not see.
+
+Run it explicitly because it retrains once per fold and per lect orientation:
+
+```sh
+regulae train corpus.tsv --human --predictive-folds 5
+```
+
+Rows sharing a cognate id, `etymon_group` or `source_group` are kept together.
+Within each training partition regulae rebuilds the feature vocabulary,
+alignments and complete greedy decision list; the held-out partition only sees
+that frozen model. The report compares conditioned prediction with identity,
+inventory frequency, feature distance and the unconditioned correspondence
+table, and publishes log loss, top-k coverage, calibration and abstention. With
+three or more lects it also predicts each lect by pooling the others.
+
+The predictive verdict is separate from `STANDS` and the split score:
+
+- `confirmed` means conditioning lowered group-held-out log loss.
+- `not_confirmed` means it did not. The rule may still describe the supplied
+  corpus accurately.
+- `descriptive_only` means there were too few independent histories, or the
+  exact association was not rediscovered often enough, for confirmation.
+- `unmeasured` means no predictive run was requested.
+
+This is surface cloze prediction: the other lect's form and the surrounding
+surface context are observed while the reflex is predicted. It is not a
+proto-form reconstruction score and not a claim that regulae discovered a
+sound law. The frozen protocol and real negative panel are in
+`docs/m4_evaluation.md`.
+
 ## How much data do I need?
 
 About **eight examples of a change and eight counterexamples**, measured.
