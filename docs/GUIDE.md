@@ -236,6 +236,114 @@ distinguishable from having looked — while the rule that *is* Grassmann's Law,
 Greek `t` answering Proto-Indo-European `tʰ` where an aspirate follows, stands
 in the second. A corpus's only real finding can be in either.
 
+## How much data do I need?
+
+About **eight examples of a change and eight counterexamples**, measured.
+
+`testdata/restraint/sparse_008` … `sparse_128` is one conditioned change — /p/ answering /f/
+before a front vowel — at 8, 16, 32, 64 and 128 cognate sets, each corpus a
+prefix of the next so that the only thing that varies is size. At 8 sets
+nothing at all is committed. At 16 the rule is found, and it is committed
+*second*, behind a weaker environment that the shuffled baseline then rejects.
+From 32 up it leads and everything committed stands.
+
+Two readings, and the second is the one people miss.
+
+**Silence on a small corpus is not evidence of absence.** Below the floor the
+search stays quiet rather than guessing, which is what you want it to do, and
+it means a run that reports nothing on thirty cognates has told you about your
+corpus and not about your languages.
+
+**The floor for finding a rule and the floor for trusting the order is not the
+same number.** Rules are listed in the order they were decided and that order
+carries meaning — a later rule refines what an earlier one left. Near the
+floor the order is noise, and `--permutations` is what separates them.
+
+One more thing changes the arithmetic, and it catches people out. **A change
+that applies to a whole class of segments is divided by the size of that class
+before the search sees it.** Germanic i-umlaut is one change, and it arrives as
+four correspondences — `a ~ e`, `uː ~ yː`, `u ~ y`, `oː ~ øː` — each of which
+has to carry its own evidence. In `testdata/soundlaws/opaque_umlaut.tsv` only
+the first crosses the floor, so only the first gets its environment, and the
+other three are published as bare splits with the trigger standing right next
+to them in the same words. Palatalisation, lenition, nasalisation and every
+chain shift have this shape. If a change you know is there comes out
+unconditioned, count how many segments it applies to before concluding
+anything.
+
+## Two correspondences, no environment
+
+Sometimes one proto segment answers two daughter segments and the search
+commits no environment. That is an answer, not a failure, and there are at
+least four different things it can mean:
+
+- **A borrowed layer.** English *father* beside *paternal*: the second is not
+  an exception to Grimm's Law, it is a word that was not in the language when
+  Grimm's Law ran. The tell is that a whole *set* of correspondences splits at
+  once, not just one.
+- **A neutralisation.** German word-final /t/ has two sources and nothing in
+  the citation form says which; the alternation in the inflected stem is the
+  only evidence. This is what internal reconstruction is for.
+- **Lexical diffusion, or a change still in progress.** No environment because
+  there is none: which words changed is a fact about the words.
+- **An environment regulae cannot state.** Syllable weight is the clearest
+  case — see `docs/capabilities.md` for the standing list of these.
+
+Distinguishing them is your job, and the distributions will not do it. What
+regulae owes you is not inventing a fifth possibility, and on all three of the
+fixtures above it commits no environment.
+
+## What the answer cannot tell you
+
+Three limits worth knowing before the output is quoted anywhere.
+
+**Contact against inheritance.** A wordlist half borrowed from an unrelated
+neighbour produces real, regular, well-supported correspondences over the
+borrowed half and sits far below its own shuffled baseline. Japanese and
+Chinese are the textbook case. Nothing in the distribution of segments
+separates a loan stratum from an inherited one, so nothing in this output does
+either.
+
+There is a signature, and the report names it when it is strong:
+
+```
+  the sets fall in two groups, 50% of them in the worse-aligning
+  one, 6.3 standard deviations apart.
+```
+
+Read the percentage with the separation. A high separation with a *small*
+share — a tenth of the corpus — is a tail of sets that do not belong, which is
+what a handful of bad cognate judgements looks like. A high separation at about
+half is a corpus that is two populations. Which of the two it is, and why, the
+distributions cannot say: a borrowed layer, a block of bad judgements, two
+sources, and half a lexicon that underwent a change the other half did not all
+produce it. It is a reason to ask a different question, not an answer.
+
+**Transcription drift.** Two sources for one language that disagree about
+where a segment ends — `tʃ` against `t ʃ`, `tʰ` against `t h`, `aː` against
+`a a` — produce a family of clean correspondences that read as deaffrication,
+loss of aspiration and loss of length. Nothing in the *model* catches it: every
+grapheme is valid, the fit is excellent, and the shuffled baseline cannot help,
+because a systematic difference is exactly what a sound law is.
+
+`regulae check` asks the other question — about the writing rather than the
+sounds — and prints a `DRIFT` line per suspect grapheme with the evidence
+beside it:
+
+```
+DRIFT   broad   narrow   tʃ   t ʃ   13/13
+```
+
+Thirteen cognate sets where `broad` writes `tʃ`, and in all thirteen `narrow`
+writes `t ʃ`. A ratio near 1 is a transcription difference; a low one is a
+sound change — Latin `kʷ` against French `k w` comes out at 1 of 5, which is
+*qu* → /k/. It reports and never refuses: a corpus can honestly hold one
+language with affricates and one without, and only you can tell that from two
+sources disagreeing.
+
+**Which lect is the innovator.** A correspondence is symmetric. Deciding which
+side changed is reconstruction, and regulae does not do reconstruction.
+
 ## Confidence and outliers
 
 Not every cognate set deserves equal weight. A confidence column carries that:

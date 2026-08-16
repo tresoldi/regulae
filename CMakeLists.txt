@@ -85,6 +85,7 @@ endif()
 add_library(regulae
     third_party/cjson/cJSON.c
     src/context.c
+    src/drift.c
     src/environment.c
     src/memory.c
     src/format.c
@@ -256,6 +257,16 @@ if(REGULAE_BUILD_TESTS)
     target_compile_definitions(test_uncertainty PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_sound_laws PRIVATE regulae::regulae)
     add_test(NAME sound_laws COMMAND test_sound_laws)
+
+    add_executable(test_restraint tests/c/test_restraint.c)
+    target_compile_definitions(test_restraint PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_restraint PRIVATE regulae::regulae)
+    add_test(NAME restraint COMMAND test_restraint)
+
+    add_executable(test_diagnostics tests/c/test_diagnostics.c)
+    target_compile_definitions(test_diagnostics PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_diagnostics PRIVATE regulae::regulae)
+    add_test(NAME diagnostics COMMAND test_diagnostics)
 
     add_executable(test_loaders tests/c/test_loaders.c)
     target_compile_definitions(test_loaders PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")

@@ -21,12 +21,24 @@ the engine changed to allow it.
 | confidence weighting and outliers | supported | TSV and wide (`confidence` column) | `testdata/corpora/real_contaminated.tsv` |
 | morpheme boundaries | supported | arcaverborum, and wide via `<lect>_breaks` | `testdata/corpora/morph_boundary.csv` |
 | cross-dimensional rules | supported | every loader | `tests/c/test_pairwise_model.c` |
-| tone | supported | every loader, from Chao superscripts or a `_tone` column | `tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c` |
+| tone | supported | every loader, from Chao superscripts in the transcription or a tone column | `tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c` |
 | stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
 | manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
 | bootstrap uncertainty | **not ported** | n/a | never ported; `bootstrap_n` is accepted and ignored |
 | chunk transparency screening | supported | `chunk_min_transparency`; every chunk row carries its score | `testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c` |
 | anomaly detection | **not ported** | n/a | never ported |
+| opaque conditioning (the daughter lost the trigger) | supported | every loader | `testdata/soundlaws/graded_9_lost_trigger.tsv`, `opaque_umlaut.tsv` |
+| chain shifts kept apart from mergers | supported | every loader | `testdata/soundlaws/great_vowel_shift.tsv` |
+| compensatory lengthening | supported | every loader | `testdata/soundlaws/compensatory_lengthening.tsv` |
+| a verdict on whether two lects are related at all | supported | `permutation_count`, or `--permutations` | `testdata/restraint/chance.tsv` |
+| restraint on a change with no environment | supported | every loader | `testdata/restraint/diffusion.tsv`, `stratum.tsv`, `soundlaws/final_devoicing.tsv` |
+| ranking cognate sets worst-first, for triage | supported | every loader | `testdata/diagnostics/contaminated.tsv`, `partial.tsv` |
+| disjunctive trigger sets (RUKI's shape) | supported, as a decision list | every loader | `testdata/soundlaws/graded_7_disjunction.tsv`: one rule per trigger, all with one outcome |
+| syllable shape and weight | supported | every loader | `testdata/soundlaws/graded_8_weight.tsv`: `prev-syl[syllable_weight:heavy]`, Sievers' shape in one rule |
+| several environments for one correspondence | supported | every loader | `tests/c/test_sound_laws.c`: rows merge on their observations, not on the tuple |
+| partial cognacy, per morpheme | **not expressible** | n/a | `testdata/diagnostics/partial.tsv`: visible in the ranking, not usable in training |
+| transcription drift between sources | reported, not refused | `regulae check`, or `rg_find_transcription_drift` | `testdata/diagnostics/drift.tsv`: 5 of 5 found, and no corpus in this repository reports a false one |
+| telling borrowing from inheritance | **out of scope** | n/a | `testdata/restraint/contact.tsv`: the correspondences are real either way; the ranking shows the split |
 
 ## Corpora regulae reads (22 of 24)
 
@@ -36,20 +48,20 @@ Trained through the wide loader with default options.
 | --- | --- | --- | --- |
 | arabic_hebrew | arabic, hebrew | 33 | 4 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
-| finnish_estonian | estonian, finnish | 36 | 2 |
-| georgian_svan | georgian, svan | 51 | 9 |
+| finnish_estonian | estonian, finnish | 36 | 4 |
+| georgian_svan | georgian, svan | 51 | 8 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 82 | 16 |
-| latin_italian | italian, latin | 69 | 14 |
-| latin_spanish | latin, spanish | 62 | 20 |
+| latin_french | french, latin | 82 | 25 |
+| latin_italian | italian, latin | 68 | 18 |
+| latin_spanish | latin, spanish | 64 | 24 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 48 | 7 |
 | navajo_chipewyan | chipewyan, navajo | 53 | 2 |
-| oe_english | modern_english, old_english | 60 | 12 |
-| ppn_hawaiian | hawaiian, ppn | 22 | 4 |
+| oe_english | modern_english, old_english | 60 | 11 |
+| ppn_hawaiian | hawaiian, ppn | 22 | 3 |
 | swahili_zulu | swahili, zulu | 41 | 2 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 50 | 15 |
+| tone_chinese_like | cantonese, mandarin | 50 | 16 |
 | tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |

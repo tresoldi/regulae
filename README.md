@@ -70,10 +70,16 @@ carrying:
 - **A verdict per rule.** Every conditioned rule reports how
   heavy a search charge its evidence carries, and — with
   `--permutations` — whether that clears what the same search
-  reaches on the corpus shuffled. On sixty unrelated pseudo-word
-  pairs, a run produces thirty-two conditioned rules and marks
-  thirty-one of them as findable in noise. `--tune-search`
-  turns the comparison into a gate.
+  reaches on the corpus shuffled. `--tune-search` turns the
+  comparison into a gate. On German final devoicing
+  (`testdata/soundlaws/final_devoicing.tsv`) the search commits
+  four environments for a change that has none, and the baseline
+  rejects all four — which is the whole case for running it.
+  It is a 95th-percentile cut and behaves like one: on wordlists
+  with no history between them
+  (`testdata/restraint/chance.tsv`) about one rule in ten still
+  clears it, so the corpus-level statistic below is what answers
+  "related or not", never the count of standing rules.
 - **A decision list, not a bag of rules.** Discovery is greedy,
   so a later rule refines what an earlier one left unsettled.
   That order is published and the reports render it. Every committed
@@ -102,6 +108,10 @@ carrying:
   thing in the output that answers "is there a relationship here at
   all". The class counts do not: shuffling removes every
   correspondence there is to find and the counts go **up**.
+  Measured, on two wordlists drawn from one inventory with no
+  history between them: 76 correspondences and 47 conditioned
+  classes, against a shuffled 79 and 48, and `z = -0.6`. The
+  same statistic on a corpus with a real change in it is `-33`.
 - **Determinism.** Same input, same output across runs and
   processes.
 
@@ -122,6 +132,22 @@ ctest --test-dir build/c --output-on-failure
 
 Sanitizer builds use `-DREGULAE_ENABLE_SANITIZER=address` (or
 `undefined`).
+
+Three corpus suites sit behind `ctest`, and they ask three different
+questions. Each has a README explaining how to add to it.
+
+| suite | question | test |
+| --- | --- | --- |
+| [`testdata/soundlaws/`](testdata/soundlaws/) | can regulae find a change the field settled long ago? | `sound_laws` |
+| [`testdata/restraint/`](testdata/restraint/) | can it decline to find one that is not there? | `restraint` |
+| [`testdata/diagnostics/`](testdata/diagnostics/) | can it tell you your corpus is wrong? | `diagnostics` |
+
+A tool that passes the first and fails the second is worse than useless,
+because a spurious conditioned rule is formatted exactly like a real one.
+`restraint/` carries two lects with no history between them, a change spread
+over the lexicon rather than over an environment, a borrowed stratum, and a
+ladder that measures the evidence floor — about eight examples of a change and
+eight counterexamples, below which the search stays quiet rather than guessing.
 
 ## Command line
 
@@ -283,6 +309,11 @@ has the full list with reasons:
   generated: which capabilities are implemented, and which corpora the loaders
   can currently express. A corpus it cannot read says something about the input
   path, not the engine.
+- **What it does on real data** at
+  [`docs/family_survey.md`](docs/family_survey.md) — a recorded run over forty-odd
+  published wordlists, one or two per family, from Indo-European to Pama-Nyungan.
+  Regenerate with `scripts/families.py` against your own Lexibank clone; nothing
+  is vendored, so it is not checked by CI.
 - **Conversion state** at `docs/c_conversion_roadmap.md`
   (milestones, intentional deviations, why parity ended) and
   `docs/c_conversion_handoff.md`.

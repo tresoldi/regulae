@@ -59,12 +59,16 @@ def corpora():
     """Every corpus the tree can train, in a stable order.
 
     testdata/soundlaws is the set built so that exactly one answer is right,
-    testdata/corpora is what the tests and CLI smoke checks read, and
-    experiments/ is the real data. A corpus that does not load is still
-    recorded: that it refuses, and goes on refusing, is also behaviour.
+    testdata/restraint the set where the right answer is nothing,
+    testdata/diagnostics the set where the corpus rather than the method is
+    what is wrong, testdata/corpora is what the tests and CLI smoke checks
+    read, and experiments/ is the real data. A corpus that does not load is
+    still recorded: that it refuses, and goes on refusing, is also behaviour.
     """
     paths = []
     paths += sorted((REPO / "testdata" / "soundlaws").glob("*.tsv"))
+    paths += sorted((REPO / "testdata" / "restraint").glob("*.tsv"))
+    paths += sorted((REPO / "testdata" / "diagnostics").glob("*.tsv"))
     paths += sorted((REPO / "testdata" / "corpora").glob("*.tsv"))
     paths += sorted((REPO / "testdata" / "corpora").glob("*.csv"))
     paths += sorted((REPO / "experiments").glob("*/cognates.tsv"))

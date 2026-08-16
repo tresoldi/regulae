@@ -56,6 +56,11 @@ typedef struct merged_class {
     size_t *observation_indices;
     size_t observation_count;
     size_t observation_cap;
+    /* The observations of the split that created this class, kept apart from
+     * the evidence list above because they decide what may still join it. See
+     * `restates_an_earlier_rule`. */
+    size_t *defining_indices;
+    size_t defining_count;
     char *key;
     char **lects;
     char **graphemes;
@@ -171,6 +176,71 @@ static rg_status join_lect_grapheme_key(
     *p = '\0';
     *out = key;
     return RG_OK;
+}
+
+/* Whether every observation in `inner` is already in `outer`. */
+static int observation_set_contains(
+    const size_t *outer,
+    size_t outer_count,
+    const size_t *inner,
+    size_t inner_count
+) {
+    size_t i;
+    size_t j;
+    if (inner_count > outer_count) {
+        return 0;
+    }
+    for (i = 0; i < inner_count; i++) {
+        int seen = 0;
+        for (j = 0; j < outer_count; j++) {
+            if (outer[j] == inner[i]) {
+                seen = 1;
+                break;
+            }
+        }
+        if (!seen) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* Whether a committed split belongs to a class already published rather than
+ * being a rule of its own.
+ *
+ * The correspondence tuple alone is not the identity of a conditioned class,
+ * and using it as one cost the multi-lect table its decision list. Discovery is
+ * greedy: each rule is committed against what the earlier ones left, so one
+ * correspondence can be the outcome of several rules under several
+ * environments. That is what Grassmann's Law is, what RUKI's four triggers are,
+ * and what every change conditioned by something that is not a natural class
+ * looks like. Keyed on the tuple alone the whole list collapsed into one row
+ * whose environment was picked by constraint count -- on `real_romance_4lect`,
+ * 32 of the 58 splits the search committed were discarded before a reader could
+ * see them, and on `graded_7_disjunction` three of the four RUKI triggers were.
+ *
+ * What separates a second rule from a second description of the first is the
+ * observations, and the direction matters. Splits found from different pivots
+ * for one class carry the *same* observations -- that is the cross-pivot join,
+ * and it is what puts an environment in more than one lect's slot of an N-way
+ * row. A later split whose observations are a *subset* of an earlier class's is
+ * a narrower restatement of a rule already made: Latin rhotacism commits
+ * `old_latin fol@2[fricative:+]` over ten of the same fourteen intervocalic
+ * /s/, which is a correlate of the rule and not a second one.
+ *
+ * A later split that brings observations no earlier class has is the next rule
+ * in the list, however much it overlaps. `prev-syl[close:+]` on the disjunction
+ * rung covers twelve observations of which eight belong to the first rule; it
+ * stays, and the shuffled baseline marks it within-noise, which is the right
+ * place for that judgement to be made. Absorbing it would also absorb the
+ * genuine `pre[close:+]` underneath it, since a superset swallows what it
+ * contains. */
+static int restates_an_earlier_rule(
+    const merged_class *entry,
+    const committed_split *split
+) {
+    return observation_set_contains(entry->defining_indices, entry->defining_count,
+                                    split->observation_indices, split->observation_count);
 }
 
 static rg_status sister_index_for(
@@ -343,6 +413,24 @@ static rg_status collect_stress_values(discovery_state *state, const rg_context_
     return rg_env_collect_stress_values(context, record_stress_value_cb, state);
 }
 
+/* Properties of a syllable rather than of its segments, so they are not in the
+ * feature vocabulary and are offered directly -- the same table the pairwise
+ * stage offers, because a stage that cannot name what the other one found
+ * publishes a decision list with a hole in it. A predicate true of every
+ * syllable in a corpus partitions nothing and is dropped by the split gate, so
+ * offering them where they do not apply costs one gate test each. */
+static const rg_feature_constraint syllable_shape_candidates[] = {
+    {"syllable_shape", "open"},
+    {"syllable_shape", "closed"},
+    {"syllable_nucleus", "long"},
+    {"syllable_nucleus", "short"},
+    {"syllable_weight", "heavy"},
+    {"syllable_weight", "light"}
+};
+
+#define RG_SYLLABLE_SHAPE_CANDIDATE_COUNT \
+    (sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]))
+
 /* The candidate lists are fixed once the observed stress values are known,
  * because every multi-lect split is searched against an empty base context. */
 static rg_status build_candidate_lists(discovery_state *state, const rg_feature_vocabulary *vocabulary) {
@@ -351,7 +439,8 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
     size_t long_slots = rg_env_long_range_slot_count;
     size_t long_features = vocabulary->count == 0 ? 1 : vocabulary->count;
     size_t total = immediate_total + slot_count * state->stress_count
-        + state->morph_placement_count + state->morph_index_count;
+        + state->morph_placement_count + state->morph_index_count
+        + rg_env_syllable_slot_count * RG_SYLLABLE_SHAPE_CANDIDATE_COUNT;
     size_t i;
     size_t s;
     size_t n = 0;
@@ -389,6 +478,14 @@ static rg_status build_candidate_lists(discovery_state *state, const rg_feature_
         state->immediate[n].feature = state->morph_indices[i];
         state->immediate[n].value = "+";
         n++;
+    }
+    for (s = 0; s < rg_env_syllable_slot_count; s++) {
+        for (i = 0; i < RG_SYLLABLE_SHAPE_CANDIDATE_COUNT; i++) {
+            state->immediate[n].slot = rg_env_syllable_slots[s];
+            state->immediate[n].feature = syllable_shape_candidates[i].feature;
+            state->immediate[n].value = syllable_shape_candidates[i].value;
+            n++;
+        }
     }
     state->immediate_count = n;
 
@@ -786,6 +883,7 @@ static void merged_classes_free(merged_class *items, size_t count) {
     for (i = 0; i < count; i++) {
         free(items[i].key);
         free(items[i].observation_indices);
+        free(items[i].defining_indices);
         string_array_clear(items[i].lects, items[i].segment_count);
         string_array_clear(items[i].graphemes, items[i].segment_count);
         if (items[i].contexts != 0) {
@@ -922,7 +1020,7 @@ static rg_status merge_committed_splits(
 
         existing = count;
         for (j = 0; j < count; j++) {
-            if (strcmp(merged[j].key, key) == 0) {
+            if (strcmp(merged[j].key, key) == 0 && restates_an_earlier_rule(&merged[j], split)) {
                 existing = j;
                 break;
             }
@@ -1000,6 +1098,17 @@ static rg_status merge_committed_splits(
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
         merged[count].decision_index = split->decision_index;
+        if (split->observation_count > 0) {
+            merged[count].defining_indices =
+                (size_t *)malloc(split->observation_count * sizeof(size_t));
+            if (merged[count].defining_indices == 0) {
+                merged_classes_free(merged, count + 1);
+                return RG_ERR_OOM;
+            }
+            memcpy(merged[count].defining_indices, split->observation_indices,
+                   split->observation_count * sizeof(size_t));
+            merged[count].defining_count = split->observation_count;
+        }
         if (merged_class_add_evidence(&merged[count], split->observation_indices,
                                       split->observation_count) != RG_OK) {
             merged_classes_free(merged, count + 1);

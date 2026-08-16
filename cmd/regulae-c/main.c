@@ -343,6 +343,35 @@ static int command_check(const char *path, const char *format) {
         free(items[i].first_context);
     }
     free(items);
+
+    /* Everything above is about graphemes that will not resolve. This is about
+     * graphemes that resolve perfectly and mean the corpus was assembled from
+     * two sources that disagree about where a segment ends -- which is invisible
+     * to every other check there is, and produces confident, well-supported,
+     * entirely false correspondences. Reported after the refusals because a
+     * corpus that will not load has a more urgent problem. */
+    {
+        rg_corpus *corpus = 0;
+        rg_load_diagnosis diagnosis;
+        if (load_corpus_with_context(ctx, path, format, &corpus, &diagnosis) == RG_OK) {
+            rg_transcription_drift_row *drift = 0;
+            size_t drift_count = 0;
+            if (rg_find_transcription_drift(ctx, rg_corpus_cognate_at(corpus, 0),
+                                            rg_corpus_cognate_count(corpus),
+                                            &drift, &drift_count) == RG_OK) {
+                printf("drift\t%lu\n", (unsigned long)drift_count);
+                for (i = 0; i < drift_count; i++) {
+                    printf("DRIFT\t%s\t%s\t%s\t%s\t%lu/%lu\n",
+                           drift[i].lect, drift[i].other_lect, drift[i].grapheme,
+                           drift[i].written_as,
+                           (unsigned long)drift[i].corroborated,
+                           (unsigned long)drift[i].forms);
+                }
+                rg_transcription_drift_rows_free(drift, drift_count);
+            }
+            rg_corpus_free(corpus);
+        }
+    }
     rg_context_free(ctx);
     return count == 0 ? 0 : 1;
 }

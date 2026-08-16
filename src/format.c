@@ -493,6 +493,22 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_corpus_fit *fit = rg_multi_model_fit(model);
         builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
                         fit->cost_per_segment, (unsigned long)fit->scored_set_count);
+        /* Printed only where it is worth a second look. A mean says nothing
+         * about shape, and 4 is where the corpora in this repository that are
+         * one thing stop and the ones that are two begin. Not a threshold in
+         * the code -- the number is always published in the API -- but a
+         * report that mentioned it every time would train the reader to skip
+         * the line. */
+        if (fit->cost_split_separation > 4.0) {
+            builder_appendf(&builder,
+                            "  the sets fall in two groups, %.0f%% of them in the worse-aligning\n"
+                            "  one, %.1f standard deviations apart. That is a corpus made of two\n"
+                            "  things -- a borrowed layer, a block of bad judgements, two sources,\n"
+                            "  or half a lexicon that underwent a change the other half did not.\n"
+                            "  `outliers --model` lists them worst first; which of those it is,\n"
+                            "  the distributions cannot say.\n",
+                            100.0 * fit->cost_split_fraction, fit->cost_split_separation);
+        }
         if (fit->inferred_nucleus_form_count > 0) {
             builder_appendf(&builder,
                             "syllable nuclei:     %lu of %lu forms had none of their own\n"

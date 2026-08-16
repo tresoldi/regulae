@@ -75,7 +75,7 @@ CAPABILITIES = [
     (
         "tone",
         "supported",
-        "every loader, from Chao superscripts or a `_tone` column",
+        "every loader, from Chao superscripts in the transcription or a tone column",
         "`tests/c/test_pairwise_model.c`, `tests/c/test_merkmal_bridge.c`",
     ),
     (
@@ -107,6 +107,78 @@ CAPABILITIES = [
         "**not ported**",
         "n/a",
         "never ported",
+    ),
+    (
+        "opaque conditioning (the daughter lost the trigger)",
+        "supported",
+        "every loader",
+        "`testdata/soundlaws/graded_9_lost_trigger.tsv`, `opaque_umlaut.tsv`",
+    ),
+    (
+        "chain shifts kept apart from mergers",
+        "supported",
+        "every loader",
+        "`testdata/soundlaws/great_vowel_shift.tsv`",
+    ),
+    (
+        "compensatory lengthening",
+        "supported",
+        "every loader",
+        "`testdata/soundlaws/compensatory_lengthening.tsv`",
+    ),
+    (
+        "a verdict on whether two lects are related at all",
+        "supported",
+        "`permutation_count`, or `--permutations`",
+        "`testdata/restraint/chance.tsv`",
+    ),
+    (
+        "restraint on a change with no environment",
+        "supported",
+        "every loader",
+        "`testdata/restraint/diffusion.tsv`, `stratum.tsv`, `soundlaws/final_devoicing.tsv`",
+    ),
+    (
+        "ranking cognate sets worst-first, for triage",
+        "supported",
+        "every loader",
+        "`testdata/diagnostics/contaminated.tsv`, `partial.tsv`",
+    ),
+    (
+        "disjunctive trigger sets (RUKI's shape)",
+        "supported, as a decision list",
+        "every loader",
+        "`testdata/soundlaws/graded_7_disjunction.tsv`: one rule per trigger, all with one outcome",
+    ),
+    (
+        "syllable shape and weight",
+        "supported",
+        "every loader",
+        "`testdata/soundlaws/graded_8_weight.tsv`: `prev-syl[syllable_weight:heavy]`, Sievers' shape in one rule",
+    ),
+    (
+        "several environments for one correspondence",
+        "supported",
+        "every loader",
+        "`tests/c/test_sound_laws.c`: rows merge on their observations, not on the tuple",
+    ),
+    (
+        "partial cognacy, per morpheme",
+        "**not expressible**",
+        "n/a",
+        "`testdata/diagnostics/partial.tsv`: visible in the ranking, not usable in training",
+    ),
+    (
+        "transcription drift between sources",
+        "reported, not refused",
+        "`regulae check`, or `rg_find_transcription_drift`",
+        "`testdata/diagnostics/drift.tsv`: 5 of 5 found, and no corpus in this repository reports a false one",
+    ),
+    (
+        "telling borrowing from inheritance",
+        "**out of scope**",
+        "n/a",
+        "`testdata/restraint/contact.tsv`: the correspondences are real either way; the ranking shows the split",
     ),
 ]
 

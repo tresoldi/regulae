@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""Generates the restraint fixtures under testdata/restraint/.
+
+Every other fixture in this repository asks whether regulae can find something.
+These ask whether it can decline to. A tool a linguist leans on has to be wrong
+in the safe direction: a missed correspondence costs an afternoon, an invented
+one costs a paper, and the second failure is the one that does not announce
+itself. Spurious conditioning reads exactly like discovery.
+
+Five shapes, and none of them contains a conditioned sound law:
+
+    chance      -- two lects with no historical connection at all
+    contact     -- two unrelated lects, half of one borrowed from the other
+    diffusion   -- a real change spread over the lexicon at random
+    stratum     -- two correspondence sets in one pair, as borrowing leaves them
+    sparse_*    -- one real conditioned change, at five corpus sizes
+
+Three of them have a right answer of "no conditioned rule". `contact` has a
+right answer regulae cannot give -- the correspondences are real and their
+origin is not in the data -- and is here so that what it does give is on
+record. The ladder's right answer changes with the rung, which is the point:
+it measures how much data the search needs before it can see a change, and
+whether it stays quiet below that or starts guessing.
+
+The forms are nonsense words drawn from one inventory, for the same reason the
+graded ladder's are. Real lexical material brings correlations with it, and a
+fixture about restraint cannot afford them: if the changed words happened to
+share anything, a predicate that found it would be right about this corpus and
+the fixture would be measuring the wrong thing.
+
+Randomness is a 32-bit LCG written out here rather than `random`, so the
+fixtures are a function of this file and nothing else.
+
+Usage: scripts/restraint.py     # rewrites testdata/restraint/*.tsv
+"""
+
+import itertools
+import pathlib
+
+OUT = pathlib.Path("testdata/restraint")
+
+ONSETS = ["p", "t", "k", "m", "n", "l", "s", "w"]
+VOWELS = ["a", "e", "i", "o", "u"]
+CODAS = ["", "n", "s", "l", "k"]
+
+
+class Lcg:
+    """Numerical Recipes' LCG. Small, exactly specified, and reproducible
+    without depending on a language's random module staying put."""
+
+    def __init__(self, seed):
+        self.state = seed & 0xFFFFFFFF
+
+    def next(self):
+        self.state = (1664525 * self.state + 1013904223) & 0xFFFFFFFF
+        # High bits only. The low bits of an LCG cycle with a tiny period, and
+        # `state % 8` on this one is close to a counter -- which put the same
+        # onset opposite the same onset in 43 of the 80 unrelated pairs the
+        # first time this file generated `chance`, a correspondence built by
+        # the generator and not by the languages.
+        return self.state >> 16
+
+    def pick(self, items):
+        return items[self.next() % len(items)]
+
+    def shuffled(self, items):
+        out = list(items)
+        for i in range(len(out) - 1, 0, -1):
+            j = self.next() % (i + 1)
+            out[i], out[j] = out[j], out[i]
+        return out
+
+
+def skew_of(frames, marks, slots):
+    """Worst relative imbalance of any environment value, over `slots` -- each
+    a function pulling one environment out of a frame."""
+    tally = {}
+    for frame, mark in zip(frames, marks):
+        for index, slot in enumerate(slots):
+            cell = tally.setdefault((index, slot(frame)), [0, 0])
+            cell[0 if mark else 1] += 1
+    return max(abs(a - b) / (a + b) for a, b in tally.values())
+
+
+def balanced_marks(frames, slots, seeds=4000):
+    """Half the frames marked, chosen so that no environment the search can
+    name is much fuller of marked frames than of unmarked ones.
+
+    A shuffle alone does not give this. Drawn at random over groups of two
+    dozen, the worst group in a corpus this size lands a third of the way to
+    one side often enough to matter, and a third is a slope a greedy search
+    will happily walk up. So the draws are searched and the flattest kept: the
+    assignment stays arbitrary -- which is the property the fixture needs --
+    without being arbitrary in a direction.
+    """
+    half = len(frames) // 2
+    pool = [True] * half + [False] * (len(frames) - half)
+    best = None
+    for seed in range(seeds):
+        marks = Lcg(seed).shuffled(pool)
+        skew = skew_of(frames, marks, slots)
+        if best is None or skew < best[0]:
+            best = (skew, marks)
+    return best[1], best[0]
+
+
+def write(name, rows, note):
+    out = ["cognate_id\tlect_id\tsegments"]
+    for cid, lect, form in rows:
+        out.append(f"{cid}\t{lect}\t{form}")
+    path = OUT / f"{name}.tsv"
+    path.write_text("\n".join(out) + "\n")
+    sets = len({cid for cid, _, _ in rows})
+    print(f"{name:<16} {sets:>4} sets   {note}")
+
+
+# ---------------------------------------------------------------- chance
+
+def chance():
+    """Two lects with no historical connection.
+
+    Both wordlists are drawn from the same inventory and the same shapes, which
+    is the hard version of the test rather than the easy one: languages of a
+    region share phonotactics whether or not they share an ancestor, and a
+    method that only rejects unrelatedness when the inventories differ has not
+    rejected unrelatedness. Accidental segment matches are frequent here by
+    construction, and a few concepts will look like evidence.
+
+    The right answer is that nothing stands above the corpus's own shuffled
+    baseline -- because shuffling this corpus does not remove anything.
+    """
+    rng = Lcg(20260816)
+    rows = []
+    for i in range(80):
+        cid = f"c{i:03d}"
+        for lect in ("alpha", "omega"):
+            form = [rng.pick(ONSETS), rng.pick(VOWELS), rng.pick(ONSETS), rng.pick(VOWELS)]
+            coda = rng.pick(CODAS)
+            if coda:
+                form.append(coda)
+            rows.append((cid, lect, " ".join(form)))
+    write("chance", rows, "unrelated lects, one inventory")
+
+
+# ------------------------------------------------------------- diffusion
+
+def diffusion():
+    """One change, spread over the lexicon rather than over an environment.
+
+    Proto /p/ answers daughter /f/ in half the words and stays /p/ in the other
+    half, and which half a word falls in is not a phonological fact about it.
+    The two groups are balanced across every environment the search can name:
+    each onset, each preceding vowel and each following vowel occurs about
+    equally often on both sides, so no predicate separates them better than a
+    coin does.
+
+    This is what lexical diffusion looks like from the outside, and it is also
+    what an incomplete change, a dialect mixture and a half-finished analogy
+    look like. The right answer is two unconditioned correspondences for one
+    proto segment -- p ~ p and p ~ f -- and no environment at all. Reporting an
+    environment here would be reporting the accident that half of something has
+    to fall somewhere.
+    """
+    rows = []
+    # No /p/ or /f/ among the onsets. With one there, every medial /p/ has a
+    # vowel before it and every initial one does not, so `pre[vowel:+]` splits
+    # the corpus perfectly and truthfully -- and the fixture then reports a
+    # conditioned rule for a reason that has nothing to do with diffusion.
+    onsets = [o for o in ONSETS if o not in ("p", "f")]
+    frames = [(o, v1, v2) for o in onsets for v1 in VOWELS for v2 in VOWELS]
+    slots = (lambda f: f[0], lambda f: f[1], lambda f: f[2])
+    marks, skew = balanced_marks(frames, slots)
+    for i, ((o, v1, v2), changes) in enumerate(zip(frames, marks)):
+        cid = f"d{i:03d}"
+        rows.append((cid, "proto", f"{o} {v1} p {v2}"))
+        rows.append((cid, "daughter", f"{o} {v1} {'f' if changes else 'p'} {v2}"))
+    write("diffusion", rows, f"half changed, worst environment skew {skew:.0%}")
+
+
+# --------------------------------------------------------------- stratum
+
+def stratum():
+    """Two correspondence sets in one lect pair, as borrowing leaves them.
+
+    The inherited layer runs the whole voiceless series through a spirantising
+    shift -- p~f, t~s, k~x -- and the borrowed layer leaves all three alone.
+    Which layer a word belongs to is a fact about its history and not about its
+    shape, so the two layers occupy the same environments.
+
+    Splitting a *set* of correspondences at once is what makes a stratum
+    visible to a comparativist, and it is the reason this fixture is not just
+    `diffusion` with more segments. English has *father* beside *paternal* and
+    *three* beside *triple*, and the second member of each pair is not an
+    exception to Grimm's Law but a word that was not in the language when
+    Grimm's Law ran.
+
+    The right answer is six unconditioned correspondences and no environment.
+    Neither layer is an error; a report that named an environment for either
+    would be.
+    """
+    rows = []
+    shift = {"p": "f", "t": "s", "k": "x"}
+    frames = [(c, o, v1, v2) for c in ("p", "t", "k") for o in ("m", "l")
+              for v1 in VOWELS for v2 in VOWELS]
+    # The stop itself is a slot too: a layer that took two thirds of the /k/
+    # words would be a stratum with a phonological shape, which is not what a
+    # borrowed layer is.
+    slots = (lambda f: f[0], lambda f: f[1], lambda f: f[2], lambda f: f[3])
+    marks, skew = balanced_marks(frames, slots)
+    for i, ((c, o, v1, v2), inherited) in enumerate(zip(frames, marks)):
+        cid = f"s{i:03d}"
+        rows.append((cid, "proto", f"{o} {v1} {c} {v2}"))
+        rows.append((cid, "daughter", f"{o} {v1} {shift[c] if inherited else c} {v2}"))
+    write("stratum", rows, f"two layers, worst environment skew {skew:.0%}")
+
+
+# ------------------------------------------------------------ sparse_NNN
+
+def sparse():
+    """One real conditioned change, at five corpus sizes.
+
+    Proto /p/ answers daughter /f/ before a front vowel and stays /p/ before a
+    back one: the same change as rung 1 of the graded ladder, which regulae
+    finds comfortably on 40 sets. The question here is not whether the change
+    is findable but how much of it has to be present before it is, and what the
+    search does with the material below that line.
+
+    Both readings matter to somebody with a real wordlist. A field linguist
+    with thirty cognates wants to know whether a rule the tool reports is worth
+    writing down, and a reviewer wants to know whether its silence on a small
+    corpus is evidence of absence. Neither is answerable from a single
+    fixture: a rung that finds nothing tells you the corpus was too small, and
+    a rung that finds something tells you it was not, and only the ladder tells
+    you where the line is.
+
+    Every rung is a prefix of the same word list, so a rung differs from the
+    one below it in size and in nothing else.
+    """
+    rng = Lcg(511)
+    front = {"e", "i"}
+    back = [v for v in VOWELS if v not in front]
+    frames = []
+    # The following vowel alternates front and back rather than being drawn,
+    # so exactly half of every rung shows the change. Drawn, the rungs differed
+    # in how much evidence they carried as well as in how many sets -- the
+    # 8-set rung came out with one changed word in it -- and a ladder whose
+    # rungs differ in two things at once measures neither.
+    for i in range(128):
+        onset = rng.pick(["k", "t", "m", "n", "l", "s"])
+        v1 = rng.pick(VOWELS)
+        v2 = rng.pick(sorted(front)) if i % 2 == 0 else rng.pick(back)
+        frames.append((onset, v1, v2))
+    for size in (8, 16, 32, 64, 128):
+        rows = []
+        changed = 0
+        for i, (onset, v1, v2) in enumerate(frames[:size]):
+            cid = f"n{i:03d}"
+            applies = v2 in front
+            changed += applies
+            rows.append((cid, "proto", f"{onset} {v1} p {v2}"))
+            rows.append((cid, "daughter", f"{onset} {v1} {'f' if applies else 'p'} {v2}"))
+        write(f"sparse_{size:03d}", rows, f"{changed} showing the change")
+
+
+# --------------------------------------------------------------- contact
+
+def contact():
+    """Two unrelated lects, half of one's vocabulary borrowed from the other.
+
+    Thirty of the sixty concepts are loans, adapted through a regular
+    substitution -- the donor's f, θ, x and z have no place in the borrower's
+    inventory and come out as p, t, k and s. The other thirty are native on
+    both sides and share nothing.
+
+    This is the shape of an areal relationship, and it is the commonest way a
+    long-range comparison goes wrong. The Balkans, mainland Southeast Asia,
+    South Asia, the Pacific Northwest and Australia all contain pairs like
+    this, and Japanese and Chinese are the textbook example: half the lexicon
+    in systematic correspondence, and no common ancestor.
+
+    There is no restraint available here, and that is the point. The
+    correspondences are real, they are regular, and regulae reports them --
+    correctly. What it cannot do is say where they came from, because nothing
+    in the distribution of segments does: telling inheritance from borrowing
+    needs the semantic fields involved, the direction of cultural flow and the
+    dates, and it is the linguist's judgement.
+
+    What the corpus does leave is a signature, and it is worth knowing how to
+    read. The outlier ranking comes out bimodal -- the loans align well and the
+    native vocabulary does not -- where an inherited relationship of the same
+    strength is unimodal. A wordlist that splits in half like that is a
+    wordlist to ask a different question about.
+    """
+    rng = Lcg(65029)
+    adapt = {"f": "p", "\u03b8": "t", "x": "k", "z": "s"}
+    donor_only = list(adapt)
+    shared = ["m", "n", "l", "t", "k", "s"]
+    rows = []
+    for i in range(60):
+        cid = f"x{i:03d}"
+        borrowed = i % 2 == 0
+        c1 = rng.pick(donor_only if borrowed else shared)
+        c2 = rng.pick(donor_only + shared)
+        v1, v2 = rng.pick(VOWELS), rng.pick(VOWELS)
+        donor = f"{c1} {v1} {c2} {v2}"
+        rows.append((cid, "donor", donor))
+        if borrowed:
+            rows.append((cid, "borrower",
+                         f"{adapt.get(c1, c1)} {v1} {adapt.get(c2, c2)} {v2}"))
+        else:
+            n1, n2 = rng.pick(shared), rng.pick(shared)
+            w1, w2 = rng.pick(VOWELS), rng.pick(VOWELS)
+            rows.append((cid, "borrower", f"{n1} {w1} {n2} {w2}"))
+    write("contact", rows, "half the wordlist borrowed, half unrelated")
+
+
+def main():
+    OUT.mkdir(parents=True, exist_ok=True)
+    chance()
+    contact()
+    diffusion()
+    stratum()
+    sparse()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

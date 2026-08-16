@@ -627,7 +627,12 @@ static void test_conditioning_ladder(rg_context *ctx) {
         {"graded_3_stress", "stress", 1},
         {"graded_4_conjunction", "front", 1},
         {"graded_5_distance_two", "nasal", 1},
-        {"graded_6_existential", "nasal", 1}
+        {"graded_6_existential", "nasal", 1},
+        /* The last three each have a test of their own below. The rung entry
+         * only records that something is found and what it is named. */
+        {"graded_7_disjunction", "close", 1},
+        {"graded_8_weight", "syllable_weight", 1},
+        {"graded_9_lost_trigger", "front", 1}
     };
     size_t i;
     for (i = 0; i < sizeof(rungs) / sizeof(rungs[0]); i++) {
@@ -676,6 +681,400 @@ static void test_conditioning_ladder(rg_context *ctx) {
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
+}
+
+/* The count of the same segment tuple where the class's environment does not
+ * hold: what a report prints as `elsewhere`. Zero means the environment covers
+ * every instance of the change, which is what a sound law claims. */
+static double contrast_of(const rg_multi_model *model, const char *a, const char *b) {
+    size_t i;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_a = 0;
+        int seen_b = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], a) == 0) {
+                seen_a = 1;
+            }
+            if (strcmp(row->graphemes[j], b) == 0) {
+                seen_b = 1;
+            }
+        }
+        if (seen_a && seen_b) {
+            return row->contrast_count;
+        }
+    }
+    return -1.0;
+}
+
+/* A trigger set that is not a natural class, which is the RUKI law's shape:
+ * PIE *s retracts after *r, *u, *k and *i in Indo-Iranian, Balto-Slavic,
+ * Armenian and Albanian, and after nothing else. Two of the four are high
+ * vowels, one is a dorsal stop and one is a coronal liquid; every feature true
+ * of all four is true of something in the contrast set as well.
+ *
+ * A context is a conjunction of feature constraints and a conjunction narrows,
+ * so a disjunction cannot be written as one environment. What a comparativist
+ * writes on the board instead is a decision list -- one rule per trigger, all
+ * with the same outcome -- and that is what the search produces, because
+ * discovery is greedy and each rule is committed against what the earlier ones
+ * left unexplained.
+ *
+ * The multi-lect table could not show it until 2026-08-17. Rows were merged on
+ * the correspondence tuple alone, so three of the four rules were discarded
+ * before publication and the survivor was whichever environment carried the
+ * most constraints. The rules were in the pairwise tables the whole time,
+ * which is how the collapse stayed invisible.
+ *
+ * Each of the three predicates is asserted by name. `close` is {i, u}, `trill`
+ * is {r} and `stop` is {k}: the four triggers, in three rules, because two of
+ * them do share a feature and the search is right to use it. */
+static void test_a_disjunctive_trigger_comes_out_as_a_decision_list(rg_context *ctx) {
+    rg_corpus *corpus = load("graded_7_disjunction");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    double covered = 0.0;
+
+    assert(has_conditioned(model, "p", "f", "close"));
+    assert(has_conditioned(model, "p", "f", "trill"));
+    assert(has_conditioned(model, "p", "f", "stop"));
+
+    /* And between them they account for every instance of the change. The
+     * corpus has sixteen, four after each trigger; the three rules cover
+     * 8 + 4 + 4. A fourth rule is committed on a broader correlate that
+     * overlaps them, so the sum over rows is not the way to count -- what the
+     * assertion checks is that the three real ones are each there and each
+     * carries its own evidence. */
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_p = 0;
+        int seen_f = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], "p") == 0) {
+                seen_p = 1;
+            }
+            if (strcmp(row->graphemes[j], "f") == 0) {
+                seen_f = 1;
+            }
+        }
+        if (!seen_p || !seen_f) {
+            continue;
+        }
+        assert(row->evidence.delta_bic < 0.0);
+        for (j = 0; j < row->segment_count; j++) {
+            if (context_names(&row->contexts[j], "trill") ||
+                context_names(&row->contexts[j], "stop") ||
+                context_names(&row->contexts[j], "close")) {
+                covered += row->count;
+                break;
+            }
+        }
+    }
+    assert(covered >= 16.0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The same table, from the other direction: a decision list is only readable
+ * if the rows that make it up stay apart, and a second *description* of one
+ * rule is not a second rule.
+ *
+ * Latin rhotacism commits four splits for `latin:r ~ old_latin:s`. Three carry
+ * the same fourteen intervocalic /s/ -- two pivots and a narrowing, which is
+ * the cross-pivot join that puts an environment in both lects' slots -- and
+ * the fourth carries ten of those same fourteen under `fol@2[fricative:+]`, a
+ * correlate of the environment rather than a rule beside it. One row, with the
+ * complement empty, is the right answer, and the merge has to reach it without
+ * also collapsing the disjunction above. */
+static void test_a_second_description_of_one_rule_is_not_a_second_rule(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int rows = 0;
+    int two_sided = 0;
+
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_r = 0;
+        int seen_s = 0;
+        int slots = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], "r") == 0) {
+                seen_r = 1;
+            }
+            if (strcmp(row->graphemes[j], "s") == 0) {
+                seen_s = 1;
+            }
+        }
+        if (!seen_r || !seen_s) {
+            continue;
+        }
+        rows++;
+        for (j = 0; j < row->segment_count; j++) {
+            if (rg_context_spec_constraint_count(&row->contexts[j]) > 0) {
+                slots++;
+            }
+        }
+        if (slots > 1) {
+            two_sided = 1;
+        }
+    }
+    assert(rows == 1);
+    assert(two_sided);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* Conditioning by syllable weight, which is Sievers' Law's shape and the shape
+ * of every rule stated over moras rather than segments -- Latin's penultimate
+ * accent, Germanic high-vowel deletion, the metrical half of Verner's
+ * environment, and most of what a metrist means by a rule.
+ *
+ * A syllable is heavy because its nucleus is long **or** because it has a
+ * coda, and the fixture carries both kinds in equal number. That disjunction
+ * is what makes the rung hard: a context is a conjunction of feature
+ * constraints, so without a term for the syllable itself the search has to say
+ * the same environment twice, once per exponent.
+ *
+ * It did, until 2026-08-17, and correctly: `pre[long:+]` for the long nuclei
+ * and an equivalent of "there is a coda" for the rest, together covering all
+ * twenty-eight. Correct and not what anybody wants to read. `syllable_weight`
+ * is a verdict rather than a fact, and it is worth its place because the
+ * verdict is the thing the field states these rules in.
+ *
+ * One rule now, with nothing in the elsewhere bucket. The two facts it is
+ * computed from -- `syllable_shape` and `syllable_nucleus` -- are offered
+ * beside it, so a language whose tradition draws the weight line somewhere
+ * else can still be described. */
+static void test_syllable_weight_is_stated_in_one_rule(rg_context *ctx) {
+    rg_corpus *corpus = load("graded_8_weight");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_conditioned(model, "p", "f", "syllable_weight"));
+    /* Every instance of the change, so no reader is left to take the closed
+     * syllables for exceptions. */
+    assert(contrast_of(model, "p", "f") == 0.0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* An environment that the daughter no longer has.
+ *
+ * Rung 9 is rung 1 with the conditioning vowel deleted in the daughter, so
+ * that within the daughter nothing distinguishes the words that changed from
+ * the words that did not. This is opacity, and it is the ordinary case rather
+ * than an exotic one: Germanic i-umlaut fronted a vowel and then the *i* that
+ * fronted it fell, which is why English has *foot/feet* with no /i/ in sight,
+ * and the same sequence gave French its nasal vowels and Mandarin its tones.
+ *
+ * The environment survives on the proto's side of the pair and on no other, so
+ * finding it at all depends on the search looking at both sides of a
+ * correspondence rather than only at the segment being explained. It does --
+ * `context_is_target` is what that is for -- and the change comes out fully
+ * covered, with nothing in the elsewhere bucket. */
+static void test_an_environment_the_daughter_lost_is_found_on_the_proto_side(rg_context *ctx) {
+    rg_corpus *corpus = load("graded_9_lost_trigger");
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_conditioned(model, "p", "f", "front"));
+    assert(contrast_of(model, "p", "f") == 0.0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The same thing on curated material, three lects, and the argument for
+ * comparing more than two at a time.
+ *
+ * Germanic i-umlaut across a Gothic-shaped lect that kept the final vowel and
+ * never fronted, an Old-High-German-shaped one that fronted and kept it, and
+ * an Old-English-shaped one that fronted and lost it. In the third lect alone
+ * *gest* and *gast* are a minimal pair with nothing to separate them; the
+ * trigger is in the other two. This is the standard classroom argument for why
+ * Gothic matters to the history of English, and it is a testable claim about a
+ * method rather than only a story.
+ *
+ * The environment comes out as `next-syl[close:+]` -- the *i* in the following
+ * syllable -- read off the lects that kept it, for the lect that did not.
+ *
+ * The fixture also records a limit, and it is the more useful half. Umlaut is
+ * one change, and it surfaces here as four correspondences, one per vowel
+ * quality: a~e with fifteen examples, and uː~yː, u~y, oː~øː with two to four
+ * each. Only the first crosses the evidence floor that
+ * testdata/restraint/sparse_* measures, so only the first gets its
+ * environment; the others are published as unconditioned splits. A change that
+ * applies to a whole natural class is divided by the number of segments in
+ * that class before the search ever sees it, and each fragment has to stand on
+ * its own. Palatalisation, lenition and nasalisation all have this shape. */
+static void test_umlaut_is_recovered_from_the_lects_that_kept_the_trigger(rg_context *ctx) {
+    rg_corpus *corpus = load("opaque_umlaut");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int found = 0;
+    int thin_class_conditioned = 0;
+
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_a = 0;
+        int seen_e = 0;
+        int seen_back = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], "a") == 0) {
+                seen_a = 1;
+            }
+            if (strcmp(row->graphemes[j], "e") == 0) {
+                seen_e = 1;
+            }
+            /* The thin classes: the long back vowels and short /u/. */
+            if (strcmp(row->graphemes[j], "\xc3\xb8\xcb\x90") == 0 ||
+                strcmp(row->graphemes[j], "y\xcb\x90") == 0 ||
+                strcmp(row->graphemes[j], "y") == 0) {
+                seen_back = 1;
+            }
+        }
+        if (seen_a && seen_e) {
+            size_t k;
+            for (k = 0; k < row->segment_count; k++) {
+                if (context_names(&row->contexts[k], "close")) {
+                    found = 1;
+                }
+            }
+        }
+        if (seen_back) {
+            thin_class_conditioned = 1;
+        }
+    }
+    /* The fifteen-example class gets the trigger. */
+    assert(found);
+    /* The two-to-four-example ones get nothing, though it is the same change
+     * and the same trigger stands next to it in the same words. */
+    assert(!thin_class_conditioned);
+    /* They are still published, as unconditioned splits. */
+    assert(has_correspondence(model, "u\xcb\x90", "y\xcb\x90"));
+    assert(has_correspondence(model, "o\xcb\x90", "\xc3\xb8\xcb\x90"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A chain shift, and the merger it must not be reported as.
+ *
+ * In the Great Vowel Shift Middle English /eː/ raised to /iː/ while /iː/ was
+ * diphthongising out of the way, and /oː/ raised to /uː/ while /uː/ did the
+ * same. Every step lands where the next one just left, so a method that keeps
+ * no separate account of the two sources reports a merger: ME /eː/ and /iː/
+ * both answering Modern English /iː/, which is false about both and would say
+ * that *feet* and *five* had the same vowel in 1400.
+ *
+ * They did not merge, and nothing in the corpus says they did except the
+ * surface arithmetic. The assertion is that the two chains stay apart. */
+static void test_a_chain_shift_is_not_reported_as_a_merger(rg_context *ctx) {
+    rg_corpus *corpus = load("great_vowel_shift");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+
+    /* Each link of the front chain, and of the back one. The diphthongs are
+     * written as two segments, so the raised /iː/ answers the nucleus of
+     * /aɪ/ -- a correspondence is stated at the granularity the transcription
+     * was written at, which is a decision the corpus makes and not the tool. */
+    assert(has_correspondence(model, "e\xcb\x90", "i\xcb\x90"));   /* eː > iː */
+    assert(has_correspondence(model, "i\xcb\x90", "\xc9\xaa"));    /* iː > aɪ */
+    assert(has_correspondence(model, "o\xcb\x90", "u\xcb\x90"));   /* oː > uː */
+    assert(has_correspondence(model, "u\xcb\x90", "\xca\x8a"));    /* uː > aʊ */
+
+    /* And no class puts the two Middle English sources together. */
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        size_t j;
+        int seen_mid = 0;
+        int seen_high = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->lect_ids[j], "middle_english") != 0) {
+                continue;
+            }
+            if (strcmp(row->graphemes[j], "e\xcb\x90") == 0 ||
+                strcmp(row->graphemes[j], "o\xcb\x90") == 0) {
+                seen_mid = 1;
+            }
+            if (strcmp(row->graphemes[j], "i\xcb\x90") == 0 ||
+                strcmp(row->graphemes[j], "u\xcb\x90") == 0) {
+                seen_high = 1;
+            }
+        }
+        assert(!(seen_mid && seen_high));
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A change to one segment caused by the loss of another.
+ *
+ * The Ingvaeonic nasal spirant law: Proto-Germanic lost a nasal before a
+ * fricative and lengthened the vowel in front of it, so *gans* answers Old
+ * English *gōs* and *tanþ* answers *tōþ*, while the same nasal before a stop
+ * is untouched -- *hand* stays *hand*. Two events with one cause, and the
+ * segment that explains the vowel is the one that is no longer there.
+ *
+ * The environment has to reach *past* the segment that went, and that is what
+ * the distance slots are for: `fol@2[fricative:+]` says "the second thing
+ * after this vowel is a fricative", which is true exactly where a nasal stood
+ * between them and false where the nasal is followed by a stop. Counting past
+ * the deleted segment is how a rule of this shape is stated, and the shape is
+ * common -- Greek, Latin, Old Irish, Hindi and Middle Korean all have a
+ * version, and it is behind a large share of the world's long vowels, nasal
+ * vowels and tone systems.
+ *
+ * The assertion is on the distance slot rather than on a particular predicate:
+ * which feature of the fricative the search names is a tie-break among
+ * predicates that partition this corpus identically, and asserting one of them
+ * would be asserting the tie. */
+static void test_compensatory_lengthening_reaches_past_the_segment_that_was_lost(rg_context *ctx) {
+    rg_corpus *corpus = load("compensatory_lengthening");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int found = 0;
+
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_a = 0;
+        int seen_long = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], "a") == 0) {
+                seen_a = 1;
+            }
+            if (strcmp(row->graphemes[j], "o\xcb\x90") == 0) {
+                seen_long = 1;
+            }
+        }
+        if (!seen_a || !seen_long) {
+            continue;
+        }
+        for (j = 0; j < row->segment_count; j++) {
+            size_t k;
+            for (k = 0; k < row->contexts[j].following_at_distance_count; k++) {
+                if (row->contexts[j].following_at_distance[k].offset >= 2) {
+                    found = 1;
+                }
+            }
+        }
+        /* And it accounts for every vowel that lengthened. */
+        assert(row->contrast_count == 0.0);
+    }
+    assert(found);
+    /* The nasal before a stop is the contrast, and it does not lengthen. */
+    assert(has_correspondence(model, "a", "a"));
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
 }
 
 /* regulae states an environment in whatever vocabulary the feature system in
@@ -1256,6 +1655,13 @@ int main(void) {
     test_chunk_transparency_filters_the_least_readable_chunks(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
+    test_a_disjunctive_trigger_comes_out_as_a_decision_list(ctx);
+    test_a_second_description_of_one_rule_is_not_a_second_rule(ctx);
+    test_syllable_weight_is_stated_in_one_rule(ctx);
+    test_an_environment_the_daughter_lost_is_found_on_the_proto_side(ctx);
+    test_umlaut_is_recovered_from_the_lects_that_kept_the_trigger(ctx);
+    test_a_chain_shift_is_not_reported_as_a_merger(ctx);
+    test_compensatory_lengthening_reaches_past_the_segment_that_was_lost(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);

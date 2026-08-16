@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 24
+#define RG_ABI_VERSION 25
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -477,6 +477,26 @@ typedef struct rg_multi_pair_model_row {
     const rg_pairwise_model *model;
 } rg_multi_pair_model_row;
 
+/* One correspondence under one environment.
+ *
+ * A segment tuple may appear in **several** conditioned rows, and a consumer
+ * that indexes this table by tuple has to expect that. Discovery is greedy and
+ * each rule is committed against what the earlier ones left, so a change
+ * conditioned by something that is not a natural class comes out as a decision
+ * list: RUKI's *s retracts after r, u, k and i, which is four rules with one
+ * outcome, and no single feature covers the four.
+ *
+ * It did not until 2026-08-17. Rows were merged on the tuple alone, so the
+ * whole list collapsed into one and the survivor's environment was whichever
+ * had the most constraints -- on the four-lect Romance corpus that discarded
+ * 32 of the 58 splits the search had committed, and on Latin/Spanish it is the
+ * difference between 20 conditioned classes and 25. Rows are merged now when a
+ * later split's observations are a subset of an earlier row's, which is what a
+ * second *description* of a rule looks like, and kept apart when it brings
+ * observations no earlier row has, which is what the next rule in the list
+ * looks like.
+ *
+ * `evidence.decision_index` is the order to read them in. */
 typedef struct rg_multi_class_row {
     int class_id;
     const char *const *lect_ids;
@@ -507,6 +527,39 @@ typedef struct rg_multi_cross_dimensional_row {
     const char *target_lect;
     rg_cross_dimensional_row rule;
 } rg_multi_cross_dimensional_row;
+
+/* How one lect writes a sound that another lect in the same corpus writes as a
+ * sequence -- see rg_find_transcription_drift. */
+typedef enum rg_drift_kind {
+    /* A grapheme merkmal itself splits: `tʃ` against `t ʃ`. */
+    RG_DRIFT_SEGMENTATION = 0,
+    /* A modifier letter the other source spells with an ordinary one: `tʰ`
+     * against `t h`, `kʷ` against `k w`. */
+    RG_DRIFT_MODIFIER = 1,
+    /* Length written by doubling: `aː` against `a a`. */
+    RG_DRIFT_LENGTH = 2
+} rg_drift_kind;
+
+typedef struct rg_transcription_drift_row {
+    /* The lect that writes the sound whole, and the one that writes it apart. */
+    const char *lect;
+    const char *other_lect;
+    const char *grapheme;
+    /* What the other lect writes instead, space-separated. */
+    const char *written_as;
+    rg_drift_kind kind;
+    /* Cognate sets where `lect` uses the grapheme and `other_lect` is present,
+     * and how many of those have `other_lect` writing `written_as` as adjacent
+     * segments.
+     *
+     * The second number is the evidence. An inventory asymmetry on its own is
+     * what two different languages look like -- one of them lost its
+     * affricates -- and what it is not is the same cognate sets showing the
+     * pieces in the same order. A ratio near 1 is a transcription difference;
+     * a low one is a sound change. */
+    size_t forms;
+    size_t corroborated;
+} rg_transcription_drift_row;
 
 typedef struct rg_cognate_outlier_row {
     const char *cognate_id;
@@ -581,6 +634,46 @@ typedef struct rg_corpus_fit {
      * that had found nothing. */
     size_t pairwise_rules_above_noise;
     size_t pairwise_rules_measured;
+    /* Whether the cognate sets align in one group or two.
+     *
+     * `cost_per_segment` above is a mean, and a mean says nothing about shape.
+     * Two wordlists half of one of which was borrowed from the other produce a
+     * perfectly good mean and a corpus that is not one thing: the loans align
+     * beautifully and the native vocabulary does not, with no overlap between
+     * them. Japanese and Chinese are the textbook case, and the Balkans,
+     * mainland Southeast Asia, South Asia and much of Australia have pairs
+     * like it.
+     *
+     * `cost_split_separation` is how far apart the two groups are, in pooled
+     * standard deviations, at the best two-way split of the per-set costs.
+     * `cost_split_fraction` is the share of sets on the worse-aligning side of
+     * that split. Both are zero on a corpus with fewer than four scored sets.
+     *
+     * A unimodal sample still has a best split, so the number is never zero and
+     * has to be read against something, and it has to be read *with* the
+     * fraction. Measured on this repository's fixtures:
+     *
+     *     real pair corpora        2.7 - 3.0   fraction 39-65%
+     *     chance (unrelated)       2.4         fraction 52%
+     *     contaminated             7.2         fraction 11%
+     *     contact (half borrowed)  6.3         fraction 50%
+     *     stratum, diffusion      23.0, 31.5   fraction 50%
+     *
+     * Read together: a high separation with a *small* fraction is a tail of
+     * sets that do not belong -- five bad judgements in forty-five. A high
+     * separation at about half is a corpus that is two populations.
+     *
+     * **This is not a borrowing test and must not be quoted as one.** The two
+     * highest numbers in that table are `stratum` and `diffusion`, where every
+     * set is cognate and nothing was borrowed at all: half the words underwent
+     * a change and half did not, so half align one way and half the other.
+     * Nothing in the distribution of segments separates a loan stratum from an
+     * inherited one -- that judgement needs the semantic fields, the direction
+     * of cultural flow and the dates. What a high separation says is that the
+     * corpus is not one thing, which is a reason to ask a different question
+     * and not an answer to this one. */
+    double cost_split_separation;
+    double cost_split_fraction;
 } rg_corpus_fit;
 
 RG_API const char *rg_version_string(void);
@@ -1102,6 +1195,36 @@ RG_API rg_status rg_find_cognate_outliers(
     size_t *out_count
 );
 RG_API void rg_cognate_outlier_rows_free(rg_cognate_outlier_row *rows, size_t count);
+
+/* Whether two lects in this corpus are transcribed by sources that disagree
+ * about where a segment ends.
+ *
+ * The commonest way a comparative dataset goes wrong and the least visible.
+ * Both transcriptions are valid IPA, every grapheme resolves, `rg_corpus_load_*`
+ * accepts them and the model that comes out reports deaffrication, loss of
+ * aspiration and loss of vowel length as clean, well-supported correspondences.
+ * None of it happened. The shuffled baseline does not catch it either and
+ * cannot: a baseline separates a pattern from chance, and this pattern is
+ * perfectly systematic, which is what a sound law is.
+ *
+ * Reports; never refuses, and is not a verdict. A corpus can honestly contain
+ * one language with affricates and one without, and only the person who
+ * assembled it can tell that from two sources disagreeing. `corroborated`
+ * against `forms` is the number to read: it says how often the other lect
+ * actually writes the pieces where this one writes the whole.
+ *
+ * Rows come strongest-evidence first, ties broken on their own text so two
+ * runs over one corpus print the same thing. Free with
+ * rg_transcription_drift_rows_free. Zero rows is the common case and is not an
+ * error. */
+RG_API rg_status rg_find_transcription_drift(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_transcription_drift_row **out,
+    size_t *out_count
+);
+RG_API void rg_transcription_drift_rows_free(rg_transcription_drift_row *rows, size_t count);
 
 #ifdef __cplusplus
 }

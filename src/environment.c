@@ -603,6 +603,19 @@ const char *const rg_env_stress_slots[] = {
 const size_t rg_env_stress_slot_count =
     sizeof(rg_env_stress_slots) / sizeof(rg_env_stress_slots[0]);
 
+/* The three slots that hold a whole syllable, and so can be asked about the
+ * syllable's own shape and weight rather than about a segment in it. The same
+ * three appear in the long-range list, where they carry the segment
+ * predicates; a slot belongs to both families because the two ask different
+ * questions of it. */
+const char *const rg_env_syllable_slots[] = {
+    "same_syllable",
+    "next_syllable",
+    "previous_syllable"
+};
+const size_t rg_env_syllable_slot_count =
+    sizeof(rg_env_syllable_slots) / sizeof(rg_env_syllable_slots[0]);
+
 rg_status rg_env_collect_stress_values(
     const rg_context_spec *context,
     rg_status (*add)(void *user, const char *value),

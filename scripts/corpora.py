@@ -40,6 +40,22 @@ LADDER = [
     ("testdata/corpora/real_romance_4lect.tsv",
      "Romance, four lects",
      "Latin, Spanish, French and Italian reconciled into classes binding all four."),
+    # The last three are what the tool looks like when it is right to find
+    # nothing, and they belong on the ladder for the same reason the contrast
+    # environments belong in a fixture. A reader who has only seen it succeed
+    # cannot tell success from output.
+    ("testdata/restraint/chance.tsv",
+     "Two unrelated lects",
+     "76 classes and 47 environments, from wordlists with no history between them. "
+     "Run the shuffled baseline and the corpus is indistinguishable from its own noise."),
+    ("testdata/soundlaws/final_devoicing.tsv",
+     "German final devoicing",
+     "A neutralisation: /t/ and /d/ merge word-finally, so the four environments "
+     "reported for it are correlates. All four fall below the baseline."),
+    ("testdata/diagnostics/drift.tsv",
+     "One language, two transcriptions",
+     "The same forty words segmented two ways. Reads as deaffrication, loss of "
+     "aspiration and loss of length -- none of which happened, and nothing catches it."),
 ]
 
 DESCRIPTIONS = {

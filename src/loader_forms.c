@@ -1,5 +1,7 @@
 #include "loader_internal.h"
 
+#include <merkmal.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -10,6 +12,7 @@
  * when track_boundaries is set, "+" tokens record a morpheme boundary at the
  * current position instead of producing a segment. */
 static rg_status lift_stress_mark(rg_segment *segment);
+static rg_status lift_tone_marks(rg_segment *segments, size_t *count);
 
 rg_status parse_segments(
     const char *raw,
@@ -95,6 +98,9 @@ rg_status parse_segments(
             }
         }
     }
+    if (lift_tone_marks(segments, &count) != RG_OK) {
+        goto fail;
+    }
     *out_segments = segments;
     *out_count = count;
     if (out_breaks != 0) {
@@ -107,14 +113,95 @@ rg_status parse_segments(
 
 fail:
     {
+        /* Every owned field, not just the grapheme. The two lift passes above
+         * run before this label is reachable for the last time and both can
+         * leave a segment holding a stress or a tone, so freeing graphemes
+         * alone leaks whatever they lifted -- silently, and only when an
+         * allocation has already failed, which is where a leak is least
+         * likely to be found. */
         size_t i;
         for (i = 0; i < count; i++) {
             rg_free_owned_internal(segments[i].grapheme);
+            rg_free_owned_internal(segments[i].tone);
+            rg_free_owned_internal(segments[i].stress);
+            rg_free_owned_internal(segments[i].length);
         }
     }
     free(segments);
     free(breaks);
     return RG_ERR_OOM;
+}
+
+/* Takes tone off the graphemes of an already-segmented cell: "a⁵⁵" becomes /a/
+ * carrying ⁵⁵, and a token that is nothing but tone becomes the tone of the
+ * segment before it.
+ *
+ * This is the policy `append_word_piece` in context.c has applied to whole
+ * words since tone existed, and its comment says why: it is how CLDF wordlists
+ * publish a tonal language. The pre-segmented path -- which is the one a CLDF
+ * `Segments` column arrives on -- did not apply it, so the same corpus read
+ * through the wide loader and through the TSV loader produced two different
+ * models. The wide one reported `TONE a>b ⁵⁵>¹³`; this one reported a segment
+ * correspondence between two tone marks, no tone on any segment, and so
+ * nothing at all for the cross-dimensional stage to work from.
+ *
+ * The cost of that was the whole tonal half of the field's reference data.
+ * Every Lexibank dataset for a tonal language writes Chao tokens exactly this
+ * way -- `tʰ u ⁵¹` -- and tonogenesis, which is what cross-dimensional
+ * discovery is for, is a live question in most of the families that have it.
+ *
+ * A tone token with nothing before it, or before a segment that already
+ * carries a tone, is left as a segment. Both are annotations this cannot make
+ * sense of, and guessing at one is worse than letting it fail at feature
+ * lookup, where it names itself. */
+static rg_status lift_tone_marks(rg_segment *segments, size_t *count) {
+    size_t read;
+    size_t write = 0;
+
+    for (read = 0; read < *count; read++) {
+        char *base = 0;
+        char *tone = 0;
+        mk_status split;
+
+        if (segments[read].grapheme == 0 || segments[read].tone != 0) {
+            segments[write++] = segments[read];
+            continue;
+        }
+        split = mk_split_tone(segments[read].grapheme, &base, &tone);
+        if (split == MK_ERR_UNKNOWN_GRAPHEME) {
+            /* Nothing but tone. */
+            mk_string_free(base);
+            mk_string_free(tone);
+            if (write > 0 && segments[write - 1].tone == 0) {
+                segments[write - 1].tone = segments[read].grapheme;
+                segments[read].grapheme = 0;
+                continue;
+            }
+            segments[write++] = segments[read];
+            continue;
+        }
+        if (split == MK_OK && tone != 0 && tone[0] != '\0' && base != 0) {
+            char *new_base = rg_strdup_internal(base);
+            char *new_tone = rg_strdup_internal(tone);
+            mk_string_free(base);
+            mk_string_free(tone);
+            if (new_base == 0 || new_tone == 0) {
+                rg_free_owned_internal(new_base);
+                rg_free_owned_internal(new_tone);
+                return RG_ERR_OOM;
+            }
+            rg_free_owned_internal(segments[read].grapheme);
+            segments[read].grapheme = new_base;
+            segments[read].tone = new_tone;
+            segments[write++] = segments[read];
+            continue;
+        }
+        mk_string_free(base);
+        mk_string_free(tone);
+        segments[write++] = segments[read];
+    }
+    *count = write;
+    return RG_OK;
 }
 
 /* Attaches a suprasegmental cell's whitespace-separated values to

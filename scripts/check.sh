@@ -83,6 +83,16 @@ python3 scripts/capabilities.py >/dev/null || fail "scripts/capabilities.py"
 python3 scripts/corpora.py >/dev/null || fail "scripts/corpora.py"
 python3 scripts/guide.py >/dev/null || fail "scripts/guide.py"
 
+# The fixture generators, for the same reason and with the same consequence:
+# the staleness gate below reads `git status`, so a generator that no longer
+# produces its committed fixture fails here rather than at the next person to
+# run it. `graded_3_stress.tsv` could not be reproduced from its generator for
+# months -- Python salts string hashes per process and the rung keyed on one --
+# and nothing noticed, because the rung kept passing.
+python3 scripts/graded.py >/dev/null || fail "scripts/graded.py"
+python3 scripts/restraint.py >/dev/null || fail "scripts/restraint.py"
+python3 scripts/diagnostics.py >/dev/null || fail "scripts/diagnostics.py"
+
 # A second compiler, because every assumption GCC happens to be lenient about
 # is otherwise untested -- and until 2026-08-15 the string "clang" appeared
 # nowhere in this repository. The build is the cheap part and catches almost
@@ -175,7 +185,13 @@ step "learned models"
 python3 scripts/model_hashes.py || fail "the learned models moved; see above"
 
 step "generated artifacts were already current"
-dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO)"
+# Tracked files only. The fixture directories joined this list when their
+# generators did, and they hold files a person writes by hand as well as files
+# a script writes -- a new hand-authored fixture is untracked until it is
+# committed, and reporting it as a stale generated artifact is a wrong answer
+# to a question nobody asked. What the gate is for is a *committed* file that
+# its generator no longer produces.
+dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO testdata/soundlaws testdata/restraint testdata/diagnostics | grep -v '^??' || true)"
 if [ -n "$dirty" ]; then
     printf '%s\n' "$dirty" >&2
     fail "generated artifacts were stale; they have been regenerated, review and commit them"

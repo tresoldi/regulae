@@ -504,6 +504,77 @@ static void test_tsv_tone_column_attaches_by_position(void) {
     rg_corpus_free(corpus);
 }
 
+/* Chao tone in the segments themselves, which is how every CLDF wordlist for a
+ * tonal language publishes it: `tʰ u ⁵¹`, the tone a token of its own after
+ * the syllable it belongs to. Some sources write it onto the vowel instead.
+ *
+ * Both have to give the same thing, and the same thing the wide loader gives
+ * for the same word, because they are the same word. Until 2026-08-16 the
+ * pre-segmented path gave neither: the tone token stayed a segment, so a
+ * tonal corpus trained with a phantom consonant after every syllable, no
+ * segment carried a tone, and the cross-dimensional stage -- the stage that
+ * exists for tonogenesis -- had nothing to read. Read through the wide loader
+ * the same forms produced a tonal correspondence.
+ *
+ * The whole tonal half of the field's reference data arrives on this path.
+ * `testdata/corpora/tonogenesis_cldf.tsv` is the end-to-end version: voiced
+ * onsets conditioning a low tone, in CLDF shape, which now comes out as
+ * `pre[voiced:+] -> tone=¹¹` and used to come out as nothing. */
+static void test_tsv_reads_chao_tone_written_into_the_segments(void) {
+    static const char *const text =
+        "cognate_id\tlect_id\tsegments\n"
+        "c1\tsrc\tt a ⁵⁵\n"          /* the tone a token of its own */
+        "c1\ttgt\tt a⁵⁵\n"           /* the tone on the vowel */
+        "c2\tsrc\t⁵⁵ t a\n"          /* nothing before it to belong to */
+        "c2\ttgt\tt a ⁵⁵ ¹³\n";      /* two tones for one syllable */
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+    const rg_form *form;
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
+
+    set = find_cognate(corpus, "c1");
+    form = form_for(set, "src");
+    assert(form != 0 && form->segment_count == 2);
+    assert(strcmp(form->segments[1].grapheme, "a") == 0);
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "\xe2\x81\xb5\xe2\x81\xb5") == 0);
+    form = form_for(set, "tgt");
+    assert(form != 0 && form->segment_count == 2);
+    assert(strcmp(form->segments[1].grapheme, "a") == 0);
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "\xe2\x81\xb5\xe2\x81\xb5") == 0);
+
+    /* Neither of the two annotations that cannot be read is guessed at. A tone
+     * with nothing before it, and a second tone on a segment that already has
+     * one, stay segments and fail at feature lookup naming themselves, which
+     * is more use to whoever has to fix the file. */
+    set = find_cognate(corpus, "c2");
+    form = form_for(set, "src");
+    assert(form != 0 && form->segment_count == 3);
+    assert(strcmp(form->segments[0].grapheme, "\xe2\x81\xb5\xe2\x81\xb5") == 0);
+    form = form_for(set, "tgt");
+    assert(form != 0 && form->segment_count == 3);
+    assert(strcmp(form->segments[2].grapheme, "\xc2\xb9\xc2\xb3") == 0);
+
+    rg_corpus_free(corpus);
+}
+
+/* An explicit tone column still wins, so a corpus that annotates both is not
+ * ambiguous and the corpora that predate the change are unaffected. */
+static void test_an_explicit_tone_column_beats_tone_in_the_segments(void) {
+    static const char *const text =
+        "cognate_id\tlect_id\tsegments\ttone\n"
+        "c1\tsrc\tt a⁵⁵\t- 2\n";
+    rg_corpus *corpus = 0;
+    const rg_form *form;
+
+    assert(rg_corpus_parse_tsv(text, 0, &corpus, 0) == RG_OK);
+    form = form_for(find_cognate(corpus, "c1"), "src");
+    assert(form != 0 && form->segment_count == 2);
+    assert(strcmp(form->segments[1].grapheme, "a") == 0);
+    assert(form->segments[1].tone != 0 && strcmp(form->segments[1].tone, "2") == 0);
+    rg_corpus_free(corpus);
+}
+
 /* A corpus that annotates tone is doing so deliberately, so a row whose tone
  * count disagrees with its segment count is an error rather than a truncation
  * that would tone the wrong vowel. */
@@ -696,6 +767,8 @@ int main(void) {
     rg_context_free(ctx);
     test_tsv_grouping_and_order();
     test_tsv_tone_column_attaches_by_position();
+    test_tsv_reads_chao_tone_written_into_the_segments();
+    test_an_explicit_tone_column_beats_tone_in_the_segments();
     test_tsv_tone_length_mismatch_is_refused();
     test_tsv_without_tone_column_is_untoned();
     test_tsv_confidence_is_the_minimum();

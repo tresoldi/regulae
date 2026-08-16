@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates the graded conditioning ladder under testdata/soundlaws/.
 
-Seven corpora with the same shape and the same change -- proto /p/ answers to
+Ten corpora with the same shape and the same change -- proto /p/ answers to
 daughter /f/ -- differing only in what conditions it. The point is to separate
 "the tool cannot find this pattern" from "the tool cannot find patterns of this
 *kind*". A single fixture that fails tells you something is wrong; a ladder
@@ -73,10 +73,20 @@ build("graded_2_position",
 
 # 3. Stress: only when the preceding vowel carries the accent. This is
 #    Verner's shape, with everything else held constant.
-build("graded_3_stress",
-      lambda o, v1, v2: (f"{o} {STRESS}{v1} p {v2}" if hash((o, v1, v2)) % 2 == 0
-                         else f"{o} {v1} p {STRESS}{v2}",
-                         f"{o} {v1} {'f' if hash((o, v1, v2)) % 2 == 0 else 'p'} {v2}"))
+#
+#    Which words take the accent used to be `hash((o, v1, v2)) % 2`, and
+#    Python salts string hashes per process: the rung was a different corpus
+#    every time this script ran, so the committed fixture could not be
+#    reproduced from the generator that claims to produce it. Any index will
+#    do here as long as it is one -- what the rung needs is that the accent
+#    falls independently of the segments around the /p/, not that it falls
+#    unpredictably.
+def stress(o, v1, v2):
+    accented = (ONSETS.index(o) + VOWELS.index(v2)) % 2 == 0
+    proto = f"{o} {STRESS}{v1} p {v2}" if accented else f"{o} {v1} p {STRESS}{v2}"
+    daughter = f"{o} {v1} {'f' if accented else 'p'} {v2}"
+    return proto, daughter
+build("graded_3_stress", stress)
 
 # 4. Two predicates at once: preceded by a nasal *and* followed by a front
 #    vowel. All four combinations are present, so neither half predicts the
@@ -125,3 +135,114 @@ def existential(o, v1, v2):
     daughter = f"{o} {v1} {'f' if nasal else 'p'} {tail}"
     return proto, daughter
 build("graded_6_existential", existential)
+
+
+# 7. A trigger set that is not a natural class: /p/ answers /f/ after any of
+#    r, u, k or i, and stays /p/ after a, e, o, m, n, l, t or s. This is the
+#    RUKI law's shape -- PIE *s retracts after exactly those four segments in
+#    Indo-Iranian, Balto-Slavic, Armenian and Albanian -- and it is on the
+#    ladder because the four share no articulatory feature. Two are high
+#    vowels, one is a dorsal stop, one is a coronal liquid; every feature true
+#    of all four is true of something in the contrast set as well.
+#
+#    A context here is a conjunction of feature constraints, and a conjunction
+#    narrows. There is no way to write a disjunction, so the best available
+#    answer is a decision list: one rule per trigger, all with the same
+#    outcome. That is also what a comparativist writes on the board, so the
+#    rung is not asking for something the field does differently -- it asks
+#    whether the search finds the four rules or gives up after one.
+#
+#    The word shape is held constant across triggers. A trigger that was
+#    sometimes a vowel and sometimes a consonant would change the length of
+#    the word with it, and "the /p/ is fourth" would be a predicate the corpus
+#    handed over for free.
+TRIGGERS = ["r", "u", "k", "i"]
+INERT = ["a", "e", "o", "m", "n", "l", "t", "s"]
+
+
+def disjunction(o, v1, v2):
+    index = ONSETS.index(o) * 5 + VOWELS.index(v2)
+    pool = TRIGGERS if index % 3 == 0 else INERT
+    pre = pool[index % len(pool)]
+    applies = pre in TRIGGERS
+    proto = f"{o} {v1} {pre} p {v2}"
+    daughter = f"{o} {v1} {pre} {'f' if applies else 'p'} {v2}"
+    return proto, daughter
+build("graded_7_disjunction", disjunction)
+
+
+# 8. Syllable weight: /p/ answers /f/ when the syllable before it is heavy,
+#    and stays /p/ after a light one. Sievers' Law is this shape, and so is
+#    every rule stated over moras rather than over segments -- Latin's penult
+#    accent, Germanic's high-vowel deletion, the metrical half of Verner's
+#    environment.
+#
+#    Weight is disjunctive at the segmental level, deliberately: a syllable is
+#    heavy here either because its vowel is long or because it has a coda, and
+#    both kinds are present in equal number. That is what weight *is*, and it
+#    is why the rung is not a repeat of rung 7. Rung 7 asks whether a
+#    disjunction can be written; this one asks whether the term that makes
+#    writing one unnecessary is available at all.
+#
+#    Two confounds had to be taken out of it, and both were the fixture's fault
+#    rather than the tool's.
+#
+#    The coda is drawn from five segments sharing no feature -- n, s, l, m, r
+#    span nasal, fricative, lateral, rhotic, voiced and voiceless. It was `n`
+#    every time until 2026-08-17, and then "the syllable is closed" and "the
+#    preceding segment is a voiced sonorant" were the same partition: the rung
+#    reported `prev-syl[voiced:+]`, which was true and said nothing about
+#    weight. That is rung 4's recorded hole in another place.
+#
+#    `k` and `t` are not among them, and the reason is a fact about the
+#    syllabifier rather than a preference: a stop before /p/ is analysed as the
+#    onset of the next syllable rather than as a coda, so those words come out
+#    with an *open* first syllable and the rung would be asserting something
+#    the corpus does not contain. Measured, not assumed -- n, s, l, m and r
+#    close the syllable and k and t do not.
+#
+#    And the onset carries an optional second consonant, in all three groups
+#    equally. Without it a coda was the only thing that could make a word
+#    longer, so the /p/ stood one place later in exactly the closed-syllable
+#    words and `pre@2[vowel:+]` predicted closure perfectly -- a fact about
+#    where the segment sits, not about the syllable it sits after.
+CODAS = ["n", "s", "l", "m", "r"]
+
+
+def weight(o, v1, v2):
+    index = ONSETS.index(o) * 5 + VOWELS.index(v2)
+    onset = f"{o} r" if index % 2 == 0 else o
+    kind = index % 3
+    if kind == 0:
+        first, heavy = f"{onset} {v1}ː", True                 # heavy: long vowel
+    elif kind == 1:
+        coda = CODAS[index % len(CODAS)]
+        first, heavy = f"{onset} {v1} {coda}", True                # heavy: closed
+    else:
+        first, heavy = f"{onset} {v1}", False                      # light
+    proto = f"{first} p {v2}"
+    daughter = f"{first} {'f' if heavy else 'p'} {v2}"
+    return proto, daughter
+build("graded_8_weight", weight)
+
+
+# 9. The conditioning environment is gone from the daughter. Rung 1's change
+#    exactly -- /p/ answers /f/ before a front vowel -- with the vowel that
+#    conditioned it deleted in the daughter, so that in the daughter alone
+#    nothing distinguishes the words that changed from the words that did not.
+#
+#    This is opacity, and it is the ordinary case rather than an exotic one.
+#    Germanic i-umlaut fronted a vowel and then the *i* that fronted it fell,
+#    which is why English has *foot/feet* with no /i/ anywhere in sight; the
+#    same sequence gave Old Norse its umlaut, French its nasal vowels, and
+#    Mandarin its tones. A change that destroys its own environment leaves the
+#    daughter looking irregular, and the environment survives only in a
+#    relative that did not run the second change.
+#
+#    Which is the argument for comparing more than two lects at a time, and it
+#    is testable: the environment here is on the proto's side of the pair and
+#    on no other, so a search that only looked at the segment being explained
+#    would find nothing.
+build("graded_9_lost_trigger",
+      lambda o, v1, v2: (f"{o} {v1} p {v2}",
+                         f"{o} {v1} {'f' if v2 in FRONT else 'p'}"))

@@ -1,37 +1,75 @@
 cognate_id	lect_id	segments
-day	citation	t a: k
-day	stem	t a: g e
-wheel	citation	r a: t
-wheel	stem	r a: d e s
-thief	citation	d i: p
-thief	stem	d i: b e
+day	citation	t aː k
+day	stem	t aː g e
+way	citation	v eː k
+way	stem	v eː g e
+train	citation	ts uː k
+train	stem	ts yː g e
+mountain	citation	b ɛ r k
+mountain	stem	b ɛ r g e
+wheel	citation	r aː t
+wheel	stem	r ɛː d e r
+bath	citation	b aː t
+bath	stem	b ɛː d e r
+song	citation	l iː t
+song	stem	l iː d e r
 child	citation	k ɪ n t
 child	stem	k ɪ n d e r
 country	citation	l a n t
 country	stem	l ɛ n d e r
-mountain	citation	b ɛ r k
-mountain	stem	b ɛ r g e
-song	citation	l i: t
-song	stem	l i: d e r
-house	citation	h a ʊ s
-house	stem	h ɔ y z e r
-word	citation	v ɔ r t
-word	stem	v ɔ r t e
-blood	citation	b l u: t
-blood	stem	b l u: t e s
-hand	citation	h a n t
-hand	stem	h ɛ n d e
+field	citation	f ɛ l t
+field	stem	f ɛ l d e r
+forest	citation	v a l t
+forest	stem	v ɛ l d e r
+dog	citation	h ʊ n t
+dog	stem	h ʊ n d e
 friend	citation	f r ɔ y n t
 friend	stem	f r ɔ y n d e
-foot	citation	f u: s
-foot	stem	f y: s e
-book	citation	b u: x
-book	stem	b y: x e r
-roof	citation	d a x
-roof	stem	d ɛ x e r
+thief	citation	d iː p
+thief	stem	d iː b e
+grave	citation	g r aː p
+grave	stem	g r ɛː b e r
+basket	citation	k ɔ r p
+basket	stem	k œ r b e
+house	citation	h a ʊ s
+house	stem	h ɔ y z e r
+glass	citation	g l aː s
+glass	stem	g l ɛː z e r
+word	citation	v ɔ r t
+word	stem	v ɔ r t e
+blood	citation	b l uː t
+blood	stem	b l uː t e s
+hat	citation	h uː t
+hat	stem	h yː t e
+bread	citation	b r oː t
+bread	stem	b r oː t e
+place	citation	ɔ r t
+place	stem	ɔ r t e
 light	citation	l ɪ x t
 light	stem	l ɪ x t e r
-seat	citation	z ɪ t s
-seat	stem	z ɪ t s e
 night	citation	n a x t
 night	stem	n ɛ x t e
+power	citation	k r a f t
+power	stem	k r ɛ f t e
+air	citation	l ʊ f t
+air	stem	l ʏ f t e
+office	citation	a m t
+office	stem	ɛ m t e r
+market	citation	m a r k t
+market	stem	m ɛ r k t e
+foot	citation	f uː s
+foot	stem	f yː s e
+price	citation	p r a ɪ s
+price	stem	p r a ɪ s e
+book	citation	b uː x
+book	stem	b yː x e r
+roof	citation	d a x
+roof	stem	d ɛ x e r
+sack	citation	z a k
+sack	stem	z ɛ k e
+stick	citation	ʃ t ɔ k
+stick	stem	ʃ t œ k e
+work	citation	v ɛ r k
+work	stem	v ɛ r k e
+seat	citation	z ɪ t s
+seat	stem	z ɪ t s e

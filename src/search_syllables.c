@@ -84,14 +84,26 @@ void syllable_data_clear(syllable_data *data) {
     memset(data, 0, sizeof(*data));
 }
 
-/* Two properties of a syllable that its segments' features do not carry, and
- * that quantity-sensitive changes are stated in: whether it ends in a coda,
- * and whether its nucleus is long.
+/* Properties of a syllable that its segments' features do not carry, and that
+ * quantity-sensitive changes are stated in: whether it ends in a coda, whether
+ * its nucleus is long, and the verdict the first two are usually read for.
  *
- * They are named for what they measure rather than for "heavy" and "light",
- * which are language-particular verdicts -- CVC counts heavy in Latin and does
- * not in every quantity system. A reader who knows their language can read
- * weight off the shape; the tool should not guess it for them.
+ * `syllable_shape` and `syllable_nucleus` are facts. `syllable_weight` is not,
+ * and it is here anyway, so it needs its terms stated. Heavy means a long
+ * nucleus **or** a coda, which is the majority convention and the one Latin,
+ * Ancient Greek, Arabic and Sanskrit metrics use. It is not universal: plenty
+ * of quantity systems count CVC light, some count only CVV heavy, and a few
+ * weigh the coda by its sonority. A rule reported over `syllable_weight` in a
+ * language whose tradition draws the line elsewhere is a rule stated in
+ * somebody else's terms, and the two facts underneath it are there so that it
+ * can be restated -- `prev-syl[syllable_shape:closed]` and
+ * `prev-syl[syllable_nucleus:long]` are the same partition, said without the
+ * verdict.
+ *
+ * What buys the verdict its place is that weight is disjunctive over segments
+ * and a context is a conjunction. Without the term the search states the same
+ * environment as two rules, `pre[long:+]` and an equivalent of "there is a
+ * coda", which is correct and is not what a metrist wants to read.
  *
  * Appended to the syllable's own feature union, so they conjoin with the
  * segment predicates through the machinery that is already there. */
@@ -103,10 +115,12 @@ static rg_status append_syllable_shape(
     const rg_feature_constraint **union_out,
     size_t *union_count
 ) {
-    rg_feature_constraint extra[2];
+    rg_feature_constraint extra[3];
     size_t extra_count = 0;
     size_t nucleus = end;
     size_t i;
+    int closed;
+    int is_long = 0;
     rg_feature_constraint *grown;
 
     for (i = start; i < end; i++) {
@@ -119,12 +133,12 @@ static rg_status append_syllable_shape(
             }
         }
     }
+    closed = !(nucleus != end && nucleus + 1 == end);
     extra[extra_count].feature = "syllable_shape";
-    extra[extra_count].value = (nucleus != end && nucleus + 1 == end) ? "open" : "closed";
+    extra[extra_count].value = closed ? "closed" : "open";
     extra_count++;
     if (nucleus != end) {
         size_t c;
-        int is_long = 0;
         for (c = 0; c < source_feature_counts[nucleus]; c++) {
             if (strcmp(source_features[nucleus][c].feature, "long") == 0) {
                 is_long = 1;
@@ -132,6 +146,12 @@ static rg_status append_syllable_shape(
         }
         extra[extra_count].feature = "syllable_nucleus";
         extra[extra_count].value = is_long ? "long" : "short";
+        extra_count++;
+        /* Only where a nucleus was found. A syllable with none is one this
+         * corpus does not let us weigh, and guessing would put every vowelless
+         * form on the heavy side of every quantity rule in the report. */
+        extra[extra_count].feature = "syllable_weight";
+        extra[extra_count].value = (closed || is_long) ? "heavy" : "light";
         extra_count++;
     }
     grown = (rg_feature_constraint *)calloc(*union_count + extra_count, sizeof(*grown));

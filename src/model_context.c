@@ -225,6 +225,19 @@ static void collect_observed_morphology(morphology_inventory *inventory, const r
     morphology_inventory_add(inventory->indices, &inventory->index_count, 8, context->morpheme_index);
 }
 
+/* Properties of a syllable rather than of its segments, so they are not in the
+ * feature vocabulary and are offered directly. A predicate true of every
+ * syllable in a corpus partitions nothing and is dropped by the split gate, so
+ * the cost of offering them where they do not apply is one gate test each. */
+static const rg_feature_constraint syllable_shape_candidates[] = {
+    {"syllable_shape", "open"},
+    {"syllable_shape", "closed"},
+    {"syllable_nucleus", "long"},
+    {"syllable_nucleus", "short"},
+    {"syllable_weight", "heavy"},
+    {"syllable_weight", "light"}
+};
+
 static size_t immediate_candidates_for(
     const rg_context_spec *base_context,
     const stress_inventory *stress,
@@ -329,19 +342,35 @@ static size_t immediate_candidates_for(
             }
         }
     }
+    /* The shape and weight of the syllables next door.
+     *
+     * They were offered only in the long-range pass, which is where the
+     * *segment* predicates for those slots belong, and that starved them:
+     * long-range discovery does not decompose promoted chunks, so on a corpus
+     * where promotion has fired it sees a different and smaller set of
+     * observations. On the weight rung it never saw the ungrouped corpus at
+     * all -- the candidates were tested, held on every row of the group they
+     * were shown or on none of it, and so could never split anything.
+     *
+     * The adjacent syllable is an immediate environment even though it is not
+     * an immediate segment, and every rule this vocabulary exists for says so:
+     * Sievers' Law, Latin's penultimate accent, Germanic high-vowel deletion
+     * and the metrical half of Verner's environment are all stated over the
+     * syllable next to the one that changed, never over one somewhere in the
+     * word. Six candidates per slot against a hundred-odd is a 3% rise in the
+     * search charge. */
+    for (s = 0; s < rg_env_syllable_slot_count; s++) {
+        for (i = 0; i < sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]); i++) {
+            if (count < capacity) {
+                out[count].slot = rg_env_syllable_slots[s];
+                out[count].feature = syllable_shape_candidates[i].feature;
+                out[count].value = syllable_shape_candidates[i].value;
+                count++;
+            }
+        }
+    }
     return count;
 }
-
-/* Properties of a syllable rather than of its segments, so they are not in the
- * feature vocabulary and are offered directly. A predicate true of every
- * syllable in a corpus partitions nothing and is dropped by the split gate, so
- * the cost of offering them where they do not apply is one gate test each. */
-static const rg_feature_constraint syllable_shape_candidates[] = {
-    {"syllable_shape", "open"},
-    {"syllable_shape", "closed"},
-    {"syllable_nucleus", "long"},
-    {"syllable_nucleus", "short"}
-};
 
 static size_t long_range_candidates(
     const rg_feature_vocabulary *vocabulary,
@@ -902,7 +931,9 @@ static rg_status discover_context_counts(
         size_t immediate_cap =
             2 * vocabulary->count +
             sizeof(split_positions) / sizeof(split_positions[0]) +
-            3 * stress.count + 8 + morphology.placement_count + morphology.index_count;
+            3 * stress.count + 8 + morphology.placement_count + morphology.index_count +
+            rg_env_syllable_slot_count *
+            (sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]));
         size_t long_cap =
             rg_env_long_range_slot_count *
             (vocabulary->count == 0 ? 1 : vocabulary->count) +

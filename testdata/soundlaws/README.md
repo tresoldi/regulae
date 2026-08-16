@@ -112,9 +112,107 @@ at no fixed distance. Place in an existential environment, which is what place
 conditioning looks like when it is not adjacent, and the reason the major
 classes are searchable at long range rather than only next door.
 
+### `opaque_umlaut.tsv` — the environment is in a different language
+
+Germanic i-umlaut across three lects: a Gothic-shaped one that kept the final
+vowel and never fronted, an Old-High-German-shaped one that fronted and kept
+it, and an Old-English-shaped one that fronted and lost it. In the third alone
+`g e s t` and `g a s t` are a minimal pair with nothing to separate them; the
+*i* that explains them is in the other two.
+
+This is the standard classroom argument for why Gothic matters to the history
+of English, and it turns out to be a testable claim about a method rather than
+only a story. The environment comes out as `next-syl[close:+]`, read off the
+lects that kept the trigger, for the lect that did not.
+
+The fixture also records a limit, and it is the more useful half. **Umlaut is
+one change and it surfaces here as four correspondences, one per vowel
+quality**: `a ~ e` with fifteen examples, and `uː ~ yː`, `u ~ y`, `oː ~ øː`
+with two to four each. Only the first crosses the evidence floor that
+`testdata/restraint/sparse_*` measures, so only the first gets its environment;
+the other three are published as unconditioned splits, with the same trigger
+standing next to them in the same words.
+
+A change that applies to a natural class of segments is divided by the size of
+that class before the search ever sees it, and each fragment has to carry its
+own evidence. Palatalisation, lenition, nasalisation and every chain shift have
+this shape, which makes it one of the more consequential limits in the tool: a
+change can be overwhelmingly attested as a change and invisible as any one of
+its correspondences.
+
+The first draft of this fixture had ten stems and found no environment at all.
+Adding ten more `a`-stems — and nothing else — was enough. That is what pins
+the cause on class size rather than on the opacity.
+
+### `great_vowel_shift.tsv` — a chain, not a merger
+
+Middle English /eː/ raised to /iː/ while /iː/ was diphthongising out of the
+way, and /oː/ raised to /uː/ while /uː/ did the same. Every step lands where
+the next one has just left.
+
+Which is what makes it a test. A method that keeps no separate account of the
+two sources reports a merger — ME /eː/ and /iː/ both answering Modern English
+/iː/ — and that is false about both, and would say that *feet* and *five* had
+the same vowel in 1400. The fixture asserts each link separately and asserts
+that no class puts two Middle English sources together.
+
+The diphthongs are written as two segments, so the raised vowel answers the
+*nucleus* of `a ɪ` rather than the diphthong whole. That is a decision the
+corpus makes and not the tool: a correspondence is stated at the granularity
+the transcription was written at, and a dataset that wrote `aɪ` as one grapheme
+would get a different and equally correct answer. It is worth knowing before
+comparing two sources that made that choice differently.
+
+### `compensatory_lengthening.tsv` — a change caused by a deletion
+
+The Ingvaeonic nasal spirant law: Proto-Germanic lost a nasal before a
+fricative and lengthened the vowel in front of it, so *gans* answers Old
+English *gōs* and *tanþ* answers *tōþ*. The same nasal before a stop is
+untouched — *hand* stays *hand* — and a nasal with nothing after it is
+untouched too, so neither "before a consonant" nor "before anything" will do.
+
+Two events with one cause, and the segment that explains the vowel is the one
+that is no longer there. The environment has to name both the nasal and what
+followed it, which is a conjunction with a distance term in it:
+
+    oe oː ~ pgmc a   /  fol[nasal:+] ∧ fol@2[fricative:+]
+
+Greek, Latin, Old Irish, Hindi and Middle Korean all have a version of this,
+and it is the mechanism behind a large share of the world's long vowels,
+nasal vowels and tone systems. It is here because the alignment is the part
+that could go wrong: the nasal has to be absorbed into a chunk with the vowel
+rather than aligned against the fricative that follows it.
+
+### `final_devoicing.tsv` — a neutralisation, and what a baseline is for
+
+German *Rad/Räder*, *Tag/Tage*, *Kind/Kinder* against *Wort/Worte*,
+*Blut/Blutes*, *Licht/Lichter*. Two "lects" that are two slots of one
+paradigm, which makes this internal reconstruction rather than comparison —
+the same machinery, and the method a linguist reaches for when there is only
+one language to work with.
+
+Word-final /t/ has two sources and nothing in the citation form says which, so
+the right answer is two correspondences and no environment: `t ~ t` and
+`t ~ d`, `k ~ k` and `k ~ g`, `p ~ p` and `p ~ b`. regulae commits four
+conditioned rules, every one of them a correlate of the alternation rather
+than a cause of it — the alternating /d/-words happen to have sonorants before
+them more often than the others do — and **all four fall below the level the
+same search reaches on the shuffled corpus**, while the corpus itself sits
+twenty standard deviations below its own baseline.
+
+Read without the baseline it reports four environments for a change that has
+none. Read with it, it reports a neutralisation. That is the argument for
+`permutation_count`, made on data nobody disputes, and it is why the
+`tests/c/test_restraint.c` assertions for this fixture live with the restraint
+suite rather than here.
+
+The file was in this directory for a week before any test read it, and it
+wrote length with an ASCII colon. Both are fixed; the second is the sort of
+thing `regulae check` reports and nobody runs.
+
 ## The graded ladder — `graded_*.tsv`
 
-Seven corpora with the same shape and the same change, proto /p/ answering to
+Ten corpora with the same shape and the same change, proto /p/ answering to
 daughter /f/, differing only in what conditions it. Regenerate with
 `scripts/graded.py`.
 
@@ -130,6 +228,112 @@ where the ceiling is:
 | 4 | two predicates at once | yes, `pre[voiced:+] ∧ fol[front:+]` |
 | 5 | a segment two places back | yes, `prev-syl[nasal:+]` |
 | 6 | a segment somewhere later | yes, `somewhere-fol[nasal:+]` |
+| 7 | any one of four unrelated segments | yes, as a decision list: `pre[close:+]`, `pre[stop:+]`, `pre[trill:+]` |
+| 8 | the weight of the preceding syllable | **partly** — one of the two things that make a syllable heavy |
+| 9 | a segment the daughter has since lost | yes, `fol[front:+]`, read off the proto |
+
+Rung 8 is the ceiling, and it is asserted as it stands so that raising it shows
+up as a test that has to be rewritten rather than as one that starts passing by
+accident.
+
+### Rung 7 — a trigger set that is not a natural class
+
+/p/ answers /f/ after any of `r`, `u`, `k` or `i`, and stays /p/ after `a`,
+`e`, `o`, `m`, `n`, `l`, `t` or `s`.
+
+This is the RUKI law's shape. PIE *s retracts after exactly those four segments
+in Indo-Iranian, Balto-Slavic, Armenian and Albanian, and the four share no
+articulatory feature: two are high vowels, one is a dorsal stop, one is a
+coronal liquid, and every feature true of all four is true of something in the
+contrast set as well. The field has argued about whether they form an *acoustic*
+class for a century; nobody claims they form a featural one.
+
+A context is a conjunction of feature constraints and a conjunction narrows, so
+a disjunction cannot be written as one environment. What a comparativist writes
+on the board instead is a decision list — one rule per trigger, all with the same
+outcome — and that is what comes out, because discovery is greedy and each rule
+is committed against what the earlier ones left:
+
+    f ~ p / pre[close:+]    8   ({i, u}, which do share a feature)
+    f ~ p / pre[stop:+]     4   ({k})
+    f ~ p / pre[trill:+]    4   ({r})
+
+**This rung documented a ceiling for a day, and the ceiling was in the report
+rather than in the search.** Until 2026-08-17 the multi-lect table merged rows
+on the correspondence tuple alone, so three of these four rules were discarded
+before publication and the survivor was whichever environment carried the most
+constraints — here a two-term conjunction describing none of them well. The
+rules were in the pairwise tables the whole time, which is how the collapse
+went unnoticed, and the same merge was throwing away 32 of the 58 splits
+committed on `testdata/corpora/real_romance_4lect.tsv`.
+
+A fourth row is committed on a broader correlate overlapping the first, and the
+shuffled baseline marks it within-noise. That is the right place for the
+judgement: absorbing it during the merge would absorb the genuine
+`pre[close:+]` underneath it too, because a superset swallows what it contains.
+
+### Rung 8 — syllable weight
+
+/p/ answers /f/ after a heavy syllable and stays /p/ after a light one, with
+heavy-by-long-vowel and heavy-by-coda present in equal number.
+
+Sievers' Law has this shape, and so does every rule stated over moras rather
+than segments: Latin's penultimate accent, Germanic's high-vowel deletion, the
+metrical half of Verner's environment, most of what a metrist means by a rule.
+
+The disjunction is deliberate, and it is why this is not rung 7 again. There
+the missing thing was the ability to write a disjunction; here it is the term
+that would make writing one unnecessary.
+
+    f ~ p / prev-syl[syllable_weight:heavy]    28, elsewhere 0
+
+Three syllable properties are available and none of them is a segment feature:
+`syllable_shape` (open or closed), `syllable_nucleus` (long or short) and
+`syllable_weight` (heavy or light). The first two are facts. The third is a
+**verdict** — heavy means a long nucleus or a coda, which is the majority
+convention and the one Latin, Greek, Arabic and Sanskrit metrics use, and it is
+not universal. It is offered anyway because a disjunction over segments is
+exactly what a context cannot hold, and because the verdict is the term the
+field states these rules in; the two facts sit beside it so a language whose
+tradition draws the line elsewhere can still be described.
+
+Until 2026-08-17 the rung reported `pre[long:+]` and left the closed syllables
+to a second rule. That was correct — the two rules covered all twenty-eight —
+and it was not what anybody wants to read. Two things had to change: the
+predicates had to reach the pass that sees the ungrouped corpus (they were
+offered only in the long-range pass, which does not decompose promoted chunks
+and so never saw the corpus whole), and the multi-lect stage had to be given
+them at all.
+
+Two confounds had to come out of the fixture first, and both were the
+fixture's fault rather than the tool's. The coda was `n` every time, so
+"closed" and "preceded by a voiced sonorant" were the same partition. And
+without an optional second consonant in the onset, a coda was the only thing
+that could lengthen a word, so `pre@2[vowel:+]` predicted closure exactly — a
+fact about where the segment sits rather than about the syllable before it.
+`k` and `t` are not among the codas either, and that is measured rather than
+chosen: a stop before /p/ is syllabified as the onset of the next syllable, so
+those words have an *open* first syllable and the rung would be asserting
+something the corpus does not contain.
+
+### Rung 9 — an environment the daughter no longer has
+
+Rung 1 exactly, with the conditioning vowel deleted in the daughter. Within the
+daughter nothing distinguishes the words that changed from the words that did
+not.
+
+This is opacity, and it is the ordinary case rather than an exotic one.
+Germanic i-umlaut fronted a vowel and then the *i* that fronted it fell, which
+is why English has *foot/feet* with no /i/ anywhere in sight; the same sequence
+gave Old Norse its umlaut, French its nasal vowels and Mandarin its tones. A
+change that destroys its own environment leaves the daughter looking irregular,
+and the environment survives only in the proto, or in a relative that did not
+run the second change.
+
+It is found, fully covered, from the proto's side of the pair — which is what
+`context_is_target` is for, and which is the argument for comparing more than
+two lects at a time stated as a property of the search. `opaque_umlaut.tsv`
+below is the same claim on curated material.
 
 Rungs 5 and 6 found nothing at all until 2026-08-15. Of the thirteen features
 regulae computes for every segment, four — `nasal`, `stop`, `fricative`,
@@ -224,6 +428,28 @@ The two are separate because they need different machinery. Adjacent
 transposition fits inside a chunk. Long-distance transposition does not: the
 search can only express it as one link covering everything between the two
 segments that moved, which is wider than a chunk is allowed to be.
+
+## Reproducibility
+
+Every generated fixture has to be a function of its generator and nothing else,
+or the committed file cannot be checked against the script that claims to
+produce it.
+
+`graded_3_stress.tsv` was not, until 2026-08-16. Which words took the accent
+was `hash((onset, v1, v2)) % 2`, and Python salts string hashes per process, so
+running `scripts/graded.py` rewrote the fixture with a different accent
+assignment every time. Nothing failed — the rung kept passing, because the rung
+is about stress conditioning and any assignment gives it — which is why it went
+unnoticed. The index is arithmetic now.
+
+## The other half of the suite
+
+`testdata/restraint/` holds the corpora that contain **no** conditioned sound
+law, and asserts that regulae reports none: two lects with no history between
+them, a change spread over the lexicon rather than over an environment, a
+borrowed stratum, and a ladder measuring how much evidence the search needs
+before it can see a rule at all. A tool that finds every law in this directory
+and also finds laws in that one has not been shown to work.
 
 ## Adding one
 

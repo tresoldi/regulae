@@ -19,9 +19,9 @@ mean, is the point of this document.
 **Two things changed shape on 2026-08-16, and this document has been
 brought with them.** Every published table is now handed out whole
 rather than through a count function and an index function
-(§4.7), and the four fields that say what a search decided about a
+(§4.9), and the four fields that say what a search decided about a
 rule moved into one `evidence` member on the rows that carry them
-(§4.6). `RG_ABI_VERSION` is 24. Both are source-level breaks for a
+(§4.6). `RG_ABI_VERSION` is 25. Both are source-level breaks for a
 C consumer, and §7 is the contract that governs them.
 
 This document said until 2026-08-15 that the meanings were
@@ -251,7 +251,7 @@ had no shared cognate data in the corpus.
 
 In C this is `rg_multi_model_pair_model_at`, which returns an
 `rg_multi_pair_model_row` carrying `lect_a`, `lect_b` and the
-model. It is the one table still read a row at a time (§4.7): it
+model. It is the one table still read a row at a time (§4.9): it
 holds each pair's owned strings alongside the published row, so
 there is no array of rows to hand out. The row *is* ordered — reconciliation walks lect pairs in
 ascending lect-id order, which fixes the direction each pair is
@@ -320,6 +320,27 @@ field: a per-lect mapping `lect_id -> Context` describing the
 conditioning environment under which that lect's segment
 appears. A lect without a specific constraint has the empty
 `Context()`.
+
+**One segment tuple may appear in several conditioned classes,
+and code that indexes this list by tuple has to expect that.**
+Discovery is greedy and each rule is committed against what the
+earlier ones left, so a change conditioned by something that is
+not a natural class comes out as a decision list: RUKI's *s
+retracts after *r*, *u*, *k* and *i*, which is four rules with
+one outcome, and no single feature covers the four. Read them in
+`evidence.decision_index` order — a later rule refines or applies
+within what an earlier one did not settle.
+
+It was not so until 2026-08-17: classes were merged on the tuple
+alone, which collapsed the whole list into one row whose
+environment was whichever carried the most constraints. On the
+four-lect Romance corpus that discarded 32 of the 58 splits the
+search had committed, and on Latin/Spanish it is the difference
+between 20 conditioned classes and 25. Rows merge now when a
+later split's observations are a subset of an earlier row's —
+which is what a second *description* of one rule looks like — and
+stay apart when the split brings observations no earlier row
+has.
 
 Reading a conditioned class:
 
@@ -482,7 +503,67 @@ about a language, not an error in a file, and the corpus carries
 one set per combination of reflexes with a share of the
 confidence each.
 
-### 4.7 How a table is read
+### 4.7 Is the corpus one thing?
+
+`rg_corpus_fit` carries two numbers about the *shape* of the fit
+rather than its level. `cost_split_separation` is how far apart
+the two sides are, in pooled standard deviations, at the best
+two-way split of the per-cognate-set alignment costs;
+`cost_split_fraction` is the share of sets on the worse-aligning
+side.
+
+A unimodal sample still has a best split, so the number is never
+zero and has to be read against something — and read *with* the
+fraction. Measured on this repository's fixtures:
+
+| corpus | separation | fraction |
+| --- | ---: | ---: |
+| real pair corpora | 2.7 – 3.0 | 39–65% |
+| `chance` (unrelated lects) | 2.4 | 52% |
+| `contaminated` (5 bad judgements in 45) | 7.2 | 11% |
+| `contact` (half the wordlist borrowed) | 6.3 | 50% |
+| `stratum`, `diffusion` | 23.0, 31.5 | 50% |
+
+A high separation with a *small* fraction is a tail of sets that
+do not belong. A high separation at about half is a corpus that
+is two populations.
+
+**It is not a borrowing test.** The two highest numbers in that
+table are `stratum` and `diffusion`, where every set is cognate
+and nothing was borrowed: half the words underwent a change and
+half did not. What a high separation says is that the corpus is
+not one thing, which is a reason to ask a different question and
+not an answer to this one.
+
+### 4.8 Transcription drift between sources
+
+`rg_find_transcription_drift` asks whether two lects in one
+corpus were transcribed by sources that disagree about where a
+segment ends — one writing `tʃ` where the other writes `t ʃ`,
+`tʰ` where the other writes `t h`, `aː` where the other writes
+`a a`.
+
+Nothing else catches this. Every grapheme involved is valid IPA,
+the corpus loads, `regulae check` finds no unreadable grapheme,
+and what training produces is a family of clean, well-supported
+correspondences that read as deaffrication, loss of aspiration
+and loss of vowel length. The shuffled baseline does not help and
+cannot: it separates a pattern from chance, and this pattern is
+perfectly systematic, which is what a sound law is.
+
+Each row names the grapheme, what the other lect writes instead,
+and two counts. `corroborated / forms` is the evidence: how often
+the other lect actually writes the pieces where this one writes
+the whole. A ratio near 1 is a transcription difference; a low
+one is a sound change — Latin `kʷ` against French `k w` comes
+out at 1 of 5, which is *qu* → /k/ and not a convention.
+
+It reports and never refuses, and it is not a verdict. A corpus
+can honestly hold one language with affricates and one without.
+Only the person who assembled it can tell that from two sources
+disagreeing; what this does is say where to look.
+
+### 4.9 How a table is read
 
 Every published table is handed out whole — the rows and how many,
 borrowed and valid while the model that owns them lives:
@@ -709,12 +790,28 @@ Adding a field to a public struct changes its layout, so it moves
 the ABI version whether or not it breaks a source-level consumer.
 The rule is: `RG_ABI_VERSION` moves on any exported struct
 layout, enum, signature or ownership change, and the reason is
-recorded in `docs/c_conversion_roadmap.md`. It is at **24**.
+recorded in `docs/c_conversion_roadmap.md`. It is at **25**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **25** — `rg_find_transcription_drift`,
+  `rg_transcription_drift_rows_free`, `rg_transcription_drift_row`
+  and `rg_drift_kind` are new (§4.8). Additive, and it moves the
+  version because the surface is what the version names.
+
+  Landing beside it, and *not* a compile-time break, is a change a
+  consumer has to know about: a segment tuple may now appear in
+  more than one conditioned class. Rows used to be merged on the
+  tuple alone, which collapsed a decision list — a change
+  conditioned by something that is not a natural class is several
+  rules with one outcome — into a single row whose environment was
+  whichever carried the most constraints. On the four-lect Romance
+  corpus that discarded 32 of the 58 splits the search had
+  committed. Code that indexes conditioned classes by tuple and
+  expects at most one will now silently see only the first;
+  `evidence.decision_index` is the order to read them in.
 - **24** — `rg_corpus_fit` gained `pairwise_rules_above_noise` and
   `pairwise_rules_measured` (§4.6). Additive, but a struct layout
   change.
@@ -722,7 +819,7 @@ time rather than silently, which is the intent.
   one `evidence` member (§4.6); `rg_multi_cross_dimensional_row`
   became the pairwise row plus two lect names (§6); the
   twenty-two per-row table accessors became eleven that hand out
-  a table whole (§4.7); `rg_format_multi_model_summary` and
+  a table whole (§4.9); `rg_format_multi_model_summary` and
   `rg_format_pairwise_tables` were added, so the CLI's two
   machine-readable renderings are library functions.
 - **22** — public booleans became `bool` rather than `int`, and

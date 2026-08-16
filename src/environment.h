@@ -97,6 +97,8 @@ extern const char *const rg_env_long_range_slots[];
 extern const size_t rg_env_long_range_slot_count;
 extern const char *const rg_env_stress_slots[];
 extern const size_t rg_env_stress_slot_count;
+extern const char *const rg_env_syllable_slots[];
+extern const size_t rg_env_syllable_slot_count;
 
 /* Every stress value the environment's three stress slots name, in slot order,
  * handed to `add` one at a time. Both discovery stages build an inventory of

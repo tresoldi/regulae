@@ -42,6 +42,91 @@ static uint64_t permutation_next(uint64_t *state) {
 }
 
 /* Mean cost per segment over every cognate set the model can score. */
+static int double_cmp(const void *a, const void *b) {
+    double x = *(const double *)a;
+    double y = *(const double *)b;
+    if (x < y) {
+        return -1;
+    }
+    return x > y ? 1 : 0;
+}
+
+/* The best two-way split of a set of per-cognate costs, and how far apart the
+ * two sides of it are.
+ *
+ * A mean says nothing about shape, and some corpora are not one thing. Half a
+ * wordlist borrowed from an unrelated neighbour aligns beautifully and the
+ * other half does not, with no overlap; so does a wordlist with a block of bad
+ * cognate judgements in it, and so does one assembled from two sources. All
+ * three are worth knowing about and none of them moves the mean much.
+ *
+ * Sorted costs make the optimal one-dimensional two-means split a single scan:
+ * for every place the sorted values could be cut, the within-group sum of
+ * squares falls out of prefix sums, and the cut with the smallest one is the
+ * split. What is reported is the distance between the two group means in
+ * pooled standard deviations, which is comparable across corpora in a way the
+ * raw costs are not.
+ *
+ * A unimodal sample still has a best cut, so this is never zero and is not a
+ * threshold. It is a number to read against the ones in this repository's
+ * fixtures, which is what the field on `rg_corpus_fit` says. */
+static void cost_split(
+    double *costs,
+    size_t count,
+    double *out_separation,
+    double *out_fraction
+) {
+    double *prefix;
+    double *prefix_sq;
+    size_t k;
+    size_t best_k = 0;
+    double best_wss = 0.0;
+    int have_best = 0;
+
+    *out_separation = 0.0;
+    *out_fraction = 0.0;
+    if (count < 4) {
+        return;
+    }
+    qsort(costs, count, sizeof(*costs), double_cmp);
+    prefix = (double *)calloc(count + 1, sizeof(*prefix));
+    prefix_sq = (double *)calloc(count + 1, sizeof(*prefix_sq));
+    if (prefix == 0 || prefix_sq == 0) {
+        free(prefix);
+        free(prefix_sq);
+        return;
+    }
+    for (k = 0; k < count; k++) {
+        prefix[k + 1] = prefix[k] + costs[k];
+        prefix_sq[k + 1] = prefix_sq[k] + costs[k] * costs[k];
+    }
+    /* Both sides need two members before a spread means anything. */
+    for (k = 2; k + 2 <= count; k++) {
+        double low_n = (double)k;
+        double high_n = (double)(count - k);
+        double low_ss = prefix_sq[k] - prefix[k] * prefix[k] / low_n;
+        double high_ss = (prefix_sq[count] - prefix_sq[k]) -
+                         (prefix[count] - prefix[k]) * (prefix[count] - prefix[k]) / high_n;
+        double wss = low_ss + high_ss;
+        if (!have_best || wss < best_wss) {
+            best_wss = wss;
+            best_k = k;
+            have_best = 1;
+        }
+    }
+    if (have_best) {
+        double pooled = best_wss / (double)(count - 2);
+        double low_mean = prefix[best_k] / (double)best_k;
+        double high_mean = (prefix[count] - prefix[best_k]) / (double)(count - best_k);
+        if (pooled > 0.0) {
+            *out_separation = (high_mean - low_mean) / sqrt(pooled);
+        }
+        *out_fraction = (double)(count - best_k) / (double)count;
+    }
+    free(prefix);
+    free(prefix_sq);
+}
+
 static rg_status corpus_cost_per_segment(
     const rg_context *ctx,
     const rg_multi_model *model,
@@ -49,24 +134,39 @@ static rg_status corpus_cost_per_segment(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     double *out_mean,
-    size_t *out_scored
+    size_t *out_scored,
+    double *out_separation,
+    double *out_fraction
 ) {
     size_t c;
     size_t scored = 0;
     double total = 0.0;
+    double *costs = 0;
     int max_chunk_size = options != 0 && options->max_chunk_size > 0
         ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
 
     *out_mean = 0.0;
     *out_scored = 0;
+    if (out_separation != 0) {
+        *out_separation = 0.0;
+        *out_fraction = 0.0;
+        costs = (double *)calloc(cognate_count == 0 ? 1 : cognate_count, sizeof(*costs));
+        if (costs == 0) {
+            return RG_ERR_OOM;
+        }
+    }
     for (c = 0; c < cognate_count; c++) {
         double cost = 0.0;
         int pair_count = 0;
         rg_status status = score_cognate_set(ctx, model, options, &cognates[c], max_chunk_size, &cost, &pair_count);
         if (status != RG_OK) {
+            free(costs);
             return status;
         }
         if (pair_count > 0) {
+            if (costs != 0) {
+                costs[scored] = cost;
+            }
             total += cost;
             scored++;
         }
@@ -75,6 +175,10 @@ static rg_status corpus_cost_per_segment(
         *out_mean = total / (double)scored;
     }
     *out_scored = scored;
+    if (costs != 0) {
+        cost_split(costs, scored, out_separation, out_fraction);
+        free(costs);
+    }
     return RG_OK;
 }
 
@@ -332,7 +436,8 @@ rg_status run_permutation_baseline(
         if (status != RG_OK) {
             break;
         }
-        status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count, &cost, &scored);
+        status = corpus_cost_per_segment(ctx, shuffled, &nested, sets, cognate_count,
+                                         &cost, &scored, 0, 0);
         if (status == RG_OK && scored > 0) {
             costs[completed] = cost;
             uncond += (double)shuffled->unconditioned_class_count;
@@ -420,7 +525,9 @@ rg_status compute_corpus_fit(
         }
     }
     status = corpus_cost_per_segment(ctx, model, options, cognates, cognate_count,
-                                     &model->fit.cost_per_segment, &model->fit.scored_set_count);
+                                     &model->fit.cost_per_segment, &model->fit.scored_set_count,
+                                     &model->fit.cost_split_separation,
+                                     &model->fit.cost_split_fraction);
     if (status != RG_OK || baseline->runs == 0) {
         return status;
     }
