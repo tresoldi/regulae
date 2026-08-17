@@ -5,38 +5,39 @@ API from the perspective of a downstream package that wants to
 *consume* its output — historical inference, visualization,
 cross-family comparison, whatever.
 
-**On names.** The contract below is written in the original
-Python spelling (`train_model`, `MultiLectModel`,
-`snake_case` fields). The implementation is a C99 core, so the
-authoritative spelling of any name is `include/regulae.h`:
-`train_model` is `rg_train_model`, `MultiLectModel` is the
-opaque `rg_multi_model` read through `rg_multi_model_*`
-accessors, `find_cognate_outliers` is
-`rg_find_cognate_outliers`, and the loaders are
-`rg_corpus_load_*`. What each field *means*, and what it does not
-mean, is the point of this document.
+**Two interfaces, one contract.** The core is a C99 library, and
+its output has two faces that carry the same data:
 
-**The public surface changed shape on 2026-08-16, and this document has been
-brought with it.** Every published table is now handed out whole
-rather than through a count function and an index function
-(§4.9), and the four fields that say what a search decided about a
-rule moved into one `evidence` member on the rows that carry them
-(§4.6). `RG_ABI_VERSION` is 28. Group-held-out predictive evidence is the
-newest source-level break; named split scorers and observation-group metadata
-remain governed by §7.
+- The **C ABI** — the opaque `rg_multi_model` read through
+  `rg_multi_model_*` accessors, declared in `include/regulae.h`.
+  This is the authoritative spelling: `train_model` is
+  `rg_train_model`, a class row is `rg_multi_class_row`, and so on.
+- The **JSON** the core renders (`rg_model_to_json`, the CLI's
+  `train --json`), which is the same model as a string. The
+  **Python package** is a thin wrapper that trains through the C
+  core and parses that JSON into dataclasses (§2); it does no
+  modelling of its own, so the JSON schema *is* the Python schema.
 
-This document said until 2026-08-15 that the meanings were
-"unchanged", and it was wrong in four places: a cross-dimensional
-rule's environment is a whole `Context` rather than one feature at
-one position (§6), the model does not retain the input corpus
-(§4.4), `Context` gained the segment-itself and morphological
-slots (§5), and there is no Python package to install (§2). The
-reliability fields — `standing`, `search_margin`,
-`decision_index`, the contrast counts, `rg_corpus_fit` — were
-never described here at all, and they are what decides whether an
-inference built on this output is defensible. §4.6 is that
-section. **Where this document and `include/regulae.h` disagree,
-the header is right.**
+This document describes what each field *means*, and what it does
+not mean, in a readable dataclass spelling that follows the Python
+wrapper. Where a name differs, the C accessor is given alongside.
+**Where this document and `include/regulae.h` disagree, the header
+is right.**
+
+`RG_ABI_VERSION` is 34. The public surface has moved since this
+guide was first written: every published table is handed out whole
+rather than through a count/index pair (§4.9); the fields that say
+what a search decided moved into one `evidence` member (§4.6); a
+class row names its distinct supporting sets (§4.2) and links to
+the row that contrasts it (§4.3); a deletion has a row shape (§4.9,
+§6); and a cross-dimensional rule can be lect-internal (§6). The
+Python wrapper replaced a full reimplementation on 2026-08-17
+(§2) — the retired code is under `docs/legacy_python/`.
+
+The reliability fields — `standing`, `search_margin`,
+`decision_index`, the contrast counts, `rg_corpus_fit` — are what
+decide whether an inference built on this output is defensible.
+§4.6 is that section.
 
 The target reader is someone building a separate package (not
 modifying `regulae` itself) who needs to know:
@@ -72,9 +73,12 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   cognate; regulae never decides that for them. A non-cognate pair
   passed into training will be trained on alongside the real
   cognates and its segment pairings will contribute to the
-  learned counts. The only post-hoc recourse is
-  `find_cognate_outliers`, a diagnostic that z-scores cognate
-  sets by alignment cost so a human reviewer can flag suspects.
+  learned counts. The only post-hoc recourse is the outlier
+  diagnostic — `rg_find_cognate_outliers`, and the CLI's
+  `regulae outliers` — which z-scores cognate sets by alignment
+  cost so a human reviewer can flag suspects. The thin wrapper does
+  not surface it; the model JSON's `outliers` section (on `.raw`)
+  carries the same ranking.
 - **No directionality.** The pairwise alignment and scoring
   functions are symmetric. "Source" and "target" in the API are
   positional labels inside a pair, not a claim that one is the
@@ -135,9 +139,9 @@ cross-dimensional rules (e.g. tonogenesis) layered on top.
   without it is presenting the wrong number.
 - **No time.** Lects are referred to by string IDs; there are no
   dates, epochs, or temporal orderings anywhere in the output.
-- **No proto-forms.** A `MultiLectCorrespondenceClass` names
-  which segment appears in each participating lect; it does not
-  reconstruct what "the proto-segment" was, because
+- **No proto-forms.** A `CorrespondenceClass` names which segment
+  appears in each participating lect; it does not reconstruct what
+  "the proto-segment" was, because
   reconstruction presupposes a topology (see
   `07_historical_inference.md` §4).
 - **No phylogeny.** regulae never builds a tree, network, or
@@ -159,99 +163,121 @@ variables.
 
 ## 2. Installation and import
 
-**There is no installable Python package today.** The original
-implementation is archived under `python/` and is not built,
-tested or supported; the Python wrapper over the C core is M6 on
-the roadmap and has not been written. A consumer today links the
-C library:
+**C consumers** link the library:
 
 ```sh
 cmake -S . -B build && cmake --build build
 # libregulae.a (or .so), include/regulae.h, and merkmal alongside it
 ```
 
-`include/regulae.h` is the contract, and `README.md` has a tour
-of it. The Python spelling below describes the *shape* of what
-that API returns, which is what the rest of this document is
-about; the archived listing is kept because it reads better than
-a list of accessor names, not because it can be imported.
+`include/regulae.h` is the contract, and `README.md` has a tour of
+it. `RG_API` marks the exported surface: anything without it is not
+public, and the `*_internal` symbols are hidden by the visibility
+preset.
 
-The archived package exposed its public API on `regulae` at the
-top level:
+**Python consumers** install the wrapper, which compiles the C core
+straight into a CPython extension — so a built wheel needs neither
+`libregulae` nor the merkmal Python package:
 
-```python
-from regulae import (
-    CognateSet, Form, Segment,       # inputs
-    train_model,                     # the canonical entry point
-    cognate_sets_from_pairs,         # pair → multi-lect migration helper
-    MultiLectModel, LearnedModel,    # outputs
-    MultiLectCorrespondenceClass,
-    ConditionedCorrespondence,
-    CrossDimensionalLink,
-    Context, FeatureConstraint,      # conditioning
-    load_gled, load_arcaverborum,    # loaders
-    find_cognate_outliers,           # diagnostic
-)
+```sh
+pip install -e .          # from the repository root
 ```
 
-That list was in `python/src/regulae/__init__.py` under
-`__all__`. For the C API the equivalent boundary is `RG_API` in
-`include/regulae.h`: anything not marked with it is not exported,
-and the `*_internal` symbols that carry external linkage for the
-library's own use are hidden by the visibility preset.
+The merkmal C is found at `../merkmal` by default
+(`REGULAE_MERKMAL_SOURCE_DIR` overrides it). The wrapper is
+deliberately small — it trains and reads JSON, nothing more:
+
+```python
+import regulae
+
+model = regulae.train_model(open("cognates.tsv").read(), fmt="tsv")
+
+# The trimmed surface, all parsed from the C core's JSON:
+regulae.MultiLectModel           # the output (§4)
+regulae.CorrespondenceClass      # a class row (§4.2, §4.3)
+regulae.CrossDimensionalRule     # §6
+regulae.PairwiseModel            # a pair's tables, incl. gaps (§4.1, §6)
+regulae.GapCorrespondence        # a deletion or epenthesis (§6)
+regulae.Segment, regulae.Uncertainty, regulae.PredictiveEvidence
+regulae.GAP_GRAPHEME             # the "∅" a deleting lect carries
+regulae.RegulaeError, regulae.SourceMarkerError
+```
+
+The wrapper used to be a full reimplementation of the engine; it
+drifted behind the C and was retired to `docs/legacy_python/` on
+2026-08-17. The fine-grained primitives it exposed (`score_link`,
+`align_forms`, `find_cognate_outliers`, the EM internals) are gone
+— they existed only because Python had its own engine. What
+remains is the model and the loaders. Any field the dataclasses do
+not surface is on `MultiLectModel.raw`, the parsed JSON verbatim.
 
 ## 3. The canonical entry point
 
+In Python, `train_model` takes a corpus as text or a path and
+returns a `MultiLectModel`:
+
 ```python
-from regulae import train_model, cognate_sets_from_pairs, CognateSet
+import regulae
 
-# Input: a list of CognateSets.
-corpus: list[CognateSet] = ...
-
-# Canonical call. Returns a MultiLectModel for N ≥ 1 lects.
-model = train_model(corpus)
+model = regulae.train_model(
+    "cognates.tsv",          # a path, or the corpus as a string
+    fmt="tsv",               # "wide" | "tsv" | "gled" | "arcaverborum"
+    options={"permutation_count": 100},   # optional, passed to the core
+)
 ```
 
-Two ways to build the `corpus`:
+`fmt` selects the loader: `"wide"` is one row per cognate with a
+column per lect; `"tsv"` is one row per (cognate, lect);
+`"gled"` and `"arcaverborum"` read those dataset formats. `options`
+is a flat mapping the C core reads (`rg_train_options_from_json`),
+which rejects unknown keys.
 
-1. **Loaders** — `load_gled(path, family="Indo-European",
-   doculects={"LATIN", "SPANISH"})` or
-   `load_arcaverborum(path, dataset="walworthpolynesian",
-   language_ids={...})` return a `list[CognateSet]` directly.
-2. **Hand-built** — construct `CognateSet` objects with
-   `cognate_id` and a `forms` mapping `lect_id -> Form`.
-3. **Legacy pair helper** — if you have a
-   `list[tuple[Form, Form]]` pair corpus,
-   `cognate_sets_from_pairs(pairs, ("lect_a", "lect_b"))`
-   converts it into the canonical form.
+In C the same call is `rg_train_model(ctx, cognates, count,
+&options, &model)`, over a `rg_cognate_set` array built by one of
+the `rg_corpus_parse_*` / `rg_corpus_load_*` loaders. The loaders
+are where a corpus is assembled; there is no hand-built dataclass
+path in the wrapper, because the wrapper hands the corpus text
+straight to the core.
 
-`train_model` is **deterministic**: identical inputs produce
-bitwise-identical outputs, cross-process. This is a guaranteed
-invariant (covered by `test_invariants.py`). All internal
-discovery loops are sequential-greedy with deterministic
-tiebreakers, vocabulary iteration is sorted, and the merkmal
-dependency is configured to avoid cross-process drift.
+Training is **deterministic**: identical inputs produce
+bitwise-identical outputs, cross-process. All internal discovery
+loops are sequential-greedy with deterministic tiebreakers,
+vocabulary iteration is sorted, and the merkmal dependency is
+configured to avoid cross-process drift (§8).
 
 ## 4. The output shape: `MultiLectModel`
 
-`MultiLectModel` is a frozen dataclass with five fields:
+`MultiLectModel` is a frozen dataclass parsed from the model JSON:
 
 ```python
 @dataclass(frozen=True)
 class MultiLectModel:
-    pairwise_models:       Mapping[frozenset[str], LearnedModel]
-    unconditioned_classes: tuple[MultiLectCorrespondenceClass, ...]
-    conditioned_classes:   tuple[MultiLectCorrespondenceClass, ...]
-    cognate_corpus:        tuple[CognateSet, ...]
-    lect_ids:              tuple[str, ...]
+    lects:                 tuple[str, ...]
+    unconditioned_classes: tuple[CorrespondenceClass, ...]
+    conditioned_classes:   tuple[CorrespondenceClass, ...]
+    cross_dimensional:     tuple[CrossDimensionalRule, ...]
+    pairwise_models:       tuple[PairwiseModel, ...]
+    fit:                   dict          # rg_corpus_fit, §4.6
+    regulae_version:       str
+    raw:                   dict          # the parsed JSON verbatim
 ```
+
+`.classes` returns the unconditioned rows then the conditioned
+ones. Anything not surfaced as a field is on `.raw` — the model
+JSON is the whole contract, and `.raw` is that JSON. The C reads
+the same data through `rg_multi_model_*` accessors over the opaque
+`rg_multi_model`.
 
 ### 4.1 `pairwise_models`
 
-A mapping keyed by `frozenset({lect_a, lect_b})` — explicitly
-*not* an ordered tuple, because pairwise training is symmetric
-(see §1). A pair missing from the mapping means the two lects
-had no shared cognate data in the corpus.
+A tuple of `PairwiseModel`, one per lect pair that had shared
+cognate data. Pairwise training is symmetric (§1), so `(a, b)` and
+`(b, a)` are one entry; a pair absent from the tuple means the two
+lects shared no cognates. Each carries the pair's `conditioned`
+correspondences and its `gaps` (§6). The full per-pair segment,
+displacement, tonal and chunk tables are on the C
+`rg_pairwise_model` and in `.raw`; the wrapper surfaces the two a
+downstream consumer reaches for.
 
 In C this is `rg_multi_model_pair_model_at`, which returns an
 `rg_multi_pair_model_row` carrying `lect_a`, `lect_b` and the
@@ -263,42 +289,37 @@ aligned in — but the analysis it holds is not: training A against
 B and B against A produce mirror models, and the tests assert it.
 Read the pair as a labelled edge, not as a direction of change.
 
-Each value is a `LearnedModel` — the full per-pair training
-output for that lect pair. It carries:
+The wrapper's `PairwiseModel` surfaces the two per-pair tables a
+downstream consumer usually reaches for: `conditioned`, a tuple of
+`ConditionedCorrespondence` (one source grapheme to one target
+under one `Context`, §5), and `gaps`, a tuple of `GapCorrespondence`
+(a segment answering to nothing, §6). The C `rg_pairwise_model`
+carries more, each with its own accessor and each present in the
+JSON on `MultiLectModel.raw`:
 
-- `segment_table`: a `SegmentCorrespondenceTable` of
-  `ConditionedCorrespondence → count` entries. Each
-  correspondence binds one source grapheme to one target
-  grapheme under one `Context`. The context may be empty
-  (unconditioned) or carry immediate-neighbour, long-range, or
-  syllable-structural constraints (see §5).
-- `displacement_dist`: a `DisplacementDistribution` over
-  `tuple[FeatureDisplacement, ...]` — the feature-space
-  signature of how segments changed, aggregated across all 1-to-1
-  links. This is what lets natural classes be discovered across
-  different grapheme pairs (e.g. the same displacement vector
-  produces `p~f`, `t~θ`, `k~x`).
-- `chunk_table`: a `ChunkPhraseTable` of promoted chunk
-  correspondences — multi-segment → multi-segment patterns the
-  EM loop decided were worth memorising (e.g. Latin `kt → tʃ`
-  in Italian).
-- `tonal_table`: a `TonalCorrespondenceTable` mapping source tone
-  to target tone with counts, for pairs where tones are present.
-- `cross_dimensional_table`: a `CrossDimensionalLinkTable` of
-  committed cross-dimensional rules where a segmental
-  feature at one position predicts a tonal value at another
-  (the tonogenesis pattern). Empty by default.
+- `rg_pairwise_model_segment_counts`: the 1-to-1 correspondence
+  table, the emission model alignment is scored against.
+- `rg_pairwise_model_displacements`: the feature-space signature of
+  how segments changed, aggregated across all 1-to-1 links — what
+  lets a natural class be found across different grapheme pairs
+  (the same displacement vector behind `p~f`, `t~θ`, `k~x`).
+- `rg_pairwise_model_chunks`: promoted multi-segment
+  correspondences (e.g. Latin `kt → tʃ` in Italian).
+- `rg_pairwise_model_tonal_counts`: source tone to target tone,
+  for pairs where tone is present.
+- `rg_pairwise_model_gap_counts`: the gap table §6 describes.
+- `rg_pairwise_model_cross_dimensional_rows`: the pair's
+  cross-dimensional rules, lifted into `model.cross_dimensional`.
 
 For most downstream consumers the pairwise models are
-**low-level, detail-heavy**. The recommended consumption pattern
-is to read `conditioned_classes` and `unconditioned_classes`
-first (§4.2, §4.3), and only descend into `pairwise_models` when
-you need a specific lect pair's full table.
+**low-level, detail-heavy**. Read `conditioned_classes` and
+`unconditioned_classes` first (§4.2, §4.3), and descend into
+`pairwise_models` only for a specific pair's tables.
 
 ### 4.2 `unconditioned_classes`
 
-A tuple of `MultiLectCorrespondenceClass`, sorted by count
-descending, then by segment tuple. Each class says:
+A tuple of `CorrespondenceClass`, sorted by count descending, then
+by segment tuple. Each class says:
 
 > "Across the corpus, when these N lects have segments at
 > corresponding positions within a cognate, this is one of the
@@ -311,19 +332,34 @@ count, and every participating lect contributes a segment.
 
 ```python
 for klass in model.unconditioned_classes:
-    # A frozen mapping lect_id -> grapheme.
-    print(klass.segments)     # e.g. {"LATIN": "k", "SPANISH": "tʃ"}
-    print(klass.count)        # e.g. 8.0
-    print(klass.confidence)   # 1.0 for unconditioned classes
+    print(klass.graphemes)              # {"LATIN": "k", "SPANISH": "tʃ"}
+    print(klass.count)                  # aligned positions, e.g. 8.0
+    print(len(klass.supporting_cognates))  # distinct sets, §4.2 below
+    print(klass.confidence)             # 1.0 for unconditioned classes
 ```
+
+`segments` is a tuple of `Segment` (`.lect`, `.grapheme`, and a
+per-lect `.context` on conditioned classes); `.graphemes` is the
+`lect -> grapheme` mapping. A `Segment` whose grapheme is
+`GAP_GRAPHEME` marks a lect that deleted the segment the others
+keep (§6), so a class can carry a `∅`.
+
+**Read `len(supporting_cognates)`, not `count`, for how many
+cognate sets a class rests on.** `count` is aligned positions
+weighted by cognate confidence, so one word with a geminate or a
+repeated segment reaches 2 without the correspondence recurring
+anywhere. `supporting_cognates` lists each set once (from ABI 30);
+its length is the recurrence a reader wants, and an adjudication
+panel repeatedly mistook `count` for it. On the C side this is
+`rg_multi_class_row.supporting_cognates` /
+`supporting_cognate_count`.
 
 ### 4.3 `conditioned_classes`
 
-Same shape as unconditioned, but with a non-None `contexts`
-field: a per-lect mapping `lect_id -> Context` describing the
-conditioning environment under which that lect's segment
-appears. A lect without a specific constraint has the empty
-`Context()`.
+Same shape as unconditioned, but at least one `Segment` carries a
+non-empty `.context` — the conditioning environment under which
+that lect's segment appears (`klass.conditioned` is true). A lect
+without a specific constraint carries no context.
 
 **One segment tuple may appear in several conditioned classes,
 and code that indexes this list by tuple has to expect that.**
@@ -350,14 +386,27 @@ Reading a conditioned class:
 
 ```python
 for klass in model.conditioned_classes:
-    print(klass.segments)
+    print(klass.graphemes)
     print(klass.count)
-    print(klass.confidence)   # coverage-based strength in [0, 1]
-    for lect, ctx in klass.contexts.items():
-        if ctx.constraint_count() > 0:
-            # This lect has a specific conditioning environment.
-            ...
+    print(klass.confidence)          # coverage-based strength in [0, 1]
+    for seg in klass.segments:
+        if seg.context:              # this lect's conditioning environment
+            print(seg.lect, seg.context)
+    # The row that holds the pivot's other reflex out of the environment:
+    print(klass.contrast_class_id)   # -1 when there is none
 ```
+
+**A conditioned class's `contrast_count` is ~0 by construction,
+and `contrast_class_id` is the number to read instead.** A real
+split exists because the pivot takes a *different* reflex out of
+the environment, so the same tuple barely recurs there;
+`contrast_count` measures that same tuple and is near zero exactly
+when the conditioning holds. `contrast_class_id` (from ABI 31) is
+the id of the class holding the pivot's *other* reflex — on Verner,
+the conditioned `gothic:d ~ pgmc:θ` before a vowel points at
+`gothic:d ~ pgmc:d` — and `contrast_alternative_count` is that
+reflex's mass in the complement. `-1` where there is none. Look the
+id up in `model.classes` (unconditioned first, then conditioned).
 
 The `confidence` field on conditioned classes is the
 **pivot-bucket coverage**: `count / pivot_bucket_size` where
@@ -369,15 +418,17 @@ minority). Use this to sort or filter classes by signal
 strength when your downstream stage is sensitive to marginal
 evidence.
 
-### 4.4 `cognate_corpus`
+### 4.4 Provenance: there is no `cognate_corpus`
 
-**Not on the C model.** The Python model retained the input
-corpus for provenance; `rg_multi_model` does not, and there is no
-accessor for it. The corpus is a handle the caller already owns
-(`rg_corpus`, from one of the loaders), and it has to outlive the
-training call anyway, because the model borrows from it. Walking
-back from a class to the source forms means keeping that handle,
-not asking the model for it.
+**The model does not retain the input corpus.** The retired Python
+model kept it; `rg_multi_model` does not, and neither does the
+wrapper. In C the corpus is a handle the caller already owns
+(`rg_corpus`, from one of the loaders) and it outlives the training
+call anyway, because the model borrows from it — walking back from
+a class to the source forms means keeping that handle. In the
+wrapper the corpus was a string the caller passed in; the model
+JSON does carry `alignments` and `outliers` sections, reachable on
+`MultiLectModel.raw`, but not the corpus itself.
 
 `rg_multi_class_row.supporting_cognates` is the anchor that does
 exist: the cognate ids a class was built from, so a consumer can
@@ -392,12 +443,12 @@ by `count` will make it silently. From ABI 30 each set is listed
 once; before it, an id appeared once per position, so the list's
 length agreed with `count` and answered nothing.
 
-### 4.5 `lect_ids`
+### 4.5 `lects`
 
-The canonical ordered list of lect IDs observed in the corpus.
-First-seen order — **not** alphabetical. This ordering is stable
-and deterministic; downstream packages can rely on it as an
-index.
+The canonical ordered list of lect IDs observed in the corpus
+(`MultiLectModel.lects`; `rg_multi_model_lects` in C). First-seen
+order — **not** alphabetical. This ordering is stable and
+deterministic; downstream packages can rely on it as an index.
 
 ### 4.6 What the model says about its own reliability
 
@@ -690,31 +741,32 @@ static inline const rg_multi_class_row *conditioned_at(
 binary-search it. That is not the order the rules were decided
 in, which is on each row's `evidence.decision_index` (§4.6).
 
-## 5. The conditioning environment: `Context`
+## 5. The conditioning environment
 
-```python
-@dataclass(frozen=True)
-class Context:                                # C: rg_context_spec
-    position:             str | None = None   # "initial"|"medial"|"final"
-    preceding:            tuple[FeatureConstraint, ...] = ()
-    following:            tuple[FeatureConstraint, ...] = ()
-    self_:                tuple[FeatureConstraint, ...] = ()
-    # Morphological, from boundaries the caller supplied:
-    morphological:        str | None = None   # "initial"|"final"|"internal"|"only"
-    morpheme_index:       str | None = None   # "0", "1", ... counted from the start
-    # Long-range fields:
-    preceding_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
-    following_at_distance: tuple[tuple[int, FeatureConstraint], ...] = ()
-    somewhere_preceding:   tuple[FeatureConstraint, ...] = ()
-    somewhere_following:   tuple[FeatureConstraint, ...] = ()
-    same_syllable:         tuple[FeatureConstraint, ...] = ()
-    next_syllable:         tuple[FeatureConstraint, ...] = ()
-    previous_syllable:     tuple[FeatureConstraint, ...] = ()
-    # Stress, which is a dimension rather than a feature of a neighbour:
-    self_stress:           tuple[FeatureConstraint, ...] = ()
-    preceding_stress:      tuple[FeatureConstraint, ...] = ()
-    following_stress:      tuple[FeatureConstraint, ...] = ()
+A conditioning environment is `rg_context_spec` in C. In the JSON —
+and so on the wrapper's `Segment.context` and a rule's
+`.environment` — it is a plain object with a slot per axis, each
+slot a list of `{"feature": ..., "value": ...}` constraints
+(`"position"` is a bare string). The slots:
+
 ```
+position               "initial" | "medial" | "final"
+preceding, following   the immediate neighbours
+self                   the segment the environment is about
+morphological          "initial" | "final" | "internal" | "only"
+morpheme_index         "0", "1", ... counted from the start
+preceding_at_distance, following_at_distance   [offset, constraint]
+somewhere_preceding, somewhere_following       anywhere on that side
+same_syllable, next_syllable, previous_syllable
+self_stress, preceding_stress, following_stress
+```
+
+A slot present with constraints is a **conjunction**: every one
+must hold. `{"feature": "front", "value": "+"}` means the relevant
+segment has `front` set to `+`. An empty or absent environment is
+unconditioned. In C the same structure is walked field by field,
+and `rg_context_spec_compare_internal` / `rg_context_spec_is_subset`
+are the ordering and lookup primitives.
 
 Three of those slots are newer than the rest of this document and
 matter to a consumer.
@@ -733,22 +785,15 @@ all, so an absent value means "not asked", not "not conditioned".
 a prefixing one, where the same index is a different thing.
 
 A non-empty field is a **conjunction**: every `FeatureConstraint`
-in the tuple must hold for the context to apply. A
-`FeatureConstraint("front", "+")` means "the relevant segment
-has the feature `front` set to `+`".
+in the list must hold for the context to apply.
 
-Subset semantics are provided by `Context.is_subset_of`: a table
-entry context matches a link context iff every constraint in the
-table entry is present in the link.
-
-Two methods you'll probably want:
-
-- `ctx.constraint_count()` → total number of constraints across
-  all slots. Useful for "is this an unconditioned context?"
-  (count == 0) or sorting by specificity.
-- `ctx.is_subset_of(other_ctx)` → does this context match the
-  other? (You probably won't need this directly; it's the
-  internal lookup primitive.)
+To tell an unconditioned environment from a conditioned one, check
+whether any slot carries a constraint — the total constraint count
+across slots is zero for the empty environment, and rises with
+specificity. Subset semantics (does a table-entry environment match
+a link's environment — every constraint in the entry present in the
+link) are the lookup primitive; in C that is
+`rg_context_spec_is_subset`.
 
 The long-range slots let the framework express rules like
 "a → æ when the *next* syllable has a front vowel" without
@@ -763,25 +808,30 @@ Conditioning is discovered from both sides, because a change is only visible
 from the side that has the split, and a consumer that ignores the flag will
 read half its rules against the wrong form.
 
-## 6. Cross-dimensional rules: `CrossDimensionalLink`
+## 6. Cross-dimensional rules and gaps
+
+Two row shapes live under this section: a **cross-dimensional
+rule**, where a feature conditions a suprasegmental dimension, and
+a **gap**, where a segment answers to nothing.
 
 ```python
 @dataclass(frozen=True)
-class CrossDimensionalLink:            # C: rg_cross_dimensional_row
-    environment:         Context       # not one feature at one position
+class CrossDimensionalRule:            # C: rg_cross_dimensional_row
+    environment:         dict          # a Context, not one feature at one position
     context_is_target:   bool          # which form the environment is read from
     dimension_from_environment: bool   # ABI 34: tone read from the env's own form
+    environment_lect:    str
+    conditioned_lect:    str           # == environment_lect when lect-internal
     dimension:           str           # "tone"|"length"|"stress"
     value:               str           # e.g. "4" for tone 4
     position_offset:     int           # signed offset from the link
     count:               float         # observed matches
-    src_count:           float         # observations in the environment
-    confidence:          float         # count / src_count
+    source_count:        float         # observations in the environment
+    confidence:          float         # count / source_count
     contrast_count:      float         # matches outside the environment
-    contrast_src_count:  float         # observations outside it
-    contrast_confidence: float         # contrast_count / contrast_src_count
-    evidence:            RuleEvidence   # what the search decided (§4.6)
-    uncertainty:         UncertaintyEstimate
+    contrast_confidence: float         # contrast_count / contrast_source_count
+    uncertainty:         Uncertainty
+    predictive:          PredictiveEvidence
 ```
 
 **The environment is a whole `Context`, not a single feature at a
@@ -819,8 +869,8 @@ perturb the segment tables.
 P(value | environment), and a rule holding at 0.9 where the
 contrast also holds at 0.9 is the ambient distribution rather
 than a conditioning effect. The contrast fields are what make the
-row a claim; `evidence.delta_score` scores the environment as a whole under
-`evidence.scorer` and is negative for every published row.
+row a claim; the search charge `search_margin` on the C row scores
+the environment as a whole and is what a rule must clear.
 
 The rule reads: "where one form satisfies `environment`, the
 other form's `dimension` carries `value` at `position_offset`
@@ -868,38 +918,82 @@ multi-lect table. Counting the per-pair copies as well would count
 them twice. The *conditioned correspondences* are the ones not
 lifted, which is why they have their own pair of counts (§4.6).
 
+### 6.1 Gaps: a segment answering to nothing
+
+```python
+@dataclass(frozen=True)
+class GapCorrespondence:               # C: rg_gap_count_row
+    grapheme:      str                 # the segment on the side that keeps it
+    deletion:      bool                # True: a loss; False: an epenthesis
+    count:         float               # times the gap link occurred
+    present_total: float               # count / present_total is the drop rate
+```
+
+A 1-to-1 table cannot say "this answers to nothing", so a deletion
+— the commonest sound change — had no row shape until ABI 32. The
+gap table (`PairwiseModel.gaps`, `rg_pairwise_model_gap_counts`)
+gives it one, per pair, keyed by the grapheme on the side that
+kept it. On real Romance data it recovers French apocope as
+`- ~ e`, `- ~ a`, `- ~ o` where Italian keeps the vowel.
+
+At the multi-lect level (from ABI 33) a loss is a class row too: a
+lect that dropped a segment the others keep appears in the class
+with `GAP_GRAPHEME` (`"∅"`), so `{french:∅, latin:u, …}` is
+apocope and not a lect missing from the row. Compare a segment's
+grapheme against `GAP_GRAPHEME` to tell a deletion from a lect that
+never had the word. Gaps appear only in unconditioned classes — a
+gap conditions nothing — and `"∅"` is never handed to the feature
+system. What still has no row is a non-one-to-one correspondence
+that is not a pure gap (a 2-to-1 fusion); those are chunk-table
+rows.
+
 ## 7. Public API stability contract
 
-The following types are **public API** and their field
-layout is stable:
+**The stable contract is the C ABI and the JSON it renders.** The
+authoritative types are the `rg_*` structs and accessors in
+`include/regulae.h`, marked with `RG_API`. The model JSON is the
+same data as a string, and the Python wrapper's dataclasses are a
+parse of it — so the schema they follow is the C library's, and a
+newer core that adds a JSON field does not break an older wrapper
+(unknown keys are ignored). The wrapper's own surface — `train_model`,
+`segment`, `version`, `MultiLectModel` and the row dataclasses — is
+small and stable, but it is a reader of the contract, not the
+contract.
 
-- `CognateSet`, `Form`, `Segment`, `Lect`
-- `MultiLectModel`, `LearnedModel`
-- `MultiLectCorrespondenceClass`, `ConditionedCorrespondence`
-- `Context`, `FeatureConstraint`, `FeatureDisplacement`
-- `CrossDimensionalLink`
-- `train_model`, `align_forms`, `find_cognate_outliers`
-- `load_gled`, `load_arcaverborum`, `load_cognates_from_tsv`,
-  `cognate_sets_from_pairs`
-
-**New fields may be added** to the frozen dataclasses as
-new capabilities land — this is how
-`LearnedModel.cross_dimensional_table` and the long-range
-slots on `Context` were added without breaking prior
-consumers. Existing fields will not be renamed, removed, or
-have their semantics changed.
-
-**In C, that promise is `RG_ABI_VERSION`, and it is weaker.**
-Adding a field to a public struct changes its layout, so it moves
-the ABI version whether or not it breaks a source-level consumer.
-The rule is: `RG_ABI_VERSION` moves on any exported struct
-layout, enum, signature or ownership change, and the reason is
-recorded in `docs/c_conversion_roadmap.md`. It is at **28**.
+**In C the version is `RG_ABI_VERSION`.** Adding a field to a
+public struct changes its layout, so it moves the version whether
+or not it breaks a source-level consumer. The rule is:
+`RG_ABI_VERSION` moves on any exported struct layout, enum,
+signature or ownership change, and the reason is recorded in
+`docs/c_conversion_roadmap.md`. It is at **34**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **34** — `rg_cross_dimensional_row` gained `dimension_from_environment`:
+  a cross-dimensional rule can now be lect-internal (an onset conditioning the
+  tone in the same lect), not only cross-lect (§6). Lect-internal rules are kept
+  out of the alignment scoring, so the class and cross-lect tables are unchanged.
+- **33** — a multi-lect class states a deletion: a lect that dropped a segment
+  the others keep appears with `RG_GAP_GRAPHEME` (`"∅"`), distinguishing a loss
+  from a lect absent from the cognate (§6). A redistribution of the unconditioned
+  table, not an addition — present-only classes that were losses in disguise
+  become gap-bearing.
+- **32** — `rg_gap_count_row` and `rg_pairwise_model_gap_counts`: a per-pair gap
+  table gives a deletion or epenthesis a row (§6). A post-EM aggregation beside
+  displacement and tone, not the scoring model.
+- **31** — `rg_multi_class_row` gained `contrast_class_id` and
+  `contrast_alternative_count`: a conditioned class links to the row holding the
+  pivot's other reflex out of the environment — the comparison `contrast_count`
+  cannot state, because it is ~0 when the conditioning is real (§4.3).
+- **30** — `rg_multi_class_row.supporting_cognates` lists each cognate set once,
+  so its length is a count of distinct sets rather than of aligned positions
+  (§4.2). Conditioned classes now carry the list too, having published an empty
+  one before.
+- **29** — `rg_cross_dimensional_row` searches both computational orientations
+  and merges equivalent findings; `rg_corpus_fit` gained lect and pair counts
+  and near-duplicate-lect detection.
 - **28** — `rg_train_options` gained opt-in grouped predictive-validation
   settings; `rg_rule_evidence` and `rg_corpus_fit` gained predictive evidence;
   `rg_predictive_status`, `rg_predictive_score`,
@@ -967,9 +1061,10 @@ cost of a break will rise with it.
 - The specific numeric values of BIC thresholds, dominance
   floors, and similar tuning constants. These are tuned
   empirically and will move.
-- Intermediate outputs like `PatternHypothesis` from
-  `find_residual_patterns`. The diagnostic itself is public
-  but its internal candidate enumeration can change.
+- The debug/inspection labelling of `rg_model_to_json`: it is a
+  single maximum-a-posteriori snapshot, not the ensemble
+  interchange format, and the wrapper reads exactly it. Fields may
+  be added to the JSON; the wrapper ignores keys it does not know.
 
 When a downstream layer like morphological alignment or the
 historical-inference package starts introducing changes that
@@ -1020,18 +1115,18 @@ regulae. In API terms:
 | historical-inference input | regulae output |
 |---|---|
 | multi-lect correspondence classes as likelihood constraints | `MultiLectModel.unconditioned_classes` + `.conditioned_classes` |
-| evidence for structured sound change (regularity) | `MultiLectCorrespondenceClass.contexts` non-None |
-| evidence for cluster-level change | `LearnedModel.chunk_table` entries in `pairwise_models` |
-| provenance / exemplar walk-back | `MultiLectModel.cognate_corpus` + `MultiLectCorrespondenceClass.supporting_cognates` |
+| evidence for structured sound change (regularity) | a `CorrespondenceClass` with `.conditioned` true |
+| evidence for cluster-level change | the chunk table on a `rg_pairwise_model` (`.raw`) |
+| loss as evidence | a class carrying `GAP_GRAPHEME`, and `PairwiseModel.gaps` |
+| provenance / exemplar walk-back | `CorrespondenceClass.supporting_cognates` (the cognate ids) |
 
 A natural consumption sketch:
 
 ```python
-from regulae import train_model, load_arcaverborum
+import regulae
 
 # Step 1. Train the alignment layer (this package, today).
-corpus = load_arcaverborum("...", dataset="walworthpolynesian", language_ids=...)
-align_model = train_model(corpus)
+align_model = regulae.train_model("walworthpolynesian.tsv", fmt="arcaverborum")
 
 # Step 2. Build the likelihood the historical-inference layer
 #         uses. At minimum, each multi-lect class becomes a
@@ -1071,19 +1166,17 @@ Things that belong inside regulae (and not historical inference):
   regulae, not in the consuming layer. Historical inference
   should treat `MultiLectModel` as immutable observed
   evidence.
-- **Feature-system changes.** The `feature_system` string on
-  `LearnedModel` is fixed by the regulae training run. Historical
-  inference doesn't re-project segments into a different feature
-  system; if you need one, retrain regulae. The default is
-  merkmal's `distinctive`; every model records which system it was
-  trained under, and models trained under different systems are not
-  comparable.
+- **Feature-system changes.** The feature system is fixed by the
+  regulae training run. Historical inference doesn't re-project
+  segments into a different feature system; if you need one,
+  retrain regulae. The default is merkmal's `distinctive`; models
+  trained under different systems are not comparable.
 - **Cognacy filtering.** If a cognate set looks suspect after
-  historical inference runs, the workflow is: flag it, re-run
-  `find_cognate_outliers` on the regulae model, decide by hand
-  what to drop, retrain regulae. Historical inference should
-  not silently discard or down-weight cognates based on its
-  own fit.
+  historical inference runs, the workflow is: flag it, re-read the
+  outlier ranking on the regulae model (the JSON's `outliers`, or
+  `regulae outliers`), decide by hand what to drop, retrain
+  regulae. Historical inference should not silently discard or
+  down-weight cognates based on its own fit.
 
 Things that belong in historical inference (and not regulae):
 
@@ -1100,46 +1193,43 @@ Things that belong in historical inference (and not regulae):
 ## 11. Worked example: read a trained model
 
 ```python
-from regulae import (
-    train_model, load_arcaverborum, format_multi_lect_model,
-    describe_multi_lect_class,
-)
+import regulae
 
-corpus = load_arcaverborum(
-    "/path/to/arcaverborum/cldf.csv",
-    dataset="walworthpolynesian",
-    language_ids={"walworthpolynesian_Hawaiian",
-                  "walworthpolynesian_Samoan",
-                  "walworthpolynesian_Tongan"},
-)
-model = train_model(corpus)
+model = regulae.train_model("walworthpolynesian.tsv", fmt="arcaverborum")
 
-# Headline: print a readable summary.
-print(format_multi_lect_model(model, top_conditioned=10))
-
-# Walk the classes programmatically.
+# Walk the strongest classes.
 for klass in model.conditioned_classes[:5]:
-    print(f"#{klass.class_id}  count={klass.count}  conf={klass.confidence:.2f}")
-    for lect, grapheme in sorted(klass.segments.items()):
-        ctx = klass.contexts[lect] if klass.contexts else None
-        tag = f" / {ctx}" if ctx and ctx.constraint_count() > 0 else ""
-        print(f"    {lect}: {grapheme}{tag}")
+    print(f"#{klass.id}  count={klass.count}  conf={klass.confidence:.2f}"
+          f"  on {len(klass.supporting_cognates)} sets")
+    for seg in klass.segments:
+        tag = f" / {seg.context}" if seg.context else ""
+        gap = "  (deleted)" if seg.is_gap else ""
+        print(f"    {seg.lect}: {seg.grapheme}{tag}{gap}")
+    if klass.contrast_class_id >= 0:
+        other = next(c for c in model.classes if c.id == klass.contrast_class_id)
+        print(f"    vs elsewhere: {other.graphemes}")
 
-# Drill into a specific lect/grapheme for everything regulae
-# committed about it (unconditioned + conditioned + evidence).
-print(describe_multi_lect_class(model, "walworthpolynesian_Hawaiian", "ʔ"))
+# Deletions, per pair.
+for pair in model.pairwise_models:
+    for gap in pair.gaps:
+        if gap.deletion:
+            print(f"{pair.source_lect}: {gap.grapheme} lost "
+                  f"{gap.count:g}/{gap.present_total:g}")
 
-# Flag cognate sets that look suspect under the current model.
-for report in find_cognate_outliers(corpus, model, top_k=10):
-    print(f"z={report.z_score:+.2f}  {report.cognate_id}")
+# Lect-internal tonogenesis, if any.
+for rule in model.cross_dimensional:
+    if rule.dimension_from_environment:
+        print(f"{rule.environment_lect}: own onset -> {rule.dimension} {rule.value}")
+
+# Whether the corpus has signal at all (§4.6), needs permutation_count > 0.
+print("cost/segment:", model.fit["cost_per_segment"])
 ```
 
 ### 11.1 The same thing in C
 
-The above is the Python spelling this document uses throughout. Since
-the implementation is a C99 core and there is no Python surface
-(§2), here is what a consumer actually writes. It compiles clean
-under the warning set `scripts/check.sh` enforces.
+The wrapper reads the JSON the C core renders. A C consumer works
+against the model directly; here is what that looks like. It
+compiles clean under the warning set `scripts/check.sh` enforces.
 
 ```c
 #include "regulae.h"
