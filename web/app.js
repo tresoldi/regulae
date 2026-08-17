@@ -141,6 +141,16 @@ function correspondence(entry) {
   return entry.segments.map((s) => `${s.lect}:${s.grapheme}`).join("  ~  ");
 }
 
+/* A class by its id, across both tables. -1 (no contrast) returns null. */
+function classById(id) {
+  if (id === undefined || id < 0) {
+    return null;
+  }
+  return model.classes.unconditioned.find((c) => c.id === id)
+    || model.classes.conditioned.find((c) => c.id === id)
+    || null;
+}
+
 /* Renders an environment the way the guide reads it: a filter on where the
  * correspondence applies, not a rewrite rule. */
 function environment(entry) {
@@ -193,6 +203,13 @@ function renderClasses() {
       const env = document.createElement("span");
       env.className = "env";
       env.textContent = environment(entry) || "conditioned";
+      /* The pivot's other reflex out of the environment: the contrast that
+         makes it a split, and the row a visitor needs to believe it. Shown
+         inline so the comparison is not a separate hunt through the table. */
+      const contrast = classById(entry.contrast_class_id);
+      if (contrast) {
+        env.textContent += ` · else ${correspondence(contrast)}`;
+      }
       corr.appendChild(env);
     }
 

@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 30
+#define RG_ABI_VERSION 31
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -654,8 +654,31 @@ typedef struct rg_multi_class_row {
     /* The same segment tuple where the environment does not hold. Zero on an
      * unconditioned class, which has no environment and so no complement to
      * compare against -- as are that class's evidence fields, which was not
-     * committed by a search. */
+     * committed by a search.
+     *
+     * On a genuine conditioning split this is ~0 by construction: the split
+     * exists precisely because the pivot takes a DIFFERENT reflex out of the
+     * environment, so the same tuple barely recurs there. It is the wrong
+     * number to judge the split by; `contrast_class_id` names the right one. */
     double contrast_count;
+    /* The class holding the pivot's majority reflex where this row's
+     * environment does not hold -- the comparison the split was scored on, and
+     * the row a reader needs to judge it. On Verner the conditioned
+     * `gothic:d ~ pgmc:θ` (before a vowel) points here at `gothic:d ~ pgmc:d`:
+     * the contrast that makes the conditioning real, which sat in an unrelated
+     * row with nothing linking it before ABI 31.
+     *
+     * -1 on an unconditioned class, and on a conditioned class whose complement
+     * was empty or had no majority reflex. Indexes `class_id`, which is a
+     * position in the unconditioned array or, past its end, the conditioned
+     * array; the target is usually unconditioned (the pivot's aggregate other
+     * reflex) but may be another conditioned class. */
+    int contrast_class_id;
+    /* The mass of that majority reflex in the complement -- the denominator the
+     * split was scored against, local to this pivot's observations. Distinct
+     * from the linked class's own `count`, which aggregates that tuple across
+     * the whole corpus. Zero when `contrast_class_id` is -1. */
+    double contrast_alternative_count;
     rg_rule_evidence evidence;
     /* The distinct cognate sets this class rests on, each listed once however
      * many aligned positions in it realise the class. Owned by the model and

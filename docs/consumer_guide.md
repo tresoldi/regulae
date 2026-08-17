@@ -521,6 +521,20 @@ conditioning claim is a comparison, and these are the other side
 of it: a rule published without the contrast it was measured
 against cannot be read.
 
+On a conditioned multi-lect class, `contrast_count` alone will not
+answer "is this real?" — it is the *same* reflex out of the
+environment, and that is ~0 exactly when the conditioning holds,
+because a real split means the pivot takes a *different* reflex
+elsewhere. From ABI 31 the row also carries `contrast_class_id`,
+the id of the class holding that different reflex, and
+`contrast_alternative_count`, its mass in the complement. On
+Verner the conditioned `gothic:d ~ pgmc:θ` (before a vowel) points
+at `gothic:d ~ pgmc:d`: the contrast that makes the rule, which
+sat in an unrelated row with nothing linking it before. `-1` where
+there is no contrast (an unconditioned class, or a complement with
+no majority). The id indexes `class_id` — a position in the
+unconditioned array, or past its end in the conditioned array.
+
 `uncertainty` also stays on the row. How well a rate is pinned is
 a different question from whether the environment is real, and it
 is asked of every row including the aggregated tables, which

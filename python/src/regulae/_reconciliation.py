@@ -445,6 +445,11 @@ def _multi_lect_context_discovery(
     # way in, so closing it means widening the tuples that
     # _commit_multi_lect_splits_for_pivot consumes. Left as it stands rather
     # than half-done, and recorded so it reads as a gap and not an oversight.
+    #
+    # The C library's ABI 31 contrast link (a conditioned class pointing at the
+    # class holding the pivot's other reflex out of the environment) is
+    # likewise not built here, and for the same reason: this lineage carries
+    # neither contrast_count nor the complement's dominant sister.
     supporting: dict[
         tuple[str, str, Context, tuple[tuple[str, str], ...]], list[str]
     ] = defaultdict(list)

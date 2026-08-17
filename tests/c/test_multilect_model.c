@@ -175,10 +175,26 @@ static void test_conditioned_palatalization(rg_context *ctx, const rg_train_opti
             row->contexts[0].following_count > 0 &&
             row->count >= 8.0 &&
             fabs(row->confidence - 0.5) < 1e-9) {
+            /* k~s holds before a front vowel; where it does not, A:k takes B:k.
+             * That contrast is what makes the split a split, and it must be
+             * reachable -- a class id, not the ~0 same-reflex contrast_count. */
+            const rg_multi_class_row *contrast;
+            assert(row->contrast_class_id >= 0);
+            assert((size_t)row->contrast_class_id < rg_multi_model_unconditioned_class_count(model));
+            assert(row->contrast_alternative_count > 0.0);
+            contrast = rg_multi_model_unconditioned_class_at(model, (size_t)row->contrast_class_id);
+            assert(contrast != 0);
+            assert(contrast->segment_count == 2);
+            assert(strcmp(contrast->graphemes[0], "k") == 0);
+            assert(strcmp(contrast->graphemes[1], "k") == 0);
             found = 1;
         }
     }
     assert(found);
+    /* An unconditioned class has no environment, so no contrast row. */
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        assert(rg_multi_model_unconditioned_class_at(model, i)->contrast_class_id == -1);
+    }
     assert(rg_multi_model_conditioned_class_at(model, 1000) == 0);
     rg_multi_model_free(model);
     for (i = 0; i < 16; i++) {

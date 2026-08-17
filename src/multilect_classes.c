@@ -3,6 +3,7 @@
 #include "environment.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -43,6 +44,16 @@ typedef struct committed_split {
      * scored. A conditioning claim is a comparison; without these the class is
      * a number with no denominator. */
     double contrast_count;
+    /* The pivot's MAJORITY reflex where the environment does not hold: the
+     * sister the split actually contrasts against, as a full segment tuple,
+     * and its mass in the complement. contrast_count above is the same reflex
+     * out of the environment, which is ~0 exactly when the conditioning is
+     * real; this is the row a reader needs instead. Empty (count 0) when the
+     * complement is empty. */
+    char **contrast_lects;
+    char **contrast_graphemes;
+    size_t contrast_segment_count;
+    double contrast_alternative_count;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -71,6 +82,11 @@ typedef struct merged_class {
     double bucket_size;
     double winning_count;
     double contrast_count;
+    /* Index into state->committed of the split whose coverage this class
+     * reports; its contrast tuple is the class's contrast. SIZE_MAX before any
+     * split is recorded. state->committed outlives the merge and the resolve,
+     * so this reads the tuple without copying it. */
+    size_t contrast_split;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -130,6 +146,10 @@ static void discovery_state_clear(discovery_state *state) {
         free(state->committed[i].pivot_lect);
         free(state->committed[i].pivot_grapheme);
         free(state->committed[i].observation_indices);
+        string_array_clear(state->committed[i].contrast_lects,
+                           state->committed[i].contrast_segment_count);
+        string_array_clear(state->committed[i].contrast_graphemes,
+                           state->committed[i].contrast_segment_count);
         rg_context_spec_clear_internal(&state->committed[i].context);
     }
     free(state->committed);
@@ -549,6 +569,16 @@ static int multi_lect_min_commit_count(double n_total, double scale) {
     return (int)v;
 }
 
+static rg_status pivot_sister_segments(
+    const discovery_state *state,
+    const char *pivot_lect,
+    const char *pivot_grapheme,
+    size_t sister_index,
+    char ***out_lects,
+    char ***out_graphemes,
+    size_t *out_count
+);
+
 static rg_status append_committed_split(
     discovery_state *state,
     const char *pivot_lect,
@@ -558,6 +588,9 @@ static rg_status append_committed_split(
     double count,
     double bucket_size,
     double contrast_count,
+    size_t contrast_sister_index,
+    int has_contrast,
+    double contrast_alternative_count,
     double delta_bic,
     double search_margin,
     int decision_index,
@@ -599,12 +632,32 @@ static rg_status append_committed_split(
     slot->sister_index = sister_index;
     slot->count = count;
     slot->bucket_size = bucket_size;
+    slot->contrast_alternative_count = contrast_alternative_count;
+    if (has_contrast && contrast_sister_index != sister_index) {
+        /* Skip the self-link when the pivot's majority reflex is the same in
+         * and out of the environment; the split would then not change the
+         * outcome and could not have been committed, but a defensive guard is
+         * cheaper than the assumption. */
+        status = pivot_sister_segments(state, pivot_lect, pivot_grapheme,
+                                       contrast_sister_index,
+                                       &slot->contrast_lects, &slot->contrast_graphemes,
+                                       &slot->contrast_segment_count);
+        if (status != RG_OK) {
+            free(slot->pivot_lect);
+            free(slot->pivot_grapheme);
+            rg_context_spec_clear_internal(&slot->context);
+            memset(slot, 0, sizeof(*slot));
+            return status;
+        }
+    }
     if (observation_count > 0) {
         slot->observation_indices = (size_t *)calloc(observation_count, sizeof(size_t));
         if (slot->observation_indices == 0) {
             free(slot->pivot_lect);
             free(slot->pivot_grapheme);
             rg_context_spec_clear_internal(&slot->context);
+            string_array_clear(slot->contrast_lects, slot->contrast_segment_count);
+            string_array_clear(slot->contrast_graphemes, slot->contrast_segment_count);
             memset(slot, 0, sizeof(*slot));
             return RG_ERR_OOM;
         }
@@ -637,6 +690,8 @@ static rg_status emit_sister_classes(
     size_t *order;
     size_t used = 0;
     size_t i;
+    size_t dominant = 0;
+    int has_dominant = 0;
     rg_status status = RG_OK;
 
     masses = (double *)calloc(state->sister_count, sizeof(*masses));
@@ -650,6 +705,19 @@ static rg_status emit_sister_classes(
     }
     for (i = 0; i < no_count; i++) {
         contrast_masses[pivot_of(&no_obs[i])->sister_index] += no_obs[i].weight;
+    }
+    /* The complement is one partition shared by every class emitted here, so
+     * its majority reflex -- the row each of them contrasts against -- is found
+     * once. Ties break on the lower sister index for determinism. */
+    {
+        size_t s;
+        for (s = 0; s < state->sister_count; s++) {
+            if (contrast_masses[s] > 0.0 &&
+                (!has_dominant || contrast_masses[s] > contrast_masses[dominant])) {
+                dominant = s;
+                has_dominant = 1;
+            }
+        }
     }
     for (i = 0; i < yes_count; i++) {
         if (masses[pivot_of(&yes_obs[i])->sister_index] == 0.0) {
@@ -692,6 +760,9 @@ static rg_status emit_sister_classes(
             masses[order[i]],
             n_total,
             contrast_masses[order[i]],
+            dominant,
+            has_dominant,
+            has_dominant ? contrast_masses[dominant] : 0.0,
             delta_bic,
             search_margin,
             decision_index,
@@ -901,14 +972,18 @@ static void merged_classes_free(merged_class *items, size_t count) {
 
 /* Builds the full (lect, grapheme) tuple of a committed split, ascending by
  * lect id: the pivot merged into its sister tuple. */
-static rg_status committed_split_segments(
+/* Merges a pivot into a sister tuple, in sorted lect order -- the same order a
+ * published class carries, so a tuple built here can be matched against one. */
+static rg_status pivot_sister_segments(
     const discovery_state *state,
-    const committed_split *split,
+    const char *pivot_lect,
+    const char *pivot_grapheme,
+    size_t sister_index,
     char ***out_lects,
     char ***out_graphemes,
     size_t *out_count
 ) {
-    const sister_tuple *sister = &state->sisters[split->sister_index];
+    const sister_tuple *sister = &state->sisters[sister_index];
     size_t total = sister->count + 1;
     char **lects = (char **)calloc(total, sizeof(*lects));
     char **graphemes = (char **)calloc(total, sizeof(*graphemes));
@@ -922,7 +997,7 @@ static rg_status committed_split_segments(
         return RG_ERR_OOM;
     }
     for (i = 0; i < sister->count; i++) {
-        if (strcmp(sister->lects[i], split->pivot_lect) > 0) {
+        if (strcmp(sister->lects[i], pivot_lect) > 0) {
             insert_at = i;
             break;
         }
@@ -931,8 +1006,8 @@ static rg_status committed_split_segments(
         const char *lect;
         const char *grapheme;
         if (i == insert_at) {
-            lect = split->pivot_lect;
-            grapheme = split->pivot_grapheme;
+            lect = pivot_lect;
+            grapheme = pivot_grapheme;
         } else {
             size_t src = i < insert_at ? i : i - 1;
             lect = sister->lects[src];
@@ -951,6 +1026,17 @@ static rg_status committed_split_segments(
     *out_graphemes = graphemes;
     *out_count = total;
     return RG_OK;
+}
+
+static rg_status committed_split_segments(
+    const discovery_state *state,
+    const committed_split *split,
+    char ***out_lects,
+    char ***out_graphemes,
+    size_t *out_count
+) {
+    return pivot_sister_segments(state, split->pivot_lect, split->pivot_grapheme,
+                                 split->sister_index, out_lects, out_graphemes, out_count);
 }
 
 static rg_status merged_class_add_evidence(
@@ -1049,6 +1135,7 @@ static rg_status merge_committed_splits(
                  * coverage the class is reporting, not to whichever pivot
                  * merged in last. */
                 entry->contrast_count = split->contrast_count;
+                entry->contrast_split = i;
                 entry->delta_bic = split->delta_bic;
                 entry->search_margin = split->search_margin;
                 /* The earliest decision that reached this class keeps it. */
@@ -1097,6 +1184,7 @@ static rg_status merge_committed_splits(
         merged[count].bucket_size = split->bucket_size;
         merged[count].winning_count = split->count;
         merged[count].contrast_count = split->contrast_count;
+        merged[count].contrast_split = i;
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
         merged[count].decision_index = split->decision_index;
@@ -1227,6 +1315,49 @@ static rg_status attach_supporting_cognates(
     row->supporting_cognates = (const char *const *)ids;
     row->supporting_cognate_count = id_count;
     return RG_OK;
+}
+
+static int class_row_has_segments(
+    const rg_multi_class_row *row,
+    const char *const *lects,
+    const char *const *graphemes,
+    size_t count
+) {
+    size_t i;
+    if (row->segment_count != count) {
+        return 0;
+    }
+    for (i = 0; i < count; i++) {
+        if (strcmp(row->lect_ids[i], lects[i]) != 0 ||
+            strcmp(row->graphemes[i], graphemes[i]) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* The class id whose segment tuple is exactly this one, unconditioned first:
+ * a conditioned class's contrast is the pivot's aggregate other reflex, which
+ * lives in the unconditioned table, and only falls to a conditioned class when
+ * that reflex was itself split. -1 when nothing matches. */
+static int find_class_id_by_segments(
+    const rg_multi_model *model,
+    const char *const *lects,
+    const char *const *graphemes,
+    size_t count
+) {
+    size_t i;
+    for (i = 0; i < model->unconditioned_class_count; i++) {
+        if (class_row_has_segments(&model->unconditioned_classes[i], lects, graphemes, count)) {
+            return model->unconditioned_classes[i].class_id;
+        }
+    }
+    for (i = 0; i < model->conditioned_class_count; i++) {
+        if (class_row_has_segments(&model->conditioned_classes[i], lects, graphemes, count)) {
+            return model->conditioned_classes[i].class_id;
+        }
+    }
+    return -1;
 }
 
 rg_status multi_lect_context_discovery(
@@ -1487,6 +1618,13 @@ rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].count = merged[i].count;
                 model->conditioned_classes[i].confidence = merged[i].confidence;
                 model->conditioned_classes[i].contrast_count = merged[i].contrast_count;
+                /* Resolved to a class id in a second pass below, once every
+                 * class has one. */
+                model->conditioned_classes[i].contrast_class_id = -1;
+                model->conditioned_classes[i].contrast_alternative_count =
+                    merged[i].contrast_split < state.committed_count
+                        ? state.committed[merged[i].contrast_split].contrast_alternative_count
+                        : 0.0;
                 model->conditioned_classes[i].evidence.delta_bic = merged[i].delta_bic;
                 model->conditioned_classes[i].evidence.search_margin = merged[i].search_margin;
                 model->conditioned_classes[i].evidence.decision_index = merged[i].decision_index;
@@ -1513,6 +1651,28 @@ rg_status multi_lect_context_discovery(
                 }
             }
             model->conditioned_class_count = merged_count;
+        }
+    }
+
+    /* Now that every class has an id, link each conditioned class to the row
+     * holding the pivot's other reflex. Deferred to here because the target is
+     * usually an unconditioned class and may be a conditioned one, so all ids
+     * must exist first. */
+    if (status == RG_OK) {
+        for (i = 0; i < model->conditioned_class_count; i++) {
+            const committed_split *cs;
+            if (merged[i].contrast_split >= state.committed_count) {
+                continue;
+            }
+            cs = &state.committed[merged[i].contrast_split];
+            if (cs->contrast_segment_count == 0) {
+                continue;
+            }
+            model->conditioned_classes[i].contrast_class_id = find_class_id_by_segments(
+                model,
+                (const char *const *)cs->contrast_lects,
+                (const char *const *)cs->contrast_graphemes,
+                cs->contrast_segment_count);
         }
     }
 

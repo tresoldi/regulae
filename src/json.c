@@ -164,6 +164,12 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     /* The comparison the split was measured against. Zero on an unconditioned
      * class, which has no environment and so no complement. */
     cJSON_AddNumberToObject(out, "contrast_count", row->contrast_count);
+    /* The row holding the pivot's other reflex out of the environment -- the
+     * one a reader needs, since contrast_count above is ~0 whenever the
+     * conditioning is real. -1 (and alternative 0) on an unconditioned class or
+     * a complement with no majority. */
+    cJSON_AddNumberToObject(out, "contrast_class_id", row->contrast_class_id);
+    cJSON_AddNumberToObject(out, "contrast_alternative_count", row->contrast_alternative_count);
     if (row->evidence.decision_index >= 0) {
         cJSON_AddStringToObject(out, "score_kind", rg_split_scorer_string(row->evidence.scorer));
         cJSON_AddNumberToObject(out, "delta_score", row->evidence.delta_score);

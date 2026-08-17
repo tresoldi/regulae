@@ -44,6 +44,7 @@ static void test_model_json_shape(rg_context *ctx) {
     assert(strstr(text, "\"alignments\"") != 0);
     assert(strstr(text, "\"outliers\"") != 0);
     assert(strstr(text, "\"supporting_cognates\"") != 0);
+    assert(strstr(text, "\"contrast_class_id\"") != 0);
     assert(strstr(text, "\"uncertainty\"") != 0);
     assert(strstr(text, "\"predictive\":{\"status\":\"unmeasured\"") != 0);
     /* A conditioned class carries its per-lect environment. */

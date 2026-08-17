@@ -664,6 +664,15 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_multi_class_row *row = &cond_rows[decision_order[i]];
         builder_append(&builder, "  count=");
         append_count(&builder, row->count);
+        /* The pivot's other reflex out of the environment, and where to read it.
+         * This is the comparison the split was scored on; `elsewhere` below is
+         * the same reflex out of the environment, ~0 whenever the rule is real,
+         * and shown second so the two are not confused. */
+        if (row->contrast_class_id >= 0) {
+            builder_append(&builder, " vs ");
+            append_count(&builder, row->contrast_alternative_count);
+            builder_appendf(&builder, " as #%d", row->contrast_class_id);
+        }
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
         builder_appendf(&builder, " sets=%lu", (unsigned long)row->supporting_cognate_count);
@@ -956,6 +965,11 @@ static void summary_class(
             builder_appendf(builder, "%s%s=%s", i > 0 ? "|" : "", class_row->lect_ids[i], key);
         }
     }
+    /* The contrast link, so a machine consumer of the summary reaches the same
+     * comparison the human report shows: the class holding the pivot's other
+     * reflex, and its mass out of the environment. -1 / 0 where there is none. */
+    builder_appendf(builder, "\t%d\t%.6f", class_row->contrast_class_id,
+                    class_row->contrast_alternative_count);
     builder_appendf(builder, "\t%s\t%.6f\n",
                     rg_predictive_status_string(class_row->evidence.predictive.status),
                     class_row->evidence.predictive.log_loss_gain);

@@ -676,8 +676,10 @@ rg_status aggregate_position_classes(
         model->unconditioned_classes[c].segment_count = buckets[c].segment_count;
         model->unconditioned_classes[c].count = buckets[c].count;
         model->unconditioned_classes[c].confidence = 1.0;
-        /* An unconditioned class is aggregated, not decided. */
+        /* An unconditioned class is aggregated, not decided: no environment,
+         * so no complement to contrast against. */
         model->unconditioned_classes[c].evidence.decision_index = -1;
+        model->unconditioned_classes[c].contrast_class_id = -1;
         model->unconditioned_classes[c].supporting_cognates = (const char *const *)buckets[c].supporting_cognates;
         model->unconditioned_classes[c].supporting_cognate_count = buckets[c].supporting_cognate_count;
         model->unconditioned_classes[c].uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);
