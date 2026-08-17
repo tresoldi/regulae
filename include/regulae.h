@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 31
+#define RG_ABI_VERSION 32
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -498,6 +498,27 @@ typedef struct rg_tonal_count_row {
     double source_total;
     rg_uncertainty_estimate uncertainty;
 } rg_tonal_count_row;
+
+/* A correspondence between a segment and nothing: the pivot of the commonest
+ * sound change, loss, and the one the 1-to-1 tables cannot state. It is present
+ * in the alignments as a link with a gap on one side, and counted here so a
+ * consumer asking "what does this segment answer to" is told "nothing, N times"
+ * rather than shown the position dropped from the table with no row at all.
+ *
+ * `grapheme` is the segment on the side that keeps it. `deletion` is 1 when the
+ * source has it and the target a gap (loss, reading source->target), 0 when the
+ * target has it and the source a gap (an epenthesis on that reading). `count`
+ * is how often the gap link occurred; `present_total` is how often the grapheme
+ * appeared on its side at all, gap and non-gap, so `count / present_total` is
+ * the rate at which it is dropped. Uncounted are non-one-to-one links that are
+ * not a pure gap (a 2-to-1 fusion): those are chunk-table rows, not gaps. */
+typedef struct rg_gap_count_row {
+    const char *grapheme;
+    int deletion;
+    double count;
+    double present_total;
+    rg_uncertainty_estimate uncertainty;
+} rg_gap_count_row;
 
 /* A correspondence conditioned on an environment, and which form the
  * environment is read from.
@@ -1139,6 +1160,7 @@ RG_API void rg_pairwise_model_free(rg_pairwise_model *model);
 RG_API const rg_segment_count_row *rg_pairwise_model_segment_counts(const rg_pairwise_model *model, size_t *count);
 RG_API const rg_displacement_row *rg_pairwise_model_displacements(const rg_pairwise_model *model, size_t *count);
 RG_API const rg_tonal_count_row *rg_pairwise_model_tonal_counts(const rg_pairwise_model *model, size_t *count);
+RG_API const rg_gap_count_row *rg_pairwise_model_gap_counts(const rg_pairwise_model *model, size_t *count);
 RG_API const rg_conditioned_segment_count_row *rg_pairwise_model_conditioned_segment_counts(const rg_pairwise_model *model, size_t *count);
 RG_API const rg_chunk_row *rg_pairwise_model_chunks(const rg_pairwise_model *model, size_t *count);
 RG_API const rg_cross_dimensional_row *rg_pairwise_model_cross_dimensional_rows(const rg_pairwise_model *model, size_t *count);

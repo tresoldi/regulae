@@ -647,9 +647,21 @@ The tables, and what each yields:
 | `rg_pairwise_model_cross_dimensional_rows` | `rg_cross_dimensional_row` |
 | `rg_pairwise_model_displacements` | `rg_displacement_row` |
 | `rg_pairwise_model_tonal_counts` | `rg_tonal_count_row` |
+| `rg_pairwise_model_gap_counts` | `rg_gap_count_row` |
 
 Passing `NULL` for the count is allowed; passing a `NULL` model
 yields a `NULL` table and a zero count.
+
+`rg_pairwise_model_gap_counts` (ABI 32) is where a deletion or an
+epenthesis has a row. The segment tables are one-to-one and cannot
+say "this answers to nothing"; the gap table does, keyed by the
+grapheme on the side that keeps it, with `deletion` for the
+source-to-target loss direction and `count / present_total` the
+rate it is dropped. It is a post-EM aggregation, not the scoring
+model, so a consumer reads it exactly like the tonal table. The
+multi-lect class table does not yet lift these — a deletion still
+shows there only as a lect absent from a class — so a consumer
+that needs losses reads them per pair.
 
 Until 2026-08-16 these were a count function and an index
 function each, twenty-two of them, so a consumer wrote a loop

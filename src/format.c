@@ -344,6 +344,7 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     size_t chunk_total = 0;
     size_t xdim_total = 0;
     size_t tonal_total = 0;
+    size_t gap_total = 0;
 
     if (model == 0) {
         return 0;
@@ -358,7 +359,9 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     chunk_rows = rg_pairwise_model_chunks(model, &chunk_total);
     rg_pairwise_model_cross_dimensional_rows(model, &xdim_total);
     rg_pairwise_model_tonal_counts(model, &tonal_total);
+    rg_pairwise_model_gap_counts(model, &gap_total);
     builder_appendf(&builder, "segment correspondences: %lu\n", (unsigned long)segment_total);
+    builder_appendf(&builder, "gap correspondences:     %lu\n", (unsigned long)gap_total);
     builder_appendf(&builder, "conditioned entries:     %lu\n", (unsigned long)conditioned_total);
     builder_appendf(&builder, "promoted chunks:         %lu\n", (unsigned long)chunk_total);
     builder_appendf(&builder, "cross-dimensional rules: %lu\n", (unsigned long)xdim_total);
@@ -397,6 +400,34 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         }
         free(counts);
         free(order);
+    }
+
+    builder_appendf(&builder, "\n--- Top %d gap correspondences ---\n", opts.top_segments);
+    {
+        const rg_gap_count_row *gap_rows = rg_pairwise_model_gap_counts(model, &gap_total);
+        shown = 0;
+        for (i = 0; i < gap_total && shown < (size_t)opts.top_segments; i++) {
+            const rg_gap_count_row *row = &gap_rows[i];
+            if (row->count < opts.min_count) {
+                continue;
+            }
+            builder_append(&builder, "  count=");
+            append_count(&builder, row->count);
+            builder_append(&builder, "/");
+            append_count(&builder, row->present_total);
+            /* Written source-side first, so a deletion reads "n ~ -" and an
+             * epenthesis "- ~ n" -- the same shape the 1-to-1 table above uses,
+             * with a gap where it cannot put a grapheme. */
+            if (row->deletion) {
+                builder_appendf(&builder, "  %s ~ -\n", row->grapheme);
+            } else {
+                builder_appendf(&builder, "  - ~ %s\n", row->grapheme);
+            }
+            shown++;
+        }
+        if (shown == 0) {
+            builder_append(&builder, "  (none)\n");
+        }
     }
 
     builder_appendf(&builder, "\n--- Top %d promoted chunks ---\n", opts.top_chunks);
@@ -1108,6 +1139,22 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
             const rg_tonal_count_row *tone = &tone_rows[i];
             builder_appendf(&builder, "TONE\t%s>%s\t%s>%s\t%.6f\n", row->lect_a, row->lect_b,
                             tone->source_tone, tone->target_tone, tone->count);
+        }
+        {
+            const rg_gap_count_row *gap_rows = rg_pairwise_model_gap_counts(pm, &n);
+            for (i = 0; i < n; i++) {
+                const rg_gap_count_row *gap = &gap_rows[i];
+                /* Source-side first, a gap where the row has none: "n\t-" is a
+                 * deletion, "-\tn" an epenthesis. count/present_total is the
+                 * rate at which the grapheme is dropped. */
+                builder_appendf(&builder, "GAP\t%s>%s\t%s\t%s\t%.6f\t%.6f\t[%.4f,%.4f]\t%s\n",
+                                row->lect_a, row->lect_b,
+                                gap->deletion ? gap->grapheme : "-",
+                                gap->deletion ? "-" : gap->grapheme,
+                                gap->count, gap->present_total,
+                                gap->uncertainty.lower, gap->uncertainty.upper,
+                                rg_uncertainty_method_string(gap->uncertainty.method));
+            }
         }
     }
     return builder_finish(&builder);

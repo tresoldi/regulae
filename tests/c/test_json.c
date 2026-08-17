@@ -40,6 +40,7 @@ static void test_model_json_shape(rg_context *ctx) {
     assert(strstr(text, "\"unconditioned\"") != 0);
     assert(strstr(text, "\"conditioned\"") != 0);
     assert(strstr(text, "\"pairwise\"") != 0);
+    assert(strstr(text, "\"gaps\"") != 0);
     assert(strstr(text, "\"cross_dimensional\"") != 0);
     assert(strstr(text, "\"alignments\"") != 0);
     assert(strstr(text, "\"outliers\"") != 0);

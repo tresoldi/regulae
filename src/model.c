@@ -345,6 +345,117 @@ static rg_status aggregate_displacement_counts(
     return RG_OK;
 }
 
+/* Re-aligns under the post-EM model and counts every gap link: a segment on
+ * one side answering to nothing on the other. A deletion (source segment, target
+ * gap) and an epenthesis (target segment, source gap) are the two directions of
+ * the same shape, kept apart by the `deletion` flag. `present_total` is every
+ * occurrence of the grapheme on its side, gap and non-gap, so the count reads as
+ * a rate. Non-gap non-1-to-1 links (a 2-to-1 fusion) are not gaps and belong to
+ * the chunk table; they are skipped here. */
+static rg_status aggregate_gap_counts(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model
+) {
+    rg_gap_count_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
+    /* Per-grapheme totals on each side, so a gap count can be read as a rate. */
+    rg_segment_count_row *source_present = 0;
+    size_t source_present_count = 0;
+    size_t source_present_cap = 0;
+    rg_segment_count_row *target_present = 0;
+    size_t target_present_count = 0;
+    size_t target_present_cap = 0;
+    size_t i;
+    int max_chunk_size = options->max_chunk_size > 0 ? options->max_chunk_size : RG_DEFAULT_MAX_CHUNK_SIZE;
+    rg_status status = RG_OK;
+
+    for (i = 0; i < pair_count && status == RG_OK; i++) {
+        rg_alignment *alignment = 0;
+        size_t j;
+        double weight = pairs[i].weight == 0.0 ? 1.0 : pairs[i].weight;
+        if (weight <= 0.0) {
+            continue;
+        }
+        status = rg_align_forms_with_model(ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
+        if (status != RG_OK) {
+            break;
+        }
+        for (j = 0; j < rg_alignment_link_count(alignment) && status == RG_OK; j++) {
+            const rg_link *link = rg_alignment_link_at(alignment, j);
+            size_t s;
+            if (link->source_count >= 1 && link->target_count == 1) {
+                /* Presence of the target grapheme, counted once per link. */
+                status = add_present_count(&target_present, &target_present_count,
+                                           &target_present_cap, link->target[0].grapheme, weight);
+            }
+            if (status == RG_OK && link->target_count >= 1 && link->source_count == 1) {
+                status = add_present_count(&source_present, &source_present_count,
+                                           &source_present_cap, link->source[0].grapheme, weight);
+            }
+            if (status != RG_OK) {
+                break;
+            }
+            if (link->target_count == 0 && link->source_count >= 1) {
+                for (s = 0; s < link->source_count && status == RG_OK; s++) {
+                    status = add_present_count(&source_present, &source_present_count,
+                                               &source_present_cap, link->source[s].grapheme, weight);
+                    if (status == RG_OK) {
+                        status = add_gap_count(&rows, &row_count, &row_cap,
+                                               link->source[s].grapheme, 1, weight);
+                    }
+                }
+            } else if (link->source_count == 0 && link->target_count >= 1) {
+                for (s = 0; s < link->target_count && status == RG_OK; s++) {
+                    status = add_present_count(&target_present, &target_present_count,
+                                               &target_present_cap, link->target[s].grapheme, weight);
+                    if (status == RG_OK) {
+                        status = add_gap_count(&rows, &row_count, &row_cap,
+                                               link->target[s].grapheme, 0, weight);
+                    }
+                }
+            }
+        }
+        rg_alignment_free(alignment);
+    }
+    if (status == RG_OK) {
+        for (i = 0; i < row_count; i++) {
+            const rg_segment_count_row *side = rows[i].deletion ? source_present : target_present;
+            size_t side_count = rows[i].deletion ? source_present_count : target_present_count;
+            rows[i].present_total = present_total_for(side, side_count, rows[i].grapheme);
+            rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, rows[i].present_total);
+        }
+        if (row_count > 1) {
+            qsort(rows, row_count, sizeof(*rows), gap_row_cmp);
+        }
+    }
+    for (i = 0; i < source_present_count; i++) {
+        segment_count_row_clear(&source_present[i]);
+    }
+    free(source_present);
+    for (i = 0; i < target_present_count; i++) {
+        segment_count_row_clear(&target_present[i]);
+    }
+    free(target_present);
+    if (status != RG_OK) {
+        for (i = 0; i < row_count; i++) {
+            rg_free_owned_internal(rows[i].grapheme);
+        }
+        free(rows);
+        return status;
+    }
+    for (i = 0; i < model->gap_count_count; i++) {
+        rg_free_owned_internal(model->gap_counts[i].grapheme);
+    }
+    free(model->gap_counts);
+    model->gap_counts = rows;
+    model->gap_count_count = row_count;
+    return RG_OK;
+}
+
 /* Re-aligns under the post-chunk-promotion model and counts each 1-to-1 link's
  * tonal correspondence. The table stays empty for non-tonal corpora. */
 static rg_status aggregate_tonal_counts(
@@ -551,6 +662,7 @@ rg_status rg_train_pairwise_internal(
     } while (0)
 
     RUN_STAGE("displacement aggregation", aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("gap aggregation", aggregate_gap_counts(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("context discovery", discover_immediate_context_counts(ctx, pairs, pair_count, opts, model, &vocabulary));
     RUN_STAGE("chunk promotion", promote_chunk_rows(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("tonal aggregation", aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
@@ -600,6 +712,7 @@ rg_status rg_train_pairwise(
 RG_PAIRWISE_TABLE(rg_pairwise_model_segment_counts, rg_segment_count_row, segment_counts, segment_count_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_displacements, rg_displacement_row, displacement_rows, displacement_row_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_tonal_counts, rg_tonal_count_row, tonal_counts, tonal_count_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_gap_counts, rg_gap_count_row, gap_counts, gap_count_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_conditioned_segment_counts, rg_conditioned_segment_count_row, conditioned_segment_counts, conditioned_segment_count_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_chunks, rg_chunk_row, chunks, chunk_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_cross_dimensional_rows, rg_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)

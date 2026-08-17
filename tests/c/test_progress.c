@@ -73,9 +73,10 @@ static void test_progress_is_monotonic_and_bounded(rg_context *ctx) {
             saw_multilect_stage = 1;
         }
     }
-    /* Three lects means three pairs, each running the eight pairwise stages,
-     * plus the three multi-lect stages. */
-    assert(r.totals[0] == 3 * 8 + 3);
+    /* Three lects means three pairs, each running the nine pairwise stages
+     * (gap aggregation joined them at ABI 32), plus the three multi-lect
+     * stages. */
+    assert(r.totals[0] == 3 * 9 + 3);
     assert(r.count == r.totals[0]);
     assert(saw_pairwise_stage);
     assert(saw_multilect_stage);
@@ -161,9 +162,10 @@ static void test_pairwise_progress(rg_context *ctx) {
     options.progress = record;
     options.progress_user_data = &r;
     assert(rg_train_pairwise(ctx, pairs, 4, &options, &model) == RG_OK);
-    assert(r.count == 8);
+    assert(r.count == 9);
     assert(strcmp(r.stages[0], "initial prior") == 0);
-    assert(strcmp(r.stages[7], "long-range discovery") == 0);
+    assert(strcmp(r.stages[3], "gap aggregation") == 0);
+    assert(strcmp(r.stages[8], "long-range discovery") == 0);
     rg_pairwise_model_free(model);
 
     memset(&r, 0, sizeof(r));

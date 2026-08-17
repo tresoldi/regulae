@@ -31,9 +31,9 @@
 #define RG_SEARCH_PENALTY_GAMMA 1.0
 #endif
 /* Stages the pairwise pipeline reports: initial prior, segment EM, displacement
- * aggregation, context discovery, chunk promotion, tonal aggregation,
- * cross-dimensional discovery, long-range discovery. */
-#define RG_PAIRWISE_STAGE_COUNT 8
+ * aggregation, gap aggregation, context discovery, chunk promotion, tonal
+ * aggregation, cross-dimensional discovery, long-range discovery. */
+#define RG_PAIRWISE_STAGE_COUNT 9
 /* Multi-lect stages beyond the per-pair work: reconciliation, class discovery,
  * cross-dimensional lifting. */
 #define RG_MULTILECT_STAGE_COUNT 3
@@ -89,6 +89,8 @@ struct rg_pairwise_model {
     size_t displacement_row_count;
     rg_tonal_count_row *tonal_counts;
     size_t tonal_count_count;
+    rg_gap_count_row *gap_counts;
+    size_t gap_count_count;
 };
 
 typedef struct rg_multi_pair_model_owned {

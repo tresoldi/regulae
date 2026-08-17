@@ -120,6 +120,23 @@ rg_status add_tonal_count(
     const char *target_tone,
     double weight
 );
+rg_status add_gap_count(
+    rg_gap_count_row **rows,
+    size_t *count,
+    size_t *cap,
+    const char *grapheme,
+    int deletion,
+    double weight
+);
+int gap_row_cmp(const void *a, const void *b);
+rg_status add_present_count(
+    rg_segment_count_row **rows,
+    size_t *count,
+    size_t *cap,
+    const char *grapheme,
+    double weight
+);
+double present_total_for(const rg_segment_count_row *rows, size_t count, const char *grapheme);
 void fill_totals(rg_segment_count_row *rows, size_t count);
 void publish_target_totals(rg_pairwise_model *model, const rg_segment_count_row *rows, size_t count);
 void fill_displacement_total(rg_displacement_row *rows, size_t count);

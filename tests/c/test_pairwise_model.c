@@ -45,6 +45,24 @@ static rg_form one_segment_form(const char *lect, const rg_segment *segment) {
     return form(lect, segment, 1);
 }
 
+static char *dup_string(const char *value) {
+    size_t len = strlen(value);
+    char *out = (char *)malloc(len + 1);
+    assert(out != 0);
+    memcpy(out, value, len + 1);
+    return out;
+}
+
+static void segments_free(rg_segment *segments, size_t count) {
+    size_t i;
+    void *value;
+    for (i = 0; i < count; i++) {
+        memcpy(&value, &segments[i].grapheme, sizeof(value));
+        free(value);
+    }
+    free(segments);
+}
+
 static int has_constraint(const rg_feature_constraint *items, size_t count, const char *feature, const char *value) {
     size_t i;
     for (i = 0; i < count; i++) {
@@ -250,6 +268,65 @@ static void test_cross_dimensional_dimension_target(rg_context *ctx, const char 
     rg_pairwise_model_free(model);
     free(views);
     rg_corpus_free(corpus);
+}
+
+/* A segment answering to nothing has a row now. Six words keep a final -n on
+ * side A and drop it on B; the gap table must state A:n ~ -- at 6 of 6, the
+ * commonest change and the one the 1-to-1 table cannot express. */
+static void test_gap_correspondence(rg_context *ctx) {
+    const char *words[6] = {"apan", "atan", "akan", "aman", "asan", "alan"};
+    rg_train_options options;
+    rg_form_pair pairs[6];
+    rg_segment *kept[6];
+    rg_segment *lost[6];
+    size_t kept_n[6];
+    size_t lost_n[6];
+    rg_pairwise_model *model = 0;
+    size_t i;
+    int found_deletion = 0;
+
+    rg_train_options_init_defaults(&options);
+    for (i = 0; i < 6; i++) {
+        size_t n = strlen(words[i]);
+        size_t j;
+        kept_n[i] = n;
+        lost_n[i] = n - 1;
+        kept[i] = (rg_segment *)calloc(n, sizeof(rg_segment));
+        lost[i] = (rg_segment *)calloc(n - 1, sizeof(rg_segment));
+        assert(kept[i] != 0 && lost[i] != 0);
+        for (j = 0; j < n; j++) {
+            char g[2];
+            g[0] = words[i][j];
+            g[1] = '\0';
+            kept[i][j].grapheme = dup_string(g);
+            if (j < n - 1) {
+                lost[i][j].grapheme = dup_string(g);
+            }
+        }
+        pairs[i].source = form("A", kept[i], kept_n[i]);
+        pairs[i].target = form("B", lost[i], lost_n[i]);
+        pairs[i].weight = 1.0;
+    }
+    assert(rg_train_pairwise(ctx, pairs, 6, &options, &model) == RG_OK);
+    assert(rg_pairwise_model_gap_count_row_count(model) > 0);
+    for (i = 0; i < rg_pairwise_model_gap_count_row_count(model); i++) {
+        const rg_gap_count_row *row = rg_pairwise_model_gap_count_row_at(model, i);
+        assert(row != 0);
+        /* Every present grapheme's count is bounded by how often it appears. */
+        assert(row->count <= row->present_total + 1e-9);
+        if (row->deletion && strcmp(row->grapheme, "n") == 0) {
+            assert(row->count == 6.0);
+            assert(row->present_total == 6.0);
+            assert_uncertainty_contains(&row->uncertainty, 1.0);
+            found_deletion = 1;
+        }
+    }
+    assert(found_deletion);
+    rg_pairwise_model_free(model);
+    for (i = 0; i < 6; i++) {
+        segments_free(kept[i], kept_n[i]);
+        segments_free(lost[i], lost_n[i]);
+    }
 }
 
 int main(void) {
@@ -604,6 +681,7 @@ int main(void) {
     test_cross_dimensional_dimension_target(
         ctx, REGULAE_SOURCE_DIR "/testdata/corpora/length_dimension_target.tsv", "length");
     test_uninformative_environments_commit_nothing(ctx);
+    test_gap_correspondence(ctx);
     rg_context_free(ctx);
     return 0;
 }
