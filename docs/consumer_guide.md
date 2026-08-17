@@ -383,6 +383,15 @@ not asking the model for it.
 exist: the cognate ids a class was built from, so a consumer can
 point at the evidence without matching graphemes back by hand.
 
+Its length is also the number to read when the question is whether
+a correspondence recurs. `count` cannot answer that — it is
+aligned positions weighted by cognate confidence, so one word with
+a geminate reaches 2 without recurring anywhere. M6's adjudicators
+made that mistake repeatedly, and a downstream tool ranking rows
+by `count` will make it silently. From ABI 30 each set is listed
+once; before it, an id appeared once per position, so the list's
+length agreed with `count` and answered nothing.
+
 ### 4.5 `lect_ids`
 
 The canonical ordered list of lect IDs observed in the corpus.

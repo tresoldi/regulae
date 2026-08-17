@@ -200,7 +200,12 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     }
     cJSON_AddItemToObject(out, "segments", segments);
 
-    if (row->supporting_cognate_count > 0) {
+    {
+        /* Always, even when empty. Omitting the key made every conditioned
+         * class -- which carried no support at all until ABI 30 -- a KeyError
+         * in the consumer rather than a row with nothing behind it, so the
+         * gap read as a bug in whoever was reading the model. A field a
+         * consumer must guard for absence is a field that gets skipped. */
         cJSON *support = cJSON_CreateArray();
         if (support == 0) {
             cJSON_Delete(out);

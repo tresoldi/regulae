@@ -1146,6 +1146,89 @@ static rg_status merge_committed_splits(
  * appears across more than one sister tuple, a greedy score-driven split on the
  * pivot's own phonological context. Committed splits become conditioned
  * classes, deduplicated across pivots by their full segment tuple. */
+static int cognate_index_cmp(const void *a, const void *b) {
+    size_t left = *(const size_t *)a;
+    size_t right = *(const size_t *)b;
+    if (left < right) {
+        return -1;
+    }
+    return left > right ? 1 : 0;
+}
+
+/* Names the cognate sets behind a committed split, so a conditioned class can
+ * point at its own evidence.
+ *
+ * Every conditioned class published an empty support list until ABI 30. The
+ * aggregated unconditioned rows named their sets and the committed rules -- the
+ * decisions, the ones a reader has most reason to check, and the only ones that
+ * claim a conditioning environment -- named nothing. The observations were
+ * already carried this far to build the class-position table; only this last
+ * step was missing. The Python reconciler declared a dict for the same purpose
+ * and never wrote to it, so both implementations had the gap.
+ *
+ * Sorted by cognate index, which is corpus order, matching what the header
+ * promises and what the unconditioned rows already do. */
+static rg_status attach_supporting_cognates(
+    rg_multi_class_row *row,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const reconciled_observation *observations,
+    size_t observation_count,
+    const size_t *indices,
+    size_t index_count
+) {
+    size_t *found = 0;
+    size_t found_count = 0;
+    char **ids = 0;
+    size_t id_count = 0;
+    size_t i;
+
+    if (index_count == 0) {
+        return RG_OK;
+    }
+    found = (size_t *)malloc(index_count * sizeof(*found));
+    if (found == 0) {
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < index_count; i++) {
+        if (indices[i] >= observation_count) {
+            continue;
+        }
+        if (observations[indices[i]].cognate_index >= cognate_count) {
+            continue;
+        }
+        found[found_count++] = observations[indices[i]].cognate_index;
+    }
+    if (found_count == 0) {
+        free(found);
+        return RG_OK;
+    }
+    qsort(found, found_count, sizeof(*found), cognate_index_cmp);
+    ids = (char **)calloc(found_count, sizeof(*ids));
+    if (ids == 0) {
+        free(found);
+        return RG_ERR_OOM;
+    }
+    for (i = 0; i < found_count; i++) {
+        const char *id;
+        if (i > 0 && found[i] == found[i - 1]) {
+            continue;
+        }
+        id = cognates[found[i]].cognate_id;
+        ids[id_count] = rg_strdup_internal(id == 0 ? "" : id);
+        if (ids[id_count] == 0) {
+            string_array_clear(ids, id_count);
+            free(found);
+            return RG_ERR_OOM;
+        }
+        id_count++;
+    }
+    free(found);
+    row->supporting_cognates = (const char *const *)ids;
+    row->supporting_cognate_count = id_count;
+    return RG_OK;
+}
+
 rg_status multi_lect_context_discovery(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
@@ -1413,9 +1496,21 @@ rg_status multi_lect_context_discovery(
                  * interval says how well the rate is pinned given it, not
                  * whether it is real. search_margin answers that. */
                 model->conditioned_classes[i].uncertainty.post_selection = 1;
+                status = attach_supporting_cognates(
+                    &model->conditioned_classes[i],
+                    cognates,
+                    cognate_count,
+                    observations,
+                    observation_count,
+                    merged[i].observation_indices,
+                    merged[i].observation_count
+                );
                 merged[i].lects = 0;
                 merged[i].graphemes = 0;
                 merged[i].contexts = 0;
+                if (status != RG_OK) {
+                    break;
+                }
             }
             model->conditioned_class_count = merged_count;
         }

@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 29
+#define RG_ABI_VERSION 30
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -657,6 +657,19 @@ typedef struct rg_multi_class_row {
      * committed by a search. */
     double contrast_count;
     rg_rule_evidence evidence;
+    /* The distinct cognate sets this class rests on, each listed once however
+     * many aligned positions in it realise the class. Owned by the model and
+     * valid until it is freed; sorted by the order the sets were first reached,
+     * which is the order they appear in the corpus.
+     *
+     * Read `supporting_cognate_count` wherever the question is whether a
+     * correspondence recurs. `count` cannot answer it: it is aligned positions
+     * weighted by cognate confidence, so a single word with a geminate or a
+     * repeated segment reaches 2, and one of M6's adjudication panels accepted
+     * such a row believing two words supported it. Before ABI 30 this list
+     * repeated an id once per position and its length equalled `count` on an
+     * unweighted corpus; a consumer that relied on that is now reading distinct
+     * sets, which is the number it almost certainly wanted. */
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;

@@ -127,9 +127,23 @@ static rg_status participant_key_from_lects(char **lects, size_t count, char **o
     return RG_OK;
 }
 
+/* Records a cognate set behind this class, once however often it is observed.
+ *
+ * A set reaches the same class once per aligned position that realises it, so
+ * appending unconditionally made the list a multiplicity record wearing the
+ * name of a support list: on the Verner fixture a class published thirty sets
+ * as forty-two entries, `brother-fore` twice in a row. The multiplicity is
+ * already in `count`; what this list is for is the question `count` cannot
+ * answer, which is how much of the lexicon the row rests on. */
 static rg_status bucket_append_support(class_bucket *bucket, const char *cognate_id) {
     char **next;
+    size_t i;
     const char *id = cognate_id == 0 ? "" : cognate_id;
+    for (i = 0; i < bucket->supporting_cognate_count; i++) {
+        if (strcmp(bucket->supporting_cognates[i], id) == 0) {
+            return RG_OK;
+        }
+    }
     if (bucket->supporting_cognate_count == bucket->supporting_cognate_cap) {
         size_t next_cap = bucket->supporting_cognate_cap == 0 ? 4 : bucket->supporting_cognate_cap * 2;
         next = (char **)realloc(bucket->supporting_cognates, next_cap * sizeof(*bucket->supporting_cognates));

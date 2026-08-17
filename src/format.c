@@ -633,7 +633,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         const rg_multi_class_row *row = &uncond_rows[i];
         builder_appendf(&builder, "  [%lu-way] count=", (unsigned long)row->segment_count);
         append_count(&builder, row->count);
-        builder_append(&builder, "  ");
+        /* Beside count, never instead of it. count is aligned positions; a
+         * correspondence is a claim about recurrence across the lexicon, and
+         * these differ whenever one word realises the row twice. */
+        builder_appendf(&builder, " sets=%lu  ", (unsigned long)row->supporting_cognate_count);
         append_class_segments(&builder, row);
         builder_append(&builder, "\n");
     }
@@ -663,6 +666,7 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         append_count(&builder, row->count);
         builder_append(&builder, " elsewhere=");
         append_count(&builder, row->contrast_count);
+        builder_appendf(&builder, " sets=%lu", (unsigned long)row->supporting_cognate_count);
         builder_appendf(&builder, "  #%d", row->evidence.decision_index);
         if (row->evidence.standing != RG_RULE_STANDING_UNMEASURED) {
             builder_appendf(&builder, " %s",
@@ -935,16 +939,21 @@ static void summary_class(
                         class_row->lect_ids[i], class_row->graphemes[i]);
     }
     builder_appendf(builder, "\t%.6f\t%.6f\t", class_row->count, class_row->confidence);
+    /* One column each, always. This was a single column holding the supporting
+     * cognates on an unconditioned row and the environment on a conditioned
+     * one, so the only rows that state an environment were the only rows whose
+     * evidence a consumer could not reach -- and a column whose meaning depends
+     * on the row is not a column. Empty where a row has nothing to put in it. */
+    for (i = 0; i < class_row->supporting_cognate_count; i++) {
+        builder_appendf(builder, "%s%s", i > 0 ? "," : "", class_row->supporting_cognates[i]);
+    }
+    builder_append(builder, "\t");
     if (with_contexts) {
         for (i = 0; i < class_row->segment_count; i++) {
             char key[2048];
             summary_context_key(class_row->contexts == 0 ? 0 : &class_row->contexts[i],
                                 key, sizeof(key));
             builder_appendf(builder, "%s%s=%s", i > 0 ? "|" : "", class_row->lect_ids[i], key);
-        }
-    } else {
-        for (i = 0; i < class_row->supporting_cognate_count; i++) {
-            builder_appendf(builder, "%s%s", i > 0 ? "," : "", class_row->supporting_cognates[i]);
         }
     }
     builder_appendf(builder, "\t%s\t%.6f\n",

@@ -70,6 +70,19 @@ static int class_has(const rg_multi_class_row *row, const char *lect, const char
     return 0;
 }
 
+static int no_duplicate_support(const rg_multi_class_row *row) {
+    size_t i;
+    size_t j;
+    for (i = 0; i < row->supporting_cognate_count; i++) {
+        for (j = i + 1; j < row->supporting_cognate_count; j++) {
+            if (strcmp(row->supporting_cognates[i], row->supporting_cognates[j]) == 0) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
 static int model_has_class(
     const rg_multi_model *model,
     const char *lect_a,
@@ -89,8 +102,12 @@ static int model_has_class(
             class_has(row, lect_b, graph_b) &&
             class_has(row, lect_c, graph_c)) {
             assert(row->confidence == 1.0);
+            /* Every set in this fixture realises the class once, so the two
+             * numbers coincide here. They are not the same number -- see
+             * test_supporting_sets_are_distinct, where they separate. */
             assert(row->supporting_cognate_count == (size_t)count);
             assert(row->supporting_cognates != 0);
+            assert(no_duplicate_support(row));
             assert(row->uncertainty.lower <= row->uncertainty.estimate + 1e-12);
             assert(row->uncertainty.upper + 1e-12 >= row->uncertainty.estimate);
             return 1;
@@ -143,6 +160,13 @@ static void test_conditioned_palatalization(rg_context *ctx, const rg_train_opti
         assert(row != 0);
         assert(row->contexts != 0);
         assert(row->class_id >= (int)rg_multi_model_unconditioned_class_count(model));
+        /* A committed rule has to name the sets it was committed on. Until ABI
+         * 30 every conditioned class published an empty list, so the rows that
+         * are decisions were the ones a reader could not check. */
+        assert(row->supporting_cognate_count > 0);
+        assert(row->supporting_cognates != 0);
+        assert(no_duplicate_support(row));
+        assert(row->supporting_cognate_count <= (size_t)row->count);
         if (row->segment_count == 2 &&
             strcmp(row->lect_ids[0], "A") == 0 &&
             strcmp(row->lect_ids[1], "B") == 0 &&
@@ -158,6 +182,66 @@ static void test_conditioned_palatalization(rg_context *ctx, const rg_train_opti
     assert(rg_multi_model_conditioned_class_at(model, 1000) == 0);
     rg_multi_model_free(model);
     for (i = 0; i < 16; i++) {
+        segments_free(source_segments[i], source_counts[i]);
+        segments_free(target_segments[i], target_counts[i]);
+    }
+}
+
+/* The two numbers a reader can confuse, on a corpus built so they cannot
+ * coincide. Every word realises p~f twice, so the class is worth twelve aligned
+ * positions and rests on six cognate sets.
+ *
+ * M6's adjudication panel repeatedly read `count` as a count of words, and on
+ * real corpora that reading inflates a row's support by however often a word
+ * happens to repeat a segment. The distinct-set number is what they wanted, and
+ * before ABI 30 it was not published: `supporting_cognates` listed an id once
+ * per position, so its length agreed with `count` and answered nothing. */
+static void test_supporting_sets_are_distinct(rg_context *ctx, const rg_train_options *options) {
+    const char *source_words[6] = {"papa", "pipi", "pupu", "pepe", "popo", "papi"};
+    const char *target_words[6] = {"fafa", "fifi", "fufu", "fefe", "fofo", "fafi"};
+    rg_segment *source_segments[6];
+    rg_segment *target_segments[6];
+    size_t source_counts[6];
+    size_t target_counts[6];
+    rg_cognate_form forms[6][2];
+    rg_cognate_set cognates[6];
+    rg_multi_model *model = 0;
+    rg_train_options local_options = *options;
+    size_t i;
+    int found = 0;
+
+    memset(cognates, 0, sizeof(cognates));
+    local_options.max_chunk_size = 1;
+
+    for (i = 0; i < 6; i++) {
+        source_segments[i] = segments_from_ascii(source_words[i], &source_counts[i]);
+        target_segments[i] = segments_from_ascii(target_words[i], &target_counts[i]);
+        forms[i][0].lect_id = "A";
+        forms[i][0].form = form("A", source_segments[i], source_counts[i]);
+        forms[i][1].lect_id = "B";
+        forms[i][1].form = form("B", target_segments[i], target_counts[i]);
+        cognates[i].cognate_id = source_words[i];
+        cognates[i].forms = forms[i];
+        cognates[i].form_count = 2;
+        cognates[i].confidence = 1.0;
+    }
+
+    assert(rg_train_model(ctx, cognates, 6, &local_options, &model) == RG_OK);
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        assert(no_duplicate_support(row));
+        assert(row->supporting_cognate_count <= (size_t)row->count);
+        if (row->segment_count == 2 &&
+            strcmp(row->graphemes[0], "p") == 0 &&
+            strcmp(row->graphemes[1], "f") == 0) {
+            assert(fabs(row->count - 12.0) < 1e-9);
+            assert(row->supporting_cognate_count == 6);
+            found = 1;
+        }
+    }
+    assert(found);
+    rg_multi_model_free(model);
+    for (i = 0; i < 6; i++) {
         segments_free(source_segments[i], source_counts[i]);
         segments_free(target_segments[i], target_counts[i]);
     }
@@ -190,6 +274,7 @@ int main(void) {
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     rg_train_options_init_defaults(&options);
     test_conditioned_palatalization(ctx, &options);
+    test_supporting_sets_are_distinct(ctx, &options);
 
     forms1[0].lect_id = "A";
     forms1[0].form = form("A", a1, 2);

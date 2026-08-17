@@ -200,7 +200,15 @@ function renderClasses() {
     count.className = "count";
     count.textContent = entry.count % 1 === 0 ? entry.count : entry.count.toFixed(1);
 
-    row.append(corr, count);
+    /* count is aligned positions, so one word with a doubled segment reads 2.
+       Whether a correspondence recurs is the question a visitor is actually
+       asking of this table, and only this column answers it. */
+    const sets = document.createElement("td");
+    sets.className = "sets";
+    sets.textContent = (entry.supporting_cognates || []).length || "";
+    sets.title = "distinct cognate sets behind this row";
+
+    row.append(corr, count, sets);
     row.addEventListener("click", () => select(entry.id));
     body.appendChild(row);
   }
@@ -382,11 +390,12 @@ function download(name, text) {
 
 function summaryText() {
   const lines = ["LECTS\t" + model.lects.join(" ")];
+  const sets = (entry) => (entry.supporting_cognates || []).length;
   for (const entry of model.classes.unconditioned) {
-    lines.push(`UNCOND\t${entry.id}\t${correspondence(entry)}\t${entry.count}`);
+    lines.push(`UNCOND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}`);
   }
   for (const entry of model.classes.conditioned) {
-    lines.push(`COND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${environment(entry)}`);
+    lines.push(`COND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}\t${environment(entry)}`);
   }
   return lines.join("\n") + "\n";
 }

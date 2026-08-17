@@ -335,7 +335,13 @@ def _aggregate_unconditioned_classes(
             continue
         key = tuple(sorted(segments.items()))
         count, support = buckets.get(key, (0, []))
-        buckets[key] = (count + weight, support + [cog_id])
+        # Each set once, however many positions in it realise the class. The
+        # multiplicity is `count`; this list answers the other question, which
+        # is how much of the lexicon the class rests on. Matches the C library
+        # from ABI 30 -- before that both listed an id per position.
+        if cog_id not in support:
+            support = support + [cog_id]
+        buckets[key] = (count + weight, support)
 
     # Per participating-lect set, total observations across all
     # classes with that same set. Used as the Wilson denominator:
@@ -430,6 +436,15 @@ def _multi_lect_context_discovery(
     sister_by_key: dict[str, tuple[tuple[str, str], ...]] = {}
     # Track the cognate IDs supporting each committed (pivot, ctx, sisters)
     # triple.
+    #
+    # Declared and never written, which is why every conditioned class this
+    # module builds publishes an empty support list: the rows that are
+    # decisions are the ones a reader cannot trace back to a word. The C
+    # library closed the same gap in ABI 30 by carrying observation indices
+    # through to the merged class; here the pivot buckets drop `cog_id` on the
+    # way in, so closing it means widening the tuples that
+    # _commit_multi_lect_splits_for_pivot consumes. Left as it stands rather
+    # than half-done, and recorded so it reads as a gap and not an oversight.
     supporting: dict[
         tuple[str, str, Context, tuple[tuple[str, str], ...]], list[str]
     ] = defaultdict(list)

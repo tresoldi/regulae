@@ -76,6 +76,30 @@ def test_reconciliation_supporting_cognates_tracked() -> None:
         assert set(klass.supporting_cognates) == {"pair.00000", "pair.00001"}
 
 
+def test_supporting_cognates_are_distinct_sets() -> None:
+    """The number `count` cannot give: how much of the lexicon a class rests on.
+
+    Each word realises p~f twice, so the class is worth four aligned positions
+    and rests on two cognate sets. M6's adjudicators read `count` as sets and
+    accepted rows a single word supported; this is the number they wanted.
+    """
+    pairs = [
+        (_form("A", "papa"), _form("B", "fafa")),
+        (_form("A", "pipi"), _form("B", "fifi")),
+    ]
+    corpus = cognate_sets_from_pairs(pairs, ("A", "B"))
+    model = train_model(corpus)
+    assert isinstance(model, MultiLectModel)
+    matched = [k for k in model.unconditioned_classes
+               if k.segments == {"A": "p", "B": "f"}]
+    assert len(matched) == 1
+    assert matched[0].count == 4
+    assert matched[0].supporting_cognates == ("pair.00000", "pair.00001")
+    for klass in model.unconditioned_classes:
+        support = klass.supporting_cognates
+        assert len(set(support)) == len(support)
+
+
 # ----- N=3: merger disambiguation ---------------------------------------
 
 

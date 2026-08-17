@@ -43,6 +43,12 @@ strict = true
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
+# Without this the tests import whatever `regulae` the interpreter already has,
+# which on a machine holding more than one checkout is not the tree being
+# edited: a dedupe added to python/src/regulae/_reconciliation.py did not change
+# the result of the test written for it, because the test was exercising another
+# clone's copy. Relative to rootdir, so it names this repo's sources.
+pythonpath = ["src"]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_functions = ["test_*"]
