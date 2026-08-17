@@ -2,10 +2,12 @@
 *.test
 *.out
 
-# Python (archived under python/)
+# Python
 __pycache__/
 *.pyc
 *.egg-info/
+# Compiled native extension (built by setup.py from the C core)
+*.so
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

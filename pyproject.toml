@@ -1,0 +1,73 @@
+# The Python package is a thin wrapper over the C core, built by setup.py in
+# this directory: the extension compiles regulae, the vendored cJSON and the
+# sibling merkmal checkout straight in, so a built wheel needs neither an
+# installed libregulae nor the merkmal Python package. The retired pure-Python
+# implementation is under docs/legacy_python/.
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "regulae"
+version = "0.1.0"
+description = "Learned sound-correspondence rules for historical-linguistic inference"
+authors = [
+    {name = "Tiago Tresoldi", email = "tiago.tresoldi@lingfil.uu.se"}
+]
+license = "MIT"
+readme = "python/README.md"
+requires-python = ">=3.12"
+keywords = [
+    "historical linguistics",
+    "sound change",
+    "sound correspondences",
+    "cognate detection",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: C",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-cov", "ruff", "mypy", "build"]
+
+[project.scripts]
+regulae = "regulae.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/tresoldi/regulae"
+Repository = "https://github.com/tresoldi/regulae"
+
+[tool.setuptools]
+package-dir = {"" = "python"}
+
+[tool.setuptools.packages.find]
+where = ["python"]
+include = ["regulae*"]
+
+[tool.setuptools.package-data]
+regulae = ["py.typed"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 99
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM", "TC"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["python/tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
