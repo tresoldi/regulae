@@ -584,6 +584,70 @@ rg_status run_permutation_baseline(
     return status;
 }
 
+/* Whether two lects say the same thing everywhere they both say anything.
+ *
+ * The same variety sampled twice, or one wordlist copied under two names, adds
+ * pair opportunities and no evidence. Lects that merely resemble each other are
+ * not duplicates: every shared set has to match segment for segment, and a pair
+ * that shares no set at all is not compared. */
+static int lects_are_duplicates(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const char *a,
+    const char *b
+) {
+    size_t c;
+    size_t shared = 0;
+    for (c = 0; c < cognate_count; c++) {
+        const rg_form *left = form_for_lect(&cognates[c], a);
+        const rg_form *right = form_for_lect(&cognates[c], b);
+        size_t i;
+        if (left == 0 || right == 0) {
+            continue;
+        }
+        shared++;
+        if (left->segment_count != right->segment_count) {
+            return 0;
+        }
+        for (i = 0; i < left->segment_count; i++) {
+            const char *one = left->segments[i].grapheme;
+            const char *two = right->segments[i].grapheme;
+            if (one == 0 || two == 0 || strcmp(one, two) != 0) {
+                return 0;
+            }
+        }
+    }
+    return shared > 0;
+}
+
+static void count_pair_opportunities(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_multi_model *model
+) {
+    size_t i;
+    size_t c;
+    model->fit.lect_count = model->lect_count;
+    model->fit.pair_count = model->pair_model_count;
+    for (i = 1; i < model->lect_count; i++) {
+        size_t j;
+        for (j = 0; j < i; j++) {
+            if (lects_are_duplicates(cognates, cognate_count,
+                                     model->lect_ids[i], model->lect_ids[j])) {
+                model->fit.duplicate_lect_count++;
+                break;
+            }
+        }
+    }
+    for (c = 0; c < cognate_count; c++) {
+        for (i = 0; i < model->lect_count; i++) {
+            if (form_for_lect(&cognates[c], model->lect_ids[i]) == 0) {
+                model->fit.missing_form_count++;
+            }
+        }
+    }
+}
+
 /* Fills in the model's fit summary from the observed corpus, plus whatever the
  * shuffled baseline measured before the model was trained. */
 rg_status compute_corpus_fit(
@@ -598,6 +662,7 @@ rg_status compute_corpus_fit(
     size_t *groups = 0;
     size_t c;
 
+    count_pair_opportunities(cognates, cognate_count, model);
     model->fit.unconditioned_class_count = model->unconditioned_class_count;
     model->fit.conditioned_class_count = model->conditioned_class_count;
     model->fit.split_scorer = options->bic.split_scorer;

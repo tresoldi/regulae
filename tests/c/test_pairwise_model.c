@@ -181,7 +181,7 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
     assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        const rg_context_spec *environment = &row->source_environment;
+        const rg_context_spec *environment = &row->environment;
         /* Both predicates, and neither is enough: the onset's voicing, and the
          * source segment's own tone. */
         if (environment->preceding_count != 1 || environment->self_count != 1) {
@@ -195,11 +195,11 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
         /* Naming both makes the rule exact where naming one left it at half. */
         assert(row->confidence == 1.0);
         if (strcmp(environment->preceding[0].value, "+") == 0 &&
-            strcmp(row->target_value, "4") == 0) {
+            strcmp(row->value, "4") == 0) {
             found_voiced = 1;
         }
         if (strcmp(environment->preceding[0].value, "-") == 0 &&
-            strcmp(row->target_value, "2") == 0) {
+            strcmp(row->value, "2") == 0) {
             found_voiceless = 1;
         }
     }
@@ -239,9 +239,9 @@ static void test_cross_dimensional_dimension_target(rg_context *ctx, const char 
     assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
     for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
         const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        if (strcmp(row->target_dimension, dimension) == 0 &&
-            (row->source_environment.preceding_count == 1 ||
-             row->source_environment.following_count == 1)) {
+        if (strcmp(row->dimension, dimension) == 0 &&
+            (row->environment.preceding_count == 1 ||
+             row->environment.following_count == 1)) {
             assert(row->confidence == 1.0);
             found = 1;
         }
@@ -562,11 +562,11 @@ int main(void) {
         assert(row != 0);
         /* The environment is a context now, so the rule is identified by what
          * it names rather than by three parallel strings. */
-        if (row->source_environment.self_count == 1 &&
-            strcmp(row->source_environment.self[0].feature, "voiced") == 0 &&
-            strcmp(row->source_environment.self[0].value, "+") == 0 &&
-            strcmp(row->target_dimension, "tone") == 0 &&
-            strcmp(row->target_value, "H") == 0) {
+        if (row->environment.self_count == 1 &&
+            strcmp(row->environment.self[0].feature, "voiced") == 0 &&
+            strcmp(row->environment.self[0].value, "+") == 0 &&
+            strcmp(row->dimension, "tone") == 0 &&
+            strcmp(row->value, "H") == 0) {
             found_cross_dimensional = 1;
             assert(row->count == 3.0);
             assert(row->source_count == 3.0);

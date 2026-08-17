@@ -605,10 +605,11 @@ static predictive_rule_accumulator *cross_dimensional_accumulator_for_fold_row(
     size_t i;
     for (i = 0; i < count; i++) {
         const rg_cross_dimensional_row *full_row = &full_rows[i];
-        if (strcmp(full_row->target_dimension, fold_row->target_dimension) == 0 &&
-            strcmp(full_row->target_value, fold_row->target_value) == 0 &&
-            full_row->target_position_offset == fold_row->target_position_offset &&
-            context_equal(&full_row->source_environment, &fold_row->source_environment)) {
+        if (strcmp(full_row->dimension, fold_row->dimension) == 0 &&
+            strcmp(full_row->value, fold_row->value) == 0 &&
+            full_row->position_offset == fold_row->position_offset &&
+            full_row->context_is_target == fold_row->context_is_target &&
+            context_equal(&full_row->environment, &fold_row->environment)) {
             if (items[i].last_fold != fold) {
                 items[i].folds++;
                 items[i].last_fold = fold;
@@ -666,6 +667,9 @@ static rg_status score_cross_dimensional_rules(
     predictive_rule_accumulator *accumulators,
     size_t accumulator_count,
     const rg_link *link,
+    const rg_context_spec *target_context,
+    const rg_form *source,
+    size_t source_position,
     const rg_form *target,
     size_t target_position,
     double weight,
@@ -675,6 +679,13 @@ static rg_status score_cross_dimensional_rules(
     size_t row_i;
     for (row_i = 0; row_i < fold_model->cross_dimensional_count; row_i++) {
         const rg_cross_dimensional_row *row = &fold_model->cross_dimensional_rows[row_i];
+        /* Both orientations are published, so the environment is read from
+         * whichever side the row states it over and the conditioned dimension
+         * from the other. */
+        const rg_context_spec *environment_context =
+            row->context_is_target ? target_context : &link->context;
+        const rg_form *conditioned_form = row->context_is_target ? source : target;
+        size_t conditioned_start = row->context_is_target ? source_position : target_position;
         bool subset = false;
         int actual_position;
         const char *actual;
@@ -683,12 +694,15 @@ static rg_status score_cross_dimensional_rules(
         double all_count;
         double all_total;
         predictive_rule_accumulator *accumulator;
-        if (rg_context_spec_is_subset(&row->source_environment, &link->context, &subset) != RG_OK ||
+        if (environment_context == 0) {
+            continue;
+        }
+        if (rg_context_spec_is_subset(&row->environment, environment_context, &subset) != RG_OK ||
             !subset) {
             continue;
         }
-        actual_position = (int)target_position + row->target_position_offset;
-        if (actual_position < 0 || (size_t)actual_position >= target->segment_count) {
+        actual_position = (int)conditioned_start + row->position_offset;
+        if (actual_position < 0 || (size_t)actual_position >= conditioned_form->segment_count) {
             continue;
         }
         accumulator = cross_dimensional_accumulator_for_fold_row(
@@ -696,18 +710,19 @@ static rg_status score_cross_dimensional_rules(
         if (accumulator == 0) {
             continue;
         }
-        actual = segment_dimension_value(&target->segments[actual_position], row->target_dimension);
+        actual = segment_dimension_value(&conditioned_form->segments[actual_position],
+                                         row->dimension);
         conditioned_probability = (row->count + 1.0) / (row->source_count + 2.0);
         all_count = row->count + row->contrast_count;
         all_total = row->source_count + row->contrast_source_count;
         unconditioned_probability = (all_count + 1.0) / (all_total + 2.0);
         score_binary_prediction(&accumulator->conditioned,
                                 conditioned_probability,
-                                strcmp(actual, row->target_value) == 0,
+                                strcmp(actual, row->value) == 0,
                                 weight, options);
         score_binary_prediction(&accumulator->unconditioned,
                                 unconditioned_probability,
-                                strcmp(actual, row->target_value) == 0,
+                                strcmp(actual, row->value) == 0,
                                 weight, options);
     }
     return RG_OK;
@@ -1155,6 +1170,7 @@ static rg_status score_one_pair(
     rg_context_spec *target_contexts = 0;
     size_t target_context_count = 0;
     size_t target_position = 0;
+    size_t source_position = 0;
     size_t link_i;
     rg_status status;
 
@@ -1178,6 +1194,7 @@ static rg_status score_one_pair(
     for (link_i = 0; link_i < rg_alignment_link_count(alignment); link_i++) {
         const rg_link *link = rg_alignment_link_at(alignment, link_i);
         size_t link_target_position = target_position;
+        size_t link_source_position = source_position;
         const rg_context_spec *target_context =
             link->target_count == 1 && target_position < target_context_count
                 ? &target_contexts[target_position] : 0;
@@ -1185,6 +1202,7 @@ static rg_status score_one_pair(
         size_t kind;
         memset(predictions, 0, sizeof(predictions));
         target_position += link->target_count;
+        source_position += link->source_count;
         if (link->source_count != 1 || link->target_count != 1) {
             (*unscored_spans)++;
             continue;
@@ -1233,8 +1251,9 @@ static rg_status score_one_pair(
         if (full_model != 0 && cross_dimensional_accumulators != 0) {
             status = score_cross_dimensional_rules(
                 fold_model, full_model, cross_dimensional_accumulators,
-                cross_dimensional_accumulator_count, link, target,
-                link_target_position, weight, options, fold);
+                cross_dimensional_accumulator_count, link, target_context,
+                source, link_source_position, target, link_target_position,
+                weight, options, fold);
             if (status != RG_OK) {
                 for (kind = 0; kind < 5; kind++) {
                     predictive_probabilities_clear(&predictions[kind]);
@@ -1447,10 +1466,11 @@ static void propagate_cross_dimensional_evidence(rg_multi_model *model) {
         }
         for (pair_i = 0; pair_i < pair->cross_dimensional_count; pair_i++) {
             const rg_cross_dimensional_row *row = &pair->cross_dimensional_rows[pair_i];
-            if (strcmp(row->target_dimension, lifted->rule.target_dimension) == 0 &&
-                strcmp(row->target_value, lifted->rule.target_value) == 0 &&
-                row->target_position_offset == lifted->rule.target_position_offset &&
-                context_equal(&row->source_environment, &lifted->rule.source_environment)) {
+            if (strcmp(row->dimension, lifted->rule.dimension) == 0 &&
+                strcmp(row->value, lifted->rule.value) == 0 &&
+                row->position_offset == lifted->rule.position_offset &&
+                row->context_is_target == lifted->rule.context_is_target &&
+                context_equal(&row->environment, &lifted->rule.environment)) {
                 lifted->rule.evidence.predictive = row->evidence.predictive;
                 break;
             }

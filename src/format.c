@@ -582,6 +582,15 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                            "  in a corpus removes every correspondence and raises them. cost/segment\n"
                            "  is the number that falls, and the baseline is what makes it readable.\n");
         }
+        /* The divisors for the per-pair line: pairs are correlated views of
+         * one corpus, and a duplicate lect adds views without adding
+         * evidence. */
+        builder_appendf(&builder,
+                        "pair opportunities:  %lu pairs over %lu lects"
+                        ", %lu duplicate, %lu missing forms\n",
+                        (unsigned long)fit->pair_count, (unsigned long)fit->lect_count,
+                        (unsigned long)fit->duplicate_lect_count,
+                        (unsigned long)fit->missing_form_count);
         if (fit->predictive.status == RG_PREDICTIVE_UNMEASURED) {
             builder_append(&builder,
                            "predictive evidence: not run (--predictive-folds <n>)\n");
@@ -693,10 +702,11 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[decision_order[i]];
         builder_appendf(&builder, "  #%d %s>%s ", row->rule.evidence.decision_index,
-                        row->source_lect, row->target_lect);
-        append_context(&builder, &row->rule.source_environment);
+                        row->rule.context_is_target ? row->target_lect : row->source_lect,
+                        row->rule.context_is_target ? row->source_lect : row->target_lect);
+        append_context(&builder, &row->rule.environment);
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
-                        row->rule.target_dimension, row->rule.target_value, row->rule.target_position_offset);
+                        row->rule.dimension, row->rule.value, row->rule.position_offset);
         append_count(&builder, row->rule.count);
         builder_appendf(&builder, " conf=%.2f vs %.2f elsewhere %s=%.1f%s",
                         row->rule.confidence, row->rule.contrast_confidence,
@@ -972,12 +982,14 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
         char environment[2048];
-        summary_context_key(&row->rule.source_environment, environment, sizeof(environment));
+        summary_context_key(&row->rule.environment, environment, sizeof(environment));
         builder_appendf(&builder,
                         "XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
-                        row->source_lect, row->target_lect, environment,
-                        row->rule.target_dimension, row->rule.target_value,
-                        row->rule.target_position_offset,
+                        row->rule.context_is_target ? row->target_lect : row->source_lect,
+                        row->rule.context_is_target ? row->source_lect : row->target_lect,
+                        environment,
+                        row->rule.dimension, row->rule.value,
+                        row->rule.position_offset,
                         row->rule.count, row->rule.source_count, row->rule.confidence,
                         row->rule.contrast_count, row->rule.contrast_source_count,
                         row->rule.contrast_confidence,

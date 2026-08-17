@@ -99,13 +99,14 @@ void cross_dimensional_row_clear(rg_cross_dimensional_row *row) {
     if (row == 0) {
         return;
     }
-    rg_context_spec_clear_internal(&row->source_environment);
-    rg_free_owned_internal(row->target_dimension);
-    rg_free_owned_internal(row->target_value);
+    rg_context_spec_clear_internal(&row->environment);
+    rg_free_owned_internal(row->dimension);
+    rg_free_owned_internal(row->value);
 
-    row->target_dimension = 0;
-    row->target_value = 0;
-    row->target_position_offset = 0;
+    row->dimension = 0;
+    row->value = 0;
+    row->position_offset = 0;
+    row->context_is_target = 0;
     row->count = 0.0;
     row->source_count = 0.0;
     row->confidence = 0.0;
@@ -246,21 +247,29 @@ int chunk_row_cmp(const void *a, const void *b) {
     return 0;
 }
 
+/* A total order. Dimension, value and offset do not separate two rows stating
+ * different environments -- and both orientations of a pair now publish into
+ * one table, so a rule and its mirror agree on all three. qsort is not stable,
+ * so a comparator that calls them equal lets the native and the WebAssembly
+ * build serialise the same model in different orders. */
 int cross_dimensional_row_cmp(const void *a, const void *b) {
     const rg_cross_dimensional_row *ra = (const rg_cross_dimensional_row *)a;
     const rg_cross_dimensional_row *rb = (const rg_cross_dimensional_row *)b;
-    int c = strcmp(ra->target_dimension, rb->target_dimension);
+    int c = strcmp(ra->dimension, rb->dimension);
     if (c != 0) {
         return c;
     }
-    c = strcmp(ra->target_value, rb->target_value);
+    c = strcmp(ra->value, rb->value);
     if (c != 0) {
         return c;
     }
-    if (ra->target_position_offset != rb->target_position_offset) {
-        return ra->target_position_offset < rb->target_position_offset ? -1 : 1;
+    if (ra->position_offset != rb->position_offset) {
+        return ra->position_offset < rb->position_offset ? -1 : 1;
     }
-    return 0;
+    if (ra->context_is_target != rb->context_is_target) {
+        return ra->context_is_target < rb->context_is_target ? -1 : 1;
+    }
+    return rg_context_spec_compare_internal(&ra->environment, &rb->environment);
 }
 
 rg_status add_segment_count(

@@ -51,25 +51,25 @@ static int cross_dimensional_slot_holds(
     return 1;
 }
 
-static int cross_dimensional_source_holds(
+static int cross_dimensional_environment_holds(
     const rg_context *ctx,
     const rg_form *form,
-    size_t src_pos,
+    size_t position,
     const rg_cross_dimensional_row *row
 ) {
     const rg_context_spec *environment;
     if (ctx == 0 || form == 0 || row == 0) {
         return 0;
     }
-    environment = &row->source_environment;
+    environment = &row->environment;
     if (rg_context_spec_constraint_count(environment) == 0) {
         return 0;
     }
-    return cross_dimensional_slot_holds(ctx, form, (int)src_pos - 1,
+    return cross_dimensional_slot_holds(ctx, form, (int)position - 1,
                                         environment->preceding, environment->preceding_count) &&
-           cross_dimensional_slot_holds(ctx, form, (int)src_pos,
+           cross_dimensional_slot_holds(ctx, form, (int)position,
                                         environment->self, environment->self_count) &&
-           cross_dimensional_slot_holds(ctx, form, (int)src_pos + 1,
+           cross_dimensional_slot_holds(ctx, form, (int)position + 1,
                                         environment->following, environment->following_count);
 }
 
@@ -88,18 +88,25 @@ static double cross_dimensional_adjustment_for_row(
     if (model == 0 || row == 0 || actual == 0 || actual[0] == '\0') {
         return 0.0;
     }
+    /* The unconditioned rate of the value on the side it is conditioned on.
+     * The tonal table is directional, so a rule stated over the target form
+     * reads its base rate from the source column. */
     for (i = 0; i < model->tonal_count_count; i++) {
         int first_for_tone = 1;
         size_t j;
+        const char *observed = row->context_is_target ? model->tonal_counts[i].source_tone
+                                                      : model->tonal_counts[i].target_tone;
         total_all += model->tonal_counts[i].count;
-        if (strcmp(model->tonal_counts[i].target_tone, row->target_value) == 0) {
+        if (strcmp(observed, row->value) == 0) {
             total_for_value += model->tonal_counts[i].count;
         }
-        if (model->tonal_counts[i].target_tone[0] == '\0') {
+        if (observed[0] == '\0') {
             first_for_tone = 0;
         }
         for (j = 0; j < i; j++) {
-            if (strcmp(model->tonal_counts[i].target_tone, model->tonal_counts[j].target_tone) == 0) {
+            const char *earlier = row->context_is_target ? model->tonal_counts[j].source_tone
+                                                         : model->tonal_counts[j].target_tone;
+            if (strcmp(observed, earlier) == 0) {
                 first_for_tone = 0;
                 break;
             }
@@ -129,7 +136,7 @@ static double cross_dimensional_adjustment_for_row(
     if (p_base > 1.0 - 1e-12) {
         p_base = 1.0 - 1e-12;
     }
-    if (strcmp(actual, row->target_value) == 0) {
+    if (strcmp(actual, row->value) == 0) {
         return -(log(p_cond) - log(p_base));
     }
     return -(log(1.0 - p_cond) - log(1.0 - p_base));
@@ -165,20 +172,23 @@ double cross_dimensional_link_adjustment(
     }
     for (row_i = 0; row_i < model->cross_dimensional_count; row_i++) {
         const rg_cross_dimensional_row *row = &model->cross_dimensional_rows[row_i];
-        int tgt_index = (int)tgt_pos + row->target_position_offset;
+        const rg_form *environment_form = row->context_is_target ? target_form : source_form;
+        const rg_form *conditioned_form = row->context_is_target ? source_form : target_form;
+        size_t environment_pos = row->context_is_target ? tgt_pos : src_pos;
+        int index = (int)(row->context_is_target ? src_pos : tgt_pos) + row->position_offset;
         const char *actual = "";
-        if (!cross_dimensional_source_holds(ctx, source_form, src_pos, row)) {
+        if (!cross_dimensional_environment_holds(ctx, environment_form, environment_pos, row)) {
             continue;
         }
-        if (tgt_index < 0 || (size_t)tgt_index >= target_form->segment_count) {
+        if (index < 0 || (size_t)index >= conditioned_form->segment_count) {
             continue;
         }
-        if (strcmp(row->target_dimension, "tone") == 0) {
-            actual = target_form->segments[tgt_index].tone == 0 ? "" : target_form->segments[tgt_index].tone;
-        } else if (strcmp(row->target_dimension, "length") == 0) {
-            actual = target_form->segments[tgt_index].length == 0 ? "" : target_form->segments[tgt_index].length;
-        } else if (strcmp(row->target_dimension, "stress") == 0) {
-            actual = target_form->segments[tgt_index].stress == 0 ? "" : target_form->segments[tgt_index].stress;
+        if (strcmp(row->dimension, "tone") == 0) {
+            actual = conditioned_form->segments[index].tone == 0 ? "" : conditioned_form->segments[index].tone;
+        } else if (strcmp(row->dimension, "length") == 0) {
+            actual = conditioned_form->segments[index].length == 0 ? "" : conditioned_form->segments[index].length;
+        } else if (strcmp(row->dimension, "stress") == 0) {
+            actual = conditioned_form->segments[index].stress == 0 ? "" : conditioned_form->segments[index].stress;
         }
         total += cross_dimensional_adjustment_for_row(model, row, actual);
     }

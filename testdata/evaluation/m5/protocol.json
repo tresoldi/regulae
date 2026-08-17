@@ -1,0 +1,82 @@
+{
+  "milestone": "M5",
+  "claim": "The published surface relationship is recovered under lect renaming, row and column permutation, pair reversal, duplicate lects and principled taxon sampling. Not a claim about inheritance, direction of change or which lect is ancestral.",
+  "oracle": "Published models are compared as three key sets -- multi-lect classes, per-pair conditioned correspondences and cross-dimensional associations -- with lect ids mapped through the probe's renaming, table and class-id order dropped and decision indices reduced to ranks inside their table.",
+  "verdicts": {
+    "identical": "same claims and same measurements",
+    "label": "same claims and measurements, one environment spelled as an equivalent predicate",
+    "measurement": "same claims, measurements moved",
+    "substantive": "the set of published claims changed"
+  },
+  "probes": [
+    {
+      "probe_id": "rename_preserve",
+      "requires": "identical",
+      "claim": "renaming without changing the induced order changes nothing at all"
+    },
+    {
+      "probe_id": "rename_reverse",
+      "requires": "identity",
+      "claim": "renaming so the lect order reverses keeps every published claim"
+    },
+    {
+      "probe_id": "row_reverse",
+      "requires": "identical",
+      "claim": "the order of rows in the file is not evidence"
+    },
+    {
+      "probe_id": "within_set_reverse",
+      "requires": "identical",
+      "claim": "which lect is seen first inside a set is not evidence"
+    },
+    {
+      "probe_id": "duplicate_lect",
+      "requires": "identity_shared",
+      "claim": "an identical duplicate lect does not change the pairs it duplicates"
+    },
+    {
+      "probe_id": "drop_forms",
+      "requires": "identical_untouched",
+      "claim": "missing forms of one lect leave the other lects' pairs alone"
+    },
+    {
+      "probe_id": "add_unrelated_lect",
+      "requires": "identical_untouched",
+      "claim": "an unrelated lect adds pairs without moving the existing ones"
+    },
+    {
+      "probe_id": "split_digraph",
+      "requires": "report",
+      "claim": "writing an affricate apart changes the segmentation, and the relation between the lects has to survive it"
+    },
+    {
+      "probe_id": "add_evidence_lect",
+      "requires": "report",
+      "claim": "a lect bearing existing evidence may change the multi-lect result, and the report has to name the subset"
+    },
+    {
+      "probe_id": "abstention",
+      "requires": "no_association",
+      "claim": "searching both orientations does not manufacture an association where neither has one"
+    }
+  ],
+  "feature_systems": [
+    "distinctive",
+    "phoible"
+  ],
+  "real_cases": [
+    "real_latin_spanish",
+    "real_romance_4lect",
+    "restraint_chance"
+  ],
+  "gates": [
+    "order-preserving renaming, row reversal and first-seen reversal change nothing",
+    "order-reversing renaming and pair reversal keep every published claim",
+    "a duplicate lect leaves the pairs it duplicates alone and is counted as one",
+    "missing forms of one lect leave the other lects' pairs alone",
+    "an unrelated lect leaves the existing pairs alone",
+    "a corpus with no association publishes none in either orientation",
+    "real corpora are measured and reported, not gated"
+  ],
+  "seed": 20260816
+}

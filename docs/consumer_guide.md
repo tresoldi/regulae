@@ -726,10 +726,11 @@ read half its rules against the wrong form.
 ```python
 @dataclass(frozen=True)
 class CrossDimensionalLink:            # C: rg_cross_dimensional_row
-    source_environment:  Context       # not one feature at one position
-    tgt_dimension:       str           # "tone"|"length"|"stress"
-    tgt_value:           str           # e.g. "4" for tone 4
-    tgt_position_offset: int           # signed offset from the link
+    environment:         Context       # not one feature at one position
+    context_is_target:   bool          # which form the environment is read from
+    dimension:           str           # "tone"|"length"|"stress"
+    value:               str           # e.g. "4" for tone 4
+    position_offset:     int           # signed offset from the link
     count:               float         # observed matches
     src_count:           float         # observations in the environment
     confidence:          float         # count / src_count
@@ -764,11 +765,24 @@ than a conditioning effect. The contrast fields are what make the
 row a claim; `evidence.delta_score` scores the environment as a whole under
 `evidence.scorer` and is negative for every published row.
 
-The rule reads: "where the source form satisfies
-`source_environment`, the target form's `tgt_dimension` carries
-`tgt_value` at `tgt_position_offset` from the link." That is the
-tonogenesis signature — onset voicing predicting tone on the
-following vowel, for example.
+The rule reads: "where one form satisfies `environment`, the
+other form's `dimension` carries `value` at `position_offset`
+from the link." That is the tonogenesis signature — onset voicing
+predicting tone on the following vowel, for example.
+
+**`context_is_target` says which form the environment is read
+from**, and the conditioned dimension is then on the other one.
+Both computational orientations of a pair are searched, and they
+are different questions: a lect that has merged the conditioning
+contrast has nothing to state an environment over, and a lect
+with no tone has nothing to condition. An association that holds
+both ways is published once per lect, because which lect carries
+the environment is part of the claim.
+
+Neither orientation is a direction of change. On the lifted
+multi-lect row, `source_lect` and `target_lect` name the order the
+pair was trained in and nothing more; the lect the environment
+sits in is `context_is_target ? target_lect : source_lect`.
 
 These live on the per-pair model
 (`rg_pairwise_model_cross_dimensional_rows`), because discovery

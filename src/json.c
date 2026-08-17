@@ -574,6 +574,10 @@ char *rg_json_from_multi_model_internal(
             cJSON_AddNumberToObject(fit, "pairwise_rules_above_noise", (double)f->pairwise_rules_above_noise);
             cJSON_AddNumberToObject(fit, "pairwise_rules_measured", (double)f->pairwise_rules_measured);
         }
+        cJSON_AddNumberToObject(fit, "lect_count", (double)f->lect_count);
+        cJSON_AddNumberToObject(fit, "pair_count", (double)f->pair_count);
+        cJSON_AddNumberToObject(fit, "duplicate_lect_count", (double)f->duplicate_lect_count);
+        cJSON_AddNumberToObject(fit, "missing_form_count", (double)f->missing_form_count);
     }
 
     classes = cJSON_CreateObject();
@@ -674,14 +678,19 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddStringToObject(entry, "source_lect", row->source_lect);
         cJSON_AddStringToObject(entry, "target_lect", row->target_lect);
         {
-            cJSON *environment = json_context(&row->rule.source_environment);
+            cJSON *environment = json_context(&row->rule.environment);
             if (environment != 0) {
-                cJSON_AddItemToObject(entry, "source_environment", environment);
+                cJSON_AddItemToObject(entry, "environment", environment);
             }
         }
-        cJSON_AddStringToObject(entry, "target_dimension", row->rule.target_dimension);
-        cJSON_AddStringToObject(entry, "target_value", row->rule.target_value);
-        cJSON_AddNumberToObject(entry, "target_position_offset", row->rule.target_position_offset);
+        cJSON_AddBoolToObject(entry, "context_is_target", row->rule.context_is_target ? 1 : 0);
+        cJSON_AddStringToObject(entry, "environment_lect",
+                                row->rule.context_is_target ? row->target_lect : row->source_lect);
+        cJSON_AddStringToObject(entry, "conditioned_lect",
+                                row->rule.context_is_target ? row->source_lect : row->target_lect);
+        cJSON_AddStringToObject(entry, "dimension", row->rule.dimension);
+        cJSON_AddStringToObject(entry, "value", row->rule.value);
+        cJSON_AddNumberToObject(entry, "position_offset", row->rule.position_offset);
         cJSON_AddNumberToObject(entry, "count", row->rule.count);
         cJSON_AddNumberToObject(entry, "source_count", row->rule.source_count);
         cJSON_AddNumberToObject(entry, "confidence", row->rule.confidence);

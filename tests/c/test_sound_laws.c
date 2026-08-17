@@ -1349,8 +1349,8 @@ static void test_rules_carry_the_order_they_were_decided(rg_context *ctx) {
         assert(row->rule.evidence.decision_index >= 0);
         /* The conjunction refines what a single predicate left, so it cannot
          * have been decided first. */
-        if (row->rule.source_environment.preceding_count == 1 &&
-            row->rule.source_environment.self_count == 1) {
+        if (row->rule.environment.preceding_count == 1 &&
+            row->rule.environment.self_count == 1) {
             assert(row->rule.evidence.decision_index > 0);
             refinement_seen = 1;
         }

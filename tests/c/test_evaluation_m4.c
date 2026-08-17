@@ -91,8 +91,8 @@ static void test_cross_dimensional_rule_gets_its_own_confirmation(rg_context *ct
     int confirmed = 0;
     rows = rg_multi_model_cross_dimensional_rows(model, &row_count);
     for (i = 0; i < row_count; i++) {
-        if (strcmp(rows[i].rule.target_dimension, "tone") == 0 &&
-            strcmp(rows[i].rule.target_value, "1") == 0) {
+        if (strcmp(rows[i].rule.dimension, "tone") == 0 &&
+            strcmp(rows[i].rule.value, "1") == 0) {
             assert(rows[i].rule.evidence.predictive.status == RG_PREDICTIVE_CONFIRMED);
             assert(rows[i].rule.evidence.predictive.folds == 4);
             assert(rows[i].rule.evidence.predictive.conditioned.observation_count == 20);

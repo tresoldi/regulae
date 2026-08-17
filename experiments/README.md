@@ -16,43 +16,29 @@ not; nothing below those sections was rewritten to match the engine.
 
 | directory | status |
 |---|---|
-| `tone_chinese_like_clean/` | Claims two cross-dimensional rules at confidence 1.00; the engine commits **none** as the corpus loads. |
-| `mandarin_historical/` | Claims the Middle Chinese voicing tonogenesis; the engine commits two unrelated tone-to-tone rules instead. |
+| `tone_chinese_like_clean/` | Claims two cross-dimensional rules at confidence 1.00; both are committed since M5. |
+| `mandarin_historical/` | Claims the Middle Chinese voicing tonogenesis; committed since M5, alongside tone-to-tone rows. |
 | `morph_boundary_synthetic/` | Corpus **does not load** -- inline `+` is refused as CLDF/CLTS markup. |
 | `stress_conditioned_synthetic/` | Corpus **does not load** -- inline `-` is not a grapheme any feature system covers. |
 | `gled_polynesian/`, `gled_romance/`, `arcaverborum_polynesian/` | No corpus in the repository; the data is not vendored. |
 
-The first two share one cause, and it is a property of the engine rather than
-of either corpus. **Cross-dimensional discovery looks from one side of a lect
-pair only**, and the side is whichever lect id sorts first. Both corpora put the
-derived lect first alphabetically -- `cantonese` before `mandarin`, `mandarin`
-before `middle_chinese` -- so the stage asks whether the daughter predicts the
-ancestor, which is the direction the rule is not in. Rename the lects so the
-source sorts first and both produce exactly what their findings claim.
+The first two shared one cause, and it was a property of the engine rather than
+of either corpus. **Cross-dimensional discovery looked from one side of a lect
+pair only**, and the side was whichever lect id sorted first. Both corpora put
+the derived lect first alphabetically -- `cantonese` before `mandarin`,
+`mandarin` before `middle_chinese` -- so the stage asked whether the daughter
+predicts the ancestor, which is the direction the rule is not in.
 
-Conditioned correspondences do not have this problem: they are searched from
-both sides, which is what `context_is_target` is for, and the header comment on
-`rg_conditioned_segment_count_row` argues the case at length -- a change is only
-visible from the side that has the split, and which side that is depends on
-which lect happened to sort first. The same argument applies to
-cross-dimensional rules and has not been applied to them. That the sibling
-synthetic fixtures still reproduce is the tell: `umlaut_synthetic`,
-`harmony_synthetic` and `length_conditioned_synthetic` all come back as
-*target-side* conditioned correspondences.
+M5 searches both orientations. `rg_cross_dimensional_row.context_is_target` says
+which form the environment was read from, which is what
+`rg_conditioned_segment_count_row` had always carried for conditioned
+correspondences: a change is only visible from the side that has the split, and
+which side that is depends on what each lect preserved rather than on which lect
+happened to sort first. Both corpora now produce what their findings claim, and
+renaming their lects does not change it.
 
-It is worth stating as what it is. `src/multilect.c` sorts lects into ascending
-id order and explains why in a comment ending **"a name is metadata, and no
-analysis may turn on it"** -- an invariant added after renaming a lect changed a
-quarter of the published classes on real data. Cross-dimensional discovery turns
-on it. On `experiments/tone_chinese_like_clean/`, renaming a lect without
-changing which one sorts first changes nothing, and renaming one so that the
-other sorts first changes the model:
-
-```
-original            (cantonese first): 0 rules
-cantonese renamed   (cantonese first): 0 rules
-mandarin  renamed   (mandarin  first): 2 rules
-```
+The status sections dated 2026-08-16 in those two findings documents describe
+the engine before that fix.
 
 Everything else audited clean, and none of it was affected by the 2026-08-15/16
 structural work: the pre-pass build produces the same results.

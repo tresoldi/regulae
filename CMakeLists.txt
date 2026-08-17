@@ -299,6 +299,11 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_evaluation_m3 PRIVATE regulae::regulae)
     add_test(NAME evaluation_m3 COMMAND test_evaluation_m3)
 
+    add_executable(test_evaluation_m5 tests/c/test_evaluation_m5.c)
+    target_compile_definitions(test_evaluation_m5 PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_evaluation_m5 PRIVATE regulae::regulae)
+    add_test(NAME evaluation_m5 COMMAND test_evaluation_m5)
+
     add_executable(test_evaluation_m4 tests/c/test_evaluation_m4.c)
     target_compile_definitions(test_evaluation_m4 PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_evaluation_m4 PRIVATE regulae::regulae)
@@ -405,6 +410,9 @@ if(REGULAE_BUILD_TESTS)
             add_test(NAME evaluation_m4_current
                 COMMAND ${Python3_EXECUTABLE}
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m4.py" --verify)
+            add_test(NAME evaluation_m5_current
+                COMMAND ${Python3_EXECUTABLE}
+                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m5.py" --verify)
         endif()
 
         add_test(NAME web_page

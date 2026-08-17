@@ -93,10 +93,11 @@ static rg_status append_cross_dimensional_row(
     rg_cross_dimensional_row **rows,
     size_t *count,
     size_t *cap,
-    const rg_context_spec *source_environment,
-    const char *target_dimension,
-    const char *target_value,
-    int target_position_offset,
+    const rg_context_spec *environment,
+    int context_is_target,
+    const char *dimension,
+    const char *value,
+    int position_offset,
     double rule_count,
     double source_count,
     double contrast_count,
@@ -116,12 +117,13 @@ static rg_status append_cross_dimensional_row(
         *cap = next_cap;
     }
     memset(&(*rows)[*count], 0, sizeof((*rows)[*count]));
-    if (rg_context_spec_copy_internal(source_environment, &(*rows)[*count].source_environment) != RG_OK) {
+    if (rg_context_spec_copy_internal(environment, &(*rows)[*count].environment) != RG_OK) {
         return RG_ERR_OOM;
     }
-    (*rows)[*count].target_dimension = rg_strdup_internal(target_dimension);
-    (*rows)[*count].target_value = rg_strdup_internal(target_value);
-    (*rows)[*count].target_position_offset = target_position_offset;
+    (*rows)[*count].context_is_target = context_is_target;
+    (*rows)[*count].dimension = rg_strdup_internal(dimension);
+    (*rows)[*count].value = rg_strdup_internal(value);
+    (*rows)[*count].position_offset = position_offset;
     (*rows)[*count].count = rule_count;
     (*rows)[*count].source_count = source_count;
     (*rows)[*count].confidence = source_count > 0.0 ? rule_count / source_count : 0.0;
@@ -133,8 +135,8 @@ static rg_status append_cross_dimensional_row(
     (*rows)[*count].evidence.decision_index = decision_index;
     (*rows)[*count].evidence.search_margin = search_margin;
     (*rows)[*count].uncertainty = rg_wilson_default_internal(rule_count, source_count);
-    if ((*rows)[*count].target_dimension == 0 ||
-        (*rows)[*count].target_value == 0) {
+    if ((*rows)[*count].dimension == 0 ||
+        (*rows)[*count].value == 0) {
         cross_dimensional_row_clear(&(*rows)[*count]);
         return RG_ERR_OOM;
     }
@@ -657,8 +659,11 @@ static int xdim_predicate_satisfied(
     return predicate->negated ? !holds : holds;
 }
 
-/* Cross-dimensional discovery: does a feature on the source side condition a
- * dimension on the target side?
+/* One orientation of cross-dimensional discovery: does something about one
+ * form condition a suprasegmental value on the other?
+ *
+ * `context_is_target` picks which form states the environment; the conditioned
+ * dimension is read from the other one. The caller runs both.
  *
  * The claim is a conditioned split, so it is tested the way this pipeline
  * tests one. An environment earns a rule only when
@@ -667,69 +672,46 @@ static int xdim_predicate_satisfied(
  *      holds of every segment partitions nothing, and "the preceding segment
  *      is a consonant" on a corpus of CV syllables is not an environment; it
  *      is a description of the corpus.
- *   2. modelling the target dimension separately inside and outside beats
- *      modelling it once by more than the extra parameters cost under BIC.
- *      This is the criterion, and the code shape, of context discovery.
+ *   2. modelling the dimension separately inside and outside beats modelling
+ *      it once by more than the extra parameters *and the search* cost. This
+ *      is the criterion, and the code shape, of context discovery.
  *
  * and a value inside that environment is reported only when the environment
  * raises it above its rate in the contrast. That last condition is what makes
  * the output read as historical linguistics rather than as a frequency table:
  * a rule says the environment *did something*, and on a two-valued dimension
- * two rules naming one environment can no longer contradict each other.
+ * two rules naming one environment can no longer contradict each other. The
+ * stage previously committed on P(value | environment) >= 0.5 with no contrast
+ * at all, which reported the ambient distribution as though it were a rule.
  *
- * Environments are then committed one at a time, best first, against what the
+ * An environment may conjoin two predicates, and has to. The Middle Chinese
+ * register split conditions the tone on the preceding onset's voicing *and* on
+ * that segment's own tone: a tone 2 becomes tone 4 after a voiced onset and
+ * tone 2 after a voiceless one, while a tone 1 is unaffected either way.
+ * Neither predicate alone predicts anything -- voicing alone reported that rule
+ * at confidence 0.50 -- and until 2026-08-15 neither the row nor the search
+ * could say both at once. The environment form's own tone was not in the
+ * predicate vocabulary either.
+ *
+ * Environments are committed one at a time, best first, against what the
  * already-committed rules have not accounted for. Without that, every
  * correlated framing of one fact commits separately -- on a corpus of CV
  * syllables `consonant`, `sonorant`, `nasal` and `voiced` at the same offset
  * are four descriptions of the same coda, and a reader has no way to tell that
  * they are one finding. Explaining the residue is what this stage is for; it
- * runs after the segmental and tonal baselines for the same reason.
- *
- * The stage previously committed on P(value | environment) >= 0.5 with no
- * contrast at all, which reported the ambient distribution as though it were a
- * rule, and on a two-valued dimension emitted both values at once. */
-/* Cross-dimensional discovery: does something about the source form condition
- * a suprasegmental value on the target?
- *
- * The claim is a conditioned split, so it is tested the way this pipeline
- * tests one. An environment earns a rule only when
- *
- *   1. the complementary environment exists and is attested. A predicate that
- *      holds of every segment partitions nothing, and "the preceding segment
- *      is a consonant" on a corpus of CV syllables is not an environment; it
- *      is a description of the corpus.
- *   2. modelling the target dimension separately inside and outside beats
- *      modelling it once by more than the extra parameters *and the search*
- *      cost. This is the criterion, and the code shape, of context discovery.
- *
- * and a value inside that environment is reported only when the environment
- * raises it above its rate in the contrast. That last condition is what makes
- * the output read as historical linguistics rather than as a frequency table.
- *
- * An environment may conjoin two predicates, and has to. The Middle Chinese
- * register split conditions the target tone on the preceding onset's voicing
- * *and* on the source segment's own tone: a source tone 2 becomes tone 4 after
- * a voiced onset and tone 2 after a voiceless one, while a source tone 1 is
- * unaffected either way. Neither predicate alone predicts anything -- voicing
- * alone reported that rule at confidence 0.50 -- and until 2026-08-15 neither
- * the row nor the search could say both at once. The source's own tone was not
- * in the predicate vocabulary either.
- *
- * Environments are committed one at a time, best first, against what the
- * already-committed rules have not accounted for. Without that, every
- * correlated framing of one fact commits separately.
- */
-rg_status discover_cross_dimensional_rows(
+ * runs after the segmental and tonal baselines for the same reason. */
+static rg_status discover_cross_dimensional_orientation(
     const rg_context *ctx,
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
     rg_pairwise_model *model,
-    const rg_feature_vocabulary *vocabulary
+    const rg_feature_vocabulary *vocabulary,
+    int context_is_target,
+    rg_cross_dimensional_row **rows,
+    size_t *row_count,
+    size_t *row_cap
 ) {
-    rg_cross_dimensional_row *rows = 0;
-    size_t row_count = 0;
-    size_t row_cap = 0;
     rg_status status = RG_OK;
     double min_count = 3.0;
     double min_confidence = 0.0;
@@ -739,9 +721,6 @@ rg_status discover_cross_dimensional_rows(
     rg_split_score_config score_config;
     size_t dimension_i;
 
-    if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
     if (options != 0) {
         if (options->bic.cross_dim_min_rule_count > 0) {
             min_count = (double)options->bic.cross_dim_min_rule_count;
@@ -806,12 +785,14 @@ rg_status discover_cross_dimensional_rows(
             }
         }
         for (pair_i = 0; pair_i < pair_count && status == RG_OK; pair_i++) {
+            const rg_form *environment_form =
+                context_is_target ? &pairs[pair_i].target : &pairs[pair_i].source;
             size_t seg_i;
-            for (seg_i = 0; seg_i < pairs[pair_i].source.segment_count && status == RG_OK; seg_i++) {
+            for (seg_i = 0; seg_i < environment_form->segment_count && status == RG_OK; seg_i++) {
                 size_t d;
                 for (d = 0; d < sizeof(xdim_dimension_names) / sizeof(xdim_dimension_names[0]) &&
                             status == RG_OK; d++) {
-                    const char *value = segment_dimension_value(&pairs[pair_i].source.segments[seg_i],
+                    const char *value = segment_dimension_value(&environment_form->segments[seg_i],
                                                                 xdim_dimension_names[d]);
                     if (value == 0 || value[0] == '\0') {
                         continue;
@@ -831,11 +812,17 @@ rg_status discover_cross_dimensional_rows(
             free(predicates);
             continue;
         }
-
         /* One alignment pass, with each link's predicate membership recorded
          * as it is walked. */
         for (pair_i = 0; pair_i < pair_count && status == RG_OK; pair_i++) {
             rg_alignment *alignment = 0;
+            /* The alignment is always searched in the direction the model was
+             * trained in. Only which side supplies the environment and which
+             * supplies the conditioned dimension changes here. */
+            const rg_form *environment_form =
+                context_is_target ? &pairs[pair_i].target : &pairs[pair_i].source;
+            const rg_form *conditioned_form =
+                context_is_target ? &pairs[pair_i].source : &pairs[pair_i].target;
             size_t link_i;
             size_t src_pos = 0;
             size_t tgt_pos = 0;
@@ -851,8 +838,10 @@ rg_status discover_cross_dimensional_rows(
             for (link_i = 0; link_i < rg_alignment_link_count(alignment) && status == RG_OK; link_i++) {
                 const rg_link *link = rg_alignment_link_at(alignment, link_i);
                 if (link->source_count == 1 && link->target_count == 1) {
-                    const char *value = segment_dimension_value(&pairs[pair_i].target.segments[tgt_pos],
-                                                                target_dimension);
+                    size_t environment_pos = context_is_target ? tgt_pos : src_pos;
+                    const char *value = segment_dimension_value(
+                        &conditioned_form->segments[context_is_target ? src_pos : tgt_pos],
+                        target_dimension);
                     if (value != 0 && value[0] != '\0') {
                         xdim_observation *slot;
                         if (observation_count == observation_cap) {
@@ -880,12 +869,12 @@ rg_status discover_cross_dimensional_rows(
                             break;
                         }
                         for (i = 0; i < predicate_count; i++) {
-                            int index = (int)src_pos + predicates[i].offset;
-                            if (!context_position_exists(&pairs[pair_i].source, index)) {
+                            int index = (int)environment_pos + predicates[i].offset;
+                            if (!context_position_exists(environment_form, index)) {
                                 continue;
                             }
                             slot->defined[i] = 1;
-                            if (xdim_predicate_satisfied(ctx, &pairs[pair_i].source, index, &predicates[i])) {
+                            if (xdim_predicate_satisfied(ctx, environment_form, index, &predicates[i])) {
                                 slot->holds[i] = 1;
                             }
                         }
@@ -1139,8 +1128,9 @@ rg_status discover_cross_dimensional_rows(
                             continue;
                         }
                         status = append_cross_dimensional_row(
-                            &rows, &row_count, &row_cap,
-                            &environment, target_dimension, here[value_i].tone, 0,
+                            rows, row_count, row_cap,
+                            &environment, context_is_target,
+                            target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
                             best.delta_score, decision_index, best_margin);
                         if (status == RG_OK) {
@@ -1217,13 +1207,51 @@ rg_status discover_cross_dimensional_rows(
         free(predicates);
     }
 
-    if (status != RG_OK) {
-        size_t i;
-        for (i = 0; i < row_count; i++) {
-            cross_dimensional_row_clear(&rows[i]);
+    return status;
+}
+
+/* Both orientations of the pair, because they ask different questions.
+ *
+ * "Does something about the source form condition a suprasegmental value on
+ * the target?" has an answer only where the source still shows the
+ * conditioning contrast and the target carries the dimension. A lect that
+ * merged the voicing contrast has nothing to state an environment over, and a
+ * lect with no tone has nothing to condition, so a corpus can carry a rule in
+ * one orientation, in both, or in neither.
+ *
+ * Searching one orientation only made a published finding depend on which lect
+ * name sorted first, which is metadata. Neither orientation is a direction of
+ * change: which lect the environment sits in is a fact about what each lect
+ * preserved. */
+rg_status discover_cross_dimensional_rows(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_train_options *options,
+    rg_pairwise_model *model,
+    const rg_feature_vocabulary *vocabulary
+) {
+    rg_cross_dimensional_row *rows = 0;
+    size_t row_count = 0;
+    size_t row_cap = 0;
+    rg_status status;
+    int context_is_target;
+
+    if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    for (context_is_target = 0; context_is_target < 2; context_is_target++) {
+        status = discover_cross_dimensional_orientation(
+            ctx, pairs, pair_count, options, model, vocabulary, context_is_target,
+            &rows, &row_count, &row_cap);
+        if (status != RG_OK) {
+            size_t i;
+            for (i = 0; i < row_count; i++) {
+                cross_dimensional_row_clear(&rows[i]);
+            }
+            free(rows);
+            return status;
         }
-        free(rows);
-        return status;
     }
     if (row_count > 1) {
         qsort(rows, row_count, sizeof(*rows), cross_dimensional_row_cmp);

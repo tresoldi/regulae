@@ -48,6 +48,13 @@ A conjunction of attested phonological, prosodic, positional or caller-supplied
 morphological predicates associated with a correspondence.
 _Avoid_: Cause, trigger
 
+**Computational orientation**:
+Which of a pair's two lects a search states its environment over. Both are
+searched, and they ask different questions: only a lect that still shows the
+conditioning contrast has an environment to state. Which lect that is says what
+each lect preserved.
+_Avoid_: Direction of change, ancestor, source language
+
 **Contrast**:
 The observations in the complement of an environment against which a
 conditioned correspondence is measured.

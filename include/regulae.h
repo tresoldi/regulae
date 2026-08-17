@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 28
+#define RG_ABI_VERSION 29
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -560,9 +560,22 @@ typedef struct rg_chunk_row {
     rg_uncertainty_estimate uncertainty;
 } rg_chunk_row;
 
-/* A claim that a source-side feature conditions a target-side dimension: in
- * the environment (source_feature at source_position), the target dimension
- * takes target_value.
+/* A claim that a feature on one lect's form goes with a suprasegmental value
+ * on the other's: in `environment`, the other form's `dimension` takes `value`.
+ *
+ * `context_is_target` says which form the environment is read from, exactly as
+ * it does on a conditioned correspondence, and the conditioned dimension is
+ * then read from the other one. Both computational orientations of a pair are
+ * searched. They ask different questions -- a lect that has merged the voicing
+ * contrast has nothing for an environment to say, and a lect with no tone has
+ * nothing to condition -- and searching only one made a finding depend on which
+ * lect name sorted first: on `tone_chinese_like_clean`, a rule true at
+ * confidence 1.00 by construction was committed when the conditioning lect
+ * sorted first and not committed when it sorted second.
+ *
+ * Neither orientation is a direction of change. The environment sits in the
+ * lect that still shows the conditioning contrast, which is a fact about what
+ * each lect preserved, not about which one is ancestral.
  *
  * A conditioning environment is only conditioning if the complementary
  * environment behaves differently, so every row carries the contrast it was
@@ -573,24 +586,27 @@ typedef struct rg_chunk_row {
  * distribution, not a conditioned split. The row is published only when the
  * environment raises the value above its contrast.
  *
- * `evidence.delta_score` is for the environment as a whole, not for this
- * value: it compares modelling the target dimension separately inside and
- * outside under the named scorer. It is negative for every published row, and
- * more negative is stronger. */
-/* A rule where something about the source form conditions a suprasegmental
- * value on the target.
- *
  * The environment is an rg_context_spec, the same type a conditioned
  * correspondence uses, so it can name more than one predicate. It has to: the
- * Middle Chinese register split conditions the target tone on the preceding
- * onset's voicing *and* on the source segment's own tone, and neither alone
- * predicts it above chance. A single-predicate row reported that rule at
- * confidence 0.50 and looked like a weak finding rather than half of one. */
+ * Middle Chinese register split conditions the tone on the preceding onset's
+ * voicing *and* on that segment's own tone, and neither alone predicts it above
+ * chance. A single-predicate row reported that rule at confidence 0.50 and
+ * looked like a weak finding rather than half of one.
+ *
+ * `evidence.delta_score` is for the environment as a whole, not for this
+ * value: it compares modelling the dimension separately inside and outside
+ * under the named scorer. It is negative for every published row, and more
+ * negative is stronger. */
 typedef struct rg_cross_dimensional_row {
-    rg_context_spec source_environment;
-    const char *target_dimension;
-    const char *target_value;
-    int target_position_offset;
+    rg_context_spec environment;
+    /* The environment is read from the target form, and `dimension` from the
+     * source form. Zero is the other way round. */
+    int context_is_target;
+    const char *dimension;
+    const char *value;
+    /* Where the conditioned segment sits relative to the aligned position the
+     * environment is stated at. */
+    int position_offset;
     double count;
     double source_count;
     double confidence;
@@ -651,7 +667,12 @@ typedef struct rg_multi_class_row {
  * The rule itself is exactly the pairwise row -- the multi-lect table is built
  * by lifting every pair's rows into one place, and the lifting used to be forty
  * lines copying fifteen identical fields across, in the same order, into a
- * struct that differed from its source by two strings. */
+ * struct that differed from its source by two strings.
+ *
+ * `source_lect` and `target_lect` name the pair's computational orientation,
+ * which is the order the pair was trained in and nothing more. The lect the
+ * environment is stated over is `rule.context_is_target ? target_lect :
+ * source_lect`, and the conditioned dimension is on the other one. */
 typedef struct rg_multi_cross_dimensional_row {
     const char *source_lect;
     const char *target_lect;
@@ -775,6 +796,30 @@ typedef struct rg_corpus_fit {
      * that had found nothing. */
     size_t pairwise_rules_above_noise;
     size_t pairwise_rules_measured;
+    /* How many views of this corpus the pair counts above are counting, and
+     * how many of them are not independent evidence.
+     *
+     * Pairwise rows are correlated views of one multi-lect corpus, and the
+     * denominator of `pairwise_rules_measured` grows as though they were not:
+     * a relation visible in every pair of four lects is six rows there and one
+     * relation. `lect_count` and `pair_count` are the divisors that make that
+     * readable.
+     *
+     * `duplicate_lect_count` counts lects whose forms repeat an earlier lect's
+     * in every cognate set the two share -- the same variety sampled twice,
+     * or one wordlist copied under two names. Each one adds pairs and no
+     * evidence, and the pair count alone cannot show it.
+     *
+     * `missing_form_count` counts the lect-and-set slots with no form. They are
+     * the opportunities the pair count implies and the corpus does not have.
+     *
+     * None of the three is a taxonomic claim. regulae has no family or area
+     * labels and does not infer them: a duplicate here is an identical
+     * wordlist, not a sister language. */
+    size_t lect_count;
+    size_t pair_count;
+    size_t duplicate_lect_count;
+    size_t missing_form_count;
     /* Whether the cognate sets align in one group or two.
      *
      * `cost_per_segment` above is a mean, and a mean says nothing about shape.

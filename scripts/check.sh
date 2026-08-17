@@ -95,6 +95,7 @@ python3 scripts/diagnostics.py >/dev/null || fail "scripts/diagnostics.py"
 python3 scripts/linguistic_probes.py >/dev/null || fail "scripts/linguistic_probes.py"
 python3 scripts/evaluate_m2.py >/dev/null || fail "scripts/evaluate_m2.py"
 python3 scripts/evaluate_m3.py --verify >/dev/null || fail "scripts/evaluate_m3.py"
+python3 scripts/evaluate_m5.py >/dev/null || fail "scripts/evaluate_m5.py"
 
 # A second compiler, because every assumption GCC happens to be lenient about
 # is otherwise untested -- and until 2026-08-15 the string "clang" appeared
@@ -194,7 +195,7 @@ step "generated artifacts were already current"
 # committed, and reporting it as a stale generated artifact is a wrong answer
 # to a question nobody asked. What the gate is for is a *committed* file that
 # its generator no longer produces.
-dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO testdata/soundlaws testdata/restraint testdata/diagnostics | grep -v '^??' || true)"
+dirty="$(git status --porcelain -- docs/capabilities.md web/corpora.js web/guide-content.js web/BUILD_INFO testdata/soundlaws testdata/restraint testdata/diagnostics docs/m5_evaluation.md docs/m5_evaluation_probes.tsv testdata/evaluation/m5 | grep -v '^??' || true)"
 if [ -n "$dirty" ]; then
     printf '%s\n' "$dirty" >&2
     fail "generated artifacts were stale; they have been regenerated, review and commit them"

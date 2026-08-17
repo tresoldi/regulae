@@ -1,0 +1,12 @@
+corpus_id	regime	path	lects	cognate_sets	note
+xdim_conditioner_first	cross_dimensional	testdata/evaluation/m5/generated/xdim_conditioner_first.tsv	2	36	the conditioning lect sorts first
+xdim_conditioner_second	cross_dimensional	testdata/evaluation/m5/generated/xdim_conditioner_second.tsv	2	36	the same relationship with the conditioning lect sorting second
+xdim_both_orientations	cross_dimensional	testdata/evaluation/m5/generated/xdim_both_orientations.tsv	2	36	the association holds whichever lect carries the environment
+xdim_neither_orientation	cross_dimensional	testdata/evaluation/m5/generated/xdim_neither_orientation.tsv	2	36	a tone no predicate about the other lect predicts
+xdim_uncorrelated_dimensions	cross_dimensional	testdata/evaluation/m5/generated/xdim_uncorrelated_dimensions.tsv	2	60	both lects carry a tone and neither predicts the other
+segmental_conditioned	segmental	testdata/evaluation/m5/generated/segmental_conditioned.tsv	2	20	one conditioned correspondence over two lects
+multilect_three	multilect	testdata/evaluation/m5/generated/multilect_three.tsv	3	20	three lects, one conditioned and one unconditioned change
+sampling_conservative_sister	sampling	testdata/evaluation/m5/generated/sampling_conservative_sister.tsv	3	20	a conservative sister beside two innovators
+sampling_dialect_continuum	sampling	testdata/evaluation/m5/generated/sampling_dialect_continuum.tsv	4	20	four points on a chain
+sampling_parallel_innovators	sampling	testdata/evaluation/m5/generated/sampling_parallel_innovators.tsv	4	20	the same reflex reached from two different sources
+sampling_imbalanced_subgroup	sampling	testdata/evaluation/m5/generated/sampling_imbalanced_subgroup.tsv	4	20	three close lects against one distant lect
