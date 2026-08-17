@@ -770,6 +770,7 @@ read half its rules against the wrong form.
 class CrossDimensionalLink:            # C: rg_cross_dimensional_row
     environment:         Context       # not one feature at one position
     context_is_target:   bool          # which form the environment is read from
+    dimension_from_environment: bool   # ABI 34: tone read from the env's own form
     dimension:           str           # "tone"|"length"|"stress"
     value:               str           # e.g. "4" for tone 4
     position_offset:     int           # signed offset from the link
@@ -799,6 +800,20 @@ A conditioned split is a two-sided statement and both halves are
 published: a `"-"` constraint names the complementary
 environment, and a consumer that filters to `"+"` will read a
 merger as a one-way change.
+
+**`dimension_from_environment` (ABI 34) says whether the rule is
+lect-internal.** 0 is the cross-lect rule — one lect's material
+predicts the other lect's tone. 1 is tonogenesis proper: an onset
+and the tone it conditions in the same language, read from one
+form. With `context_is_target` this names the single lect both
+sides are read from (the multi-lect JSON exposes it as
+`conditioned_lect`, equal to `environment_lect` for a
+lect-internal rule). The two are found independently, so a clean
+tonogenesis where a lect kept its voicing publishes both readings;
+a lect that merged its voicing keeps only the cross-lect one.
+Lect-internal rules do not price the alignment — they describe one
+lect's structure, not how two forms line up — so they never
+perturb the segment tables.
 
 **Do not read `confidence` on its own.** It is
 P(value | environment), and a rule holding at 0.9 where the

@@ -1,4 +1,5 @@
 #include "multilect_internal.h"
+#include "environment.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -95,8 +96,45 @@ rg_status lift_cross_dimensional_rows(rg_multi_model *model) {
         for (j = 0; j < row_count; j++) {
             const rg_cross_dimensional_row *row = &pair_rows[j];
             rg_multi_cross_dimensional_row *next;
+            const char *env_lect;
             if (row == 0) {
                 continue;
+            }
+            env_lect = row->context_is_target ? model->pair_models[i].lect_b
+                                              : model->pair_models[i].lect_a;
+            /* A lect-internal rule is about one lect, but the pass that finds it
+             * runs in every pair that lect takes part in, so it arrives here
+             * once per partner. A cross-lect rule names two lects and is
+             * genuinely per-pair; only the internal ones are deduplicated, on
+             * the lect and the rule, keeping the pair whose alignment gave the
+             * most observations. */
+            if (row->dimension_from_environment) {
+                size_t k;
+                int superseded = 0;
+                for (k = 0; k < model->cross_dimensional_count; k++) {
+                    rg_multi_cross_dimensional_row *have = &model->cross_dimensional_rows[k];
+                    const char *have_env = have->rule.context_is_target ? have->target_lect
+                                                                        : have->source_lect;
+                    if (!have->rule.dimension_from_environment ||
+                        strcmp(have_env, env_lect) != 0 ||
+                        strcmp(have->rule.dimension, row->dimension) != 0 ||
+                        strcmp(have->rule.value, row->value) != 0 ||
+                        have->rule.position_offset != row->position_offset ||
+                        rg_context_spec_compare_internal(&have->rule.environment, &row->environment) != 0) {
+                        continue;
+                    }
+                    /* Same lect-internal rule already lifted: keep the stronger. */
+                    if (row->source_count > have->rule.source_count) {
+                        have->source_lect = model->pair_models[i].lect_a;
+                        have->target_lect = model->pair_models[i].lect_b;
+                        have->rule = *row;
+                    }
+                    superseded = 1;
+                    break;
+                }
+                if (superseded) {
+                    continue;
+                }
             }
             if (model->cross_dimensional_count == cap) {
                 size_t next_cap = cap == 0 ? 8 : cap * 2;

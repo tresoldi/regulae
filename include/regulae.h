@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 33
+#define RG_ABI_VERSION 34
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -631,6 +631,14 @@ typedef struct rg_cross_dimensional_row {
     /* The environment is read from the target form, and `dimension` from the
      * source form. Zero is the other way round. */
     int context_is_target;
+    /* Whether the conditioned dimension is read from the same form that states
+     * the environment. 0 is the cross-lect rule -- one lect's material predicts
+     * the other lect's tone. 1 is lect-internal: an onset and the tone it
+     * conditions in the same language, which is what tonogenesis leaves behind
+     * and what the row could not say before ABI 34. With `context_is_target`
+     * this names the single form both are read from: target when
+     * `context_is_target`, source otherwise. */
+    int dimension_from_environment;
     const char *dimension;
     const char *value;
     /* Where the conditioned segment sits relative to the aligned position the

@@ -609,6 +609,7 @@ static predictive_rule_accumulator *cross_dimensional_accumulator_for_fold_row(
             strcmp(full_row->value, fold_row->value) == 0 &&
             full_row->position_offset == fold_row->position_offset &&
             full_row->context_is_target == fold_row->context_is_target &&
+            full_row->dimension_from_environment == fold_row->dimension_from_environment &&
             context_equal(&full_row->environment, &fold_row->environment)) {
             if (items[i].last_fold != fold) {
                 items[i].folds++;
@@ -684,8 +685,16 @@ static rg_status score_cross_dimensional_rules(
          * from the other. */
         const rg_context_spec *environment_context =
             row->context_is_target ? target_context : &link->context;
-        const rg_form *conditioned_form = row->context_is_target ? source : target;
-        size_t conditioned_start = row->context_is_target ? source_position : target_position;
+        /* Lect-internal rules read the conditioned dimension from the same form
+         * that states the environment; cross-lect rules read it from the other.
+         * Getting this wrong scores the rule against a form it makes no claim
+         * about. */
+        const rg_form *conditioned_form = row->dimension_from_environment
+            ? (row->context_is_target ? target : source)
+            : (row->context_is_target ? source : target);
+        size_t conditioned_start = row->dimension_from_environment
+            ? (row->context_is_target ? target_position : source_position)
+            : (row->context_is_target ? source_position : target_position);
         bool subset = false;
         int actual_position;
         const char *actual;

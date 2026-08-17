@@ -227,30 +227,47 @@ static void test_tone_clean_fixture(rg_context *ctx) {
     assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
     /* The fixture encodes one conditioned split, and both halves of it are
      * findings: voiced onsets take one tone, voiceless onsets the other. The
-     * complementary environment is published under source_value "-". */
-    assert(rg_pairwise_model_cross_dimensional_row_count(model) == 2);
-    for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
-        const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
-        /* One predicate, on the preceding segment: the onset's voicing. */
-        assert(row->environment.preceding_count == 1);
-        assert(strcmp(row->environment.preceding[0].feature, "voiced") == 0);
-        assert(row->environment.self_count == 0);
-        assert(row->environment.following_count == 0);
-        assert(row->count == 40.0 && row->source_count == 40.0);
-        assert(row->confidence == 1.0);
-        /* The environment is what makes the difference: the value never occurs
-         * outside it. */
-        assert(row->contrast_count == 0.0);
-        assert(row->contrast_confidence == 0.0);
-        assert(row->evidence.delta_bic < 0.0);
-        if (strcmp(row->environment.preceding[0].value, "+") == 0 &&
-            strcmp(row->value, "\xe2\x81\xb4\xe2\x81\xb4") == 0) {
-            found_voiced = 1;
+     * complementary environment is published under source_value "-".
+     *
+     * Cantonese kept its voicing here, so the split is found twice: as the
+     * cross-lect rule (Mandarin's onset predicts Cantonese's tone) and as the
+     * lect-internal one (Cantonese's own onset predicts its own tone, which is
+     * tonogenesis). Four rows: two halves, each in both readings. */
+    assert(rg_pairwise_model_cross_dimensional_row_count(model) == 4);
+    {
+        int internal_rows = 0;
+        int cross_lect_rows = 0;
+        for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
+            const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
+            /* One predicate, on the preceding segment: the onset's voicing.
+             * True of both readings, since the environment is the same onset. */
+            assert(row->environment.preceding_count == 1);
+            assert(strcmp(row->environment.preceding[0].feature, "voiced") == 0);
+            assert(row->environment.self_count == 0);
+            assert(row->environment.following_count == 0);
+            assert(row->count == 40.0 && row->source_count == 40.0);
+            assert(row->confidence == 1.0);
+            /* The environment is what makes the difference: the value never
+             * occurs outside it. */
+            assert(row->contrast_count == 0.0);
+            assert(row->contrast_confidence == 0.0);
+            assert(row->evidence.delta_bic < 0.0);
+            if (row->dimension_from_environment) {
+                internal_rows++;
+            } else {
+                cross_lect_rows++;
+                if (strcmp(row->environment.preceding[0].value, "+") == 0 &&
+                    strcmp(row->value, "\xe2\x81\xb4\xe2\x81\xb4") == 0) {
+                    found_voiced = 1;
+                }
+                if (strcmp(row->environment.preceding[0].value, "-") == 0 &&
+                    strcmp(row->value, "\xc2\xb9\xc2\xb9") == 0) {
+                    found_voiceless = 1;
+                }
+            }
         }
-        if (strcmp(row->environment.preceding[0].value, "-") == 0 &&
-            strcmp(row->value, "\xc2\xb9\xc2\xb9") == 0) {
-            found_voiceless = 1;
-        }
+        assert(cross_lect_rows == 2);
+        assert(internal_rows == 2);
     }
     assert(found_voiced);
     assert(found_voiceless);

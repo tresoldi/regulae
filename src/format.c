@@ -745,9 +745,16 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[decision_order[i]];
-        builder_appendf(&builder, "  #%d %s>%s ", row->rule.evidence.decision_index,
-                        row->rule.context_is_target ? row->target_lect : row->source_lect,
-                        row->rule.context_is_target ? row->source_lect : row->target_lect);
+        const char *env_lect = row->rule.context_is_target ? row->target_lect : row->source_lect;
+        const char *other_lect = row->rule.context_is_target ? row->source_lect : row->target_lect;
+        if (row->rule.dimension_from_environment) {
+            /* Lect-internal: one lect's onset conditions its own tone. Written
+             * `lect (self)` so it does not read as a cross-lect prediction. */
+            builder_appendf(&builder, "  #%d %s (self) ", row->rule.evidence.decision_index, env_lect);
+        } else {
+            builder_appendf(&builder, "  #%d %s>%s ", row->rule.evidence.decision_index,
+                            env_lect, other_lect);
+        }
         append_context(&builder, &row->rule.environment);
         builder_appendf(&builder, " -> %s=%s@%+d  count=",
                         row->rule.dimension, row->rule.value, row->rule.position_offset);
@@ -1037,10 +1044,14 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
         char environment[2048];
         summary_context_key(&row->rule.environment, environment, sizeof(environment));
+        {
+        const char *env_lect = row->rule.context_is_target ? row->target_lect : row->source_lect;
+        const char *cond_lect = row->rule.dimension_from_environment
+            ? env_lect
+            : (row->rule.context_is_target ? row->source_lect : row->target_lect);
         builder_appendf(&builder,
                         "XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
-                        row->rule.context_is_target ? row->target_lect : row->source_lect,
-                        row->rule.context_is_target ? row->source_lect : row->target_lect,
+                        env_lect, cond_lect,
                         environment,
                         row->rule.dimension, row->rule.value,
                         row->rule.position_offset,
@@ -1048,6 +1059,7 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
                         row->rule.contrast_count, row->rule.contrast_source_count,
                         row->rule.contrast_confidence,
                         row->rule.evidence.delta_bic);
+        }
     }
     {
         const rg_corpus_fit *fit = rg_multi_model_fit(model);

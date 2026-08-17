@@ -1,0 +1,301 @@
+cognate_id	lect_id	segments
+w001	proto	b a n
+w001	daughter	b a n ¹¹
+w002	proto	p a n
+w002	daughter	p a n ⁵⁵
+w003	proto	b a ŋ
+w003	daughter	b a ŋ ¹¹
+w004	proto	p a ŋ
+w004	daughter	p a ŋ ⁵⁵
+w005	proto	b a
+w005	daughter	b a ¹¹
+w006	proto	p a
+w006	daughter	p a ⁵⁵
+w007	proto	b e n
+w007	daughter	b e n ¹¹
+w008	proto	p e n
+w008	daughter	p e n ⁵⁵
+w009	proto	b e ŋ
+w009	daughter	b e ŋ ¹¹
+w010	proto	p e ŋ
+w010	daughter	p e ŋ ⁵⁵
+w011	proto	b e
+w011	daughter	b e ¹¹
+w012	proto	p e
+w012	daughter	p e ⁵⁵
+w013	proto	b i n
+w013	daughter	b i n ¹¹
+w014	proto	p i n
+w014	daughter	p i n ⁵⁵
+w015	proto	b i ŋ
+w015	daughter	b i ŋ ¹¹
+w016	proto	p i ŋ
+w016	daughter	p i ŋ ⁵⁵
+w017	proto	b i
+w017	daughter	b i ¹¹
+w018	proto	p i
+w018	daughter	p i ⁵⁵
+w019	proto	b o n
+w019	daughter	b o n ¹¹
+w020	proto	p o n
+w020	daughter	p o n ⁵⁵
+w021	proto	b o ŋ
+w021	daughter	b o ŋ ¹¹
+w022	proto	p o ŋ
+w022	daughter	p o ŋ ⁵⁵
+w023	proto	b o
+w023	daughter	b o ¹¹
+w024	proto	p o
+w024	daughter	p o ⁵⁵
+w025	proto	b u n
+w025	daughter	b u n ¹¹
+w026	proto	p u n
+w026	daughter	p u n ⁵⁵
+w027	proto	b u ŋ
+w027	daughter	b u ŋ ¹¹
+w028	proto	p u ŋ
+w028	daughter	p u ŋ ⁵⁵
+w029	proto	b u
+w029	daughter	b u ¹¹
+w030	proto	p u
+w030	daughter	p u ⁵⁵
+w031	proto	d a n
+w031	daughter	d a n ¹¹
+w032	proto	t a n
+w032	daughter	t a n ⁵⁵
+w033	proto	d a ŋ
+w033	daughter	d a ŋ ¹¹
+w034	proto	t a ŋ
+w034	daughter	t a ŋ ⁵⁵
+w035	proto	d a
+w035	daughter	d a ¹¹
+w036	proto	t a
+w036	daughter	t a ⁵⁵
+w037	proto	d e n
+w037	daughter	d e n ¹¹
+w038	proto	t e n
+w038	daughter	t e n ⁵⁵
+w039	proto	d e ŋ
+w039	daughter	d e ŋ ¹¹
+w040	proto	t e ŋ
+w040	daughter	t e ŋ ⁵⁵
+w041	proto	d e
+w041	daughter	d e ¹¹
+w042	proto	t e
+w042	daughter	t e ⁵⁵
+w043	proto	d i n
+w043	daughter	d i n ¹¹
+w044	proto	t i n
+w044	daughter	t i n ⁵⁵
+w045	proto	d i ŋ
+w045	daughter	d i ŋ ¹¹
+w046	proto	t i ŋ
+w046	daughter	t i ŋ ⁵⁵
+w047	proto	d i
+w047	daughter	d i ¹¹
+w048	proto	t i
+w048	daughter	t i ⁵⁵
+w049	proto	d o n
+w049	daughter	d o n ¹¹
+w050	proto	t o n
+w050	daughter	t o n ⁵⁵
+w051	proto	d o ŋ
+w051	daughter	d o ŋ ¹¹
+w052	proto	t o ŋ
+w052	daughter	t o ŋ ⁵⁵
+w053	proto	d o
+w053	daughter	d o ¹¹
+w054	proto	t o
+w054	daughter	t o ⁵⁵
+w055	proto	d u n
+w055	daughter	d u n ¹¹
+w056	proto	t u n
+w056	daughter	t u n ⁵⁵
+w057	proto	d u ŋ
+w057	daughter	d u ŋ ¹¹
+w058	proto	t u ŋ
+w058	daughter	t u ŋ ⁵⁵
+w059	proto	d u
+w059	daughter	d u ¹¹
+w060	proto	t u
+w060	daughter	t u ⁵⁵
+w061	proto	g a n
+w061	daughter	g a n ¹¹
+w062	proto	k a n
+w062	daughter	k a n ⁵⁵
+w063	proto	g a ŋ
+w063	daughter	g a ŋ ¹¹
+w064	proto	k a ŋ
+w064	daughter	k a ŋ ⁵⁵
+w065	proto	g a
+w065	daughter	g a ¹¹
+w066	proto	k a
+w066	daughter	k a ⁵⁵
+w067	proto	g e n
+w067	daughter	g e n ¹¹
+w068	proto	k e n
+w068	daughter	k e n ⁵⁵
+w069	proto	g e ŋ
+w069	daughter	g e ŋ ¹¹
+w070	proto	k e ŋ
+w070	daughter	k e ŋ ⁵⁵
+w071	proto	g e
+w071	daughter	g e ¹¹
+w072	proto	k e
+w072	daughter	k e ⁵⁵
+w073	proto	g i n
+w073	daughter	g i n ¹¹
+w074	proto	k i n
+w074	daughter	k i n ⁵⁵
+w075	proto	g i ŋ
+w075	daughter	g i ŋ ¹¹
+w076	proto	k i ŋ
+w076	daughter	k i ŋ ⁵⁵
+w077	proto	g i
+w077	daughter	g i ¹¹
+w078	proto	k i
+w078	daughter	k i ⁵⁵
+w079	proto	g o n
+w079	daughter	g o n ¹¹
+w080	proto	k o n
+w080	daughter	k o n ⁵⁵
+w081	proto	g o ŋ
+w081	daughter	g o ŋ ¹¹
+w082	proto	k o ŋ
+w082	daughter	k o ŋ ⁵⁵
+w083	proto	g o
+w083	daughter	g o ¹¹
+w084	proto	k o
+w084	daughter	k o ⁵⁵
+w085	proto	g u n
+w085	daughter	g u n ¹¹
+w086	proto	k u n
+w086	daughter	k u n ⁵⁵
+w087	proto	g u ŋ
+w087	daughter	g u ŋ ¹¹
+w088	proto	k u ŋ
+w088	daughter	k u ŋ ⁵⁵
+w089	proto	g u
+w089	daughter	g u ¹¹
+w090	proto	k u
+w090	daughter	k u ⁵⁵
+w091	proto	z a n
+w091	daughter	z a n ¹¹
+w092	proto	s a n
+w092	daughter	s a n ⁵⁵
+w093	proto	z a ŋ
+w093	daughter	z a ŋ ¹¹
+w094	proto	s a ŋ
+w094	daughter	s a ŋ ⁵⁵
+w095	proto	z a
+w095	daughter	z a ¹¹
+w096	proto	s a
+w096	daughter	s a ⁵⁵
+w097	proto	z e n
+w097	daughter	z e n ¹¹
+w098	proto	s e n
+w098	daughter	s e n ⁵⁵
+w099	proto	z e ŋ
+w099	daughter	z e ŋ ¹¹
+w100	proto	s e ŋ
+w100	daughter	s e ŋ ⁵⁵
+w101	proto	z e
+w101	daughter	z e ¹¹
+w102	proto	s e
+w102	daughter	s e ⁵⁵
+w103	proto	z i n
+w103	daughter	z i n ¹¹
+w104	proto	s i n
+w104	daughter	s i n ⁵⁵
+w105	proto	z i ŋ
+w105	daughter	z i ŋ ¹¹
+w106	proto	s i ŋ
+w106	daughter	s i ŋ ⁵⁵
+w107	proto	z i
+w107	daughter	z i ¹¹
+w108	proto	s i
+w108	daughter	s i ⁵⁵
+w109	proto	z o n
+w109	daughter	z o n ¹¹
+w110	proto	s o n
+w110	daughter	s o n ⁵⁵
+w111	proto	z o ŋ
+w111	daughter	z o ŋ ¹¹
+w112	proto	s o ŋ
+w112	daughter	s o ŋ ⁵⁵
+w113	proto	z o
+w113	daughter	z o ¹¹
+w114	proto	s o
+w114	daughter	s o ⁵⁵
+w115	proto	z u n
+w115	daughter	z u n ¹¹
+w116	proto	s u n
+w116	daughter	s u n ⁵⁵
+w117	proto	z u ŋ
+w117	daughter	z u ŋ ¹¹
+w118	proto	s u ŋ
+w118	daughter	s u ŋ ⁵⁵
+w119	proto	z u
+w119	daughter	z u ¹¹
+w120	proto	s u
+w120	daughter	s u ⁵⁵
+w121	proto	v a n
+w121	daughter	v a n ¹¹
+w122	proto	f a n
+w122	daughter	f a n ⁵⁵
+w123	proto	v a ŋ
+w123	daughter	v a ŋ ¹¹
+w124	proto	f a ŋ
+w124	daughter	f a ŋ ⁵⁵
+w125	proto	v a
+w125	daughter	v a ¹¹
+w126	proto	f a
+w126	daughter	f a ⁵⁵
+w127	proto	v e n
+w127	daughter	v e n ¹¹
+w128	proto	f e n
+w128	daughter	f e n ⁵⁵
+w129	proto	v e ŋ
+w129	daughter	v e ŋ ¹¹
+w130	proto	f e ŋ
+w130	daughter	f e ŋ ⁵⁵
+w131	proto	v e
+w131	daughter	v e ¹¹
+w132	proto	f e
+w132	daughter	f e ⁵⁵
+w133	proto	v i n
+w133	daughter	v i n ¹¹
+w134	proto	f i n
+w134	daughter	f i n ⁵⁵
+w135	proto	v i ŋ
+w135	daughter	v i ŋ ¹¹
+w136	proto	f i ŋ
+w136	daughter	f i ŋ ⁵⁵
+w137	proto	v i
+w137	daughter	v i ¹¹
+w138	proto	f i
+w138	daughter	f i ⁵⁵
+w139	proto	v o n
+w139	daughter	v o n ¹¹
+w140	proto	f o n
+w140	daughter	f o n ⁵⁵
+w141	proto	v o ŋ
+w141	daughter	v o ŋ ¹¹
+w142	proto	f o ŋ
+w142	daughter	f o ŋ ⁵⁵
+w143	proto	v o
+w143	daughter	v o ¹¹
+w144	proto	f o
+w144	daughter	f o ⁵⁵
+w145	proto	v u n
+w145	daughter	v u n ¹¹
+w146	proto	f u n
+w146	daughter	f u n ⁵⁵
+w147	proto	v u ŋ
+w147	daughter	v u ŋ ¹¹
+w148	proto	f u ŋ
+w148	daughter	f u ŋ ⁵⁵
+w149	proto	v u
+w149	daughter	v u ¹¹
+w150	proto	f u
+w150	daughter	f u ⁵⁵

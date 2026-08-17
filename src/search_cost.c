@@ -172,11 +172,23 @@ double cross_dimensional_link_adjustment(
     }
     for (row_i = 0; row_i < model->cross_dimensional_count; row_i++) {
         const rg_cross_dimensional_row *row = &model->cross_dimensional_rows[row_i];
-        const rg_form *environment_form = row->context_is_target ? target_form : source_form;
-        const rg_form *conditioned_form = row->context_is_target ? source_form : target_form;
-        size_t environment_pos = row->context_is_target ? tgt_pos : src_pos;
-        int index = (int)(row->context_is_target ? src_pos : tgt_pos) + row->position_offset;
+        const rg_form *environment_form;
+        const rg_form *conditioned_form;
+        size_t environment_pos;
+        int index;
         const char *actual = "";
+        /* A lect-internal rule describes one lect's own onset-to-tone relation.
+         * It says nothing about which source position answers to which target
+         * position, so it must not price the alignment -- letting it would make
+         * a reported fact perturb reconciliation and the class table. It is a
+         * table, not a constraint. */
+        if (row->dimension_from_environment) {
+            continue;
+        }
+        environment_form = row->context_is_target ? target_form : source_form;
+        conditioned_form = row->context_is_target ? source_form : target_form;
+        environment_pos = row->context_is_target ? tgt_pos : src_pos;
+        index = (int)(row->context_is_target ? src_pos : tgt_pos) + row->position_offset;
         if (!cross_dimensional_environment_holds(ctx, environment_form, environment_pos, row)) {
             continue;
         }

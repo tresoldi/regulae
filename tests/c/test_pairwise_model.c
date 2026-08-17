@@ -228,6 +228,64 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* Tonogenesis is lect-internal: an onset conditions the tone in the same
+ * language. Until ABI 34 the row could only say "one lect's material predicts
+ * the other's tone", never "this lect's own onset predicts its own tone", so
+ * the daughter's own voicing-conditioned tone was unstatable. The fixture keeps
+ * voicing on the daughter and splits its tone by that voicing; both the
+ * lect-internal rule and the cross-lect one must appear, and no gap must reach
+ * the segment side. */
+static void test_lect_internal_tonogenesis(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    rg_form_pair *views;
+    rg_pairwise_model *model = 0;
+    rg_train_options options;
+    size_t count;
+    size_t i;
+    int found_internal = 0;
+    int found_cross_lect = 0;
+
+    assert(rg_corpus_load_tsv(REGULAE_SOURCE_DIR "/testdata/corpora/tonogenesis_internal.tsv",
+                              0, &corpus, 0) == RG_OK);
+    count = rg_corpus_cognate_count(corpus);
+    views = (rg_form_pair *)calloc(count, sizeof(*views));
+    assert(views != 0);
+    for (i = 0; i < count; i++) {
+        const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+        assert(set->form_count == 2);
+        views[i].source = set->forms[0].form;
+        views[i].target = set->forms[1].form;
+        views[i].weight = 1.0;
+    }
+    rg_train_options_init_defaults(&options);
+    assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
+    for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
+        const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
+        /* The voiced-onset rule, at full confidence: onset voiced -> low tone. */
+        if (row->environment.preceding_count != 1 ||
+            strcmp(row->environment.preceding[0].feature, "voiced") != 0 ||
+            strcmp(row->environment.preceding[0].value, "+") != 0 ||
+            strcmp(row->dimension, "tone") != 0 ||
+            strcmp(row->value, "\xc2\xb9\xc2\xb9") != 0) {
+            continue;
+        }
+        assert(row->confidence == 1.0);
+        if (row->dimension_from_environment && row->context_is_target) {
+            /* The daughter (target) preserved voicing, so its own onset
+             * conditions its own tone -- read from the target on both sides. */
+            found_internal = 1;
+        }
+        if (!row->dimension_from_environment) {
+            found_cross_lect = 1;
+        }
+    }
+    assert(found_internal);
+    assert(found_cross_lect);
+    rg_pairwise_model_free(model);
+    free(views);
+    rg_corpus_free(corpus);
+}
+
 /* The target dimension is not only tone. The scorer has handled stress and
  * length as targets since the port; this stage proposed neither until
  * 2026-08-15, so compensatory lengthening and stress shifts were unreachable
@@ -676,6 +734,7 @@ int main(void) {
     assert(rg_align_forms_with_model(ctx, 0, &options, &pairs[0].source, &pairs[0].target, 0, &learned_alignment) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_train_pairwise(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
     test_joint_cross_dimensional_rule(ctx);
+    test_lect_internal_tonogenesis(ctx);
     test_cross_dimensional_dimension_target(
         ctx, REGULAE_SOURCE_DIR "/testdata/corpora/stress_dimension_target.tsv", "stress");
     test_cross_dimensional_dimension_target(

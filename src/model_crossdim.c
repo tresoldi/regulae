@@ -95,6 +95,7 @@ static rg_status append_cross_dimensional_row(
     size_t *cap,
     const rg_context_spec *environment,
     int context_is_target,
+    int dimension_from_environment,
     const char *dimension,
     const char *value,
     int position_offset,
@@ -121,6 +122,7 @@ static rg_status append_cross_dimensional_row(
         return RG_ERR_OOM;
     }
     (*rows)[*count].context_is_target = context_is_target;
+    (*rows)[*count].dimension_from_environment = dimension_from_environment;
     (*rows)[*count].dimension = rg_strdup_internal(dimension);
     (*rows)[*count].value = rg_strdup_internal(value);
     (*rows)[*count].position_offset = position_offset;
@@ -708,6 +710,7 @@ static rg_status discover_cross_dimensional_orientation(
     rg_pairwise_model *model,
     const rg_feature_vocabulary *vocabulary,
     int context_is_target,
+    int same_lect,
     rg_cross_dimensional_row **rows,
     size_t *row_count,
     size_t *row_cap
@@ -839,8 +842,14 @@ static rg_status discover_cross_dimensional_orientation(
                 const rg_link *link = rg_alignment_link_at(alignment, link_i);
                 if (link->source_count == 1 && link->target_count == 1) {
                     size_t environment_pos = context_is_target ? tgt_pos : src_pos;
+                    /* Lect-internal: the tone is read from the same form the
+                     * environment is stated on, at the environment position --
+                     * the onset conditions the tone on its own vowel. */
+                    size_t conditioned_pos = same_lect ? environment_pos
+                                                       : (context_is_target ? src_pos : tgt_pos);
+                    const rg_form *value_form = same_lect ? environment_form : conditioned_form;
                     const char *value = segment_dimension_value(
-                        &conditioned_form->segments[context_is_target ? src_pos : tgt_pos],
+                        &value_form->segments[conditioned_pos],
                         target_dimension);
                     if (value != 0 && value[0] != '\0') {
                         xdim_observation *slot;
@@ -871,6 +880,16 @@ static rg_status discover_cross_dimensional_orientation(
                         for (i = 0; i < predicate_count; i++) {
                             int index = (int)environment_pos + predicates[i].offset;
                             if (!context_position_exists(environment_form, index)) {
+                                continue;
+                            }
+                            /* Lect-internal, a predicate on the outcome's own
+                             * dimension at its own position predicts itself: a
+                             * tone always has its own tone. Left undefined so it
+                             * partitions nothing. Offsets away from zero remain
+                             * -- a preceding tone conditioning this one is tone
+                             * sandhi, a real lect-internal rule. */
+                            if (same_lect && predicates[i].offset == 0 &&
+                                strcmp(predicates[i].feature, target_dimension) == 0) {
                                 continue;
                             }
                             slot->defined[i] = 1;
@@ -1129,7 +1148,7 @@ static rg_status discover_cross_dimensional_orientation(
                         }
                         status = append_cross_dimensional_row(
                             rows, row_count, row_cap,
-                            &environment, context_is_target,
+                            &environment, context_is_target, same_lect,
                             target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
                             best.delta_score, decision_index, best_margin);
@@ -1236,21 +1255,30 @@ rg_status discover_cross_dimensional_rows(
     size_t row_cap = 0;
     rg_status status;
     int context_is_target;
+    int same_lect;
 
     if (ctx == 0 || model == 0 || (pair_count > 0 && pairs == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
     }
-    for (context_is_target = 0; context_is_target < 2; context_is_target++) {
-        status = discover_cross_dimensional_orientation(
-            ctx, pairs, pair_count, options, model, vocabulary, context_is_target,
-            &rows, &row_count, &row_cap);
-        if (status != RG_OK) {
-            size_t i;
-            for (i = 0; i < row_count; i++) {
-                cross_dimensional_row_clear(&rows[i]);
+    /* Four orientations, each with its own observation pool so the cross-lect
+     * output is unchanged by the lect-internal passes. same_lect=0 asks whether
+     * one lect's material predicts the other's tone; same_lect=1 asks whether a
+     * lect's own onset predicts its own tone, which is tonogenesis and what the
+     * stage could not state before. context_is_target then names the form both
+     * are read from. */
+    for (same_lect = 0; same_lect < 2; same_lect++) {
+        for (context_is_target = 0; context_is_target < 2; context_is_target++) {
+            status = discover_cross_dimensional_orientation(
+                ctx, pairs, pair_count, options, model, vocabulary, context_is_target,
+                same_lect, &rows, &row_count, &row_cap);
+            if (status != RG_OK) {
+                size_t i;
+                for (i = 0; i < row_count; i++) {
+                    cross_dimensional_row_clear(&rows[i]);
+                }
+                free(rows);
+                return status;
             }
-            free(rows);
-            return status;
         }
     }
     if (row_count > 1) {

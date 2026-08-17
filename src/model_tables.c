@@ -273,6 +273,9 @@ int cross_dimensional_row_cmp(const void *a, const void *b) {
     if (ra->context_is_target != rb->context_is_target) {
         return ra->context_is_target < rb->context_is_target ? -1 : 1;
     }
+    if (ra->dimension_from_environment != rb->dimension_from_environment) {
+        return ra->dimension_from_environment < rb->dimension_from_environment ? -1 : 1;
+    }
     return rg_context_spec_compare_internal(&ra->environment, &rb->environment);
 }
 

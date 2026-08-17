@@ -724,10 +724,20 @@ char *rg_json_from_multi_model_internal(
             }
         }
         cJSON_AddBoolToObject(entry, "context_is_target", row->rule.context_is_target ? 1 : 0);
-        cJSON_AddStringToObject(entry, "environment_lect",
-                                row->rule.context_is_target ? row->target_lect : row->source_lect);
-        cJSON_AddStringToObject(entry, "conditioned_lect",
-                                row->rule.context_is_target ? row->source_lect : row->target_lect);
+        cJSON_AddBoolToObject(entry, "dimension_from_environment",
+                              row->rule.dimension_from_environment ? 1 : 0);
+        {
+            const char *environment_lect =
+                row->rule.context_is_target ? row->target_lect : row->source_lect;
+            const char *other_lect =
+                row->rule.context_is_target ? row->source_lect : row->target_lect;
+            cJSON_AddStringToObject(entry, "environment_lect", environment_lect);
+            /* Lect-internal rules condition the tone in the same lect the
+             * environment sits in; only cross-lect rules read it from the
+             * other. */
+            cJSON_AddStringToObject(entry, "conditioned_lect",
+                                    row->rule.dimension_from_environment ? environment_lect : other_lect);
+        }
         cJSON_AddStringToObject(entry, "dimension", row->rule.dimension);
         cJSON_AddStringToObject(entry, "value", row->rule.value);
         cJSON_AddNumberToObject(entry, "position_offset", row->rule.position_offset);
