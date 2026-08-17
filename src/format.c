@@ -770,6 +770,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                             row->rule.evidence.predictive.log_loss_gain,
                             (unsigned long)row->rule.evidence.predictive.conditioned.observation_count);
         }
+        if (row->rule.environment_alternatives > 0) {
+            /* The corpus cannot tell this environment from another segment's
+             * feature; the named conditioner is one of several it supports. */
+            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve it the same]",
+                            row->rule.environment_alternatives,
+                            row->rule.environment_alternatives == 1 ? "" : "s");
+        }
         builder_append(&builder, "\n");
     }
     free(decision_order);
@@ -1050,7 +1057,7 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
             ? env_lect
             : (row->rule.context_is_target ? row->source_lect : row->target_lect);
         builder_appendf(&builder,
-                        "XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\n",
+                        "XDIM\t%s>%s\t%s\t%s=%s@%d\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%.6f\t%d\t%.6f\n",
                         env_lect, cond_lect,
                         environment,
                         row->rule.dimension, row->rule.value,
@@ -1058,6 +1065,7 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
                         row->rule.count, row->rule.source_count, row->rule.confidence,
                         row->rule.contrast_count, row->rule.contrast_source_count,
                         row->rule.contrast_confidence,
+                        row->rule.environment_alternatives,
                         row->rule.evidence.delta_bic);
         }
     }

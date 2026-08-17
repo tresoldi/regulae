@@ -830,6 +830,7 @@ class CrossDimensionalRule:            # C: rg_cross_dimensional_row
     confidence:          float         # count / source_count
     contrast_count:      float         # matches outside the environment
     contrast_confidence: float         # contrast_count / contrast_source_count
+    environment_alternatives: int      # ABI 35: rival conditioners the data cannot rule out
     uncertainty:         Uncertainty
     predictive:          PredictiveEvidence
 ```
@@ -871,6 +872,24 @@ contrast also holds at 0.9 is the ambient distribution rather
 than a conditioning effect. The contrast fields are what make the
 row a claim; the search charge `search_margin` on the C row scores
 the environment as a whole and is what a rule must clear.
+
+**`environment_alternatives` (ABI 35) says whether the named
+conditioner is pinned.** A rule can predict the outcome perfectly
+and still not identify its cause: if every voiced onset is also
+before a front vowel, "voiced onset → low tone" and "front vowel →
+low tone" fit the data equally, and the corpus cannot say which is
+the conditioner. This field counts the distinct other features, at
+a *different* segment position, that carve the rule's observations
+the same way — 0 when the environment is uniquely identifiable, >0
+when it is confounded and the stated environment is one of several
+the data supports. It fires only on a perfect confound, never on a
+partial correlation, and it says nothing about whether the split is
+real (that is `search_margin` and the contrast fields) — only
+whether its cause is pinned. The M7.2 analyst study
+(`docs/m7_analyst_study.md`) found a confounded environment stated
+at full confidence is the report's most anchoring line; a consumer
+that surfaces `environment_alternatives > 0` beside `confidence` is
+warning the reader the report cannot warn them of otherwise.
 
 The rule reads: "where one form satisfies `environment`, the
 other form's `dimension` carries `value` at `position_offset`
@@ -965,12 +984,16 @@ public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
 signature or ownership change, and the reason is recorded in
-`docs/c_conversion_roadmap.md`. It is at **34**.
+`docs/c_conversion_roadmap.md`. It is at **35**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **35** — `rg_cross_dimensional_row` gained `environment_alternatives`: the
+  count of rival conditioners at another position the corpus cannot tell the
+  committed environment from (§6). 0 when identifiable, >0 when confounded.
+  Additive; discovery is unchanged.
 - **34** — `rg_cross_dimensional_row` gained `dimension_from_environment`:
   a cross-dimensional rule can now be lect-internal (an onset conditioning the
   tone in the same lect), not only cross-lect (§6). Lect-internal rules are kept

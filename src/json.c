@@ -747,6 +747,10 @@ char *rg_json_from_multi_model_internal(
         cJSON_AddNumberToObject(entry, "contrast_count", row->rule.contrast_count);
         cJSON_AddNumberToObject(entry, "contrast_source_count", row->rule.contrast_source_count);
         cJSON_AddNumberToObject(entry, "contrast_confidence", row->rule.contrast_confidence);
+        /* How many other features carve this rule's observations the same way;
+         * 0 = the environment is uniquely identifiable, >0 = confounded. */
+        cJSON_AddNumberToObject(entry, "environment_alternatives",
+                                row->rule.environment_alternatives);
         cJSON_AddStringToObject(entry, "score_kind",
                                rg_split_scorer_string(row->rule.evidence.scorer));
         cJSON_AddNumberToObject(entry, "delta_score", row->rule.evidence.delta_score);

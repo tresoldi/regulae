@@ -286,6 +286,56 @@ static void test_lect_internal_tonogenesis(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* A committed environment is not always identifiable. Where onset voicing and
+ * the following vowel's frontness are perfectly confounded, the corpus cannot
+ * say which conditions the tone; the rule names one but must flag that another
+ * feature at another position carves it the same. Where they vary independently,
+ * the environment is pinned and the flag is zero. */
+static void test_cross_dimensional_identifiability(rg_context *ctx) {
+    struct { const char *path; int expect_confounded; } cases[] = {
+        {REGULAE_SOURCE_DIR "/testdata/evaluation/m7/corpora/trap_confounded_environment.tsv", 1},
+        {REGULAE_SOURCE_DIR "/testdata/corpora/tonogenesis_internal.tsv", 0},
+    };
+    size_t ci;
+    for (ci = 0; ci < sizeof(cases) / sizeof(cases[0]); ci++) {
+        rg_corpus *corpus = 0;
+        rg_form_pair *views;
+        rg_pairwise_model *model = 0;
+        rg_train_options options;
+        size_t count;
+        size_t i;
+        int saw_rule = 0;
+        assert(rg_corpus_load_tsv(cases[ci].path, 0, &corpus, 0) == RG_OK);
+        count = rg_corpus_cognate_count(corpus);
+        views = (rg_form_pair *)calloc(count, sizeof(*views));
+        assert(views != 0);
+        for (i = 0; i < count; i++) {
+            const rg_cognate_set *set = rg_corpus_cognate_at(corpus, i);
+            views[i].source = set->forms[0].form;
+            views[i].target = set->forms[1].form;
+            views[i].weight = 1.0;
+        }
+        rg_train_options_init_defaults(&options);
+        assert(rg_train_pairwise(ctx, views, count, &options, &model) == RG_OK);
+        for (i = 0; i < rg_pairwise_model_cross_dimensional_row_count(model); i++) {
+            const rg_cross_dimensional_row *row = rg_pairwise_model_cross_dimensional_row_at(model, i);
+            if (strcmp(row->dimension, "tone") != 0) {
+                continue;
+            }
+            saw_rule = 1;
+            if (cases[ci].expect_confounded) {
+                assert(row->environment_alternatives > 0);
+            } else {
+                assert(row->environment_alternatives == 0);
+            }
+        }
+        assert(saw_rule);
+        rg_pairwise_model_free(model);
+        free(views);
+        rg_corpus_free(corpus);
+    }
+}
+
 /* The target dimension is not only tone. The scorer has handled stress and
  * length as targets since the port; this stage proposed neither until
  * 2026-08-15, so compensatory lengthening and stress shifts were unreachable
@@ -735,6 +785,7 @@ int main(void) {
     assert(rg_train_pairwise(ctx, 0, 1, &options, &model) == RG_ERR_INVALID_ARGUMENT);
     test_joint_cross_dimensional_rule(ctx);
     test_lect_internal_tonogenesis(ctx);
+    test_cross_dimensional_identifiability(ctx);
     test_cross_dimensional_dimension_target(
         ctx, REGULAE_SOURCE_DIR "/testdata/corpora/stress_dimension_target.tsv", "stress");
     test_cross_dimensional_dimension_target(

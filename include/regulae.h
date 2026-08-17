@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 34
+#define RG_ABI_VERSION 35
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -650,6 +650,23 @@ typedef struct rg_cross_dimensional_row {
     double contrast_count;
     double contrast_source_count;
     double contrast_confidence;
+    /* How many other features carve this rule's observations the same way -- a
+     * different phonological dimension the corpus cannot tell apart from the
+     * committed environment. 0 when the environment is uniquely identifiable;
+     * >0 when it is confounded, and the stated environment is one of several the
+     * data supports equally well. The count is of distinct alternative features
+     * that induce the identical (or exactly complementary) partition of the same
+     * observations, so it fires only on a perfect confound, never on a partial
+     * correlation.
+     *
+     * The M7.2 analyst study found a confounded environment stated at full
+     * confidence is the report's most anchoring line: on a corpus where onset
+     * voicing and vowel frontness were perfectly confounded, every reader given
+     * the report adopted the one predicate it named and missed the ambiguity,
+     * while readers of the raw table caught it. This is the flag that was
+     * missing. It says nothing about whether the split is real -- that is
+     * `evidence` and the contrast fields -- only whether its cause is pinned. */
+    int environment_alternatives;
     rg_rule_evidence evidence;
     rg_uncertainty_estimate uncertainty;
 } rg_cross_dimensional_row;

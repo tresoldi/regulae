@@ -14,27 +14,27 @@
      0  3ffdd08538496f990ba4216774583cdc2ac6848169f82c3b6ef81259b009616f  experiments/latin_italian/cognates.tsv
      0  58ffc0ab26613f64767fa1c530ffec501e99136d838b84c0005408e473a91862  experiments/latin_spanish/cognates.tsv
      0  8ee2283d5fdd77bd111a3cc8e65e79a4858bf6ebfa581b6c9fdd4f31649a69ea  experiments/length_conditioned_synthetic/cognates.tsv
-     0  086db8ff0faa842a26daa20fd02eb30d46183c6807b8bee75fa4846913bad7a4  experiments/mandarin_historical/cognates.tsv
+     0  08f29d5a9c1e7038248753ffd1b6fafc4280d01d75d653a2d7378f04698d073a  experiments/mandarin_historical/cognates.tsv
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  experiments/morph_boundary_synthetic/cognates.tsv
      0  2826b54a8ac950c298115f62733623160af069feaede0e760b363230798b8fcc  experiments/navajo_chipewyan/cognates.tsv
      0  ce6aa7f84d04a657840a7f4200f0910cdb34577c30f0e36491e1dd16bf260e11  experiments/oe_english/cognates.tsv
      0  20144c673d871ab4b23abf726bf603800415fe9b72c98c0909cba0fe663d9670  experiments/ppn_hawaiian/cognates.tsv
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  experiments/stress_conditioned_synthetic/cognates.tsv
      0  b2e3853786e5bf642382a89d49145d7c84d853bf2ef5f98489446fdc58bcaeb3  experiments/swahili_zulu/cognates.tsv
-     0  66ece04a24508fd8cc1e66c5f7be217c362e286cd557cadcee26c32e617754bd  experiments/tone_3way_synthetic/cognates.tsv
-     0  84b096e15821b25cdc9a6c7d6e993343edeccd71ffc3cd1e0bc3a47d7cf63a4b  experiments/tone_chinese_like/cognates.tsv
-     0  ddf95bed66f57fc534229ba9f927182441fe38b2310f69839f9901215ba40f5c  experiments/tone_chinese_like_clean/cognates.tsv
+     0  4cc593b6fc65945091373a18d834f6ab1a772d7956936a4aa5b8fda0eb1d90c0  experiments/tone_3way_synthetic/cognates.tsv
+     0  7101cbf8950a2e9a1657c68bfad11edfc384699fb93d2c682fbf76a39a8a295f  experiments/tone_chinese_like/cognates.tsv
+     0  6d7a4533d26aa045dbdfd22e4672aadc5723fc06537229800c2ab2d33b048b37  experiments/tone_chinese_like_clean/cognates.tsv
      0  2afb8e15433a66283d8f0afb14dd944574d5ea3fc7b20113b9fb99cb3481cafa  experiments/tone_synthetic/cognates.tsv
-     0  33780f10cbbb17f01bf98f71238cfd04f820fcce66e725dcef01da3edc619a6a  experiments/tone_vietnamese_like/cognates.tsv
-     0  3dd58594c37ee20ef5d6dce366a938903efe65f7e4321f6e58eb1a5cfafcc4a8  experiments/tone_yoruba_like/cognates.tsv
+     0  4ab9078ec523b38cd997dace75e55127baa1d60ca6a51d0f1d65d2b0cacbc596  experiments/tone_vietnamese_like/cognates.tsv
+     0  0b727229cf6cbbfbf3eb27eef0c4afa0536ae780e8c8ac24438c54563bf35997  experiments/tone_yoruba_like/cognates.tsv
      0  fc7cf8946246a8f09ef94c5824362e843e8e9976c210af91f4aa32c060c2c003  experiments/turkish_azerbaijani/cognates.tsv
      0  38c49951e0a8c4c08f1c759a2e8746bec2aa1a6e119b8cda44ba27db6b8f06a1  experiments/umlaut_synthetic/cognates.tsv
      0  3b62c6f346f9b273ad41317a914933eb4a415b1e78ae1a6d5d1ebc4c7c6610f0  testdata/corpora/conditioned_multilect.tsv
      0  ca5b6377da46b786371b2fe72b2a32c4053cd4f4e3edca26460d5b8a3a7120d9  testdata/corpora/conditioned_palatalization.tsv
      0  544169ea1691a5584afe237bb6f3413beec6d58dba0c17419940bd50596c0499  testdata/corpora/doublet.tsv
      0  1931b05ca47c330cfa484ea1e2d5709e5468165ee85e6d85ce9a2580bba71de2  testdata/corpora/gaps_and_length.tsv
-     0  9b68b19a47dc9451cc8640d39abd63297c46d3a207bc1c454c3bb8032f9e697f  testdata/corpora/joint_tonogenesis.tsv
-     0  63b58ef45643be4c11812655a5947af5f984bf511dd65b0a89e4575920021c72  testdata/corpora/length_dimension_target.tsv
+     0  2f406713ef798472f8340aa2c3209f20608f6e1a4a54c2baf9c399183a308046  testdata/corpora/joint_tonogenesis.tsv
+     0  e29acf227aaec2b328406d4c7e8f2f8c1c414cf71e9c72cf0006ddc7d38c4474  testdata/corpora/length_dimension_target.tsv
      0  f15b31623e52a6329e421529a81ebff06398ef0f00aed302b9cfd20c39f5d93b  testdata/corpora/long_range.tsv
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  testdata/corpora/missing_lect_column.tsv
      0  c3029fc2439e061183e1e77a86d9de31aa88b3f88c930c3efe88c505d0ed3034  testdata/corpora/morph_boundary.csv
@@ -44,12 +44,12 @@
      0  5c0c5fe8dd8985c5cda0815a5e6b7bdeea9a8845fd43ef91c92dfa81d71b4320  testdata/corpora/real_ppn_hawaiian.tsv
      0  9fa7fc023a83bc94cc630a2f0b71b3098d6544d5addaa4c5fe94ed5e2a299446  testdata/corpora/real_romance_4lect.tsv
      0  d7f9066bb1ac72bee2b0f4d6a0df979e2300ce71aa65f0f85e390f8a4981bd6d  testdata/corpora/real_tone_chinese.tsv
-     0  3cad4c2eed7ac8719ed87bddd7e201bd2bb4060dbd0328703c03c21bf6207b0f  testdata/corpora/stress_dimension_target.tsv
+     0  3ab9a976b0955978eb1604da142878b48d1d757543eac1a82246cca9015be113  testdata/corpora/stress_dimension_target.tsv
      0  eb3a7971faa77d08c8eb72431fd7ca32a73c112ec499981d0b9c0d7896852730  testdata/corpora/syllable_breaks_column.tsv
      0  dd8caa333e78eabd2b16e2b7a472d83b842463efe2b8f0b2872bb4f6b37cfdb4  testdata/corpora/three_lect_basic.tsv
      0  2c384059b680c71ee86ccb29431726d7e853f8c99605c7e2d2aa376569a4aa96  testdata/corpora/tonal_multilect.tsv
-     0  098a6c108c78820cbe5027ecda2e89395433ecfde75114ecfad97b14de82af8e  testdata/corpora/tonogenesis_cldf.tsv
-     0  0164e344d673ff922072db718517f8882364243390b2f5c3f67599622f250e10  testdata/corpora/tonogenesis_internal.tsv
+     0  449a654d6ef3986ae6a5e10ed536b3bebea7148a558f90b87377920f5b33dd13  testdata/corpora/tonogenesis_cldf.tsv
+     0  f73bed79b7f6553d29e9c0e02a8faf03410df203a80bcbdd5371347f22ed2bde  testdata/corpora/tonogenesis_internal.tsv
      0  35e8864aaf3f1daf0568af0637646e9591d13dab1d667dc0f8935d29e398de20  testdata/diagnostics/contaminated.tsv
      0  c81083b5592ac1c61015da4031b23d3fbd3f59fb01200d0c7a8dcec5631052eb  testdata/diagnostics/drift.tsv
      0  799aa65fca4b5336154183835b952a502fca43860601d06418f58e482ffaf77d  testdata/diagnostics/partial.tsv

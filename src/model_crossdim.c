@@ -103,6 +103,7 @@ static rg_status append_cross_dimensional_row(
     double source_count,
     double contrast_count,
     double contrast_source_count,
+    int environment_alternatives,
     double delta_bic,
     int decision_index,
     double search_margin
@@ -133,6 +134,7 @@ static rg_status append_cross_dimensional_row(
     (*rows)[*count].contrast_source_count = contrast_source_count;
     (*rows)[*count].contrast_confidence =
         contrast_source_count > 0.0 ? contrast_count / contrast_source_count : 0.0;
+    (*rows)[*count].environment_alternatives = environment_alternatives;
     (*rows)[*count].evidence.delta_bic = delta_bic;
     (*rows)[*count].evidence.decision_index = decision_index;
     (*rows)[*count].evidence.search_margin = search_margin;
@@ -357,6 +359,104 @@ static int xdim_partition_relation(
         opposite = opposite && xdim_holds(observation, a) != xdim_holds(observation, b);
     }
     return same ? 1 : (opposite ? -1 : 0);
+}
+
+/* How many distinct OTHER features, at a DIFFERENT position, carve the committed
+ * environment's observations the same way -- the confound count. A single
+ * predicate on another segment (a different offset) and another feature, whose
+ * partition of the observations is identical or exactly complementary, is a
+ * rival conditioner the corpus cannot rule out: the split might be caused by
+ * that segment, not the one the rule names.
+ *
+ * The position test is deliberate. Features of the SAME segment that co-vary
+ * with the committed one -- voicing and its correlated laryngeal features on the
+ * one onset -- are always confounded and a linguist collapses them into one
+ * category; flagging them is noise. The confound worth a warning is the one the
+ * M7.2 study caught: the conditioner could be a different segment entirely
+ * (onset voicing versus the following vowel's frontness). Counts distinct
+ * features, so the same feature at two other offsets is one alternative. */
+static size_t xdim_environment_alternatives(
+    const xdim_observation *observations,
+    size_t observation_count,
+    const xdim_predicate *predicates,
+    const xdim_environment *candidates,
+    size_t candidate_count,
+    size_t committed
+) {
+    const char *committed_first = predicates[candidates[committed].first].feature;
+    const char *committed_second = candidates[committed].conjoined
+        ? predicates[candidates[committed].second].feature : 0;
+    int committed_offset_first = predicates[candidates[committed].first].offset;
+    int committed_offset_second = candidates[committed].conjoined
+        ? predicates[candidates[committed].second].offset : committed_offset_first;
+    const char *seen[64];
+    size_t seen_count = 0;
+    size_t c;
+    for (c = 0; c < candidate_count; c++) {
+        const char *feature;
+        int offset;
+        size_t s;
+        int already;
+        if (c == committed || candidates[c].conjoined) {
+            /* A conjunction that carves identically is a refinement naming the
+             * same cause, not a rival; only a lone different predicate is a
+             * confound. */
+            continue;
+        }
+        feature = predicates[candidates[c].first].feature;
+        offset = predicates[candidates[c].first].offset;
+        if (strcmp(feature, committed_first) == 0 ||
+            (committed_second != 0 && strcmp(feature, committed_second) == 0)) {
+            continue;
+        }
+        /* Same segment as the committed environment -- a co-varying feature of
+         * one onset, not a rival conditioner. */
+        if (offset == committed_offset_first || offset == committed_offset_second) {
+            continue;
+        }
+        /* Over every observation the committed environment is defined on, not
+         * just the ones still live: by the time the complementary side commits,
+         * retirement has left its environment all-true over the residual, and a
+         * degenerate partition matches every constant feature. The confound is a
+         * property of the full split, so it is measured over the full split. */
+        {
+            size_t i;
+            int same = 1;
+            int opposite = 1;
+            int comparable = 1;
+            for (i = 0; i < observation_count && comparable; i++) {
+                int a_def = xdim_defined(&observations[i], &candidates[committed]);
+                int b_def = xdim_defined(&observations[i], &candidates[c]);
+                if (a_def != b_def) {
+                    comparable = 0;
+                    break;
+                }
+                if (!a_def) {
+                    continue;
+                }
+                if (xdim_holds(&observations[i], &candidates[committed]) ==
+                    xdim_holds(&observations[i], &candidates[c])) {
+                    opposite = 0;
+                } else {
+                    same = 0;
+                }
+            }
+            if (!comparable || (!same && !opposite)) {
+                continue;
+            }
+        }
+        already = 0;
+        for (s = 0; s < seen_count; s++) {
+            if (strcmp(seen[s], feature) == 0) {
+                already = 1;
+                break;
+            }
+        }
+        if (!already && seen_count < sizeof(seen) / sizeof(seen[0])) {
+            seen[seen_count++] = feature;
+        }
+    }
+    return seen_count;
 }
 
 static rg_status xdim_distinct_partition_count(
@@ -1151,6 +1251,9 @@ static rg_status discover_cross_dimensional_orientation(
                             &environment, context_is_target, same_lect,
                             target_dimension, here[value_i].tone, 0,
                             here_mass, here_total, there_mass, there_total,
+                            (int)xdim_environment_alternatives(observations, observation_count,
+                                                               predicates, candidates,
+                                                               candidate_count, best_env),
                             best.delta_score, decision_index, best_margin);
                         if (status == RG_OK) {
                             size_t obs_i;
