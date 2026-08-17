@@ -13,13 +13,13 @@ of the clone produced them; regenerate after any merkmal upgrade.
 
 **2,789,926 segment tokens, 3,715 distinct types. 99.94% of tokens resolve.**
 
-92 datasets are usable. 16 of them carry at least one token that cannot be read, and a dataset with one unreadable token in one form loses the whole training run — which is why a handful of tokens is worth this much attention.
+92 datasets are usable. 16 of them carry at least one token that cannot be read.
 
-## Blocked datasets
+A form regulae cannot read refuses the whole training run, so `scripts/lexibank.py` drops those forms and counts them, the way it already drops forms carrying markup: the word has a hole in it and the rest of it is not a word. What the table below reports is therefore a *cost* and not a verdict — two tokens cost `grollemundbantu` two forms of 35,918 rather than all of them. Pass `--keep-unreadable` to see the refusals instead of paying for them.
 
-The column that matters for choosing a corpus: what it would cost to use each one, and what is in the way.
+## What each dataset costs
 
-| dataset | unreadable forms | of | blocked by |
+| dataset | forms dropped | of | refused |
 | --- | ---: | ---: | --- |
 | `oliveiraprotopanoan` | 467 | 6894 | `∼` |
 | `starostinhmongmien` | 414 | 1717 | `←`, `→` |

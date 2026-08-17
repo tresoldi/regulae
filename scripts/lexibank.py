@@ -134,6 +134,60 @@ ZERO_MARKS = ("\u2205",)           # zero: a segment that is not there
 PRESYLLABIC_SCHWA = "\u1d4a"
 
 
+def unreadable_graphemes(cli, rows):
+    """The tokens `regulae check` refuses in this corpus.
+
+    Asked of regulae rather than decided here: the feature system is what
+    knows, and a second opinion in this file would drift from it. Returns an
+    empty set when the CLI cannot be run, so a caller without a build gets the
+    whole corpus rather than a silently smaller one.
+    """
+    import subprocess
+    import tempfile
+
+    if cli is None or not pathlib.Path(cli).exists():
+        return set()
+    with tempfile.NamedTemporaryFile("w", suffix=".tsv", encoding="utf-8",
+                                     delete=False) as handle:
+        path = pathlib.Path(handle.name)
+        handle.write("cognate_id\tlect_id\tsegments\n")
+        for cognate_id, lect, segments in rows:
+            handle.write(f"{cognate_id}\t{lect}\t{segments}\n")
+    try:
+        completed = subprocess.run([str(cli), "check", str(path)],
+                                   capture_output=True, text=True)
+    finally:
+        path.unlink()
+    refused = set()
+    for line in completed.stdout.splitlines():
+        parts = line.split("\t")
+        if parts[0] == "GRAPHEME" and len(parts) > 1:
+            refused.add(parts[1])
+    return refused
+
+
+def drop_unreadable(rows, refused):
+    """Drops the forms carrying a token the feature system cannot read.
+
+    A form regulae cannot read refuses the whole training run, so without this
+    two tokens cost `grollemundbantu` all 35,918 of its forms. Dropping them is
+    the same policy this file already applies to forms carrying markup -- the
+    word has a hole in it and the rest is not a word -- and the count is
+    returned rather than swallowed, because a corpus minus some of its forms is
+    a different corpus and the reader has to be told how different.
+    """
+    if not refused:
+        return rows, 0
+    kept = []
+    dropped = 0
+    for row in rows:
+        if any(token in refused for token in row[2].split()):
+            dropped += 1
+            continue
+        kept.append(row)
+    return kept, dropped
+
+
 def split_presyllabic_schwa(token):
     """Splits a presyllable written as one token into its two segments.
 
@@ -186,6 +240,11 @@ def main():
     parser.add_argument("--max-lects", type=int)
     parser.add_argument("--min-lects", type=int, default=2)
     parser.add_argument("--list", action="store_true")
+    parser.add_argument("--cli", default=str(pathlib.Path(__file__).resolve().parents[1]
+                                             / "build" / "c" / "regulae"))
+    parser.add_argument("--keep-unreadable", action="store_true",
+                        help="keep forms the feature system cannot read, so the "
+                             "corpus refuses to load; use it to see what they are")
     args = parser.parse_args()
 
     if args.list:
@@ -206,6 +265,10 @@ def main():
             stats["markup"] += 1
             continue
         kept.append((cognate_id, lect, cleaned))
+
+    if not args.keep_unreadable:
+        kept, dropped = drop_unreadable(kept, unreadable_graphemes(args.cli, kept))
+        stats["unreadable"] = dropped
 
     handle = open(args.out, "w", encoding="utf-8") if args.out else sys.stdout
     try:
