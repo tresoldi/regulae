@@ -25,13 +25,21 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 32
+#define RG_ABI_VERSION 33
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
  * on BDPA gold alignments it is the one merkmal cannot distinguish from SCA.
  * rg_context_use_system takes any system the registry holds. */
 #define RG_DEFAULT_FEATURE_SYSTEM "distinctive"
+/* The grapheme a multi-lect class carries for a lect that deleted the segment
+ * the others keep -- "∅", U+2205. Before ABI 33 a deletion was invisible in the
+ * class table: the deleting lect was simply absent from the class, so a loss and
+ * a lect that never had the word looked identical. A class row now names the
+ * loss as `lect:∅`. It is only ever a class-table grapheme, never fed back to
+ * the feature system, and it appears only in the unconditioned table -- a gap
+ * conditions nothing, so it is kept out of the conditioning search. */
+#define RG_GAP_GRAPHEME "\xe2\x88\x85"
 
 typedef struct rg_context rg_context;
 typedef struct rg_feature_set rg_feature_set;

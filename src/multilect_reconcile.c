@@ -287,9 +287,35 @@ rg_status present_lects_sorted(
     return RG_OK;
 }
 
+/* One recorded gap: the node of the lect that kept a segment, and the index of
+ * the lect that had nothing to align to it. After union-find settles, the
+ * keeper's component gains the deleter as a `∅` member. */
+typedef struct gap_edge {
+    size_t keeper_node;
+    size_t deleter_lect;
+} gap_edge;
+
+static rg_status gap_edges_append(gap_edge **edges, size_t *count, size_t *cap,
+                                  size_t keeper_node, size_t deleter_lect) {
+    if (*count == *cap) {
+        size_t next_cap = *cap == 0 ? 8 : *cap * 2;
+        gap_edge *next = (gap_edge *)realloc(*edges, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        *edges = next;
+        *cap = next_cap;
+    }
+    (*edges)[*count].keeper_node = keeper_node;
+    (*edges)[*count].deleter_lect = deleter_lect;
+    (*count)++;
+    return RG_OK;
+}
+
 /* Position-level union-find edges induced by aligning one pair. Equal-length
  * chunks pair position by position; unequal-length non-gap chunks are
- * decomposed through a one-segment sub-alignment; pure gaps induce no edges. */
+ * decomposed through a one-segment sub-alignment; pure gaps induce no edges but
+ * are recorded, so the kept side can name the lect that dropped the segment. */
 static rg_status union_pair_alignment_edges(
     const rg_context *ctx,
     const rg_pairwise_model *pair_model,
@@ -298,7 +324,12 @@ static rg_status union_pair_alignment_edges(
     const rg_form *target,
     size_t source_offset,
     size_t target_offset,
-    uf_state *uf
+    size_t source_lect,
+    size_t target_lect,
+    uf_state *uf,
+    gap_edge **gaps,
+    size_t *gap_count,
+    size_t *gap_cap
 ) {
     rg_alignment *alignment = 0;
     size_t link_i;
@@ -347,15 +378,53 @@ static rg_status union_pair_alignment_edges(
                 rg_alignment_free(alignment);
                 return status;
             }
-            for (k = 0; k < rg_alignment_link_count(sub); k++) {
+            for (k = 0; k < rg_alignment_link_count(sub) && status == RG_OK; k++) {
                 const rg_link *sub_link = rg_alignment_link_at(sub, k);
+                size_t s;
                 if (sub_link->source_count == 1 && sub_link->target_count == 1) {
                     uf_union(uf, source_offset + source_pos + sub_source_pos, target_offset + target_pos + sub_target_pos);
+                } else if (sub_link->target_count == 0 && sub_link->source_count != 0) {
+                    /* A loss inside an unequal chunk -- the common shape of a
+                     * final -n dropped as `an ~ a`. The kept source segments
+                     * name the target as their deleter. */
+                    for (s = 0; s < sub_link->source_count; s++) {
+                        status = gap_edges_append(gaps, gap_count, gap_cap,
+                                                  source_offset + source_pos + sub_source_pos + s, target_lect);
+                    }
+                } else if (sub_link->source_count == 0 && sub_link->target_count != 0) {
+                    for (s = 0; s < sub_link->target_count; s++) {
+                        status = gap_edges_append(gaps, gap_count, gap_cap,
+                                                  target_offset + target_pos + sub_target_pos + s, source_lect);
+                    }
                 }
                 sub_source_pos += sub_link->source_count;
                 sub_target_pos += sub_link->target_count;
             }
             rg_alignment_free(sub);
+            if (status != RG_OK) {
+                rg_alignment_free(alignment);
+                return status;
+            }
+        } else if (link->target_count == 0 && link->source_count != 0) {
+            /* The source kept these segments; the target dropped them. Each
+             * kept node names the target as a deleter of its component. */
+            for (k = 0; k < link->source_count; k++) {
+                status = gap_edges_append(gaps, gap_count, gap_cap,
+                                          source_offset + source_pos + k, target_lect);
+                if (status != RG_OK) {
+                    rg_alignment_free(alignment);
+                    return status;
+                }
+            }
+        } else if (link->source_count == 0 && link->target_count != 0) {
+            for (k = 0; k < link->target_count; k++) {
+                status = gap_edges_append(gaps, gap_count, gap_cap,
+                                          target_offset + target_pos + k, source_lect);
+                if (status != RG_OK) {
+                    rg_alignment_free(alignment);
+                    return status;
+                }
+            }
         }
         source_pos += link->source_count;
         target_pos += link->target_count;
@@ -415,6 +484,9 @@ rg_status aggregate_position_classes(
         int *seen_roots;
         uf_state uf;
         size_t node_count = 0;
+        gap_edge *gap_edges = 0;
+        size_t gap_edge_count = 0;
+        size_t gap_edge_cap = 0;
         double weight = cognate_weight(&cognates[c]);
         size_t i;
         rg_status status = RG_OK;
@@ -495,7 +567,12 @@ rg_status aggregate_position_classes(
                     forms[b],
                     offsets[a],
                     offsets[b],
-                    &uf
+                    a,
+                    b,
+                    &uf,
+                    &gap_edges,
+                    &gap_edge_count,
+                    &gap_edge_cap
                 );
             }
         }
@@ -503,7 +580,6 @@ rg_status aggregate_position_classes(
             size_t root = uf_find(&uf, i);
             reconciled_observation obs;
             size_t item_count = 0;
-            size_t n;
             int inconsistent = 0;
             if (seen_roots[root]) {
                 continue;
@@ -520,30 +596,103 @@ rg_status aggregate_position_classes(
                 status = RG_ERR_OOM;
                 break;
             }
-            /* Nodes are visited in ascending (lect, position) order, so members
-             * accumulate already sorted by lect id. */
-            for (n = 0; n < node_count; n++) {
-                size_t lect_index;
-                if (uf_find(&uf, n) != root) {
-                    continue;
-                }
-                lect_index = node_lects[n];
-                if (item_count > 0 && obs.lect_indices[item_count - 1] == lect_index) {
-                    inconsistent = 1;
-                    break;
-                }
-                obs.lects[item_count] = rg_strdup_internal(model->lect_ids[lect_index]);
-                obs.graphemes[item_count] = rg_strdup_internal(forms[lect_index]->segments[node_positions[n]].grapheme);
-                if (obs.lects[item_count] == 0 || obs.graphemes[item_count] == 0) {
-                    obs.segment_count = item_count + 1;
+            /* Nodes are visited in ascending (lect, position) order, so the real
+             * members accumulate already sorted by lect id. A lect that dropped
+             * a segment aligning to this component is a member too, carrying the
+             * gap grapheme; its lect id is merged into the same ascending order
+             * so the class tuple reads left to right regardless of who deleted.
+             * Held apart from the real members until both are known, because a
+             * deleter that also has a real segment here is not a deletion. */
+            {
+                size_t g;
+                size_t next_node = 0;
+                size_t next_gap = 0;
+                /* The deleter lects for this component, ascending and deduped. */
+                size_t *gap_lects = (size_t *)calloc(order_count == 0 ? 1 : order_count, sizeof(*gap_lects));
+                size_t gap_lects_count = 0;
+                if (gap_lects == 0) {
                     reconciled_observation_clear(&obs);
                     status = RG_ERR_OOM;
                     break;
                 }
-                obs.positions[item_count] = node_positions[n];
-                obs.lect_indices[item_count] = lect_index;
-                item_count++;
-                (void)node_order;
+                for (g = 0; g < gap_edge_count; g++) {
+                    size_t dl = gap_edges[g].deleter_lect;
+                    size_t existing;
+                    int is_real = 0;
+                    size_t nn;
+                    if (uf_find(&uf, gap_edges[g].keeper_node) != root) {
+                        continue;
+                    }
+                    /* A lect present in the component kept the segment; its own
+                     * gap edge elsewhere does not make it a deleter here. */
+                    for (nn = 0; nn < node_count; nn++) {
+                        if (uf_find(&uf, nn) == root && node_lects[nn] == dl) {
+                            is_real = 1;
+                            break;
+                        }
+                    }
+                    if (is_real) {
+                        continue;
+                    }
+                    for (existing = 0; existing < gap_lects_count; existing++) {
+                        if (gap_lects[existing] == dl) {
+                            break;
+                        }
+                    }
+                    if (existing < gap_lects_count) {
+                        continue;
+                    }
+                    /* Insertion sort keeps the merge below a single pass. */
+                    {
+                        size_t at = gap_lects_count;
+                        while (at > 0 && gap_lects[at - 1] > dl) {
+                            gap_lects[at] = gap_lects[at - 1];
+                            at--;
+                        }
+                        gap_lects[at] = dl;
+                        gap_lects_count++;
+                    }
+                }
+                /* Merge the real members and the gap members by lect id. */
+                while ((next_node < node_count || next_gap < gap_lects_count) && status == RG_OK) {
+                    size_t real_lect = (size_t)-1;
+                    /* Advance to the next node that belongs to this component. */
+                    while (next_node < node_count && uf_find(&uf, next_node) != root) {
+                        next_node++;
+                    }
+                    if (next_node < node_count) {
+                        real_lect = node_lects[next_node];
+                    }
+                    if (next_gap < gap_lects_count &&
+                        (next_node >= node_count || gap_lects[next_gap] < real_lect)) {
+                        obs.lects[item_count] = rg_strdup_internal(model->lect_ids[gap_lects[next_gap]]);
+                        obs.graphemes[item_count] = rg_strdup_internal(RG_GAP_GRAPHEME);
+                        obs.positions[item_count] = (size_t)-1;
+                        obs.lect_indices[item_count] = gap_lects[next_gap];
+                        next_gap++;
+                    } else if (next_node < node_count) {
+                        if (item_count > 0 && obs.lect_indices[item_count - 1] == real_lect) {
+                            inconsistent = 1;
+                            break;
+                        }
+                        obs.lects[item_count] = rg_strdup_internal(model->lect_ids[real_lect]);
+                        obs.graphemes[item_count] = rg_strdup_internal(forms[real_lect]->segments[node_positions[next_node]].grapheme);
+                        obs.positions[item_count] = node_positions[next_node];
+                        obs.lect_indices[item_count] = real_lect;
+                        next_node++;
+                    } else {
+                        break;
+                    }
+                    if (obs.lects[item_count] == 0 || obs.graphemes[item_count] == 0) {
+                        obs.segment_count = item_count + 1;
+                        reconciled_observation_clear(&obs);
+                        status = RG_ERR_OOM;
+                        break;
+                    }
+                    item_count++;
+                    (void)node_order;
+                }
+                free(gap_lects);
             }
             if (status != RG_OK) {
                 break;
@@ -606,6 +755,7 @@ rg_status aggregate_position_classes(
             }
         }
         uf_clear(&uf);
+        free(gap_edges);
         free(forms);
         free(offsets);
         free(order);

@@ -1414,13 +1414,22 @@ rg_status multi_lect_context_discovery(
             if (obs->segment_count < 2 || obs->segment_count > 64) {
                 continue;
             }
+            /* A gap conditions nothing and has no position to read a context
+             * from, so it is neither a pivot nor a sister: the conditioning
+             * search sees the class as if the deleting lect were absent. */
+            if (grapheme_is_gap(obs->graphemes[p])) {
+                continue;
+            }
             for (q = 0; q < obs->segment_count; q++) {
-                if (q == p) {
+                if (q == p || grapheme_is_gap(obs->graphemes[q])) {
                     continue;
                 }
                 sister_lects[sister_count] = obs->lects[q];
                 sister_graphemes[sister_count] = obs->graphemes[q];
                 sister_count++;
+            }
+            if (sister_count == 0) {
+                continue;
             }
             status = sister_index_for(&state, sister_lects, sister_graphemes, sister_count, &sister_index);
             if (status != RG_OK) {

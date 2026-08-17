@@ -263,6 +263,64 @@ static void test_supporting_sets_are_distinct(rg_context *ctx, const rg_train_op
     }
 }
 
+/* A loss has a class row now. Six words keep a final -n on A and drop it on B;
+ * the class table must state {A:n, B:∅} rather than leave B silently absent, and
+ * the gap must not leak into the conditioning search. */
+static void test_multi_lect_deletion_class(rg_context *ctx, const rg_train_options *options) {
+    const char *src[6] = {"apan", "atan", "akan", "aman", "asan", "alan"};
+    const char *tgt[6] = {"apa", "ata", "aka", "ama", "asa", "ala"};
+    rg_segment *src_seg[6];
+    rg_segment *tgt_seg[6];
+    size_t src_n[6];
+    size_t tgt_n[6];
+    rg_cognate_form forms[6][2];
+    rg_cognate_set cognates[6];
+    rg_multi_model *model = 0;
+    rg_train_options local = *options;
+    size_t i;
+    int found_deletion = 0;
+
+    memset(cognates, 0, sizeof(cognates));
+    for (i = 0; i < 6; i++) {
+        src_seg[i] = segments_from_ascii(src[i], &src_n[i]);
+        tgt_seg[i] = segments_from_ascii(tgt[i], &tgt_n[i]);
+        forms[i][0].lect_id = "A";
+        forms[i][0].form = form("A", src_seg[i], src_n[i]);
+        forms[i][1].lect_id = "B";
+        forms[i][1].form = form("B", tgt_seg[i], tgt_n[i]);
+        cognates[i].cognate_id = src[i];
+        cognates[i].forms = forms[i];
+        cognates[i].form_count = 2;
+        cognates[i].confidence = 1.0;
+    }
+    assert(rg_train_model(ctx, cognates, 6, &local, &model) == RG_OK);
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        if (row->segment_count == 2 &&
+            strcmp(row->graphemes[0], "n") == 0 &&
+            strcmp(row->graphemes[1], RG_GAP_GRAPHEME) == 0 &&
+            strcmp(row->lect_ids[0], "A") == 0 &&
+            strcmp(row->lect_ids[1], "B") == 0) {
+            assert(row->count == 6.0);
+            found_deletion = 1;
+        }
+    }
+    assert(found_deletion);
+    /* A gap conditions nothing: it must never reach the conditioned table. */
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        for (j = 0; j < row->segment_count; j++) {
+            assert(strcmp(row->graphemes[j], RG_GAP_GRAPHEME) != 0);
+        }
+    }
+    rg_multi_model_free(model);
+    for (i = 0; i < 6; i++) {
+        segments_free(src_seg[i], src_n[i]);
+        segments_free(tgt_seg[i], tgt_n[i]);
+    }
+}
+
 int main(void) {
     rg_context *ctx = 0;
     rg_train_options options;
@@ -291,6 +349,7 @@ int main(void) {
     rg_train_options_init_defaults(&options);
     test_conditioned_palatalization(ctx, &options);
     test_supporting_sets_are_distinct(ctx, &options);
+    test_multi_lect_deletion_class(ctx, &options);
 
     forms1[0].lect_id = "A";
     forms1[0].form = form("A", a1, 2);

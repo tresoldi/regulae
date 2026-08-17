@@ -49,27 +49,27 @@ Trained through the wide loader with default options.
 
 | corpus | lects | classes | conditioned |
 | --- | --- | --- | --- |
-| arabic_hebrew | arabic, hebrew | 33 | 5 |
+| arabic_hebrew | arabic, hebrew | 43 | 5 |
 | contaminated_cognates_synthetic | derived, proto | 9 | 0 |
-| finnish_estonian | estonian, finnish | 36 | 3 |
-| georgian_svan | georgian, svan | 51 | 3 |
+| finnish_estonian | estonian, finnish | 48 | 3 |
+| georgian_svan | georgian, svan | 75 | 3 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 79 | 2 |
-| latin_italian | italian, latin | 69 | 11 |
-| latin_spanish | latin, spanish | 65 | 10 |
+| latin_french | french, latin | 107 | 2 |
+| latin_italian | italian, latin | 96 | 11 |
+| latin_spanish | latin, spanish | 96 | 10 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
-| mandarin_historical | mandarin, middle_chinese | 50 | 3 |
-| navajo_chipewyan | chipewyan, navajo | 53 | 1 |
-| oe_english | modern_english, old_english | 61 | 12 |
-| ppn_hawaiian | hawaiian, ppn | 22 | 2 |
-| swahili_zulu | swahili, zulu | 41 | 0 |
+| mandarin_historical | mandarin, middle_chinese | 65 | 3 |
+| navajo_chipewyan | chipewyan, navajo | 64 | 1 |
+| oe_english | modern_english, old_english | 81 | 12 |
+| ppn_hawaiian | hawaiian, ppn | 41 | 2 |
+| swahili_zulu | swahili, zulu | 57 | 0 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 51 | 8 |
+| tone_chinese_like | cantonese, mandarin | 69 | 8 |
 | tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
 | tone_synthetic | src, tgt | 8 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 19 | 0 |
 | tone_yoruba_like | ekiti, standard | 21 | 0 |
-| turkish_azerbaijani | azerbaijani, turkish | 34 | 3 |
+| turkish_azerbaijani | azerbaijani, turkish | 38 | 3 |
 | umlaut_synthetic | derived, proto | 14 | 1 |
 
 ## Corpora regulae cannot read yet (2 of 24)

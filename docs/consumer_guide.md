@@ -658,10 +658,17 @@ say "this answers to nothing"; the gap table does, keyed by the
 grapheme on the side that keeps it, with `deletion` for the
 source-to-target loss direction and `count / present_total` the
 rate it is dropped. It is a post-EM aggregation, not the scoring
-model, so a consumer reads it exactly like the tonal table. The
-multi-lect class table does not yet lift these — a deletion still
-shows there only as a lect absent from a class — so a consumer
-that needs losses reads them per pair.
+model, so a consumer reads it exactly like the tonal table.
+
+The multi-lect class table states losses too, from ABI 33: a lect
+that dropped a segment the others keep appears in the class with
+the grapheme `RG_GAP_GRAPHEME` (`"∅"`), so `{french:∅, latin:u,
+…}` is French apocope and not a lect missing from the row. A
+consumer distinguishing a deletion from an absent lect compares the
+grapheme against `RG_GAP_GRAPHEME`. Gaps appear only in
+unconditioned classes — a gap conditions nothing, so the
+conditioning search never sees one — and `"∅"` is never a scoring
+grapheme, so it is never passed to the feature system.
 
 Until 2026-08-16 these were a count function and an index
 function each, twenty-two of them, so a consumer wrote a loop

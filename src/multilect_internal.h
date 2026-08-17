@@ -16,6 +16,8 @@
 
 #include "internal.h"
 
+#include <string.h>
+
 /* What a run of shuffled corpora reached, held by rg_train_model and filled
  * by multilect_fit.c. */
 typedef struct permutation_baseline permutation_baseline;
@@ -85,6 +87,13 @@ typedef struct reconciled_observation {
 void string_array_clear(char **items, size_t count);
 double cognate_weight(const rg_cognate_set *cognate);
 const rg_form *form_for_lect(const rg_cognate_set *cognate, const char *lect_id);
+
+/* True for the deletion sentinel a class carries for a lect that lost the
+ * segment. A gap has no phonological position, so the conditioning search steps
+ * over it -- see the pivot loop in multilect_classes.c. */
+static inline int grapheme_is_gap(const char *grapheme) {
+    return grapheme != 0 && strcmp(grapheme, RG_GAP_GRAPHEME) == 0;
+}
 void reconciled_observation_clear(reconciled_observation *obs);
 void reconciled_observations_free(reconciled_observation *items, size_t count);
 
