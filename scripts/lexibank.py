@@ -122,6 +122,28 @@ def convert(clone, name, lects=None, min_lects=2, max_lects=None, drop_doubt=Tru
 # system, and certainly not a silent one.
 BOUNDARY_MARKS = ("+", "_", "#")   # morphological and word boundaries
 ZERO_MARKS = ("\u2205",)           # zero: a segment that is not there
+# U+1D4A MODIFIER LETTER SMALL SCHWA. In the Vietic wordlist this is the
+# reduced vowel of a presyllable, and the dataset writes it as a segment of its
+# own nearly everywhere -- `k ᵊ/ə + ʌ` -- so `mᵊ` is the case where the source
+# did not split it. Expanded here for that reason and no other: it follows the
+# dataset's own convention rather than imposing one, and the alternative is
+# losing a 145-set wordlist to two forms.
+#
+# Not merkmal's to fix. `mə` is a consonant and a vowel, not a grapheme, so a
+# mapping there would turn one unreadable token into another.
+PRESYLLABIC_SCHWA = "\u1d4a"
+
+
+def split_presyllabic_schwa(token):
+    """Splits a presyllable written as one token into its two segments.
+
+    A token carrying a slash is a source saying "written this way, read that
+    way", and the reading after the slash is what the feature system is given;
+    those are left alone.
+    """
+    if PRESYLLABIC_SCHWA not in token or "/" in token:
+        return [token]
+    return [part for part in token.replace(PRESYLLABIC_SCHWA, " \u0259 ").split() if part]
 
 
 def clean_segments(segments, drop_markers=True):
@@ -151,6 +173,7 @@ def clean_segments(segments, drop_markers=True):
         return None
     if drop_markers:
         tokens = [t for t in tokens if t not in BOUNDARY_MARKS and t not in ZERO_MARKS]
+    tokens = [part for token in tokens for part in split_presyllabic_schwa(token)]
     return " ".join(tokens) if tokens else None
 
 
