@@ -19,6 +19,8 @@ testdata/soundlaws/lenition.tsv                        3   0.00   1.00     0    
 testdata/soundlaws/metathesis_adjacent.tsv             0    n/a   1.00     0    n/a    n/a
 testdata/soundlaws/metathesis_distant.tsv              0    n/a   1.00     0    n/a    n/a
 testdata/soundlaws/morphological_rhotacism.tsv         4   0.75   1.00     0    n/a   1.50
+testdata/soundlaws/natural_class.tsv                   8   0.50   1.00     0    n/a   1.00
+testdata/soundlaws/natural_class_control.tsv           2   0.50   1.00     0    n/a   1.00
 testdata/soundlaws/opaque_umlaut.tsv                   3   0.67   1.00     0    n/a   1.67
 testdata/soundlaws/place_assimilation.tsv              2   0.50   1.00     0    n/a   1.00
 testdata/soundlaws/place_dissimilation.tsv             2   0.50   1.00     0    n/a   1.50
@@ -65,7 +67,7 @@ testdata/corpora/tonal_multilect.tsv                   0    n/a   1.00     0    
 testdata/corpora/tonogenesis_cldf.tsv                  0    n/a   1.00     2   1.00    n/a
 testdata/corpora/tonogenesis_internal.tsv              0    n/a   1.00     4   1.00    n/a
 
-TOTAL identity            36.0 / 94.0     = 0.3830
-TOTAL fragmentation    12167.0 / 12196.0  = 0.9976
+TOTAL identity            41.0 / 104.0    = 0.3942
+TOTAL fragmentation    12743.0 / 12772.0  = 0.9977
 TOTAL density             18.0 / 25.0     = 0.7200
-TOTAL conjuncts          115.0 / 94.0     = 1.2234
+TOTAL conjuncts          125.0 / 104.0    = 1.2019

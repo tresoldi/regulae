@@ -1,0 +1,129 @@
+cognate_id	lect_id	segments
+fv00	proto	m a f a
+fv00	daughter	m a v a
+fv01	proto	m a f u
+fv01	daughter	m a v u
+fv02	proto	m e f u
+fv02	daughter	m e v u
+fv03	proto	m i f o
+fv03	daughter	m i v o
+fv04	proto	m o f o
+fv04	daughter	m o v o
+fv05	proto	m u f o
+fv05	daughter	m u v o
+fv06	proto	n a f i
+fv06	daughter	n a v i
+fv07	proto	n e f i
+fv07	daughter	n e v i
+fc00	proto	m o t f o
+fc00	daughter	m o t f o
+fc01	proto	m u l f o
+fc01	daughter	m u l f o
+fc02	proto	n a ŋ f i
+fc02	daughter	n a ŋ f i
+fc03	proto	n e k f i
+fc03	daughter	n e k f i
+fc04	proto	n i n f i
+fc04	daughter	n i n f i
+fc05	proto	n o p f e
+fc05	daughter	n o p f e
+fc06	proto	n u r f e
+fc06	daughter	n u r f e
+fc07	proto	l a m f e
+fc07	daughter	l a m f e
+θv00	proto	n i θ o
+θv00	daughter	n i ð o
+θv01	proto	n o θ o
+θv01	daughter	n o ð o
+θv02	proto	n u θ o
+θv02	daughter	n u ð o
+θv03	proto	l a θ i
+θv03	daughter	l a ð i
+θv04	proto	l e θ i
+θv04	daughter	l e ð i
+θv05	proto	l i θ i
+θv05	daughter	l i ð i
+θv06	proto	l o θ e
+θv06	daughter	l o ð e
+θv07	proto	l u θ e
+θv07	daughter	l u ð e
+θc00	proto	l e k θ i
+θc00	daughter	l e k θ i
+θc01	proto	l i n θ i
+θc01	daughter	l i n θ i
+θc02	proto	l o p θ e
+θc02	daughter	l o p θ e
+θc03	proto	l u r θ e
+θc03	daughter	l u r θ e
+θc04	proto	r a m θ e
+θc04	daughter	r a m θ e
+θc05	proto	r e t θ a
+θc05	daughter	r e t θ a
+θc06	proto	r i l θ a
+θc06	daughter	r i l θ a
+θc07	proto	r i ŋ θ u
+θc07	daughter	r i ŋ θ u
+xv00	proto	r a x i
+xv00	daughter	r a ɣ i
+xv01	proto	r e x i
+xv01	daughter	r e ɣ i
+xv02	proto	r i x i
+xv02	daughter	r i ɣ i
+xv03	proto	r o x e
+xv03	daughter	r o ɣ e
+xv04	proto	r u x e
+xv04	daughter	r u ɣ e
+xv05	proto	k a x a
+xv05	daughter	k a ɣ a
+xv06	proto	k e x a
+xv06	daughter	k e ɣ a
+xv07	proto	k i x a
+xv07	daughter	k i ɣ a
+xc00	proto	r u r x e
+xc00	daughter	r u r x e
+xc01	proto	k a m x e
+xc01	daughter	k a m x e
+xc02	proto	k e t x a
+xc02	daughter	k e t x a
+xc03	proto	k i l x a
+xc03	daughter	k i l x a
+xc04	proto	k i ŋ x u
+xc04	daughter	k i ŋ x u
+xc05	proto	k o k x u
+xc05	daughter	k o k x u
+xc06	proto	k u n x u
+xc06	daughter	k u n x u
+xc07	proto	t a p x o
+xc07	daughter	t a p x o
+sv00	proto	k o s e
+sv00	daughter	k o z e
+sv01	proto	k u s e
+sv01	daughter	k u z e
+sv02	proto	t a s a
+sv02	daughter	t a z a
+sv03	proto	t e s a
+sv03	daughter	t e z a
+sv04	proto	t i s a
+sv04	daughter	t i z a
+sv05	proto	t i s u
+sv05	daughter	t i z u
+sv06	proto	t o s u
+sv06	daughter	t o z u
+sv07	proto	t u s u
+sv07	daughter	t u z u
+sc00	proto	t i l s a
+sc00	daughter	t i l s a
+sc01	proto	t i ŋ s u
+sc01	daughter	t i ŋ s u
+sc02	proto	t o k s u
+sc02	daughter	t o k s u
+sc03	proto	t u n s u
+sc03	daughter	t u n s u
+sc04	proto	p a p s o
+sc04	daughter	p a p s o
+sc05	proto	p e r s o
+sc05	daughter	p e r s o
+sc06	proto	p i m s o
+sc06	daughter	p i m s o
+sc07	proto	p o t s i
+sc07	daughter	p o t s i

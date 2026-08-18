@@ -83,6 +83,8 @@
      0  ce4756bddd4591b73c4af51e597827ae2a0b0f3b443d944c4830c3abe54a088e  testdata/soundlaws/metathesis_adjacent.tsv
      0  3ecc4030d7bce85267f92be12d118a5c43b0a9d124b59680be1bda7e896b29fd  testdata/soundlaws/metathesis_distant.tsv
      0  927b42c28f034c7f27a877a94a7df653944d3a3df7b8c5f796cce5158d7350f0  testdata/soundlaws/morphological_rhotacism.tsv
+     0  e74db73b1d5432842cca78d88a60408dc39255cacfc84eb25f9717ce7ff5038e  testdata/soundlaws/natural_class.tsv
+     0  4445667f9be0747cdd8efc2e6a584e3c5434b825eb01863195e7899ffcfc33bc  testdata/soundlaws/natural_class_control.tsv
      0  fec66714e23200ae2a5121a9163116d9c13ad9a334c8cb29a5855c578f7b3a56  testdata/soundlaws/opaque_umlaut.tsv
      0  9edb94616302ba75aa25734c2c788d73e1c067bc82b64cd9ef635cae85aa2869  testdata/soundlaws/place_assimilation.tsv
      0  51e35af0889a568735c55731b90897bf19b0f865e22559d282a50b3743189730  testdata/soundlaws/place_dissimilation.tsv

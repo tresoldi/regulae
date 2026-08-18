@@ -66,6 +66,50 @@ Latin voiceless stops voice between vowels (*vīta* → *vida*, *amīcu* →
 *amigo*). The contrast set is the same stops after a consonant, where they stay
 voiceless (*campu* → *campo*, *altu* → *alto*).
 
+### `natural_class.tsv` / `natural_class_control.tsv` — what fragmentation costs
+
+A pair, and the only fixtures here that exist to be compared with each other
+rather than to be got right.
+
+Both voice a voiceless continuant between vowels and leave it alone after a
+consonant. Both carry thirty-two aligned positions showing the change and
+thirty-two showing the contrast, in sixty-four distinct words. The control puts
+all of it on /f/. The other spreads it over the four continuants that undergo
+the change together — f~v, θ~ð, x~ɣ, s~z — which is what a real change does.
+
+Nothing differs but the spread, and the answer is the same change either way.
+What differs is how regulae says it:
+
+```
+control   2 conditioned rows    v ~ f  [proto pre[vowel:+]]   dBIC −78.6  margin 14.11
+spread    8 conditioned rows    v ~ f  [proto pre[vowel:+]]   dBIC −13.4  margin  3.24
+                                z ~ s  [proto pre[vowel:+]]   dBIC −13.4  margin  3.24
+                                ɣ ~ x  [proto pre[vowel:+]]   dBIC −13.4  margin  3.24
+                                ð ~ θ  [proto pre[vowel:+]]   dBIC −13.4  margin  3.24
+                                                              (+ four retentions)
+```
+
+Two things worth separating. **The search does not lose the rule**: at eight
+examples a cell every member is found, with the right environment, so the
+evidence floor is not what fragmentation costs at this size. **The standing is
+quartered**: the same data states the change at a margin over ten as one rule,
+or under four as four rules. A verdict that depends on how many segments a
+change happens to apply to is measuring the inventory, not the history.
+
+And the reader is left to do the joining. Four rows differing only in their
+grapheme, carrying the same environment and the same score to three decimal
+places, are one event; nothing in the output says so.
+
+The class here is featurally natural on purpose. A fixture measuring the cost
+of fragmentation should not also be testing whether the class can be named —
+and whether it *can* be, in general, is the open question:
+[Mielke 2008](https://doi.org/10.1093/oso/9780199207916.001.0001) finds no
+feature theory expressing more than 71% of attested active classes, so a tool
+that pools has to earn it against the fragmented alternative rather than assume
+it. This pair is what any such pooling has to be scored against.
+
+Regenerate with `scripts/natural_class.py`.
+
 ### `grassmann.tsv` — Grassmann's Law
 
 Of two aspirates in a word, the first loses its aspiration. The hardest shape

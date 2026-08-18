@@ -1660,6 +1660,77 @@ static void test_a_confounded_environment_is_flagged(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* The best search margin among the rows stating a given change, which is what
+ * a reader judges a rule by. */
+static double margin_of(const rg_multi_model *model, const char *from, const char *to) {
+    double best = 0.0;
+    size_t i;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_from = 0;
+        int seen_to = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            seen_from |= strcmp(row->graphemes[j], from) == 0;
+            seen_to |= strcmp(row->graphemes[j], to) == 0;
+        }
+        if (seen_from && seen_to && row->evidence.search_margin > best) {
+            best = row->evidence.search_margin;
+        }
+    }
+    return best;
+}
+
+/* What it costs to spread one change over the segments it applies to.
+ *
+ * Two corpora with the same change, the same environment, the same contrast and
+ * the same thirty-two aligned positions showing it. In the control they all sit
+ * on /f/; in the other they are spread over the four voiceless continuants that
+ * undergo the change together. Nothing differs but the spread.
+ *
+ * The search finds it either way, and at eight examples a cell that is worth
+ * knowing on its own -- the evidence floor is not what fragmentation costs
+ * here. What it costs is the unit and the standing. One change states itself
+ * as two rows at a margin over ten, or as eight rows at a margin near three,
+ * on identical data. A reader given the second has to notice that four rows
+ * differing only in their grapheme, carrying the same environment and the same
+ * score, are one event -- and regulae does not say so.
+ *
+ * This is the measurement `linguistic_research_sources.md` asks for and the
+ * gate for any future pooling: a pooled hypothesis has to beat the fragmented
+ * one, and until something measures both there is nothing to beat. */
+static void test_fragmenting_a_change_over_a_class_costs_its_standing(rg_context *ctx) {
+    rg_corpus *control_corpus = load("natural_class_control");
+    rg_corpus *spread_corpus = load("natural_class");
+    rg_multi_model *control = train(ctx, control_corpus);
+    rg_multi_model *spread = train(ctx, spread_corpus);
+    static const char *const from[] = { "f", "s", "x", "\xce\xb8" };
+    static const char *const to[] = { "v", "z", "\xc9\xa3", "\xc3\xb0" };
+    size_t i;
+
+    /* One change, one row for it, and the environment is the real one. */
+    assert(has_conditioned(control, "v", "f", "vowel"));
+    assert(margin_of(control, "f", "v") > 10.0);
+
+    /* The same change, spread. Every member is found, every one carries the
+     * same environment, and not one of them reaches half the control's
+     * standing. */
+    for (i = 0; i < sizeof(from) / sizeof(from[0]); i++) {
+        assert(has_conditioned(spread, to[i], from[i], "vowel"));
+        assert(margin_of(spread, from[i], to[i]) > 0.0);
+        assert(margin_of(spread, from[i], to[i]) < margin_of(control, "f", "v") / 2.0);
+    }
+
+    /* And it takes four times the rows to say it. */
+    assert(rg_multi_model_conditioned_class_count(spread) ==
+           4 * rg_multi_model_conditioned_class_count(control));
+
+    rg_multi_model_free(control);
+    rg_multi_model_free(spread);
+    rg_corpus_free(control_corpus);
+    rg_corpus_free(spread_corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -1691,6 +1762,7 @@ int main(void) {
     test_compensatory_lengthening_reaches_past_the_segment_that_was_lost(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
     test_a_confounded_environment_is_flagged(ctx);
+    test_fragmenting_a_change_over_a_class_costs_its_standing(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);
     test_class_counts_are_not_evidence_but_the_fit_is(ctx);

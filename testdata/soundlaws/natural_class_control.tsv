@@ -1,0 +1,129 @@
+cognate_id	lect_id	segments
+fv0_00	proto	m a f a
+fv0_00	daughter	m a v a
+fv0_01	proto	m a f u
+fv0_01	daughter	m a v u
+fv0_02	proto	m e f u
+fv0_02	daughter	m e v u
+fv0_03	proto	m i f o
+fv0_03	daughter	m i v o
+fv0_04	proto	m o f o
+fv0_04	daughter	m o v o
+fv0_05	proto	m u f o
+fv0_05	daughter	m u v o
+fv0_06	proto	n a f i
+fv0_06	daughter	n a v i
+fv0_07	proto	n e f i
+fv0_07	daughter	n e v i
+fc0_00	proto	m o t f o
+fc0_00	daughter	m o t f o
+fc0_01	proto	m u l f o
+fc0_01	daughter	m u l f o
+fc0_02	proto	n a ŋ f i
+fc0_02	daughter	n a ŋ f i
+fc0_03	proto	n e k f i
+fc0_03	daughter	n e k f i
+fc0_04	proto	n i n f i
+fc0_04	daughter	n i n f i
+fc0_05	proto	n o p f e
+fc0_05	daughter	n o p f e
+fc0_06	proto	n u r f e
+fc0_06	daughter	n u r f e
+fc0_07	proto	l a m f e
+fc0_07	daughter	l a m f e
+fv1_00	proto	n i f o
+fv1_00	daughter	n i v o
+fv1_01	proto	n o f o
+fv1_01	daughter	n o v o
+fv1_02	proto	n u f o
+fv1_02	daughter	n u v o
+fv1_03	proto	l a f i
+fv1_03	daughter	l a v i
+fv1_04	proto	l e f i
+fv1_04	daughter	l e v i
+fv1_05	proto	l i f i
+fv1_05	daughter	l i v i
+fv1_06	proto	l o f e
+fv1_06	daughter	l o v e
+fv1_07	proto	l u f e
+fv1_07	daughter	l u v e
+fc1_00	proto	l e k f i
+fc1_00	daughter	l e k f i
+fc1_01	proto	l i n f i
+fc1_01	daughter	l i n f i
+fc1_02	proto	l o p f e
+fc1_02	daughter	l o p f e
+fc1_03	proto	l u r f e
+fc1_03	daughter	l u r f e
+fc1_04	proto	r a m f e
+fc1_04	daughter	r a m f e
+fc1_05	proto	r e t f a
+fc1_05	daughter	r e t f a
+fc1_06	proto	r i l f a
+fc1_06	daughter	r i l f a
+fc1_07	proto	r i ŋ f u
+fc1_07	daughter	r i ŋ f u
+fv2_00	proto	r a f i
+fv2_00	daughter	r a v i
+fv2_01	proto	r e f i
+fv2_01	daughter	r e v i
+fv2_02	proto	r i f i
+fv2_02	daughter	r i v i
+fv2_03	proto	r o f e
+fv2_03	daughter	r o v e
+fv2_04	proto	r u f e
+fv2_04	daughter	r u v e
+fv2_05	proto	k a f a
+fv2_05	daughter	k a v a
+fv2_06	proto	k e f a
+fv2_06	daughter	k e v a
+fv2_07	proto	k i f a
+fv2_07	daughter	k i v a
+fc2_00	proto	r u r f e
+fc2_00	daughter	r u r f e
+fc2_01	proto	k a m f e
+fc2_01	daughter	k a m f e
+fc2_02	proto	k e t f a
+fc2_02	daughter	k e t f a
+fc2_03	proto	k i l f a
+fc2_03	daughter	k i l f a
+fc2_04	proto	k i ŋ f u
+fc2_04	daughter	k i ŋ f u
+fc2_05	proto	k o k f u
+fc2_05	daughter	k o k f u
+fc2_06	proto	k u n f u
+fc2_06	daughter	k u n f u
+fc2_07	proto	t a p f o
+fc2_07	daughter	t a p f o
+fv3_00	proto	k o f e
+fv3_00	daughter	k o v e
+fv3_01	proto	k u f e
+fv3_01	daughter	k u v e
+fv3_02	proto	t a f a
+fv3_02	daughter	t a v a
+fv3_03	proto	t e f a
+fv3_03	daughter	t e v a
+fv3_04	proto	t i f a
+fv3_04	daughter	t i v a
+fv3_05	proto	t i f u
+fv3_05	daughter	t i v u
+fv3_06	proto	t o f u
+fv3_06	daughter	t o v u
+fv3_07	proto	t u f u
+fv3_07	daughter	t u v u
+fc3_00	proto	t i l f a
+fc3_00	daughter	t i l f a
+fc3_01	proto	t i ŋ f u
+fc3_01	daughter	t i ŋ f u
+fc3_02	proto	t o k f u
+fc3_02	daughter	t o k f u
+fc3_03	proto	t u n f u
+fc3_03	daughter	t u n f u
+fc3_04	proto	p a p f o
+fc3_04	daughter	p a p f o
+fc3_05	proto	p e r f o
+fc3_05	daughter	p e r f o
+fc3_06	proto	p i m f o
+fc3_06	daughter	p i m f o
+fc3_07	proto	p o t f i
+fc3_07	daughter	p o t f i
