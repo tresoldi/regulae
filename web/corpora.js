@@ -419,7 +419,7 @@ const CORPUS_LIST = [
     "group": "More corpora",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 65 classes · 2 conditioned · cost/segment −2.09"
+    "stats": "2 lects · 40 cognate sets · 65 classes · 2 conditioned · cost/segment −2.27"
   },
   {
     "path": "experiments/navajo_chipewyan/cognates.tsv",
@@ -473,7 +473,7 @@ const CORPUS_LIST = [
     "group": "More corpora",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 73 cognate sets · 69 classes · 5 conditioned · cost/segment −2.44"
+    "stats": "2 lects · 73 cognate sets · 69 classes · 5 conditioned · cost/segment −2.55"
   },
   {
     "path": "experiments/tone_chinese_like_clean/cognates.tsv",
@@ -500,7 +500,7 @@ const CORPUS_LIST = [
     "group": "More corpora",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 74 cognate sets · 19 classes · none conditioned · cost/segment −2.63"
+    "stats": "2 lects · 74 cognate sets · 19 classes · none conditioned · cost/segment −2.80"
   },
   {
     "path": "experiments/tone_yoruba_like/cognates.tsv",
@@ -509,7 +509,7 @@ const CORPUS_LIST = [
     "group": "More corpora",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 84 cognate sets · 21 classes · none conditioned · cost/segment −2.02"
+    "stats": "2 lects · 84 cognate sets · 21 classes · none conditioned · cost/segment −2.25"
   },
   {
     "path": "experiments/turkish_azerbaijani/cognates.tsv",

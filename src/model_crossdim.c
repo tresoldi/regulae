@@ -3,8 +3,15 @@
 
 #include <math.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* A negated value is published as the value it is not, prefixed. Feature
+ * values are short -- a Chao tone string, `+`, `-`, `primary` -- and a longer
+ * one falls back to the bare sign rather than a truncated value that would
+ * read as a different one. */
+#define RG_NEGATED_VALUE_CAPACITY 64
 
 /* Whether the position an environment names exists at all. "The preceding
  * segment is not voiced" is a claim about a preceding segment, and word-initial
@@ -645,6 +652,10 @@ static rg_status xdim_environment_context(
     rg_context_spec first;
     rg_status status;
     size_t which;
+    /* Reused per predicate, and read before the loop turns over:
+     * rg_context_from_candidate_internal and rg_context_extend_internal both
+     * deep-copy the value. */
+    char negated[RG_NEGATED_VALUE_CAPACITY];
 
     rg_context_spec_init_empty(out);
     for (which = 0; which < (environment->conjoined ? 2u : 1u); which++) {
@@ -654,10 +665,45 @@ static rg_status xdim_environment_context(
             : (predicate->offset > 0 ? "following" : "self");
         candidate.feature = predicate->feature;
         /* The complement of a conjunction is not a conjunction of complements,
-         * so a negated environment is published as the predicates it fails,
-         * with the value marked. A reader sees which predicates it is the
-         * complement of. */
-        candidate.value = (predicate->negated != flip) ? "-" : predicate->value;
+         * so a negated environment is published as the predicates it fails.
+         *
+         * It used to be published with the value struck out and replaced by
+         * "-", which said that a predicate on this feature failed and not
+         * which one. Every complement row of a tone split then serialised
+         * identically: on three Sinitic dialects, 113 of 156 cross-dimensional
+         * rows read `tone:-`, and "not ³⁵" was indistinguishable from "not ⁵⁵"
+         * unless the reader found the sibling row under the same
+         * decision_index and worked it out. The export M7 exists to provide was
+         * lossy for exactly the rows its grouping contract was built to serve.
+         *
+         * Worse than lossy, on a valued dimension. The published environment is
+         * not only read: `cross_dimensional_slot_holds` in search_cost.c
+         * re-evaluates it to charge the alignment DP for the overlay, and it
+         * decoded `tone:-` as "carries no tone at all". The search meant "does
+         * not carry tone ³⁵", and a syllable with ⁵⁵ satisfies that while
+         * failing the decoder's reading. Every tonal complement rule was
+         * mis-evaluated during search, which is why writing the value down
+         * moves ten corpora's alignment costs.
+         *
+         * `-` stays for a boolean, where it is what every other published
+         * environment writes and the decoder already agrees with the search.
+         *
+         * `≠` rather than a flag on rg_feature_constraint, which is the shape
+         * this eventually wants: that field is read by every comparator, copy,
+         * subset test and formatter, and widening it days before a release is
+         * not a trade worth making. No feature value merkmal reports begins
+         * with `≠`, so the encoding is unambiguous. */
+        if (predicate->negated == flip) {
+            candidate.value = predicate->value;
+        } else if (predicate->value != 0 && strcmp(predicate->value, "+") == 0) {
+            /* A boolean feature's complement is `-`, which is what every other
+             * published environment writes and what the reader already knows. */
+            candidate.value = "-";
+        } else {
+            int written = snprintf(negated, sizeof(negated), "\xe2\x89\xa0%s", predicate->value);
+            candidate.value = (written > 0 && (size_t)written < sizeof(negated))
+                ? negated : "\xe2\x89\xa0";
+        }
         if (which == 0) {
             status = rg_context_from_candidate_internal(&candidate, out);
             if (status != RG_OK) {

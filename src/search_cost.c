@@ -19,8 +19,19 @@ static int cross_dimensional_slot_holds(
     for (i = 0; i < count; i++) {
         const char *feature = constraints[i].feature;
         const char *want = constraints[i].value == 0 ? "+" : constraints[i].value;
+        /* `-` negates a boolean feature; `≠v` negates one value of a dimension
+         * that has several. The second spelling exists because the first could
+         * not say which value was excluded, and this function guessed: it read
+         * `tone:-` as "carries no tone at all" where the search that committed
+         * the rule meant "does not carry tone ³⁵". A syllable with ⁵⁵ satisfies
+         * what the search meant and fails what this read, so every tonal
+         * complement rule was charged wrongly while the DP searched. */
         int negated = strcmp(want, "-") == 0;
+        int excludes_value = strncmp(want, "\xe2\x89\xa0", 3) == 0;
         int holds;
+        if (excludes_value) {
+            want += 3;
+        }
         if (index < 0 || (size_t)index >= form->segment_count) {
             return 0;
         }
@@ -30,7 +41,9 @@ static int cross_dimensional_slot_holds(
                 : (strcmp(feature, "length") == 0 ? form->segments[index].length
                                                   : form->segments[index].stress);
             holds = value != 0 && strcmp(value, want) == 0;
-            if (negated) {
+            if (excludes_value) {
+                holds = !holds;
+            } else if (negated) {
                 holds = !(value != 0 && value[0] != '\0');
             }
         } else {
@@ -39,8 +52,11 @@ static int cross_dimensional_slot_holds(
                 rg_context_features_internal(ctx, form->segments[index].grapheme, &features) != RG_OK) {
                 return 0;
             }
+            /* A non-suprasegmental predicate is membership of a feature name,
+             * so both spellings of negation mean the same thing here: the
+             * segment does not carry it. */
             holds = feature_set_contains(features, feature);
-            if (negated) {
+            if (negated || excludes_value) {
                 holds = !holds;
             }
         }
