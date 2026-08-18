@@ -452,6 +452,24 @@ if(REGULAE_BUILD_TESTS)
         # One that cannot names the grapheme, says what kind of problem it is,
         # counts it, and shows a form it came from -- rather than stopping at
         # the first occurrence the way training has to.
+        # check trains, so it can say which correspondences carry uncertainty
+        # that no environment accounts for. On Latin and Spanish without vowel
+        # quantity or stress that is six of them -- the palatalisations and the
+        # -kt-, -li- and -nn- developments -- and the corpus carries no
+        # annotation any of them could be conditioned on.
+        add_test(NAME cli_check_reports_unexplained_correspondences
+            COMMAND regulae_cli check "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/real_latin_spanish.tsv")
+        set_tests_properties(cli_check_reports_unexplained_correspondences PROPERTIES
+            PASS_REGULAR_EXPRESSION "unexplained\t6")
+
+        # And declines to on two wordlists with no history between them, where
+        # every correspondence is unexplained truthfully and uselessly. The
+        # pair's own H(target|source) is what rules it out.
+        add_test(NAME cli_check_declines_residue_on_unrelated_lects
+            COMMAND regulae_cli check "${CMAKE_CURRENT_SOURCE_DIR}/testdata/restraint/chance.tsv")
+        set_tests_properties(cli_check_declines_residue_on_unrelated_lects PROPERTIES
+            PASS_REGULAR_EXPRESSION "unexplained\t0")
+
         add_test(NAME cli_check_reports_every_grapheme
             COMMAND regulae_cli check --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/morph_boundary_synthetic/cognates.tsv")
         # PASS_REGULAR_EXPRESSION decides the result, so the non-zero exit the

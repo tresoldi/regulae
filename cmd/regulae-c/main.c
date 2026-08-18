@@ -41,7 +41,10 @@ static int usage(void) {
     printf("  train <file>      train a multi-lect model and print a summary\n");
     printf("  outliers <file>   rank cognate sets by alignment cost\n");
     printf("  align <file>      print the alignment of every lect pair per cognate\n");
-    printf("  check <file>      report every grapheme the feature system cannot read\n");
+    printf("  check <file>      report what a corpus costs before training on it:\n");
+    printf("                    unreadable graphemes, transcription drift,\n");
+    printf("                    which annotations it carries, and which\n");
+    printf("                    correspondences no environment accounts for\n");
     printf("  version           print version\n");
     printf("  help              print this help\n");
     printf("\n");
@@ -174,6 +177,164 @@ static int fail(const char *what, rg_status status) {
 
 
 /* ---- check ------------------------------------------------------------- */
+
+/* Below this the pair shows too little systematic correspondence for a
+ * per-correspondence residue to mean anything: on `restraint/chance`, two
+ * wordlists with no history between them, H(target|source) is 2.47 bits and
+ * every correspondence in it is "unexplained" -- truthfully, and uselessly,
+ * because there was nothing to explain. Real pairs sit far below: Latin and
+ * Spanish without vowel quantity 1.10, Grimm 0.55, the same Latin/Spanish with
+ * quantity and stress 0.38, Latin rhotacism 0.13. Two bits is "more than two
+ * equally likely reflexes per source on average", which is a description of
+ * the corpus rather than a tuned cut. */
+#define RG_RESIDUE_MAX_PAIR_ENTROPY 2.0
+
+/* A correspondence at least as uncertain as a fair coin. Also not tuned: one
+ * bit is the point where a source segment stops having a reflex and starts
+ * having a choice of them. */
+#define RG_RESIDUE_MIN_ENTROPY 1.0
+
+/* The evidence floor AGENTS.md records, so a correspondence is not called
+ * unexplained on the strength of a handful of words. */
+#define RG_RESIDUE_MIN_OBSERVATIONS 8.0
+
+/* How predictable one lect's segment is from the other's, in bits, and which
+ * individual correspondences carry that uncertainty without any environment
+ * accounting for it.
+ *
+ * This is the question a comparativist has before any of the others: is my
+ * data good enough to start? A correspondence with high entropy and no
+ * committed environment is either a change conditioned by something the
+ * transcription does not write -- vowel length, stress, tone, a morpheme
+ * boundary -- or one conditioned by nothing, and the tool cannot tell those
+ * apart. Saying which correspondences are in that position is what it can do,
+ * and it is how Verner got to the accent.
+ *
+ * Both directions are reported because they are different questions: what
+ * Latin /e/ becomes, and what a Spanish /e/ comes from. */
+static void report_pair_residue(const rg_multi_pair_model_row *pair, size_t *unexplained) {
+    const rg_segment_count_row *segments;
+    const rg_conditioned_segment_count_row *conditioned;
+    size_t segment_count = 0;
+    size_t conditioned_count = 0;
+    size_t i;
+    size_t j;
+    double corpus_total = 0.0;
+    double corpus_entropy = 0.0;
+
+    segments = rg_pairwise_model_segment_counts(pair->model, &segment_count);
+    conditioned = rg_pairwise_model_conditioned_segment_counts(pair->model, &conditioned_count);
+    if (segments == 0 || segment_count == 0) {
+        return;
+    }
+
+    /* The table is sorted by source, so each source's rows are contiguous and
+     * one pass covers both the per-source entropy and the corpus mean. */
+    for (i = 0; i < segment_count;) {
+        double total = 0.0;
+        double entropy = 0.0;
+        for (j = i; j < segment_count && strcmp(segments[j].source, segments[i].source) == 0; j++) {
+            total += segments[j].count;
+        }
+        for (; i < j; i++) {
+            double share = total > 0.0 ? segments[i].count / total : 0.0;
+            if (share > 0.0) {
+                entropy -= share * (log(share) / log(2.0));
+            }
+        }
+        corpus_total += total;
+        corpus_entropy += total * entropy;
+    }
+    if (corpus_total <= 0.0) {
+        return;
+    }
+    corpus_entropy /= corpus_total;
+    printf("PAIR\t%s\t%s\t%.3f\n", pair->lect_a, pair->lect_b, corpus_entropy);
+    if (corpus_entropy >= RG_RESIDUE_MAX_PAIR_ENTROPY) {
+        return;
+    }
+
+    for (i = 0; i < segment_count;) {
+        double total = 0.0;
+        double entropy = 0.0;
+        double explained = 0.0;
+        size_t start = i;
+        for (j = i; j < segment_count && strcmp(segments[j].source, segments[i].source) == 0; j++) {
+            total += segments[j].count;
+        }
+        for (; i < j; i++) {
+            double share = total > 0.0 ? segments[i].count / total : 0.0;
+            if (share > 0.0) {
+                entropy -= share * (log(share) / log(2.0));
+            }
+        }
+        if (entropy < RG_RESIDUE_MIN_ENTROPY || total < RG_RESIDUE_MIN_OBSERVATIONS) {
+            continue;
+        }
+        /* Any committed environment at all disqualifies it: the claim is that
+         * nothing in the vocabulary reduced this uncertainty, not that nothing
+         * reduced all of it. */
+        for (j = 0; j < conditioned_count; j++) {
+            if (strcmp(conditioned[j].source, segments[start].source) == 0) {
+                explained += conditioned[j].count;
+            }
+        }
+        if (explained > 0.0) {
+            continue;
+        }
+        printf("RESIDUE\t%s\t%s\t%s\t%.2f\t%.0f", pair->lect_a, pair->lect_b,
+               segments[start].source, entropy, total);
+        for (j = start; j < i; j++) {
+            printf("%c%s", j == start ? '\t' : ' ', segments[j].target);
+        }
+        printf("\n");
+        (*unexplained)++;
+    }
+}
+
+/* Which annotations the corpus carries alongside its graphemes: the tone,
+ * length and stress a segment is marked with, and the morpheme boundaries a
+ * form is divided by. A dimension nothing carries is a dimension no rule can
+ * be stated over, and a user reading "no conditioning found" deserves to know
+ * whether the axis it would have been found on is absent from their file
+ * rather than from the language.
+ *
+ * Annotations, not features, and the distinction is load-bearing. A
+ * suprasegmental written into the grapheme is a feature of that grapheme and
+ * the search reads it as one: `eː` carries `long:+` and can be conditioned on
+ * without appearing here at all. What this counts is the separate channel --
+ * a `length` column, a CLDF tone token, a stress diacritic the loader lifts
+ * off the vowel -- because that is the channel a corpus can silently lack.
+ * Reporting `length 0` for a corpus full of `eː` would send a user to add
+ * something they already have. */
+static size_t report_annotations(const rg_cognate_set *sets, size_t set_count) {
+    static const char *const names[] = { "tone", "length", "stress", "boundaries" };
+    size_t carried[4] = { 0, 0, 0, 0 };
+    size_t i;
+    size_t f;
+    size_t s;
+    size_t present = 0;
+
+    for (i = 0; i < set_count; i++) {
+        for (f = 0; f < sets[i].form_count; f++) {
+            const rg_form *form = &sets[i].forms[f].form;
+            carried[3] += form->morpheme_break_count > 0 ? 1 : 0;
+            for (s = 0; s < form->segment_count; s++) {
+                carried[0] += form->segments[s].tone != 0 && form->segments[s].tone[0] != '\0';
+                carried[1] += form->segments[s].length != 0 && form->segments[s].length[0] != '\0';
+                carried[2] += form->segments[s].stress != 0 && form->segments[s].stress[0] != '\0';
+            }
+        }
+    }
+    for (i = 0; i < 4; i++) {
+        present += carried[i] > 0 ? 1 : 0;
+    }
+    printf("annotations\t%lu\n", (unsigned long)present);
+    for (i = 0; i < 4; i++) {
+        printf("ANNOTATION\t%s\t%lu\n", names[i], (unsigned long)carried[i]);
+    }
+    return present;
+}
 
 typedef struct grapheme_report {
     char *grapheme;
@@ -395,6 +556,46 @@ static int command_check(const char *path, const char *format) {
                            (unsigned long)drift[i].forms);
                 }
                 rg_transcription_drift_rows_free(drift, drift_count);
+            }
+
+            /* Everything above is about the corpus as written. This is about
+             * what can be learned from it, and it costs a training run --
+             * which is the honest price: the question "is my data good enough
+             * to start" cannot be answered without trying. */
+            {
+                size_t annotated = report_annotations(rg_corpus_cognate_at(corpus, 0),
+                                                      rg_corpus_cognate_count(corpus));
+                rg_multi_model *model = 0;
+                rg_train_options options;
+                rg_train_options_init_defaults(&options);
+                if (rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                                   rg_corpus_cognate_count(corpus), &options, &model) == RG_OK) {
+                    size_t pairs = rg_multi_model_pair_model_count(model);
+                    size_t unexplained = 0;
+                    size_t p;
+                    for (p = 0; p < pairs; p++) {
+                        const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, p);
+                        if (pair != 0) {
+                            report_pair_residue(pair, &unexplained);
+                        }
+                    }
+                    printf("unexplained\t%lu\n", (unsigned long)unexplained);
+                    /* The two numbers are only useful together, and combining
+                     * them is the tool's job rather than the reader's: an
+                     * unexplained correspondence is a different problem when
+                     * the corpus had an axis to try and did not use it than
+                     * when it never carried one. */
+                    if (unexplained > 0 && annotated == 0) {
+                        printf("NOTE\t%lu correspondence%s carr%s uncertainty that no environment "
+                               "accounts for, and the corpus writes no tone, length, stress or "
+                               "morpheme boundary. A rule cannot be stated over an axis the file "
+                               "does not carry.\n",
+                               (unsigned long)unexplained,
+                               unexplained == 1 ? "" : "s",
+                               unexplained == 1 ? "ies" : "y");
+                    }
+                    rg_multi_model_free(model);
+                }
             }
             rg_corpus_free(corpus);
         }
