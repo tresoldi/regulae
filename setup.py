@@ -101,7 +101,13 @@ setup(
                 *utf8proc_macros,
             ],
             py_limited_api=True,
-            extra_compile_args=["-std=c99", *utf8proc_cflags],
+            # -fvisibility=hidden keeps everything but the PyInit entry point and
+            # the RG_API surface out of the extension's dynamic symbol table.
+            # Otherwise the vendored cJSON_* symbols and regulae's internal
+            # cross-module helpers (`cell`, `parse_segments`, ...) are exported
+            # globally, where a second extension in the same interpreter that
+            # also vendors cJSON can be interposed against them at load time.
+            extra_compile_args=["-std=c99", "-fvisibility=hidden", *utf8proc_cflags],
             extra_link_args=[*utf8proc_ldflags],
         )
     ],

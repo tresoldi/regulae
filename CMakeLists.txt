@@ -66,6 +66,17 @@ else()
     if(REGULAE_WERROR)
         add_compile_options(-Werror)
     endif()
+    # Only the RG_API surface -- which the public header marks
+    # visibility("default") -- should escape a shared build or the Python
+    # extension. Without this, internal cross-module helpers (`cell`,
+    # `parse_segments`, `copy_ints`, ...) and the vendored `cJSON_*` set land in
+    # the global dynamic symbol table, where a second extension loaded in the
+    # same interpreter can interpose them. Static links (the CLI, the tests)
+    # resolve those symbols at link time regardless, so this is invisible to
+    # them. Directory-scoped, after the merkmal add_subdirectory, for the same
+    # reason the warnings are: a later target cannot opt out, and merkmal's
+    # already-created targets are untouched.
+    add_compile_options(-fvisibility=hidden)
 endif()
 
 # Coverage instrumentation has to reach the code being fuzzed, not just the
