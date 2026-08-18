@@ -39,6 +39,7 @@
     "trap_confounded_environment.raw": "c8fbcd71291f",
     "trap_confounded_environment.count_only": "fe292c0af2dc",
     "trap_confounded_environment.full": "f865f903485c",
+    "trap_confounded_environment.full_flagged": "7634d7f5d6b2",
     "trap_direction_overreading.raw": "c1847bf3ea2f",
     "trap_direction_overreading.count_only": "d7084fd5e715",
     "trap_direction_overreading.full": "78fb5a6bbf20"
