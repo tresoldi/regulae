@@ -197,6 +197,10 @@ textarea {
 .scroll { max-height: 62vh; overflow: auto; border: 1px solid var(--line);
   border-radius: 6px; background: var(--panel); }
 
+.panel.events { margin-top: 22px; }
+.panel.events .scroll { max-height: 30vh; }
+.panel.events .unnamed { color: var(--muted); }
+
 /* The sets the correspondences do not explain. Shorter than the panels above
    it because it is read from the top: the ranking is the point, not the tail. */
 .panel.residue { margin-top: 22px; }

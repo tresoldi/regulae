@@ -10,7 +10,8 @@
  */
 
 /* global CORPORA, CORPUS_LIST, GUIDE_STEPS,
-   correspondence, decisionOrder, environment, isIdentity, residueReading */
+   correspondence, decisionOrder, environment, eventCorrespondence, isIdentity,
+   residueReading */
 
 const $ = (id) => document.getElementById(id);
 
@@ -212,6 +213,45 @@ function renderClasses() {
 }
 
 
+/* Conditioned classes that look like one change. A proposal: every member is
+   still in the table above, and clicking an event shows the members' alignments
+   rather than replacing anything. */
+function renderEvents() {
+  const body = $("events").querySelector("tbody");
+  body.innerHTML = "";
+  const events = model.proposed_events || [];
+  $("events-hint").textContent = events.length
+    ? "Rows differing only in their graphemes, under the same environment and the same "
+      + "score. Whether one pooled rule beats the several is not decided here."
+    : "";
+  if (!events.length) {
+    body.innerHTML = '<tr><td colspan="3" class="empty">'
+      + "Every committed environment names one correspondence.</td></tr>";
+    return;
+  }
+  for (const event of events) {
+    const row = document.createElement("tr");
+    const corr = document.createElement("td");
+    corr.className = "corr";
+    corr.textContent = eventCorrespondence(event);
+    if (!event.featurally_definable) {
+      const note = document.createElement("span");
+      note.className = "env unnamed";
+      note.textContent = "no feature names this set in this corpus";
+      corr.appendChild(note);
+    }
+    const count = document.createElement("td");
+    count.className = "count";
+    count.textContent = event.count % 1 === 0 ? event.count : event.count.toFixed(1);
+    const sets = document.createElement("td");
+    sets.className = "sets";
+    sets.textContent = event.supporting_cognates.length;
+    sets.title = `${event.class_ids.length} member classes`;
+    row.append(corr, count, sets);
+    body.appendChild(row);
+  }
+}
+
 /* Cognate sets ranked by how badly they align under the trained model. The
    residue is not an error term: a set that will not align is either not
    cognate, or cognate through a correspondence the model has not got. */
@@ -393,6 +433,7 @@ function renderSummary() {
 function render() {
   selectedClass = null;
   renderSummary();
+  renderEvents();
   renderResidue();
   renderClasses();
   renderAlignments();

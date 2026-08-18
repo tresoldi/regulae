@@ -85,13 +85,15 @@ for (const id of [
   'example-note', 'example-stats', 'version', 'timing', 'guide', 'guide-open',
   'guide-close', 'guide-title', 'guide-body', 'guide-steps', 'guide-load', 'file',
   'download-json', 'download-summary', 'residue', 'residue-hint',
+  'events', 'events-hint',
 ]) {
-  byId.set(id, new Element(id === 'classes' || id === 'residue' ? 'table' : 'div'));
+  byId.set(id, new Element(['classes', 'residue', 'events'].includes(id) ? 'table' : 'div'));
 }
 // The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
 byId.get('classes').appendChild(tbody);
 byId.get('residue').appendChild(new Element('tbody'));
+byId.get('events').appendChild(new Element('tbody'));
 
 const posted = [];
 class FakeWorker {
@@ -205,6 +207,22 @@ check('a retention row names the change it is the complement of', () => {
 /* Cognate sets ranked by how badly they align, with the two split statistics
    read together above them. The residue is the part a comparativist wants
    first, and it is not an error term. */
+/* The events pane. Latin/Spanish, the corpus this file already trains, has
+   nothing to group -- so this asserts the quiet answer, which is the one a
+   grouper that fires on anything would get wrong. The loud answer is asserted
+   in C against the natural-class fixture. */
+check('the events pane renders one row per proposed event', () => {
+  const events = model.proposed_events || [];
+  const rendered = byId.get('events').querySelectorAll('td.corr');
+  assert.equal(rendered.length, events.length);
+  for (let i = 0; i < events.length; i += 1) {
+    for (const member of events[i].members) {
+      assert.ok(rendered[i].textContent.includes(member.lect),
+        `event row omits ${member.lect}`);
+    }
+  }
+});
+
 check('the residue pane ranks every scored set and reads the split', () => {
   const rows = byId.get('residue').querySelectorAll('tr[data-cognate]');
   assert.equal(rows.length, model.outliers.length);
@@ -291,6 +309,26 @@ check('selecting again clears the selection', () => {
   assert.equal(
     byId.get('alignments').querySelectorAll('.alignment:not(.hidden)').length,
     model.alignments.length);
+});
+
+/* A second model through the same page, because the corpus above has nothing
+   to group and a pane is only tested by content. natural_class is four
+   conditioned classes that are one change, and the fixture exists so both
+   halves -- the grouping and the naming -- have a corpus that shows them. */
+check('the events pane names a grouped class', () => {
+  const grouped = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/soundlaws/natural_class.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.ok(grouped.proposed_events.length > 0, 'fixture stopped producing events');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(grouped), elapsedMs: 1 } });
+
+  const rendered = byId.get('events').querySelectorAll('td.corr');
+  assert.equal(rendered.length, grouped.proposed_events.length);
+  const voicing = rendered.find((cell) => cell.textContent.includes('v,z'));
+  assert.ok(voicing, `no event row for the voicing class: ${
+    rendered.map((c) => c.textContent).join(' | ')}`);
+  assert.match(voicing.textContent, /\[[^\]]* & [^\]]*\]/,
+    'the grapheme set is not named by its features');
 });
 
 check('a failed run reports the status rather than rendering', () => {

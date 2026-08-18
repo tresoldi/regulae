@@ -104,3 +104,15 @@ function residueReading(fit) { // eslint-disable-line no-unused-vars
     + "stratum, a change spread over the lexicon and unrelated contact all make it, and this "
     + "number cannot tell them apart.";
 }
+
+/* An event's correspondence, with each lect's grapheme set named by the
+   features that pick it out when any do. A set no feature names is still an
+   event -- see rg_proposed_event_row on why that is ordinary. */
+function eventCorrespondence(event) { // eslint-disable-line no-unused-vars
+  return event.members
+    .map((m) => {
+      const set = `${m.lect}:{${m.graphemes.join(",")}}`;
+      return m.class_features.length ? `${set}=[${m.class_features.join(" & ")}]` : set;
+    })
+    .join("  ~  ");
+}
