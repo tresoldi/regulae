@@ -82,15 +82,16 @@ const byId = new Map();
 for (const id of [
   'editor', 'run', 'cancel', 'progress', 'progress-fill', 'progress-label', 'error',
   'results', 'summary', 'classes', 'alignments', 'alignments-hint', 'examples',
-  'example-note', 'version', 'timing', 'guide', 'guide-open', 'guide-close',
-  'guide-title', 'guide-body', 'guide-steps', 'guide-load', 'file',
-  'download-json', 'download-summary',
+  'example-note', 'example-stats', 'version', 'timing', 'guide', 'guide-open',
+  'guide-close', 'guide-title', 'guide-body', 'guide-steps', 'guide-load', 'file',
+  'download-json', 'download-summary', 'residue', 'residue-hint',
 ]) {
-  byId.set(id, new Element(id === 'classes' ? 'table' : 'div'));
+  byId.set(id, new Element(id === 'classes' || id === 'residue' ? 'table' : 'div'));
 }
-// The classes table needs a tbody for app.js to fill.
+// The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
 byId.get('classes').appendChild(tbody);
+byId.get('residue').appendChild(new Element('tbody'));
 
 const posted = [];
 class FakeWorker {
@@ -115,7 +116,7 @@ context.globalThis = context;
 context.URL = { createObjectURL: () => 'blob:', revokeObjectURL() {} };
 
 vm.createContext(context);
-for (const file of ['corpora.js', 'guide-content.js']) {
+for (const file of ['reading.js', 'corpora.js', 'guide-content.js']) {
   vm.runInContext(readFileSync(join(repo, 'web', file), 'utf8'), context, { filename: file });
 }
 vm.runInContext(readFileSync(join(repo, 'web/app.js'), 'utf8'), context, { filename: 'app.js' });
@@ -165,6 +166,65 @@ const model = JSON.parse(execFileSync(
 const worker = FakeWorker.instances[0];
 worker.onmessage({ data: { type: 'ready', version: '0.1.0' } });
 worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1234 } });
+
+/* The decision list is a finding: each rule was committed against what the
+   earlier ones left unexplained. The JSON sorts every table by id, so a
+   consumer that iterates it as it arrives publishes the list scrambled -- which
+   is what this page did until decisionOrder went in, rendering Verner as
+   0, 4, 1, 3 where the CLI rendered 0, 1, 3, 4. The shim was here and the
+   linkage was checked; the order simply was not. */
+check('conditioned classes render in the order they were decided', () => {
+  const conditioned = model.classes.conditioned;
+  assert.ok(conditioned.length > 1, 'need at least two conditioned classes to order');
+  const byRow = new Map(conditioned.map((c) => [String(c.id), c.decision_index]));
+  const rendered = byId.get('classes').querySelectorAll('tr[data-class-id]')
+    .map((row) => byRow.get(row.dataset.classId))
+    .filter((index) => index !== undefined);
+  assert.deepEqual(rendered, [...rendered].sort((a, b) => a - b),
+    `conditioned rows rendered out of decision order: ${rendered.join(', ')}`);
+});
+
+/* Two in five committed rules are X ~ X, and most are the retention side of a
+   real split with the change in the contrast class. "p ~ p before a vowel" is a
+   null statement to read, so the row has to say which half is the event. */
+check('a retention row names the change it is the complement of', () => {
+  const conditioned = model.classes.conditioned;
+  const identity = conditioned.find((entry) => {
+    if (new Set(entry.segments.map((s) => s.grapheme)).size !== 1) return false;
+    const contrast = [...conditioned, ...model.classes.unconditioned]
+      .find((c) => c.id === entry.contrast_class_id);
+    return contrast && new Set(contrast.segments.map((s) => s.grapheme)).size > 1;
+  });
+  assert.ok(identity, 'no retention row with a non-identity contrast in this corpus');
+  const row = byId.get('classes')
+    .querySelectorAll(`tr[data-class-id="${identity.id}"]`)[0];
+  const env = row.querySelectorAll('.env')[0];
+  assert.match(env.textContent, /unchanged here; the change is/);
+});
+
+/* Cognate sets ranked by how badly they align, with the two split statistics
+   read together above them. The residue is the part a comparativist wants
+   first, and it is not an error term. */
+check('the residue pane ranks every scored set and reads the split', () => {
+  const rows = byId.get('residue').querySelectorAll('tr[data-cognate]');
+  assert.equal(rows.length, model.outliers.length);
+  const scores = rows.map((row) => Number(row.querySelectorAll('.z')[0].textContent));
+  assert.deepEqual(scores, [...scores].sort((a, b) => b - a),
+    'residue rows are not ranked worst-first');
+  assert.ok(byId.get('residue-hint').textContent.length > 0, 'no reading of the split');
+});
+
+check('selecting a residue row shows that set and nothing else', () => {
+  const rows = byId.get('residue').querySelectorAll('tr[data-cognate]');
+  const target = rows[0].dataset.cognate;
+  rows[0].click();
+  const shown = byId.get('alignments').querySelectorAll('.alignment:not(.hidden)');
+  assert.ok(shown.length > 0, 'selecting a set hid everything');
+  for (const block of shown) {
+    assert.equal(block.dataset.cognate, target);
+  }
+  rows[0].click();
+});
 
 check('a result renders classes and alignments', () => {
   const rows = byId.get('classes').querySelectorAll('tr[data-class-id]');

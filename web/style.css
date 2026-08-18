@@ -197,6 +197,15 @@ textarea {
 .scroll { max-height: 62vh; overflow: auto; border: 1px solid var(--line);
   border-radius: 6px; background: var(--panel); }
 
+/* The sets the correspondences do not explain. Shorter than the panels above
+   it because it is read from the top: the ranking is the point, not the tail. */
+.panel.residue { margin-top: 22px; }
+.panel.residue .scroll { max-height: 34vh; }
+.panel.residue tr.apart td { color: var(--warn); }
+.panel.residue td.z, .panel.residue td.cost {
+  text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+
 table.classes { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.classes th {
   position: sticky; top: 0; background: var(--panel); text-align: left;

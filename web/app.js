@@ -9,7 +9,8 @@
  * show. Each link in the payload carries the class ids it realises.
  */
 
-/* global CORPORA, CORPUS_LIST, GUIDE_STEPS */
+/* global CORPORA, CORPUS_LIST, GUIDE_STEPS,
+   correspondence, decisionOrder, environment, isIdentity, residueReading */
 
 const $ = (id) => document.getElementById(id);
 
@@ -25,6 +26,7 @@ let running = false;
 let model = null;
 let currentFormat = "wide";
 let selectedClass = null;
+let selectedSet = null;
 
 /* ---- worker lifecycle -------------------------------------------------- */
 
@@ -137,15 +139,7 @@ function finish({ json, elapsedMs }) {
 
 /* ---- rendering --------------------------------------------------------- */
 
-function correspondence(entry) {
-  return entry.segments.map((s) => `${s.lect}:${s.grapheme}`).join("  ~  ");
-}
 
-/* Whether every lect in the class shows the same grapheme -- a retention
-   rather than a change. */
-function isIdentity(entry) {
-  return new Set(entry.segments.map((s) => s.grapheme)).size === 1;
-}
 
 /* A class by its id, across both tables. -1 (no contrast) returns null. */
 function classById(id) {
@@ -157,49 +151,13 @@ function classById(id) {
     || null;
 }
 
-/* Renders an environment the way the guide reads it: a filter on where the
- * correspondence applies, not a rewrite rule. */
-function environment(entry) {
-  const parts = [];
-  for (const segment of entry.segments) {
-    const context = segment.context;
-    if (!context || Object.keys(context).length === 0) {
-      continue;
-    }
-    const bits = [];
-    for (const [slot, value] of Object.entries(context)) {
-      if (typeof value === "string") {
-        bits.push(`${slot}: ${value}`);
-      } else if (Array.isArray(value)) {
-        bits.push(`${slot}: ` + value
-          .map((c) => (c.offset === undefined
-            ? `${c.feature}:${c.value}`
-            : `${c.feature}:${c.value}@${c.offset}`))
-          .join(", "));
-      }
-    }
-    if (bits.length) {
-      parts.push(`${segment.lect} — ${bits.join("; ")}`);
-    }
-  }
-  return parts.join(" · ");
-}
 
 function renderClasses() {
   const body = $("classes").querySelector("tbody");
   body.innerHTML = "";
 
-  /* Conditioned classes are a decision list: each was committed against what
-     the earlier ones left unexplained, so a later one refines an earlier one
-     and the order carries that. The JSON publishes every table sorted by id,
-     which is why each row also carries decision_index -- iterating the array
-     as it arrives renders the list scrambled, and the CLI and this page then
-     report the same model in two different orders. */
-  const decided = [...model.classes.conditioned].sort(
-    (a, b) => (a.decision_index - b.decision_index) || (a.id - b.id),
-  );
   const all = [
-    ...decided.map((c) => ({ entry: c, conditioned: true })),
+    ...decisionOrder(model.classes.conditioned).map((c) => ({ entry: c, conditioned: true })),
     ...model.classes.unconditioned.map((c) => ({ entry: c, conditioned: false })),
   ];
   if (!all.length) {
@@ -253,6 +211,72 @@ function renderClasses() {
   }
 }
 
+
+/* Cognate sets ranked by how badly they align under the trained model. The
+   residue is not an error term: a set that will not align is either not
+   cognate, or cognate through a correspondence the model has not got. */
+function renderResidue() {
+  const body = $("residue").querySelector("tbody");
+  body.innerHTML = "";
+  const rows = model.outliers || [];
+  if (!rows.length) {
+    $("residue-hint").textContent = "";
+    body.innerHTML = '<tr><td colspan="3" class="empty">No sets were scored.</td></tr>';
+    return;
+  }
+  $("residue-hint").textContent = residueReading(model.fit);
+
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+    tr.dataset.cognate = row.cognate_id;
+    /* One standard deviation above the corpus mean. Not a verdict -- the cut
+       that separated the planted sets from the good ones on the contaminated
+       fixture, where the five bad ones ran 1.46 to 3.84 and the worst good one
+       reached -0.06. On a clean corpus nothing is marked. */
+    tr.classList.toggle("apart", row.z_score >= 1);
+
+    const id = document.createElement("td");
+    id.className = "corr";
+    id.textContent = row.cognate_id;
+
+    const z = document.createElement("td");
+    z.className = "z";
+    z.textContent = row.z_score.toFixed(2);
+
+    const cost = document.createElement("td");
+    cost.className = "cost";
+    cost.textContent = row.cost_per_segment.toFixed(3);
+
+    tr.append(id, z, cost);
+    tr.addEventListener("click", () => selectSet(row.cognate_id));
+    body.appendChild(tr);
+  }
+}
+
+/* Show one cognate set's alignments and nothing else, so a row in the residue
+   table resolves to the words behind it in one click. */
+function selectSet(cognateId) {
+  selectedSet = selectedSet === cognateId ? null : cognateId;
+  selectedClass = null;
+
+  for (const row of $("residue").querySelectorAll("tr[data-cognate]")) {
+    row.classList.toggle("selected", row.dataset.cognate === selectedSet);
+  }
+  for (const row of $("classes").querySelectorAll("tr[data-class-id]")) {
+    row.classList.remove("selected", "dimmed");
+  }
+  for (const block of $("alignments").querySelectorAll(".alignment")) {
+    block.classList.toggle("hidden", selectedSet !== null && block.dataset.cognate !== selectedSet);
+  }
+  for (const col of $("alignments").querySelectorAll(".col")) {
+    col.classList.remove("lit");
+  }
+  const hint = $("alignments-hint");
+  hint.textContent = selectedSet === null
+    ? "Select a column to see which class it belongs to."
+    : `Showing ${selectedSet}. Select it again to show every set.`;
+}
+
 function renderAlignments() {
   const container = $("alignments");
   container.innerHTML = "";
@@ -267,6 +291,7 @@ function renderAlignments() {
     block.className = "alignment";
     block.dataset.classes = JSON.stringify(
       [...new Set(alignment.links.flatMap((l) => l.classes || []))]);
+    block.dataset.cognate = alignment.cognate_id;
 
     const gloss = document.createElement("div");
     gloss.className = "gloss";
@@ -312,6 +337,11 @@ function renderAlignments() {
 
 function select(classId, scrollToClass) {
   selectedClass = selectedClass === classId ? null : classId;
+  /* The two filters would otherwise stack and hide everything. */
+  selectedSet = null;
+  for (const row of $("residue").querySelectorAll("tr[data-cognate]")) {
+    row.classList.remove("selected");
+  }
 
   for (const row of $("classes").querySelectorAll("tr[data-class-id]")) {
     const id = Number(row.dataset.classId);
@@ -363,6 +393,7 @@ function renderSummary() {
 function render() {
   selectedClass = null;
   renderSummary();
+  renderResidue();
   renderClasses();
   renderAlignments();
   select(null);
