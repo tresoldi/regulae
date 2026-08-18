@@ -1146,10 +1146,19 @@ static void test_conditioning_works_in_any_feature_system(void) {
  * baseline; the row-by-row assertions below are the regression for both
  * possible verdicts whenever a future fixture falls within noise. */
 static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
-    static const char *fixtures[] = { "rounding_harmony", "verner" };
+    /* rounding_harmony carries a well-evidenced change that clears its pivot's
+     * null and the eight-example floor; verner is the same law fragmented into
+     * four rows of four to six observations, none of which clears the floor.
+     * That split is the point of the pair: the machinery certifies the first
+     * and, unlike the pairing shuffle it replaced, declines the second rather
+     * than passing every row a small fixture commits. */
+    static const struct { const char *name; int expect_standing; } fixtures[] = {
+        { "rounding_harmony", 1 },
+        { "verner", 0 }
+    };
     size_t f;
     for (f = 0; f < 2; f++) {
-        rg_corpus *corpus = load(fixtures[f]);
+        rg_corpus *corpus = load(fixtures[f].name);
         rg_train_options options;
         rg_multi_model *model = 0;
         const rg_corpus_fit *fit;
@@ -1164,17 +1173,26 @@ static void test_rules_report_whether_they_stand_above_noise(rg_context *ctx) {
         assert(fit->rules_above_noise <= fit->rules_measured);
         for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
             const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
-            /* A measured rule has a verdict, and it agrees with the numbers it
-             * was computed from. */
+            /* Every measured class carries a verdict, and it names the null it
+             * was cut against: each is judged in discovery against its own
+             * pivot's context-permuted environment, not the pairing shuffle.
+             * There is no corpus-wide bar to compare `search_margin` against
+             * here, because the bar is a property of the pivot -- which is the
+             * whole point of judging per pivot. A class below the eight-example
+             * floor is within-noise whatever its margin. */
             assert(row->evidence.standing != RG_RULE_STANDING_UNMEASURED);
-            assert(row->evidence.standing_null == RG_NULL_MODEL_PAIRING_SHUFFLE);
-            if (row->evidence.search_margin > fit->null_search_margin) {
-                assert(row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE);
-            } else {
-                assert(row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
+            assert(row->evidence.standing_null == RG_NULL_MODEL_WITHIN_BUCKET_SHUFFLE);
+            assert(row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ||
+                   row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
+            if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                assert(row->count >= 8.0);
             }
         }
-        assert(fit->rules_above_noise == fit->rules_measured);
+        if (fixtures[f].expect_standing) {
+            assert(fit->rules_above_noise > 0);
+        } else {
+            assert(fit->rules_above_noise == 0);
+        }
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
@@ -1269,11 +1287,14 @@ static void test_no_baseline_means_no_verdict(rg_context *ctx) {
 
 
 /* The multi-lect verdict is not the whole verdict, and Grassmann is the corpus
- * that proves it. After the categorical parameter correction, one of three
- * multi-lect associations and both per-pair associations stand with thirty
- * shuffles. The unequal denominators are the point: counting the pairwise rows
- * into the multi-lect ratio would make it depend on how many lect pairs the
- * corpus samples. */
+ * that proves it. Its two multi-lect classes -- greek:t ~ pie:tʰ and
+ * greek:k ~ pie:kʰ -- rest on six and five observations, below the
+ * eight-example floor, so neither clears its pivot's null; the per-pair
+ * correspondences, judged against the pairing shuffle, stand. The unequal
+ * denominators are the point, and the per-pivot null makes them starker:
+ * counting the pairwise rows into the multi-lect ratio would make it depend on
+ * how many lect pairs the corpus samples, and here the multi-lect view is
+ * silent where the per-pair view is not. */
 static void test_the_per_pair_verdict_is_reported_separately(rg_context *ctx) {
     char path[1024];
     rg_corpus *corpus = 0;
@@ -1292,9 +1313,10 @@ static void test_the_per_pair_verdict_is_reported_separately(rg_context *ctx) {
                           rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
     fit = rg_multi_model_fit(model);
 
-    /* The multi-lect verdict is measured independently. */
+    /* The multi-lect verdict is measured independently -- and here it is
+     * measured and silent, both classes below the floor. */
     assert(fit->rules_measured > 0);
-    assert(fit->rules_above_noise > 0);
+    assert(fit->rules_above_noise == 0);
 
     /* The per-pair verdict counts every conditioned correspondence every pair
      * carries, and at least one of them stands. */

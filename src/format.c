@@ -631,12 +631,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             builder_appendf(&builder,
                             "  the same shuffles give %.1f unconditioned and %.1f conditioned classes\n",
                             fit->null_unconditioned_class_mean, fit->null_conditioned_class_mean);
+            builder_append(&builder,
+                           "context-permuted null: each conditioned class is judged against its own\n"
+                           "  pivot's environment shuffled against its outcome, correspondences held\n"
+                           "  intact; a class at or under its pivot's p95 was findable with no\n"
+                           "  environment to find\n");
             builder_appendf(&builder,
-                            "  noise reaches search margin %.2f (p%.0f); a rule at or under that\n"
-                            "  was findable in data with no correspondences left in it\n",
-                            fit->null_search_margin, fit->null_search_margin_quantile * 100.0);
-            builder_appendf(&builder,
-                            "verdict:             %lu of %lu conditioned rules stand above it\n",
+                            "verdict:             %lu of %lu conditioned rules stand above their pivot's null\n",
                             (unsigned long)fit->rules_above_noise,
                             (unsigned long)fit->rules_measured);
             /* Counted per lect pair, so not added to the line above: a rule
@@ -645,7 +646,8 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
              * whose one standing rule is in this table. */
             builder_appendf(&builder,
                             "                     %lu of %lu per-pair conditioned"
-                            " correspondences, counted per pair\n",
+                            " correspondences above the pairing-shuffle level,\n"
+                            "                     counted per pair\n",
                             (unsigned long)fit->pairwise_rules_above_noise,
                             (unsigned long)fit->pairwise_rules_measured);
         } else {

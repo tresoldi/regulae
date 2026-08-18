@@ -393,24 +393,27 @@ static void test_sixteen_sets_recover_the_conditioned_surface_contrast(rg_contex
 
     corpus = load("restraint", "sparse_016");
     model = train(ctx, corpus, SHUFFLES);
-    /* Doubling it is enough. */
+    /* Doubling it is enough to commit and to stand: the intended change
+     * daughter:f ~ proto:p before a front vowel clears its pivot's own null. */
     assert(rg_multi_model_conditioned_class_count(model) > 0);
     assert(names_feature(model, "front"));
-    /* Search standing says both selected surface associations exceed the null;
-     * it does not choose the intended historical description over the stable
-     * open-vowel correlate in this lexicon. */
     assert(rg_multi_model_fit(model)->rules_above_noise > 0);
-    assert(rg_multi_model_fit(model)->rules_above_noise ==
+    /* The per-pivot null does what the pairing shuffle did not: the retention
+     * side of the same split -- daughter:p ~ proto:p, the correlate the fixture
+     * warns about -- does NOT clear the null, so not everything committed
+     * stands. Under the old bar both sides passed, which is the
+     * over-certification this null corrects. */
+    assert(rg_multi_model_fit(model)->rules_above_noise <
            rg_multi_model_fit(model)->rules_measured);
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
 
     corpus = load("restraint", "sparse_128");
     model = train(ctx, corpus, SHUFFLES);
-    /* With plenty of evidence every rule the search commits stands. */
+    /* With plenty of evidence the intended change stands against its own
+     * pivot's null. */
     assert(names_feature(model, "front"));
-    assert(rg_multi_model_fit(model)->rules_above_noise ==
-           rg_multi_model_fit(model)->rules_measured);
+    assert(rg_multi_model_fit(model)->rules_above_noise > 0);
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
 }
@@ -425,12 +428,11 @@ static void test_sixteen_sets_recover_the_conditioned_surface_contrast(rg_contex
  * and p~b -- with no causal phonological environment: the two groups occupy
  * the same one. A surface model may still report lexical covariates.
  *
- * regulae commits four conditioned associations on it, every one of them a
+ * regulae commits conditioned associations on it, every one of them a
  * correlate: the alternating /d/-words happen to have sonorants before them
- * more often than the others do. After the categorical parameter correction
- * all four exceed the shuffled search even though none is a cause of final
- * devoicing. That is the distinction between a standing surface association
- * and a historical hypothesis, on data nobody disputes. */
+ * more often than the others do. The two historical correspondences are still
+ * recovered -- /t/ answers both /t/ and /d/ -- which is the whole of the right
+ * answer, since the environment is a covariate and not a cause. */
 static void test_a_neutralisation_keeps_stable_surface_correlates_explicit(rg_context *ctx) {
     rg_corpus *corpus = load("soundlaws", "final_devoicing");
     rg_multi_model *model = train(ctx, corpus, SHUFFLES);
@@ -443,9 +445,13 @@ static void test_a_neutralisation_keeps_stable_surface_correlates_explicit(rg_co
     assert(has_correspondence(model, "k", "g"));
     assert(has_correspondence(model, "p", "b"));
 
-    /* The stable lexical correlates survive a chance-search comparison. */
+    /* The correlates the search commits rest on a handful of words each, below
+     * the eight-example floor, so none is certified against its pivot's null.
+     * Under the pairing shuffle all of them stood -- a surface covariate
+     * published with the same STANDS a cause would earn, on a fixture built to
+     * show the covariate is not the cause. Declining them is the restraint. */
     assert(fit->rules_measured > 0);
-    assert(fit->rules_above_noise == fit->rules_measured);
+    assert(fit->rules_above_noise < fit->rules_measured);
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -597,6 +603,60 @@ static void test_a_trigger_a_syllable_away_needs_five_a_side(rg_context *ctx) {
     }
 }
 
+/* A strong, wholly unconditioned relationship with a little transcription
+ * noise. Every proto segment has one reflex, so there is no conditioned sound
+ * law; one segment in twelve is a non-reflex token, the loans and slips a real
+ * wordlist carries. The corpus is unmistakably one language pair, and the right
+ * answer is still zero conditioned rules.
+ *
+ * The search commits several, each resting on the three or four words where a
+ * noise token lined up with a neighbour -- and one on seven, above the eight-
+ * example floor's neighbourhood, which the pairing shuffle certified along with
+ * the rest. This is the over-certification docs/m6_evaluation.md is about, and
+ * it grew with corpus size because the shuffle's bar does not. The per-pivot
+ * context-permuted null and the evidence floor decline all of them.
+ *
+ * So this is a restraint on STANDING, not on commitment: unlike `chance`, where
+ * nothing is committed at all, here the search commits and the verdict is what
+ * declines it. That is the half of restraint the standing verdict exists for,
+ * and nothing else in this directory tests it. */
+static void test_an_unconditioned_relationship_commits_but_nothing_stands(rg_context *ctx) {
+    rg_corpus *corpus = load("restraint", "noise_unconditioned");
+    /* Fewer shuffles than the other fixtures: the standing verdict here rides
+     * on the per-pivot context-permuted null, which is independent of the
+     * pairing-shuffle count, and the corpus is tens of standard deviations from
+     * its shuffles either way. Keeping the pairing pass small keeps this
+     * 280-set fixture inside the sanitizer builds' time budget. */
+    rg_multi_model *model = train(ctx, corpus, 6);
+    const rg_corpus_fit *fit = rg_multi_model_fit(model);
+
+    /* Unmistakably one language pair: it aligns tens of standard deviations
+     * better than its own shuffles. The restraint is not doubt about the data. */
+    assert(fit->cost_per_segment_z < -10.0);
+
+    /* The search does commit conditioned classes -- this is not `chance`. */
+    assert(rg_multi_model_conditioned_class_count(model) > 0);
+    assert(fit->rules_measured > 0);
+
+    /* And not one of them clears its pivot's null. Under the pairing shuffle
+     * they stood. That gap is the finding. */
+    assert(fit->rules_above_noise == 0);
+
+    /* Every measured class was cut against the context-permuted null, not the
+     * pairing shuffle. */
+    {
+        size_t i;
+        for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+            const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+            assert(row->evidence.standing == RG_RULE_STANDING_WITHIN_NOISE);
+            assert(row->evidence.standing_null == RG_NULL_MODEL_WITHIN_BUCKET_SHUFFLE);
+        }
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -610,6 +670,7 @@ int main(void) {
     test_a_neutralisation_keeps_stable_surface_correlates_explicit(ctx);
     test_adding_a_lect_costs_the_conditioned_rule(ctx);
     test_a_trigger_a_syllable_away_needs_five_a_side(ctx);
+    test_an_unconditioned_relationship_commits_but_nothing_stands(ctx);
     rg_context_free(ctx);
     printf("restraint tests passed\n");
     return 0;

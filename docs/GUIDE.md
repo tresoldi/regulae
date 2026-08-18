@@ -197,21 +197,27 @@ This is a statement about the corpus, not about any one rule. It answers
 
 ## Does *this* rule stand?
 
-The same shuffles answer the per-rule question too, and they are printed on the
-same run.
+Asking whether a corpus has a relationship and whether one rule's environment is
+real are different questions, and they need different nulls. The pairing shuffle
+above answers the first: it breaks the correspondences, so what its search
+reaches is what the method finds in a corpus with no cross-lect structure at
+all. That is the wrong bar for a single rule, whose correspondences are not in
+doubt — the question is only whether its *environment* is.
 
-A rule is committed because it beat a bar. But the rule that gets committed is
-the best of however many environments were searched, and the best of a hundred
-candidates clears its bar by chance far more often than one candidate does. So
-each rule records how heavy a search charge its evidence could carry and still
-commit — its **margin** — and the shuffled corpus gives the level the same
-search reaches with nothing to find:
+So each conditioned class is judged against a second null, printed on the same
+run: its own pivot's **context-permuted** search. The bucket that produced the
+rule is re-searched many times with its environments shuffled against their
+outcomes and the correspondences left exactly as they are. A rule stands when
+its margin beats that shuffled environment on 95% of draws — a permutation
+p-value — so a lone overfit draw cannot sink a real rule, and a well-attested
+environment the shuffled search reaches just as often cannot pass.
 
 ```
-  noise reaches search margin 1.13 (p95); a rule at or under that
-  was findable in data with no correspondences left in it
-verdict:             3 of 3 conditioned rules stand above it
-                     3 of 5 per-pair conditioned correspondences, counted per pair
+context-permuted null: each conditioned class is judged against its own
+  pivot's environment shuffled against its outcome, correspondences held intact
+verdict:             3 of 5 conditioned rules stand above their pivot's null
+                     3 of 5 per-pair conditioned correspondences above the
+                     pairing-shuffle level, counted per pair
 ```
 
 and every rule then carries its own verdict:
@@ -220,27 +226,39 @@ and every rule then carries its own verdict:
   count=14 elsewhere=0  #0 STANDS cov=0.74 dBIC=-7.3 margin=1.26 ...
 ```
 
-`STANDS` means the margin cleared the noise level; `within-noise` means it did
-not. **Without `--permutations` there is no verdict at all** — every rule reads
-`unmeasured`, which is not a pass. It says the comparison was never made.
+Beneath the p-value sits an **eight-example floor**, the same one the
+`sparse_016`…`sparse_128` ladder measures: a class on fewer than eight
+observations is `within-noise` whatever its margin. Below the floor a clean real
+change and a thin accident both leave the permutation rarely reaching their
+margin — the first because its signal is destroyed, the second because there is
+too little to resample — so no distribution separates them, and the honest
+verdict is that the corpus is too small to say. That is why a fragmented law
+often reads `within-noise` on every one of its pieces even when the change is
+not in doubt: each fragment is below the floor. It is the predictive check
+below, not the standing verdict, that tells a real thin rule from an accident.
 
-`within-noise` does not mean the rule is false. It means that on this corpus,
-with this much data, it is not distinguishable from something the search would
-have turned up in noise. Small corpora produce a lot of these, and the answer is
-usually more data rather than a different reading.
+`STANDS` means the margin cleared the rule's own pivot null and the floor;
+`within-noise` means it did not. **Without `--permutations` there is no verdict
+at all** — every rule reads `unmeasured`, which is not a pass. It says the
+comparison was never made. Small corpora produce a lot of `within-noise`, and
+the answer is usually more data rather than a different reading.
 
 Two verdicts are printed because regulae works at two levels, and they are
-counted differently. The first counts the multi-lect rules — the classes
-reconciled across every lect. The second counts the conditioned correspondences
-each *pair* of lects carries in its own model, and those are counted per pair,
-so a rule visible in every pair of a four-lect corpus is six there and one
-above. They are not added together for that reason.
+counted differently — and, for now, against different nulls. The first counts
+the multi-lect rules — the classes reconciled across every lect — each against
+its pivot's context-permuted null. The second counts the conditioned
+correspondences each *pair* of lects carries in its own model, still against the
+pairing shuffle, and those are counted per pair, so a rule visible in every pair
+of a four-lect corpus is six there and one above. They are not added together
+for that reason.
 
-**Read both.** With thirty shuffles the Grassmann fixture reports 1 of 3
-multi-lect associations and 2 of 2 per-pair associations above noise. The
-Greek `t` correspondence with Proto-Indo-European `tʰ` where an aspirate
-follows is visible in both views, but their denominators and evidence units are
-different. A corpus's strongest surface association can be in either.
+**Read both.** On the Grassmann fixture the two multi-lect classes —
+`greek:t ~ pie:tʰ` and `greek:k ~ pie:kʰ` — rest on six and five observations,
+below the floor, so the multi-lect view is silent; the per-pair view, judged
+against the shuffle, still shows the aspirate-dissimilation correspondences. A
+corpus's strongest surface association can be in either view, and a small
+fixture can carry it per-pair while its reconciled fragments fall below the
+floor.
 
 ## Does it predict an unseen reflex?
 
@@ -285,8 +303,9 @@ About **eight examples of a change and eight counterexamples**, measured.
 before a front vowel — at 8, 16, 32, 64 and 128 cognate sets, each corpus a
 prefix of the next so that the only thing that varies is size. At 8 sets
 nothing at all is committed. At 16 the two sides of the intended contrast are
-the only committed classes and both stand above the shuffled search. The same
-holds from 32 upward.
+the only committed classes, and the intended change — /p/ answering /f/ before a
+front vowel — clears its pivot's null while the retention side committed beside
+it does not. From 32 upward both the change and its recovery are stable.
 
 Two readings, and the second is the one people miss.
 

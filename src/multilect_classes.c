@@ -7,6 +7,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* How many context-permuted draws estimate each pivot's null p95. Fixed and
+ * high because a draw is cheap (no EM, no alignment) and a stable per-pivot
+ * quantile needs a couple hundred. */
+#define RG_CONTEXT_NULL_DRAWS 99
+/* The evidence floor a rule must clear to be certified STANDS, on top of a 0.05
+ * permutation p-value. Eight observations, the floor `testdata/restraint/
+ * sparse_*` measures for an immediate-neighbour change: below it a clean real
+ * change and a thin accident both leave the permutation rarely reaching their
+ * margin -- the first because the signal is destroyed, the second because there
+ * is too little to resample -- so the p-value cannot separate them and the
+ * count must. Distinguishing the two below the floor is the predictive layer's
+ * job, not a distribution's. */
+#define RG_CONTEXT_NULL_MIN_COUNT 8.0
+
 /* ---- multi-lect context discovery ------------------------------------- */
 
 
@@ -60,6 +74,15 @@ typedef struct committed_split {
     double delta_bic;
     double search_margin;
     int decision_index;
+    /* The verdict from this split's own pivot: whether its margin cleared the
+     * p95 the context-permuted null reached on the same bucket. Set here rather
+     * than in the fit assembly because the null distribution is a property of
+     * the pivot, and pooling it across pivots would judge a six-observation
+     * consonant rule against the overfitting a forty-observation vowel pivot
+     * can reach. `null_measured` is 0 when no permutation was requested. */
+    rg_rule_standing standing;
+    int null_measured;
+    double null_bar;
     /* The observations that justified this split, so the class it merges into
      * can name its own evidence. */
     size_t *observation_indices;
@@ -94,6 +117,9 @@ typedef struct merged_class {
     double delta_bic;
     double search_margin;
     int decision_index;
+    /* Carried from the winning split, alongside search_margin. */
+    rg_rule_standing standing;
+    int null_measured;
 } merged_class;
 
 typedef struct discovery_state {
@@ -785,6 +811,73 @@ static rg_status emit_sister_classes(
     return status;
 }
 
+/* A per-rule null that keeps the correspondences and breaks only the
+ * environment.
+ *
+ * The pairing shuffle in multilect_fit.c answers "is there a relationship
+ * here" -- it destroys the correspondences, so the margins it reaches say what
+ * an adaptive search finds in a corpus with no cross-lect structure at all.
+ * That is the wrong question for a single rule. A rule is committed because
+ * some predicate on the environment predicts the outcome; the question its
+ * standing has to answer is whether that association survives when the
+ * environment is shuffled against the outcome, holding the correspondences and
+ * their outcome alphabet exactly as they are. So the null here permutes each
+ * bucket's context assignment while leaving every sister key and weight in
+ * place: same K, same masses, no environment-to-outcome link. Whatever the
+ * search reaches on that is the level a real rule has to clear.
+ *
+ * The harvest reuses the real commit path -- same candidates, same gates, same
+ * per-pivot score config -- so the null margins are comparable to the real
+ * ones charge for charge. A `margin_sink` in place of emission is the whole of
+ * the difference. */
+typedef struct margin_sink {
+    double *values;
+    size_t count;
+    size_t cap;
+} margin_sink;
+
+static rg_status margin_sink_push(margin_sink *sink, double margin) {
+    if (sink->count == sink->cap) {
+        size_t next_cap = sink->cap == 0 ? 64 : sink->cap * 2;
+        double *next = (double *)realloc(sink->values, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        sink->values = next;
+        sink->cap = next_cap;
+    }
+    sink->values[sink->count++] = margin;
+    return RG_OK;
+}
+
+static uint64_t splitmix64_next(uint64_t *state) {
+    uint64_t z = (*state += UINT64_C(0x9E3779B97F4A7C15));
+    z = (z ^ (z >> 30)) * UINT64_C(0xBF58476D1CE4E5B9);
+    z = (z ^ (z >> 27)) * UINT64_C(0x94D049BB133111EB);
+    return z ^ (z >> 31);
+}
+
+/* A copy of a bucket's observations with the context pointers shuffled among
+ * them by Fisher-Yates. The sister key and weight ride along untouched, so the
+ * outcome distribution is identical and only the environment moves. */
+static rg_status permute_bucket_contexts(
+    const pivot_bucket *bucket,
+    uint64_t *rng,
+    pivot_obs *out
+) {
+    size_t i;
+    for (i = 0; i < bucket->obs_count; i++) {
+        out[i] = bucket->obs[i];
+    }
+    for (i = bucket->obs_count; i > 1; i--) {
+        size_t j = (size_t)(splitmix64_next(rng) % (uint64_t)i);
+        const rg_context_spec *tmp = out[i - 1].context;
+        out[i - 1].context = out[j].context;
+        out[j].context = tmp;
+    }
+    return RG_OK;
+}
+
 /* Greedy BIC-gated split loop over one pivot bucket. The immediate and
  * long-range passes differ only in candidate inventory, thresholds, the
  * small-sample penalty, and the dominance filter. */
@@ -794,7 +887,11 @@ static rg_status emit_sister_classes(
  * classes it separates. Without this the stage can only ever say one thing
  * about an environment, and a change conditioned by two -- preceded by a nasal
  * *and* before a front vowel, which is what assimilation usually looks like --
- * comes out as a single predicate with contradictory outcomes under it. */
+ * comes out as a single predicate with contradictory outcomes under it.
+ *
+ * When `sink` is non-NULL the split is not emitted: its search margin is
+ * recorded and the recursion continues, which is how the context-permuted null
+ * harvests the same refinements the real pass would have committed. */
 static rg_status refine_pivot_split(
     discovery_state *state,
     const pivot_bucket *bucket,
@@ -806,7 +903,8 @@ static rg_status refine_pivot_split(
     const rg_split_gate *gates,
     const rg_split_score_config *score_config,
     double min_commit,
-    double n_total
+    double n_total,
+    margin_sink *sink
 ) {
     rg_split_search search;
     rg_split_result best;
@@ -826,18 +924,22 @@ static rg_status refine_pivot_split(
         rg_context_spec narrowed;
         status = rg_context_extend_internal(base_context, &best.candidate, &narrowed);
         if (status == RG_OK) {
-            status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
-                                         &narrowed, search.best_yes, best.yes_count,
-                                         search.best_no, best.no_count,
-                                         (int)rg_split_environment_alternatives(rows, count,
-                                             &best.candidate, state->all, state->all_count),
-                                         best.delta_score,
-                                         best.search_margin,
-                                         state->decision_count++, min_commit, n_total);
+            if (sink != 0) {
+                status = margin_sink_push(sink, best.search_margin);
+            } else {
+                status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
+                                             &narrowed, search.best_yes, best.yes_count,
+                                             search.best_no, best.no_count,
+                                             (int)rg_split_environment_alternatives(rows, count,
+                                                 &best.candidate, state->all, state->all_count),
+                                             best.delta_score,
+                                             best.search_margin,
+                                             state->decision_count++, min_commit, n_total);
+            }
             if (status == RG_OK) {
                 status = refine_pivot_split(state, bucket, &narrowed, search.best_yes,
                                             best.yes_count, depth + 1, max_depth,
-                                            gates, score_config, min_commit, n_total);
+                                            gates, score_config, min_commit, n_total, sink);
             }
             rg_context_spec_clear_internal(&narrowed);
         }
@@ -857,7 +959,8 @@ static rg_status commit_splits_for_pivot(
     int max_depth,
     const rg_split_score_config *score_config,
     double min_commit,
-    double n_total
+    double n_total,
+    margin_sink *sink
 ) {
     rg_split_search search;
     rg_split_observation *remaining;
@@ -898,30 +1001,34 @@ static rg_status commit_splits_for_pivot(
             rg_context_spec yes_context;
             status = rg_context_from_candidate_internal(&best.candidate, &yes_context);
             if (status == RG_OK) {
-                status = emit_sister_classes(
-                    state,
-                    bucket->lect,
-                    bucket->grapheme,
-                    &yes_context,
-                    search.best_yes,
-                    best.yes_count,
-                    search.best_no,
-                    best.no_count,
-                    (int)rg_split_environment_alternatives(remaining, remaining_count,
-                        &best.candidate, candidates, candidate_count),
-                    best.delta_score,
-                    best.search_margin,
-                    state->decision_count++,
-                    min_commit,
-                    n_total
-                );
+                if (sink != 0) {
+                    status = margin_sink_push(sink, best.search_margin);
+                } else {
+                    status = emit_sister_classes(
+                        state,
+                        bucket->lect,
+                        bucket->grapheme,
+                        &yes_context,
+                        search.best_yes,
+                        best.yes_count,
+                        search.best_no,
+                        best.no_count,
+                        (int)rg_split_environment_alternatives(remaining, remaining_count,
+                            &best.candidate, candidates, candidate_count),
+                        best.delta_score,
+                        best.search_margin,
+                        state->decision_count++,
+                        min_commit,
+                        n_total
+                    );
+                }
                 /* The group that satisfied this predicate may still be mixed;
                  * a second predicate within it is a narrower environment, not
                  * a competing rule. */
                 if (status == RG_OK) {
                     status = refine_pivot_split(state, bucket, &yes_context, search.best_yes,
                                                 best.yes_count, 1, max_depth, all_gates,
-                                                score_config, min_commit, n_total);
+                                                score_config, min_commit, n_total, sink);
                 }
                 rg_context_spec_clear_internal(&yes_context);
             }
@@ -1152,6 +1259,8 @@ static rg_status merge_committed_splits(
                 entry->environment_alternatives = split->environment_alternatives;
                 entry->delta_bic = split->delta_bic;
                 entry->search_margin = split->search_margin;
+                entry->standing = split->standing;
+                entry->null_measured = split->null_measured;
                 /* The earliest decision that reached this class keeps it. */
                 if (split->decision_index < entry->decision_index) {
                     entry->decision_index = split->decision_index;
@@ -1202,6 +1311,8 @@ static rg_status merge_committed_splits(
         merged[count].environment_alternatives = split->environment_alternatives;
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
+        merged[count].standing = split->standing;
+        merged[count].null_measured = split->null_measured;
         merged[count].decision_index = split->decision_index;
         if (split->observation_count > 0) {
             merged[count].defining_indices =
@@ -1430,9 +1541,24 @@ rg_status multi_lect_context_discovery(
     const rg_train_options *options,
     rg_multi_model *model,
     const reconciled_observation *observations,
-    size_t observation_count
+    size_t observation_count,
+    int *out_null_ran
 ) {
     discovery_state state;
+    margin_sink null_sink;
+    pivot_obs *null_obs = 0;
+    size_t null_obs_cap = 0;
+    double *draw_max = 0;
+    /* The context-permuted null re-runs a pivot's split search on shuffled
+     * environments; it does no EM and no alignment, so a draw costs a fraction
+     * of a pairing shuffle's full retrain. It is decoupled from
+     * permutation_count for that reason: a per-pivot p95 needs a couple hundred
+     * * draws to be stable at a 0.05 p-value, and here that is cheap, whereas the same number of
+     * pairing shuffles would not be. Requested whenever a verdict is (i.e. when
+     * permutation_count > 0). */
+    size_t null_draws = options->permutation_count > 0 ? RG_CONTEXT_NULL_DRAWS : 0;
+    uint64_t null_rng = (uint64_t)(unsigned int)options->permutation_seed * UINT64_C(6364136223846793005)
+        + UINT64_C(1442695040888963407);
     rg_feature_vocabulary vocabulary;
     rg_split_gate *immediate_gates = 0;
     rg_split_gate *long_gates = 0;
@@ -1444,6 +1570,11 @@ rg_status multi_lect_context_discovery(
     size_t merged_count = 0;
     size_t i;
     rg_status status = RG_OK;
+
+    memset(&null_sink, 0, sizeof(null_sink));
+    if (out_null_ran != 0) {
+        *out_null_ran = 0;
+    }
 
     if (observation_count == 0 || model->lect_count == 0) {
         return RG_OK;
@@ -1600,6 +1731,7 @@ rg_status multi_lect_context_discovery(
         rg_split_score_config immediate_score;
         rg_split_score_config long_score;
         double min_commit;
+        size_t committed_before;
 
         for (j = 0; j < bucket->obs_count; j++) {
             size_t k;
@@ -1630,6 +1762,7 @@ rg_status multi_lect_context_discovery(
         long_score = immediate_score;
         long_score.bic_extra_penalty = 0.0;
         min_commit = (double)multi_lect_min_commit_count(n_total, options->bic.multi_lect_min_commit_scale);
+        committed_before = state.committed_count;
         if (n_total >= 4.0) {
             status = commit_splits_for_pivot(
                 &state,
@@ -1642,7 +1775,8 @@ rg_status multi_lect_context_discovery(
                 options->bic.max_split_depth,
                 &immediate_score,
                 min_commit,
-                n_total
+                n_total,
+                0
             );
         }
         if (status != RG_OK) {
@@ -1664,10 +1798,134 @@ rg_status multi_lect_context_discovery(
                 options->bic.max_split_depth,
                 &long_score,
                 long_min_commit,
-                n_total
+                n_total,
+                0
             );
         }
+        if (status != RG_OK) {
+            break;
+        }
+        /* The context-permuted null for THIS pivot: the same two commit passes,
+         * over the same rows with their environments shuffled against their
+         * outcomes, N times. Nothing is emitted -- every split's margin lands in
+         * the sink, and this pivot's own p95 is the bar its own real rules have
+         * to clear. Kept per pivot on purpose: the null a rule is measured
+         * against is a property of its bucket's size and outcome alphabet, and a
+         * single pooled bar would judge a thin consonant split against the
+         * overfitting a rich vowel pivot reaches. */
+        /* Only pivots that committed a real rule need a null; the rest have
+         * nothing to judge, and running the permutation for them is the bulk of
+         * the cost avoided. */
+        if (null_draws > 0 && state.committed_count > committed_before) {
+            size_t d;
+            size_t k;
+            if (draw_max == 0) {
+                draw_max = (double *)calloc(null_draws, sizeof(*draw_max));
+                if (draw_max == 0) {
+                    status = RG_ERR_OOM;
+                    break;
+                }
+            }
+            if (bucket->obs_count > null_obs_cap) {
+                pivot_obs *next = (pivot_obs *)realloc(null_obs, bucket->obs_count * sizeof(*null_obs));
+                if (next == 0) {
+                    status = RG_ERR_OOM;
+                    break;
+                }
+                null_obs = next;
+                null_obs_cap = bucket->obs_count;
+            }
+            /* One statistic per draw: the highest margin the search reached on
+             * that shuffle. A draw that commits nothing scores 0. */
+            for (d = 0; d < null_draws && status == RG_OK; d++) {
+                pivot_bucket permuted;
+                size_t m;
+                null_sink.count = 0;
+                status = permute_bucket_contexts(bucket, &null_rng, null_obs);
+                if (status != RG_OK) {
+                    break;
+                }
+                permuted = *bucket;
+                permuted.obs = null_obs;
+                if (n_total >= 4.0) {
+                    status = commit_splits_for_pivot(
+                        &state, &permuted, state.immediate, immediate_gates,
+                        state.immediate_count, all_gates,
+                        (double)options->bic.min_split_observations,
+                        options->bic.max_split_depth, &immediate_score,
+                        min_commit, n_total, &null_sink);
+                }
+                if (status == RG_OK && n_total >= (double)options->bic.long_range_min_split_observations) {
+                    double long_min_commit = (double)multi_lect_min_commit_count(
+                        n_total, options->bic.multi_lect_min_commit_scale);
+                    if (long_min_commit < (double)options->bic.long_range_min_split_observations) {
+                        long_min_commit = (double)options->bic.long_range_min_split_observations;
+                    }
+                    status = commit_splits_for_pivot(
+                        &state, &permuted, state.long_range, long_gates,
+                        state.long_range_count, all_gates,
+                        (double)options->bic.long_range_min_split_observations,
+                        options->bic.max_split_depth, &long_score,
+                        long_min_commit, n_total, &null_sink);
+                }
+                draw_max[d] = 0.0;
+                for (m = 0; m < null_sink.count; m++) {
+                    if (null_sink.values[m] > draw_max[d]) {
+                        draw_max[d] = null_sink.values[m];
+                    }
+                }
+            }
+            if (status != RG_OK) {
+                break;
+            }
+            {
+            /* A permutation p-value per real split: the share of draws whose
+             * best margin reached the real one, add-one smoothed. A split
+             * stands when that share is under 5% -- so a lone overfit draw
+             * cannot sink a real rule (it is 1/200), and a well-attested
+             * spurious environment, which the shuffled search reaches just as
+             * often, cannot pass. Rank, not a p95 threshold, because a single
+             * high draw moves a quantile but barely moves a rank. */
+            for (k = committed_before; k < state.committed_count; k++) {
+                size_t exceed = 0;
+                double p_value;
+                /* An evidence floor for certification, separate from the p-value.
+                 * A clean strong rule and a thin accident both leave the
+                 * permutation rarely reaching their margin -- the first because
+                 * its signal is destroyed, the second because it has too few
+                 * observations to resample -- so the p-value alone cannot tell
+                 * them apart. Their observation count can: below the floor the
+                 * same handful of examples is consistent with a real change and
+                 * with chance alike, which is what `sparse_*` measures and the
+                 * predictive layer is for. */
+                int well_evidenced = state.committed[k].count >= RG_CONTEXT_NULL_MIN_COUNT;
+                for (d = 0; d < null_draws; d++) {
+                    if (draw_max[d] >= state.committed[k].search_margin) {
+                        exceed++;
+                    }
+                }
+                p_value = (1.0 + (double)exceed) / (1.0 + (double)null_draws);
+                state.committed[k].null_measured = 1;
+                state.committed[k].null_bar = p_value;
+                state.committed[k].standing = (well_evidenced && p_value <= 0.05)
+                    ? RG_RULE_STANDING_ABOVE_NOISE
+                    : RG_RULE_STANDING_WITHIN_NOISE;
+            }
+            }
+        }
     }
+
+    /* Each rule was judged against its own pivot's permutation p-value above,
+     * and the verdict rides on its class row; the fit assembly only counts.
+     * There is no single corpus-wide bar to hand back -- just whether the null
+     * ran at all, which decides whether the assembly counts or leaves the rows
+     * unmeasured. */
+    if (status == RG_OK && null_draws > 0 && out_null_ran != 0) {
+        *out_null_ran = 1;
+    }
+    free(null_obs);
+    free(null_sink.values);
+    free(draw_max);
 
     if (status == RG_OK) {
         status = merge_committed_splits(&state, &merged, &merged_count);
@@ -1701,6 +1959,14 @@ rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].evidence.delta_bic = merged[i].delta_bic;
                 model->conditioned_classes[i].evidence.search_margin = merged[i].search_margin;
                 model->conditioned_classes[i].evidence.decision_index = merged[i].decision_index;
+                /* Judged against the pivot's own context-permuted null in
+                 * discovery; the fit assembly counts this, it does not
+                 * re-judge. Left UNMEASURED when no permutation was run. */
+                if (merged[i].null_measured) {
+                    model->conditioned_classes[i].evidence.standing = merged[i].standing;
+                    model->conditioned_classes[i].evidence.standing_null =
+                        RG_NULL_MODEL_WITHIN_BUCKET_SHUFFLE;
+                }
                 model->conditioned_classes[i].uncertainty =
                     rg_wilson_default_internal(merged[i].winning_count, merged[i].bucket_size);
                 /* The environment was chosen by the same observations, so the
@@ -1731,7 +1997,7 @@ rg_status multi_lect_context_discovery(
      * holding the pivot's other reflex. Deferred to here because the target is
      * usually an unconditioned class and may be a conditioned one, so all ids
      * must exist first. */
-    if (status == RG_OK) {
+    if (status == RG_OK && merged != 0) {
         for (i = 0; i < model->conditioned_class_count; i++) {
             const committed_split *cs;
             if (merged[i].contrast_split >= state.committed_count) {

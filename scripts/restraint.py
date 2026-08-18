@@ -17,6 +17,7 @@ Six shapes, and none of them contains a conditioned sound law:
     sparse_*    -- one real conditioned change, at five corpus sizes
     arity_*     -- one real conditioned change, at four lect counts
     distant_*   -- one real conditioned change, trigger a syllable away
+    noise_unconditioned -- a real relationship, noise, and nothing to condition
 
 Four of them have a right answer of "no conditioned rule", and regulae gives it
 for three. `merger_gap` is the one it fails, and it fails it at the strongest
@@ -482,6 +483,57 @@ def distant():
         write(f"distant_{size:03d}", rows, f"{size} showing the change, {size} not")
 
 
+# A spirantising map with no conditioning anywhere: every proto segment has
+# exactly one reflex.
+NOISE_MAP = {
+    "p": "f", "t": "θ", "k": "x", "b": "p", "d": "t", "g": "k",
+    "m": "m", "n": "n", "l": "l", "r": "r", "s": "s", "w": "w",
+}
+# Segments that appear only as transcription noise -- a loan, a misjudged
+# cognate, a slip -- never as a regular reflex.
+NOISE_SEGMENTS = ["h", "j", "ʃ", "ɣ", "q", "ts", "dz", "β"]
+
+
+def noise_unconditioned():
+    """A strong, wholly unconditioned relationship with a little noise.
+
+    Every proto segment has one reflex, so there is no conditioned sound law
+    anywhere. Then one segment in twelve is replaced by a token that is not a
+    regular reflex at all -- the loans, misjudged cognates and transcription
+    slips a real wordlist carries. The corpus aligns a hundred standard
+    deviations better than its own shuffles, so it is unmistakably one language
+    pair; the right answer is still zero conditioned rules.
+
+    What the search does instead is commit a handful, each resting on the three
+    or four words where a noise token happened to line up with a neighbour. This
+    is the shape `docs/m6_evaluation.md`'s finding is about: on data with a real
+    relationship but no conditioning, the pairing shuffle -- which destroys the
+    correspondences and so measures a low bar -- certified every one of these as
+    STANDS, and did it more the larger the corpus got. The per-pivot
+    context-permuted null, which keeps the correspondences and shuffles only the
+    environment, and the eight-example floor beneath it, decline all of them.
+
+    So the assertion is not that nothing is committed -- something is -- but that
+    nothing STANDS. That is a different restraint from `chance`, where nothing is
+    committed at all, and it is the one the standing verdict exists to provide.
+    """
+    rng = Lcg(90112)
+    consonants = [c for c in NOISE_MAP if c not in VOWELS]
+    rows = []
+    for i in range(280):
+        proto = []
+        for _ in range(2 + rng.next() % 2):
+            proto += [rng.pick(consonants), rng.pick(VOWELS)]
+        daughter = [NOISE_MAP.get(s, s) for s in proto]
+        for k in range(len(daughter)):
+            # One segment in twelve becomes a non-reflex token.
+            if rng.next() % 100 < 12:
+                daughter[k] = rng.pick(NOISE_SEGMENTS)
+        rows.append((f"s{i:03d}", "proto", " ".join(proto)))
+        rows.append((f"s{i:03d}", "daughter", " ".join(daughter)))
+    write("noise_unconditioned", rows, "one map, one-in-twelve noise, no environment")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     chance()
@@ -492,6 +544,7 @@ def main():
     sparse()
     arity()
     distant()
+    noise_unconditioned()
     return 0
 
 

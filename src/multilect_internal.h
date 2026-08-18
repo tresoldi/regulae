@@ -29,6 +29,11 @@ struct permutation_baseline {
     double conditioned_mean;
     double search_margin;
     double search_margin_quantile;
+    /* Whether the multi-lect conditioned classes were judged against their
+     * pivots' context-permuted nulls (in discovery) rather than the pairing
+     * shuffle. When set, the fit assembly counts the standing already on each
+     * class row instead of re-judging it against `search_margin`. */
+    int context_null_ran;
 };
 
 /* multilect_fit.c: how well the model fits, and what the same training does
@@ -118,7 +123,8 @@ rg_status multi_lect_context_discovery(
     const rg_train_options *options,
     rg_multi_model *model,
     const reconciled_observation *observations,
-    size_t observation_count
+    size_t observation_count,
+    int *out_null_ran
 );
 
 /* multilect_pairs.c: one pairwise model per ordered lect pair, and the

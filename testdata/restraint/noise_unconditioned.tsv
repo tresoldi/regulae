@@ -1,0 +1,561 @@
+cognate_id	lect_id	segments
+s000	proto	d o d o
+s000	daughter	j o t o
+s001	proto	d a t i l o
+s001	daughter	t a θ i l o
+s002	proto	b a w e t i
+s002	daughter	p a w q θ i
+s003	proto	t o m a
+s003	daughter	θ o ʃ a
+s004	proto	r a t e n u
+s004	daughter	ts a θ e n u
+s005	proto	r a s a
+s005	daughter	r a s a
+s006	proto	d o d i k i
+s006	daughter	t o t i x i
+s007	proto	w u p u
+s007	daughter	w h f u
+s008	proto	s a l i
+s008	daughter	s a l i
+s009	proto	s i g o d e
+s009	daughter	s i q o t e
+s010	proto	t i n o
+s010	daughter	θ i n o
+s011	proto	l e l u
+s011	daughter	l e l u
+s012	proto	w u m a
+s012	daughter	w u m a
+s013	proto	r i l o n o
+s013	daughter	r i l o n o
+s014	proto	s o g e w a
+s014	daughter	s o ɣ e w a
+s015	proto	l i r a l o
+s015	daughter	l i dz a l o
+s016	proto	b a t e m o
+s016	daughter	dz a θ e m o
+s017	proto	d u l u n o
+s017	daughter	t u ʃ u n o
+s018	proto	t u t u l a
+s018	daughter	θ u θ u l a
+s019	proto	r a t a g i
+s019	daughter	r a θ a k i
+s020	proto	t o k u s i
+s020	daughter	q o x u s i
+s021	proto	t a d i n a
+s021	daughter	θ a j i n a
+s022	proto	g u l u
+s022	daughter	k u l u
+s023	proto	k i l o
+s023	daughter	x i l o
+s024	proto	b i k u
+s024	daughter	p i x u
+s025	proto	g o w e
+s025	daughter	k o w e
+s026	proto	b a b u
+s026	daughter	dz a p u
+s027	proto	d u t e
+s027	daughter	t u θ q
+s028	proto	s e n o
+s028	daughter	s j h o
+s029	proto	m u m u m o
+s029	daughter	m q m u ts o
+s030	proto	w a s o w a
+s030	daughter	w a s o w a
+s031	proto	m a r u r e
+s031	daughter	m a r u r e
+s032	proto	n i s a p e
+s032	daughter	n i s a f e
+s033	proto	g i k e b u
+s033	daughter	k i x e p u
+s034	proto	g i k a
+s034	daughter	k i x a
+s035	proto	k i t a g o
+s035	daughter	x i θ a k j
+s036	proto	b u b i
+s036	daughter	p u q i
+s037	proto	t u k i p a
+s037	daughter	θ u x i h a
+s038	proto	k o d i r o
+s038	daughter	x o t β r o
+s039	proto	m i s u
+s039	daughter	m i β u
+s040	proto	g i g u l i
+s040	daughter	k i k u l i
+s041	proto	t a l i b u
+s041	daughter	θ a β i p u
+s042	proto	w u p u t e
+s042	daughter	dz u f u θ e
+s043	proto	s o r o n a
+s043	daughter	s o ts o n a
+s044	proto	n a s a p u
+s044	daughter	n a s a f u
+s045	proto	m a b o s a
+s045	daughter	m q p o s a
+s046	proto	k o s e
+s046	daughter	x o s β
+s047	proto	l u s a b i
+s047	daughter	l u s a p i
+s048	proto	l e s i b a
+s048	daughter	l ɣ s h p a
+s049	proto	w i g a k e
+s049	daughter	w i k ts x e
+s050	proto	w i l i
+s050	daughter	w i l i
+s051	proto	d e g a
+s051	daughter	t e dz a
+s052	proto	r a g o
+s052	daughter	r a k o
+s053	proto	r e k i m u
+s053	daughter	r e x i m u
+s054	proto	s e w o l o
+s054	daughter	s e w o l o
+s055	proto	n a n a g o
+s055	daughter	n a n a k o
+s056	proto	s o d e
+s056	daughter	s o ʃ e
+s057	proto	n e n i
+s057	daughter	ʃ e n i
+s058	proto	b u r e b o
+s058	daughter	p u r dz j o
+s059	proto	m a p u g i
+s059	daughter	m a f u k i
+s060	proto	t e n u
+s060	daughter	θ e n u
+s061	proto	n u b a
+s061	daughter	n u p a
+s062	proto	l o m o
+s062	daughter	l j m o
+s063	proto	g a p u s a
+s063	daughter	k a f β s a
+s064	proto	d u d a g i
+s064	daughter	t u t a k i
+s065	proto	t i s o
+s065	daughter	θ i s o
+s066	proto	l u d i n a
+s066	daughter	l u t i n a
+s067	proto	p e b a k o
+s067	daughter	f e ɣ a x o
+s068	proto	s e r i
+s068	daughter	s dz r i
+s069	proto	t u d o
+s069	daughter	θ u t o
+s070	proto	g i l a r o
+s070	daughter	k i l a r o
+s071	proto	t u b e g a
+s071	daughter	θ u p e k a
+s072	proto	n a r o
+s072	daughter	n a r o
+s073	proto	m e d u
+s073	daughter	m β t u
+s074	proto	d a n a
+s074	daughter	ɣ a n a
+s075	proto	p a n o s e
+s075	daughter	β a n o s h
+s076	proto	b o n u m u
+s076	daughter	p o n u m u
+s077	proto	t a n o b u
+s077	daughter	ʃ a n o p ʃ
+s078	proto	s a w u m e
+s078	daughter	s ʃ w u m e
+s079	proto	g a g i l i
+s079	daughter	k a k i l i
+s080	proto	d a k i d u
+s080	daughter	t a x i β u
+s081	proto	d e r e k a
+s081	daughter	t e r e x a
+s082	proto	p o r u
+s082	daughter	f o r ɣ
+s083	proto	n o l o w o
+s083	daughter	β o l o w o
+s084	proto	r e r o g e
+s084	daughter	r e r o k h
+s085	proto	n u n e
+s085	daughter	j u ʃ e
+s086	proto	r i w a d i
+s086	daughter	r i ɣ a t i
+s087	proto	w u k i r i
+s087	daughter	ts u x i r dz
+s088	proto	b e r u s u
+s088	daughter	ɣ e r u s h
+s089	proto	m e l i
+s089	daughter	m e l j
+s090	proto	g i p o
+s090	daughter	k i f o
+s091	proto	r e m u
+s091	daughter	r e m u
+s092	proto	b i d e l e
+s092	daughter	p i t e l e
+s093	proto	l u r i s a
+s093	daughter	l u r i j a
+s094	proto	k o g e
+s094	daughter	x o k e
+s095	proto	t o l a g i
+s095	daughter	θ o l a k i
+s096	proto	b o t i
+s096	daughter	p o θ i
+s097	proto	g o g o b o
+s097	daughter	k o k o p o
+s098	proto	g i p a k u
+s098	daughter	k i f a x u
+s099	proto	b o t i
+s099	daughter	p o ɣ i
+s100	proto	d a d e
+s100	daughter	t a t e
+s101	proto	b a l a l e
+s101	daughter	p a l a l e
+s102	proto	p i k i
+s102	daughter	f i x i
+s103	proto	s a w i
+s103	daughter	s a w i
+s104	proto	n i l e p a
+s104	daughter	n i l e f a
+s105	proto	d i p i
+s105	daughter	t i f i
+s106	proto	l u n e
+s106	daughter	j u n e
+s107	proto	d u m e
+s107	daughter	t u m e
+s108	proto	k e n a p e
+s108	daughter	x e n a f j
+s109	proto	b e b e
+s109	daughter	p e p e
+s110	proto	t i w u
+s110	daughter	θ i w u
+s111	proto	k a p u b i
+s111	daughter	x a f u p i
+s112	proto	b e t i n i
+s112	daughter	p e θ i n i
+s113	proto	s i t u g e
+s113	daughter	s i h u q e
+s114	proto	w e w o
+s114	daughter	w e w o
+s115	proto	r a w u
+s115	daughter	r a w u
+s116	proto	s o t a s a
+s116	daughter	s o θ a s a
+s117	proto	l u g o w u
+s117	daughter	l u k o w ɣ
+s118	proto	n e w u n i
+s118	daughter	n e w u n i
+s119	proto	r i p u
+s119	daughter	r i f u
+s120	proto	g o p e
+s120	daughter	k o f e
+s121	proto	d e p i
+s121	daughter	t β f i
+s122	proto	n o w a
+s122	daughter	n q w ɣ
+s123	proto	r i d u r o
+s123	daughter	r i t ts r h
+s124	proto	r o d o
+s124	daughter	r o t o
+s125	proto	w u b u w o
+s125	daughter	w u p u w o
+s126	proto	n u g o m u
+s126	daughter	n h k o m u
+s127	proto	t a w i l a
+s127	daughter	θ a w i l a
+s128	proto	n a n o s a
+s128	daughter	n a n o s a
+s129	proto	m a m u
+s129	daughter	m q m u
+s130	proto	w a k u m a
+s130	daughter	w a x u m a
+s131	proto	s a b o
+s131	daughter	s a p o
+s132	proto	n a l u
+s132	daughter	n a l u
+s133	proto	w o s a
+s133	daughter	w o s a
+s134	proto	p a g a
+s134	daughter	f a k h
+s135	proto	m e b i k e
+s135	daughter	m e p i x j
+s136	proto	m a t o
+s136	daughter	m a ʃ o
+s137	proto	t i l i n o
+s137	daughter	θ i l i n o
+s138	proto	p e t o b a
+s138	daughter	h e θ o p a
+s139	proto	p u w e g e
+s139	daughter	f u w e ts e
+s140	proto	s u g o
+s140	daughter	s u k o
+s141	proto	t a s a s u
+s141	daughter	θ a s a s u
+s142	proto	s o r i
+s142	daughter	j o r i
+s143	proto	m o n e
+s143	daughter	h o n e
+s144	proto	k i l o l o
+s144	daughter	x i l o l o
+s145	proto	g o m o
+s145	daughter	k o m o
+s146	proto	t u n e g e
+s146	daughter	θ u n e k e
+s147	proto	b o b a m e
+s147	daughter	p o p q m e
+s148	proto	t u p a w e
+s148	daughter	dz ʃ f a w e
+s149	proto	t e w a
+s149	daughter	θ e w a
+s150	proto	n a b i t e
+s150	daughter	n a ts i θ e
+s151	proto	p o w e n a
+s151	daughter	f o w e n a
+s152	proto	t o r u n i
+s152	daughter	θ o r h n i
+s153	proto	b i r e k o
+s153	daughter	p i r e x o
+s154	proto	l e m e n u
+s154	daughter	l e q e n u
+s155	proto	m e g u
+s155	daughter	m e k u
+s156	proto	s a l a b u
+s156	daughter	s a ɣ a p u
+s157	proto	w u w o
+s157	daughter	w u ʃ h
+s158	proto	g a d u p o
+s158	daughter	k a t u f j
+s159	proto	n e w i
+s159	daughter	n e w i
+s160	proto	n a w u
+s160	daughter	β a w u
+s161	proto	d u n u
+s161	daughter	t u n u
+s162	proto	d e p u s u
+s162	daughter	t j f u s u
+s163	proto	p o n i
+s163	daughter	h o ɣ dz
+s164	proto	d o s e
+s164	daughter	ɣ o s j
+s165	proto	w a k a
+s165	daughter	w a x a
+s166	proto	t a r o g i
+s166	daughter	θ h r ʃ k i
+s167	proto	r a s e
+s167	daughter	ɣ h s e
+s168	proto	k o m e
+s168	daughter	x ɣ m e
+s169	proto	w i p a
+s169	daughter	β h f a
+s170	proto	d e w o s e
+s170	daughter	t e β o s e
+s171	proto	l a d o
+s171	daughter	l a t o
+s172	proto	t a w i p a
+s172	daughter	θ a w i f a
+s173	proto	g i w o n e
+s173	daughter	k i w o ʃ e
+s174	proto	b o d u
+s174	daughter	p o t u
+s175	proto	m a p e
+s175	daughter	m a β e
+s176	proto	r u m o
+s176	daughter	r u m o
+s177	proto	l a m i
+s177	daughter	l a m i
+s178	proto	p i t e p i
+s178	daughter	f i θ e f β
+s179	proto	n o s i
+s179	daughter	ɣ o s i
+s180	proto	b i r u s i
+s180	daughter	p ʃ ʃ u s i
+s181	proto	b i g e s o
+s181	daughter	p i q j s o
+s182	proto	d o t e k o
+s182	daughter	t j θ e x o
+s183	proto	k a r a m i
+s183	daughter	x a r a ts i
+s184	proto	t u d e n i
+s184	daughter	θ u t e n i
+s185	proto	w a w e w a
+s185	daughter	ʃ a w e w a
+s186	proto	b i b u d e
+s186	daughter	p i p u t e
+s187	proto	r a n o
+s187	daughter	r a n o
+s188	proto	n i n o k i
+s188	daughter	n i n o x j
+s189	proto	b u b u
+s189	daughter	p u p q
+s190	proto	k u s u
+s190	daughter	x u s ts
+s191	proto	b a d u
+s191	daughter	p a t u
+s192	proto	b o r i w o
+s192	daughter	p o r i h o
+s193	proto	k u w e m e
+s193	daughter	x u w e m e
+s194	proto	w u l e n a
+s194	daughter	w u l e n a
+s195	proto	l o k u d e
+s195	daughter	l o x u t q
+s196	proto	s u g e d i
+s196	daughter	s u q e t i
+s197	proto	l e g u r i
+s197	daughter	l ts dz u r i
+s198	proto	r o b a
+s198	daughter	r o p a
+s199	proto	b o m o d i
+s199	daughter	p o m o t ʃ
+s200	proto	d a d i n i
+s200	daughter	dz a t i n h
+s201	proto	k o s e r i
+s201	daughter	x o s ts r i
+s202	proto	n e k i
+s202	daughter	n e x i
+s203	proto	b u p o g o
+s203	daughter	p u f o k o
+s204	proto	w i p i p a
+s204	daughter	w i f i f a
+s205	proto	t o d o w i
+s205	daughter	θ o t o w i
+s206	proto	k e m i n o
+s206	daughter	ts e m i n o
+s207	proto	n u t u
+s207	daughter	n u θ h
+s208	proto	m i t a
+s208	daughter	m i θ a
+s209	proto	w a b o p o
+s209	daughter	w a p o f o
+s210	proto	g i s a b a
+s210	daughter	k i s h p a
+s211	proto	d i n i k i
+s211	daughter	t i ts i x ɣ
+s212	proto	p i m e
+s212	daughter	h i m e
+s213	proto	s i r a
+s213	daughter	s i r a
+s214	proto	p e g u
+s214	daughter	f e k u
+s215	proto	t o n a
+s215	daughter	θ o n a
+s216	proto	b u r i
+s216	daughter	ʃ u r q
+s217	proto	s i p i
+s217	daughter	s i f i
+s218	proto	m i l i
+s218	daughter	β i l i
+s219	proto	k e p o w a
+s219	daughter	x ʃ β o w a
+s220	proto	m u w a r i
+s220	daughter	ts u w a r i
+s221	proto	s i s i r i
+s221	daughter	s i dz i r i
+s222	proto	w u m i r e
+s222	daughter	w u m i r e
+s223	proto	r i m u g a
+s223	daughter	r i ʃ u k a
+s224	proto	r a b e
+s224	daughter	r a dz e
+s225	proto	w a k a n i
+s225	daughter	w a β ɣ n h
+s226	proto	m a s a d e
+s226	daughter	m a s a t e
+s227	proto	l i g e
+s227	daughter	l i k e
+s228	proto	g u g a d a
+s228	daughter	k u dz a t a
+s229	proto	s u d u l o
+s229	daughter	s u t u l o
+s230	proto	w o b o
+s230	daughter	w o p o
+s231	proto	r i m i
+s231	daughter	r i m i
+s232	proto	l u w a k o
+s232	daughter	l u h a x ts
+s233	proto	r a k i
+s233	daughter	r a x i
+s234	proto	w o m a
+s234	daughter	w o m a
+s235	proto	k a p o
+s235	daughter	x a f o
+s236	proto	b a t e p e
+s236	daughter	p a θ e f e
+s237	proto	w i n i w e
+s237	daughter	w i n i w e
+s238	proto	l a k e t u
+s238	daughter	l a x e θ u
+s239	proto	m u r u
+s239	daughter	m u r u
+s240	proto	d o r i l i
+s240	daughter	t o r i l i
+s241	proto	g u l o l a
+s241	daughter	k ɣ l o l a
+s242	proto	p a n u
+s242	daughter	f dz n u
+s243	proto	m i w a g a
+s243	daughter	ʃ i w a j a
+s244	proto	g o s o b u
+s244	daughter	k o s o p u
+s245	proto	d u m i p e
+s245	daughter	t u m dz f e
+s246	proto	m u s i m u
+s246	daughter	m u s i m u
+s247	proto	n e g a s e
+s247	daughter	n e k a s e
+s248	proto	d o g e t u
+s248	daughter	t o k e θ u
+s249	proto	s e n a
+s249	daughter	s e ɣ a
+s250	proto	l o g i d o
+s250	daughter	l o k i t o
+s251	proto	t a w o m i
+s251	daughter	θ a w o ts i
+s252	proto	k o k o s i
+s252	daughter	x dz x o s i
+s253	proto	p a g o
+s253	daughter	f a k o
+s254	proto	k i p i
+s254	daughter	x i f i
+s255	proto	r a d a
+s255	daughter	r a t a
+s256	proto	s u d o l a
+s256	daughter	s u ɣ o l a
+s257	proto	g o k a
+s257	daughter	k o ɣ a
+s258	proto	g e l o
+s258	daughter	k e q o
+s259	proto	g e m e m u
+s259	daughter	k e m e m u
+s260	proto	b a k a
+s260	daughter	p a x a
+s261	proto	r u l o l e
+s261	daughter	r u l o l e
+s262	proto	m o g e n u
+s262	daughter	m o k ɣ n u
+s263	proto	w u r e t a
+s263	daughter	w u r e h a
+s264	proto	g a w e d a
+s264	daughter	k a w dz t a
+s265	proto	b i s i d o
+s265	daughter	p i s i t o
+s266	proto	t o k i
+s266	daughter	dz o x i
+s267	proto	w e s u t a
+s267	daughter	w e s j θ a
+s268	proto	g a k a
+s268	daughter	k a x ʃ
+s269	proto	p a d a
+s269	daughter	f ɣ t a
+s270	proto	s u b o b a
+s270	daughter	s u p o p a
+s271	proto	p i m o g a
+s271	daughter	f ts m o dz a
+s272	proto	n o b u
+s272	daughter	n o p u
+s273	proto	n i r i l a
+s273	daughter	n i r i l a
+s274	proto	l a g i t a
+s274	daughter	l a k i θ a
+s275	proto	n a w a
+s275	daughter	j a w a
+s276	proto	m u r e
+s276	daughter	m u r e
+s277	proto	m i b i l u
+s277	daughter	m i p i l β
+s278	proto	l a n e g e
+s278	daughter	l a n e k e
+s279	proto	p e l u
+s279	daughter	f ʃ l u

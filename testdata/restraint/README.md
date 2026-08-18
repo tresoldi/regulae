@@ -5,7 +5,14 @@ much evidence it takes before regulae can see one that is there — in cognate
 sets, in languages, and in how far from the segment its trigger sits.
 `tests/c/test_restraint.c` asserts what regulae must **not** find in each.
 
-One of them, `merger_gap.tsv`, regulae currently fails, and its section says so
+Restraint has two halves, and they need different fixtures. Most here ask
+whether the search stays quiet — commits no conditioned rule at all.
+`noise_unconditioned` asks the other half: when the search *does* commit
+something on data with a real relationship and no conditioning, whether the
+standing verdict declines it. The pairing shuffle did not; the per-pivot
+context-permuted null and the evidence floor do.
+
+One fixture, `merger_gap.tsv`, regulae currently fails, and its section says so
 in full. A directory of restraint fixtures that all pass is a directory that
 has stopped looking.
 
@@ -184,12 +191,16 @@ count=16 vs 21 as #0   daughter:a ~ proto:o   [daughter fol[labial:+]]
    dBIC=−40.4   margin=7.13   STANDS   predictive=confirmed gain=+0.705
 ```
 
-**Every safeguard agrees with it, and none of them is malfunctioning.** The
-shuffled baseline says it stands, because it is not noise. Held-out prediction
-confirms it, because a retrodiction generalises exactly as well as a law does.
-`environment_alternatives` reads 0, because no rival feature carves the split
-differently. The rule is real. It is answering a different question from the
-one the table's format implies.
+**Every safeguard agrees with it, and none of them is malfunctioning.** It
+clears its pivot's context-permuted null, because it is not noise — permuting
+the environment cannot dissolve the fact that /o/ occurs only before labials,
+which is a real distributional regularity even though it is ancestry and not a
+change. It carries sixteen observations, well above the evidence floor. Held-out
+prediction confirms it, because a retrodiction generalises exactly as well as a
+law does. `environment_alternatives` reads 0, because no rival feature carves
+the split differently. The rule is real. It is answering a different question
+from the one the table's format implies, and no null keyed to the distribution
+can catch that — only direction typing can.
 
 The cause is in `model_context.c`: `target_side` means both *the environment
 was read from the target form* and *the target grapheme is the pivot*, so a
@@ -210,6 +221,50 @@ whatever it scores.
 count that is published rather than the count that is right, and says so. M8's
 direction typing is what should change it.
 
+## `noise_unconditioned` — a real relationship, and nothing to condition
+
+Every fixture above either commits no conditioned rule (`chance`, `diffusion`,
+`stratum`) or commits one that is wrong for a reason no distribution can catch
+(`merger_gap`). This one commits several and asks a different question: not
+whether the search stays quiet, but whether the *standing verdict* declines
+what the search does say.
+
+280 cognate sets, one spirantising map with no conditioning anywhere — every
+proto segment has exactly one reflex — and then one segment in twelve replaced
+by a token that is not a regular reflex at all: the loans, misjudged cognates
+and transcription slips a real wordlist carries. The corpus aligns about a
+hundred standard deviations better than its own shuffles, so it is unmistakably
+one language pair. The right answer is still zero conditioned rules.
+
+What the search commits instead is a handful of rules, each resting on the three
+or four words where a noise token lined up with a neighbour — and one on seven,
+above the floor's neighbourhood. This is the shape `docs/m6_evaluation.md`'s
+finding is about: on data with a real relationship and no conditioning, the
+**pairing shuffle certified every one of these as `STANDS`, and did it more the
+larger the corpus grew**, because the shuffle destroys the correspondences and
+so measures a bar that does not rise with the evidence.
+
+```
+cost/segment      -1.7 (illustrative)                      z = -110
+conditioned       6           of which above their null    0
+```
+
+Two things make the verdict decline them. Each rule is cut against its own
+**pivot's context-permuted null** — the same bucket with its environments
+shuffled against their outcomes, correspondences left intact — so the bar a rule
+must clear is what the adaptive search reaches on that pivot with nothing to
+find. And beneath that sits an **eight-example floor**: below it a clean real
+change and a thin accident both leave the permutation rarely reaching their
+margin, the first because its signal is destroyed and the second because there
+is too little to resample, so the count is what separates them. The count-seven
+rule clears the floor and is declined by the permutation; the rest are declined
+by the floor.
+
+This is the half of restraint the standing verdict exists for, and `chance`
+cannot test it because `chance` commits nothing to decline.
+`test_an_unconditioned_relationship_commits_but_nothing_stands` asserts the
+split: the search commits, and not one of them stands.
+
 ## `sparse_008` … `sparse_128` — the evidence floor
 
 The same conditioned change in each — /p/ answers /f/ before a front vowel, the
@@ -221,26 +276,30 @@ This is the number a field linguist with thirty cognates actually wants, and it
 is not answerable from any single fixture: a corpus that yields nothing has
 either too little data or no pattern in it, and only the ladder says which.
 
-| sets | rules found | the intended rule | its margin | above noise |
-| ---: | ---: | --- | ---: | ---: |
-| 8 | 0 | — | — | 0 of 0 |
-| 16 | 2 | found, as decision **#1** | 1.09 | 2 of 2 |
-| 32 | 2 | found, as decision #0 | 1.12 | 2 of 2 |
-| 64 | 2 | found, as decision #0 | 2.99 | 2 of 2 |
-| 128 | 2 | found, as decision #0 | 7.38 | 2 of 2 |
+| sets | rules found | the intended rule | above its pivot's null |
+| ---: | ---: | --- | ---: |
+| 8 | 0 | — | 0 of 0 |
+| 16 | 2 | found, as decision **#1** | 1 of 2 |
+| 32 | 2 | found, as decision #0 | 2 of 2 |
+| 64 | 2 | found, as decision #0 | 2 of 2 |
+| 128 | 2 | found, as decision #0 | 2 of 2 |
 
-Measured after correcting the multinomial parameter count, with 12 shuffles.
+Measured with 12 shuffles, each rule cut against its own pivot's
+context-permuted null and the eight-example floor.
 
 **Below the floor the search stays quiet rather than guessing.** Eight sets,
 four of them showing a perfectly regular change, and nothing is committed. That
 is the half of this that matters most: silence on a small corpus is not
 evidence of absence, and it is also not the tool inventing something to say.
 
-**Sixteen sets is enough to find the intended association, but not to identify
-one unique description.** A correlated environment (`fol[open:+]`, margin
-0.65) enters ahead of `fol[front:+]`, and both exceed this fixture's shuffled
-search. Search standing separates selected structure from the null; it does not
-choose a historical interpretation among stable correlates.
+**Sixteen sets is enough to find the intended association, and now to tell it
+from its correlate.** The intended `daughter:f ~ proto:p` before a front vowel
+clears its pivot's null; the retention side `daughter:p ~ proto:p`, committed
+in the same decision, does not — it is a covariate, not a change, and the
+per-pivot null declines it where the old pairing shuffle passed both. What the
+standing verdict still cannot do is choose one historical interpretation among
+several stable correlates; it separates selected structure from noise, not a
+cause from a co-occurrence.
 
 Eight examples of a change and eight counterexamples, then. Below that, run
 the baseline and expect to be told nothing; above it, expect the search to be

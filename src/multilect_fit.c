@@ -731,12 +731,23 @@ rg_status compute_corpus_fit(
     {
         size_t i;
         size_t j;
+        /* The multi-lect conditioned classes were already judged in discovery,
+         * each against its own pivot's context-permuted null -- the right
+         * question for a single rule, and one that has to be asked per pivot so
+         * a thin split is not measured against a rich pivot's overfitting. Here
+         * the assembly only counts them. The pairing shuffle's `search_margin`
+         * still judges the pairwise and cross-dimensional rows below, whose own
+         * null is a separate stage. */
         for (i = 0; i < model->conditioned_class_count; i++) {
             rg_multi_class_row *row = &model->conditioned_classes[i];
-            rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
-            model->fit.rules_measured++;
-            if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
-                model->fit.rules_above_noise++;
+            if (!baseline->context_null_ran) {
+                rg_rule_evidence_judge_internal(&row->evidence, baseline->search_margin);
+            }
+            if (row->evidence.standing != RG_RULE_STANDING_UNMEASURED) {
+                model->fit.rules_measured++;
+                if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
+                    model->fit.rules_above_noise++;
+                }
             }
         }
         for (i = 0; i < model->cross_dimensional_count; i++) {
@@ -782,6 +793,11 @@ rg_status compute_corpus_fit(
     model->fit.null_cost_per_segment_sd = baseline->cost_sd;
     model->fit.null_unconditioned_class_mean = baseline->unconditioned_mean;
     model->fit.null_conditioned_class_mean = baseline->conditioned_mean;
+    /* This is the pairing-shuffle margin, which still judges the cross-
+     * dimensional and per-pair rows. The multi-lect conditioned classes are
+     * judged in discovery against each pivot's own context-permuted null, which
+     * has no single corpus-wide value to report -- the verdict rides on each
+     * class row rather than on one bar. */
     model->fit.null_search_margin = baseline->search_margin;
     model->fit.null_search_margin_quantile = baseline->search_margin_quantile;
     if (baseline->cost_sd > 0.0) {

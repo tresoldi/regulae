@@ -454,7 +454,8 @@ rg_status rg_train_model(
             options,
             model,
             observations,
-            observation_count
+            observation_count,
+            &baseline.context_null_ran
         );
     }
     if (status == RG_OK) {
