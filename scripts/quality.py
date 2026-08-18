@@ -13,9 +13,9 @@ numbers make comparable across a change:
                 The rest sits in partial classes that mostly restate a
                 correspondence already published at higher arity.
   density       cross-dimensional rows whose environment is segmental, over
-                all of them. Falls when the search conditions on the absence
-                of a suprasegmental, which is true of every segment that has
-                none and so predicts nothing.
+                all of them. Low means the table is mostly tone conditioning
+                tone, which is a tonal correspondence rather than the
+                segmental-conditions-suprasegmental rule the stage exists for.
   conjuncts     mean predicates per committed environment. Rises when the
                 greedy search welds on correlates it never checks again.
 
@@ -25,9 +25,15 @@ wherever every cognate set covers every lect, so only `partial_coverage`
 exercises it; density has a denominator only on the five corpora carrying
 suprasegmentals. Both collapse on real wordlists -- a five-lect Polynesian
 sample from Lexibank puts 24% of its mass in full-arity rows, and three Sinitic
-dialects publish 156 cross-dimensional rows of which 113 condition on `tone:-`.
-A number that cannot move is not yet a gate, and the fixtures that make these
-two move are worth more than tightening the two that already do.
+dialects publish 156 cross-dimensional rows over 21 decisions. A number that
+cannot move is not yet a gate, and the fixtures that make these two move are
+worth more than tightening the two that already do.
+
+None of the four counts a decision. A committed split publishes its rule and
+then one row per outcome of its complement, so a table of 156 rows can be 21
+findings, and a reader who counts rows is counting the wrong thing. Whether
+that is the right shape to publish is a question for the report rather than
+for the search, and it is not measured here.
 
 Usage:
     scripts/quality.py             # print the table
