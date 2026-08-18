@@ -7,7 +7,25 @@ void rg_bic_config_init_defaults(rg_bic_config *config) {
     config->split_scorer = RG_SPLIT_SCORER_CORRECTED_BIC;
     config->split_prior_concentration = 1.0;
     config->delta_bic_threshold = 0.0;
-    config->min_split_observations = 2;
+    /* Both sides of an immediate split need three observations, not two.
+     *
+     * At two, a partition of two aligned positions can commit a conditioned
+     * rule, which is far under the roughly eight-example evidence floor the
+     * search is known to need before it recovers a real environment. What came
+     * out of the gap was not recall: on the Grimm fixture -- three
+     * unconditioned shifts, where the README says any conditioning found is
+     * invention -- it published four rules, of which `gmc:m ~ pie:m`,
+     * `gmc:o ~ pie:o` and a `gmc:t ~ pie:t` carved against `gmc:t ~ pie:d`
+     * were all built on two or three observations. The last reads as a
+     * conditional merger of PIE *t and *d.
+     *
+     * Swept over every corpus in the tree at 2, 3 and 4. Three drops Grimm to
+     * one rule and clears Grassmann's spurious identity row while keeping both
+     * real Grassmann rules; the four restraint corpora stay silent, every
+     * graded rung resolves unchanged, and no soundlaw assertion moves. Four
+     * takes Grimm to zero but takes final devoicing with it, so it is past the
+     * point where the cost is only noise. */
+    config->min_split_observations = 3;
     config->max_split_depth = 3;
     config->min_chunk_observations = 2;
     config->long_range_delta_bic_threshold = 0.0;

@@ -20,7 +20,7 @@ int main(void) {
     assert(strcmp(rg_split_scorer_string(bic.split_scorer), "corrected_bic") == 0);
     assert(fabs(bic.split_prior_concentration - 1.0) < 1e-12);
     assert(fabs(bic.delta_bic_threshold) < 1e-12);
-    assert(bic.min_split_observations == 2);
+    assert(bic.min_split_observations == 3);
     assert(bic.max_split_depth == 3);
     assert(bic.min_chunk_observations == 2);
     assert(fabs(bic.long_range_delta_bic_threshold) < 1e-12);
