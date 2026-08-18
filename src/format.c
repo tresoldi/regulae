@@ -725,6 +725,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                             row->evidence.predictive.log_loss_gain,
                             (unsigned long)row->evidence.predictive.conditioned.observation_count);
         }
+        if (row->environment_alternatives > 0) {
+            /* Another neighbour's feature carves this split the same way; the
+             * named environment is one of several the corpus supports. */
+            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve it the same]",
+                            row->environment_alternatives,
+                            row->environment_alternatives == 1 ? "" : "s");
+        }
         builder_append(&builder, "\n");
     }
     if (total > (size_t)opts.top_classes) {
@@ -1015,6 +1022,7 @@ static void summary_class(
      * reflex, and its mass out of the environment. -1 / 0 where there is none. */
     builder_appendf(builder, "\t%d\t%.6f", class_row->contrast_class_id,
                     class_row->contrast_alternative_count);
+    builder_appendf(builder, "\t%d", class_row->environment_alternatives);
     builder_appendf(builder, "\t%s\t%.6f\n",
                     rg_predictive_status_string(class_row->evidence.predictive.status),
                     class_row->evidence.predictive.log_loss_gain);

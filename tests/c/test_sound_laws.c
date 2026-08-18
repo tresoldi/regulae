@@ -1623,6 +1623,43 @@ static void test_conditioning_is_found_from_both_sides(rg_context *ctx) {
     rg_corpus_free(corpus);
 }
 
+/* A conditioned split does not always identify its environment. Where the
+ * preceding consonant and the following vowel are perfectly confounded, the
+ * palatalisation split is equally read either way, and the class flags a rival
+ * at another position that carves it the same. Verner pins the stress
+ * environment for some of its rules and leaves it confounded for others, so it
+ * must show at least one identifiable conditioned class -- proving the flag
+ * separates the two rather than firing on every conditioned row. */
+static void test_a_confounded_environment_is_flagged(rg_context *ctx) {
+    rg_corpus *corpus = load("conditioned_confound");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t i;
+    int saw_confounded = 0;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        if (rg_multi_model_conditioned_class_at(model, i)->environment_alternatives > 0) {
+            saw_confounded = 1;
+        }
+    }
+    assert(saw_confounded);
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        assert(rg_multi_model_unconditioned_class_at(model, i)->environment_alternatives == 0);
+    }
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+
+    corpus = load("verner");
+    model = train(ctx, corpus);
+    int saw_identifiable = 0;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        if (rg_multi_model_conditioned_class_at(model, i)->environment_alternatives == 0) {
+            saw_identifiable = 1;
+        }
+    }
+    assert(saw_identifiable);
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -1653,6 +1690,7 @@ int main(void) {
     test_a_chain_shift_is_not_reported_as_a_merger(ctx);
     test_compensatory_lengthening_reaches_past_the_segment_that_was_lost(ctx);
     test_conditioning_is_found_from_both_sides(ctx);
+    test_a_confounded_environment_is_flagged(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);
     test_class_counts_are_not_evidence_but_the_fit_is(ctx);

@@ -211,6 +211,57 @@ static int candidates_same_split(
     return same || opposite;
 }
 
+/* How many distinct OTHER features, at a DIFFERENT position, carve this split's
+ * observations the same way -- the confound count for a conditioned class.
+ * A predicate at another slot (another neighbour) that partitions the same rows
+ * identically or exactly oppositely is a rival conditioner the corpus cannot
+ * rule out: the split might be caused by that segment, not the one it names.
+ *
+ * The position test is deliberate, matching the cross-dimensional flag: features
+ * of the SAME neighbour that co-vary with the committed one are one environment
+ * to a reader, not a rival, so only a different slot counts. Fires only on a
+ * perfect confound; the committed split is a real split of its rows, so a
+ * degenerate candidate cannot match it. Counts distinct features. */
+size_t rg_split_environment_alternatives(
+    const rg_split_observation *rows,
+    size_t count,
+    const rg_split_candidate *committed,
+    const rg_split_candidate *candidates,
+    size_t candidate_count
+) {
+    const char *seen[64];
+    size_t seen_count = 0;
+    size_t c;
+    for (c = 0; c < candidate_count; c++) {
+        size_t s;
+        int already;
+        if (committed->slot != 0 && candidates[c].slot != 0 &&
+            strcmp(candidates[c].slot, committed->slot) == 0) {
+            continue;
+        }
+        if (committed->slot == 0 && candidates[c].slot == 0) {
+            continue;
+        }
+        if (strcmp(candidates[c].feature, committed->feature) == 0) {
+            continue;
+        }
+        if (!candidates_same_split(rows, count, committed, &candidates[c])) {
+            continue;
+        }
+        already = 0;
+        for (s = 0; s < seen_count; s++) {
+            if (strcmp(seen[s], candidates[c].feature) == 0) {
+                already = 1;
+                break;
+            }
+        }
+        if (!already && seen_count < sizeof(seen) / sizeof(seen[0])) {
+            seen[seen_count++] = candidates[c].feature;
+        }
+    }
+    return seen_count;
+}
+
 static rg_status distinct_partition_count(
     const rg_split_observation *rows,
     size_t count,

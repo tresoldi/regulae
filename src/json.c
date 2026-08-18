@@ -170,6 +170,9 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
      * a complement with no majority. */
     cJSON_AddNumberToObject(out, "contrast_class_id", row->contrast_class_id);
     cJSON_AddNumberToObject(out, "contrast_alternative_count", row->contrast_alternative_count);
+    /* Rival conditioners at another position the corpus cannot distinguish;
+     * 0 = identifiable (and always 0 on an unconditioned class). */
+    cJSON_AddNumberToObject(out, "environment_alternatives", row->environment_alternatives);
     if (row->evidence.decision_index >= 0) {
         cJSON_AddStringToObject(out, "score_kind", rg_split_scorer_string(row->evidence.scorer));
         cJSON_AddNumberToObject(out, "delta_score", row->evidence.delta_score);

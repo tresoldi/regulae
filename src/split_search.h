@@ -76,6 +76,17 @@ typedef struct rg_split_result {
 /* The best split of `rows` under the configured categorical criterion.
  * Returns RG_OK and writes `found`; when found is true, `out` is filled and
  * the partition is in search->best_yes/best_no. */
+/* Distinct different-position features that carve a split the same way: the
+ * confound count for a conditioned class. 0 when the environment is uniquely
+ * identifiable. See the definition for the position rule. */
+size_t rg_split_environment_alternatives(
+    const rg_split_observation *rows,
+    size_t count,
+    const rg_split_candidate *committed,
+    const rg_split_candidate *candidates,
+    size_t candidate_count
+);
+
 rg_status rg_split_find_best(
     rg_split_search *search,
     const rg_split_observation *rows,

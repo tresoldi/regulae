@@ -54,6 +54,9 @@ typedef struct committed_split {
     char **contrast_graphemes;
     size_t contrast_segment_count;
     double contrast_alternative_count;
+    /* Rival conditioners at another position the corpus cannot tell this split's
+     * environment from. 0 when identifiable. */
+    int environment_alternatives;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -87,6 +90,7 @@ typedef struct merged_class {
      * split is recorded. state->committed outlives the merge and the resolve,
      * so this reads the tuple without copying it. */
     size_t contrast_split;
+    int environment_alternatives;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -591,6 +595,7 @@ static rg_status append_committed_split(
     size_t contrast_sister_index,
     int has_contrast,
     double contrast_alternative_count,
+    int environment_alternatives,
     double delta_bic,
     double search_margin,
     int decision_index,
@@ -633,6 +638,7 @@ static rg_status append_committed_split(
     slot->count = count;
     slot->bucket_size = bucket_size;
     slot->contrast_alternative_count = contrast_alternative_count;
+    slot->environment_alternatives = environment_alternatives;
     if (has_contrast && contrast_sister_index != sister_index) {
         /* Skip the self-link when the pivot's majority reflex is the same in
          * and out of the environment; the split would then not change the
@@ -679,6 +685,7 @@ static rg_status emit_sister_classes(
     size_t yes_count,
     const rg_split_observation *no_obs,
     size_t no_count,
+    int environment_alternatives,
     double delta_bic,
     double search_margin,
     int decision_index,
@@ -763,6 +770,7 @@ static rg_status emit_sister_classes(
             dominant,
             has_dominant,
             has_dominant ? contrast_masses[dominant] : 0.0,
+            environment_alternatives,
             delta_bic,
             search_margin,
             decision_index,
@@ -820,7 +828,10 @@ static rg_status refine_pivot_split(
         if (status == RG_OK) {
             status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                          &narrowed, search.best_yes, best.yes_count,
-                                         search.best_no, best.no_count, best.delta_score,
+                                         search.best_no, best.no_count,
+                                         (int)rg_split_environment_alternatives(rows, count,
+                                             &best.candidate, state->all, state->all_count),
+                                         best.delta_score,
                                          best.search_margin,
                                          state->decision_count++, min_commit, n_total);
             if (status == RG_OK) {
@@ -896,6 +907,8 @@ static rg_status commit_splits_for_pivot(
                     best.yes_count,
                     search.best_no,
                     best.no_count,
+                    (int)rg_split_environment_alternatives(remaining, remaining_count,
+                        &best.candidate, candidates, candidate_count),
                     best.delta_score,
                     best.search_margin,
                     state->decision_count++,
@@ -1136,6 +1149,7 @@ static rg_status merge_committed_splits(
                  * merged in last. */
                 entry->contrast_count = split->contrast_count;
                 entry->contrast_split = i;
+                entry->environment_alternatives = split->environment_alternatives;
                 entry->delta_bic = split->delta_bic;
                 entry->search_margin = split->search_margin;
                 /* The earliest decision that reached this class keeps it. */
@@ -1185,6 +1199,7 @@ static rg_status merge_committed_splits(
         merged[count].winning_count = split->count;
         merged[count].contrast_count = split->contrast_count;
         merged[count].contrast_split = i;
+        merged[count].environment_alternatives = split->environment_alternatives;
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
         merged[count].decision_index = split->decision_index;
@@ -1627,6 +1642,7 @@ rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].count = merged[i].count;
                 model->conditioned_classes[i].confidence = merged[i].confidence;
                 model->conditioned_classes[i].contrast_count = merged[i].contrast_count;
+                model->conditioned_classes[i].environment_alternatives = merged[i].environment_alternatives;
                 /* Resolved to a class id in a second pass below, once every
                  * class has one. */
                 model->conditioned_classes[i].contrast_class_id = -1;

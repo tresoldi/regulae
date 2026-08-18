@@ -24,15 +24,17 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 34. The public surface has moved since this
+`RG_ABI_VERSION` is 36. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
 class row names its distinct supporting sets (§4.2) and links to
 the row that contrasts it (§4.3); a deletion has a row shape (§4.9,
-§6); and a cross-dimensional rule can be lect-internal (§6). The
-Python wrapper replaced a full reimplementation on 2026-08-17
-(§2) — the retired code is under `docs/legacy_python/`.
+§6); a cross-dimensional rule can be lect-internal (§6); and a
+conditioned rule flags when its environment is not identifiable
+from the corpus (§4.3, §6). The Python wrapper replaced a full
+reimplementation on 2026-08-17 (§2) — the retired code is under
+`docs/legacy_python/`.
 
 The reliability fields — `standing`, `search_margin`,
 `decision_index`, the contrast counts, `rg_corpus_fit` — are what
@@ -407,6 +409,16 @@ the conditioned `gothic:d ~ pgmc:θ` before a vowel points at
 `gothic:d ~ pgmc:d` — and `contrast_alternative_count` is that
 reflex's mass in the complement. `-1` where there is none. Look the
 id up in `model.classes` (unconditioned first, then conditioned).
+
+A conditioned class also carries **`environment_alternatives`** (ABI 36), the
+same identifiability flag the cross-dimensional row has (§6): the count of rival
+conditioners at another position the corpus cannot tell this environment from. 0
+when the environment is pinned, >0 when a different neighbour's feature carves
+the split the same way. On a corpus where the preceding consonant and the
+following vowel are confounded it flags the palatalisation rule; on Verner it
+reads 0 for the rules committed with the stress environment and >0 for a rule
+framed as "preceded by a vowel," which the data cannot separate from "followed
+by a stressed syllable." It is 0 on every unconditioned class.
 
 The `confidence` field on conditioned classes is the
 **pivot-bucket coverage**: `count / pivot_bucket_size` where
@@ -984,12 +996,16 @@ public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
 signature or ownership change, and the reason is recorded in
-`docs/c_conversion_roadmap.md`. It is at **35**.
+`docs/c_conversion_roadmap.md`. It is at **36**.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **36** — `rg_multi_class_row` gained `environment_alternatives`: the same
+  identifiability flag, now on a conditioned segment class (§4.3). 0 when the
+  environment is pinned, >0 when a different neighbour's feature carves the split
+  the same way; always 0 on an unconditioned class. Additive.
 - **35** — `rg_cross_dimensional_row` gained `environment_alternatives`: the
   count of rival conditioners at another position the corpus cannot tell the
   committed environment from (§6). 0 when identifiable, >0 when confounded.

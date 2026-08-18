@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 35
+#define RG_ABI_VERSION 36
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -733,6 +733,13 @@ typedef struct rg_multi_class_row {
      * from the linked class's own `count`, which aggregates that tuple across
      * the whole corpus. Zero when `contrast_class_id` is -1. */
     double contrast_alternative_count;
+    /* Rival conditioners at another position the corpus cannot tell this
+     * conditioned class's environment from -- the same identifiability flag the
+     * cross-dimensional row carries (ABI 35), here for a segment split (ABI 36).
+     * 0 on an unconditioned class and on a conditioned one whose environment is
+     * uniquely identifiable; >0 when a different neighbour's feature carves the
+     * split the same way and the corpus cannot say which conditions it. */
+    int environment_alternatives;
     rg_rule_evidence evidence;
     /* The distinct cognate sets this class rests on, each listed once however
      * many aligned positions in it realise the class. Owned by the model and
