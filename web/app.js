@@ -381,17 +381,23 @@ function buildExampleList() {
 
   select.addEventListener("change", () => {
     const entry = CORPUS_LIST.find((e) => e.path === select.value);
-    if (!entry) {
-      return;
+    if (entry) {
+      showExample(entry);
     }
-    loadCorpus(entry.path, entry.format);
-    const note = $("example-note");
-    note.classList.toggle("blocked", !entry.readable);
-    note.textContent = entry.readable
-      ? entry.description
-      : `This corpus cannot be read yet: “${entry.blockedBy}” is not in the feature system. `
-        + "It is here so the gap is visible rather than hidden. Run it to see the error.";
   });
+}
+
+/* The note says what the corpus is for; the stats line says what it publishes,
+   and is generated from the trained model so it cannot contradict the run. */
+function showExample(entry) {
+  loadCorpus(entry.path, entry.format);
+  const note = $("example-note");
+  note.classList.toggle("blocked", !entry.readable);
+  note.textContent = entry.readable
+    ? entry.description
+    : `This corpus cannot be read yet: “${entry.blockedBy}” is not in the feature system. `
+      + "It is here so the gap is visible rather than hidden. Run it to see the error.";
+  $("example-stats").textContent = entry.stats || "";
 }
 
 /* ---- downloads --------------------------------------------------------- */
@@ -491,6 +497,5 @@ document.addEventListener("keydown", (event) => {
 if (CORPUS_LIST.length) {
   const first = CORPUS_LIST[0];
   $("examples").value = first.path;
-  loadCorpus(first.path, first.format);
-  $("example-note").textContent = first.description;
+  showExample(first);
 }

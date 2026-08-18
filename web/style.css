@@ -136,6 +136,18 @@ textarea {
 }
 .example-note.blocked { color: var(--warn); }
 
+/* What the corpus publishes, as against what the note says it is for. Set
+   apart from the prose because it is generated: scripts/corpora.py reads it
+   off the trained model, so it cannot disagree with the run below it. */
+.example-stats {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+.example-stats:empty { display: none; }
+
 /* ---- progress -------------------------------------------------------- */
 
 .progress { margin: 14px 0 0; display: none; }

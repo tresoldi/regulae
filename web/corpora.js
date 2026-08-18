@@ -6,6 +6,8 @@
 const CORPORA = {
   "experiments/finnish_estonian/cognates.tsv": "gloss\tfinnish\testonian\tfinnish_breaks\testonian_breaks\nhand\tkæsi\tkæsi\t-\t-\neye\tsilmæ\tsilm\t-\t-\nhead\tpæː\tpeɑ\t-\t-\nfoot\tjɑlkɑ\tjɑlg\t-\t-\ntooth\thɑmmɑs\thɑmmɑs\t-\t-\nblood\tveri\tveri\t-\t-\nwater\tvesi\tvesi\t-\t-\nname\tnimi\tnimi\t-\t-\nmoon\tkuː\tkuː\t-\t-\nfire\ttuli\ttuli\t-\t-\nnight\tyø\tøː\t-\t-\nday\tpæivæ\tpæev\t-\t-\nearth\tmɑː\tmɑː\t-\t-\nfarm\ttɑlo\ttɑlu\t-\t-\ndog\tkoirɑ\tkoer\t-\t-\nfish\tkɑlɑ\tkɑlɑ\t-\t-\ntongue\tkieli\tkeːl\t-\t-\nheart\tsydæn\tsydɑ\t-\t-\nwoman\tnɑinen\tnɑine\t-\t-\nman\tmies\tmeːs\t-\t-\nboy\tpoikɑ\tpoeg\t-\t-\ndaughter\ttytær\ttytɑr\t-\t-\nfather\tisæ\tisɑ\t-\t-\none\tyksi\tyks\t-\t-\ntwo\tkɑksi\tkɑks\t-\t-\nthree\tkolme\tkolm\t-\t-\nfour\tneljæ\tneli\t-\t-\nfive\tviːsi\tviːs\t-\t-\nsix\tkuːsi\tkuːs\t-\t-\nseven\tseitsemæn\tseitse\t-\t-\neight\tkɑhdeksɑn\tkɑheksɑ\t-\t-\nnine\tyhdeksæn\tyheksɑ\t-\t-\nten\tkymmenen\tkymme\t-\t-\ncome\ttullɑ\ttullɑ\t-\t-\ngo\tmennæ\tminnɑ\t-\t-\neat\tsyødæ\tsyːɑ\t4\t-\ndrink\tjuodɑ\tjuːɑ\t4\t-\nsee\tnæhdæ\tnæhɑ\t4\t-\nhear\tkuːllɑ\tkuːldɑ\t-\t4\nknow\ttietæː\tteɑdɑ\t-\t4\n",
   "experiments/latin_spanish/cognates.tsv": "gloss\tlatin\tspanish\tlatin_breaks\tspanish_breaks\nfather\tpater\tpadre\t-\t-\nmother\tmater\tmadre\t-\t-\nbrother\tfrater\termano\t-\t-\nsister\tsoror\termana\t-\t-\nson\tfiliu\tixo\t-\t-\ndaughter\tfilia\tixa\t-\t-\nhead\tkaput\tkabeθa\t-\t-\neye\tokulu\toxo\t-\t-\near\tauris\toreʎa\t-\t-\nnose\tnasu\tnaso\t-\t-\nmouth\tbukka\tboka\t-\t-\ntongue\tlingua\tlengwa\t-\t-\ntooth\tdentem\tdjente\t-\t-\nneck\tkollu\tkweʎo\t-\t-\nhand\tmanu\tmano\t-\t-\nfoot\tpede\tpje\t-\t-\nheart\tkor\tkoraθon\t-\t-\nblood\tsanguine\tsangre\t-\t-\nbone\tossu\tweso\t-\t-\nskin\tpelle\tpjel\t-\t-\nhair\tkapillu\tkabeʎo\t-\t-\nmilk\tlakte\tletʃe\t-\t-\nnight\tnokte\tnotʃe\t-\t-\nday\tdje\tdia\t-\t-\nsun\tsole\tsol\t-\t-\nmoon\tluna\tluna\t-\t-\nstar\tstella\testreʎa\t-\t-\nwater\taqua\tagwa\t-\t-\nfire\tfokus\tfwego\t-\t-\nearth\tterra\ttjerra\t-\t-\nstone\tpetra\tpjedra\t-\t-\nwood\tlignu\tleɲo\t-\t-\nleaf\tfolia\toxa\t-\t-\ntree\tarbor\tarbol\t-\t-\nflower\tflore\tflor\t-\t-\nfruit\tfruktu\tfruto\t-\t-\nseed\tsemen\tsemiʎa\t-\t-\nwind\tventu\tbjento\t-\t-\nrain\tpluvia\tʎubja\t-\t-\nsky\tkaelu\tθjelo\t-\t-\ndog\tkane\tperro\t-\t-\ncat\tkattu\tgato\t-\t-\nhorse\tkaballu\tkabaʎo\t-\t-\ncow\tvakka\tbaka\t-\t-\nbird\tavis\tabe\t-\t-\nfish\tpisce\tpeθ\t-\t-\nsnake\tserpente\tserpjente\t-\t-\nmouse\tmure\traton\t-\t-\nwolf\tlupu\tlobo\t-\t-\nbear\tursu\toso\t-\t-\nman\tomo\tombre\t-\t-\nwoman\tfemina\tember\t-\t3\nking\trege\trej\t-\t-\nyear\tannu\taɲo\t-\t-\nmonth\tmense\tmes\t-\t-\nname\tnomen\tnombre\t-\t-\nthree\ttres\ttres\t-\t-\nfour\tquattuor\tkwatro\t-\t-\nfive\tkinkwe\tθinko\t-\t-\nseven\tseptem\tsjete\t-\t-\neight\tokto\totʃo\t-\t-\nnine\tnovem\tnweve\t-\t-\nten\tdecem\tdjeθ\t-\t-\ngood\tbonu\tbweno\t-\t-\nbad\tmalu\tmalo\t-\t-\nnew\tnovu\tnweβo\t-\t-\nold\tvetulu\tbjexo\t-\t-\nbig\tgrande\tgrande\t-\t-\nsmall\tparvu\tpeqweɲo\t-\t-\nlong\tlongu\tlargo\t-\t-\nshort\tkurtu\tkorto\t-\t-\nwhite\tblanku\tblanko\t-\t-\nblack\tnigru\tnegro\t-\t-\nred\trubju\troxo\t-\t-\ngreen\tviride\tberde\t-\t-\nsweet\tdulke\tdulθe\t-\t-\ncold\tfrigidu\tfrio\t-\t-\nhot\tkalidu\tkaljente\t-\t-\nsee\tvidere\tber\t3\t-\nhear\taudire\tojir\t3\t2\neat\tkomedere\tkomer\t5\t3\ndrink\tbibere\tbeber\t3\t3\nspeak\tloqui\tablar\t-\t3\nknow\tsapere\tsaber\t3\t3\ncome\tvenire\tbenir\t3\t3\ngo\tire\tir\t-\t-\ngive\tdare\tdar\t-\t-\ntake\tprendere\tprender\t5\t5\nsay\tdikere\tdeθir\t3\t3\nmake\tfakere\taθer\t3\t2\nsleep\tdormire\tdormir\t4\t4\ndie\tmorire\tmorir\t3\t3\nlive\tvivere\tbibir\t3\t3\nlove\tamare\tamar\t2\t2\ndie\tmori\tmorir\t-\t3\nbreak\tfrangere\tromper\t5\t4\nwalk\tambulare\tandar\t5\t3\n",
+  "testdata/soundlaws/grimm.tsv": "cognate_id\tlect_id\tsegments\nfoot\tgmc\tf o t s\nfoot\tpie\tp o d s\nfather\tgmc\tf a θ e r\nfather\tpie\tp a t e r\nfish\tgmc\tf i s k\nfish\tpie\tp i s k\nfull\tgmc\tf u l n a s\nfull\tpie\tp l e n o s\nfor\tgmc\tf e r\nfor\tpie\tp e r\nthree\tgmc\tθ r i y i s\nthree\tpie\tt r e y e s\nthou\tgmc\tθ u\nthou\tpie\tt u\nthin\tgmc\tθ u n n u s\nthin\tpie\tt e n u s\nthat\tgmc\tθ a t\nthat\tpie\tt o d\nheart\tgmc\tx e r t\nheart\tpie\tk e r d\nhundred\tgmc\tx u n t a m\nhundred\tpie\tk m t o m\nhorn\tgmc\tx u r n\nhorn\tpie\tk e r n\nhound\tgmc\tx u n t\nhound\tpie\tk w o n\ndeep\tgmc\tt e u p a s\ndeep\tpie\td u b n o s\nten\tgmc\tt e x u n\nten\tpie\td e k m\ntwo\tgmc\tt w o\ntwo\tpie\td w o\ntooth\tgmc\tt a n θ s\ntooth\tpie\td o n t s\nknee\tgmc\tk n e w a\nknee\tpie\tg e n u\ncorn\tgmc\tk u r n a m\ncorn\tpie\tg r n o m\ncold\tgmc\tk a l t\ncold\tpie\tg e l\nbrother\tgmc\tb r o θ e r\nbrother\tpie\tbʰ r a t e r\nbear\tgmc\tb e r\nbear\tpie\tbʰ e r\nbe\tgmc\tb u\nbe\tpie\tbʰ u\ndo\tgmc\td o\ndo\tpie\tdʰ e\ndoor\tgmc\td u r\ndoor\tpie\tdʰ w e r\ndaughter\tgmc\td o x t e r\ndaughter\tpie\tdʰ u g t e r\nguest\tgmc\tg a s t i s\nguest\tpie\tgʰ o s t i s\ngoose\tgmc\tg a n s\ngoose\tpie\tgʰ a n s\ngarden\tgmc\tg a r d a s\ngarden\tpie\tgʰ o r t o s\n",
+  "testdata/soundlaws/graded_1_adjacent.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p e\nw00\tdaughter\tk a f e\nw01\tproto\tk a p i\nw01\tdaughter\tk a f i\nw02\tproto\tk a p o\nw02\tdaughter\tk a p o\nw03\tproto\tk a p u\nw03\tdaughter\tk a p u\nw04\tproto\tk e p a\nw04\tdaughter\tk e p a\nw05\tproto\tk e p i\nw05\tdaughter\tk e f i\nw06\tproto\tk e p o\nw06\tdaughter\tk e p o\nw07\tproto\tk e p u\nw07\tdaughter\tk e p u\nw08\tproto\tk i p a\nw08\tdaughter\tk i p a\nw09\tproto\tk i p e\nw09\tdaughter\tk i f e\nw10\tproto\tk i p o\nw10\tdaughter\tk i p o\nw11\tproto\tk i p u\nw11\tdaughter\tk i p u\nw12\tproto\tk o p a\nw12\tdaughter\tk o p a\nw13\tproto\tk o p e\nw13\tdaughter\tk o f e\nw14\tproto\tk o p i\nw14\tdaughter\tk o f i\nw15\tproto\tk o p u\nw15\tdaughter\tk o p u\nw16\tproto\tk u p a\nw16\tdaughter\tk u p a\nw17\tproto\tk u p e\nw17\tdaughter\tk u f e\nw18\tproto\tk u p i\nw18\tdaughter\tk u f i\nw19\tproto\tk u p o\nw19\tdaughter\tk u p o\nw20\tproto\tt a p e\nw20\tdaughter\tt a f e\nw21\tproto\tt a p i\nw21\tdaughter\tt a f i\nw22\tproto\tt a p o\nw22\tdaughter\tt a p o\nw23\tproto\tt a p u\nw23\tdaughter\tt a p u\nw24\tproto\tt e p a\nw24\tdaughter\tt e p a\nw25\tproto\tt e p i\nw25\tdaughter\tt e f i\nw26\tproto\tt e p o\nw26\tdaughter\tt e p o\nw27\tproto\tt e p u\nw27\tdaughter\tt e p u\nw28\tproto\tt i p a\nw28\tdaughter\tt i p a\nw29\tproto\tt i p e\nw29\tdaughter\tt i f e\nw30\tproto\tt i p o\nw30\tdaughter\tt i p o\nw31\tproto\tt i p u\nw31\tdaughter\tt i p u\nw32\tproto\tt o p a\nw32\tdaughter\tt o p a\nw33\tproto\tt o p e\nw33\tdaughter\tt o f e\nw34\tproto\tt o p i\nw34\tdaughter\tt o f i\nw35\tproto\tt o p u\nw35\tdaughter\tt o p u\nw36\tproto\tt u p a\nw36\tdaughter\tt u p a\nw37\tproto\tt u p e\nw37\tdaughter\tt u f e\nw38\tproto\tt u p i\nw38\tdaughter\tt u f i\nw39\tproto\tt u p o\nw39\tdaughter\tt u p o\n",
   "experiments/contaminated_cognates_synthetic/cognates.tsv": "gloss\tproto\tderived\tconfidence\nC1\tpata\tfada\t1.0\nC2\tpeti\tfeti\t1.0\nC3\tpatu\tfadu\t1.0\nC4\tpota\tfoda\t1.0\nC5\tpitu\tfidu\t1.0\nC6\tpato\tfato\t1.0\nC7\tpeka\tfeka\t1.0\nC8\tpeko\tfeko\t1.0\nC9\tpaki\tfaki\t1.0\nC10\tpako\tfako\t1.0\nC11\tpeta\tfeta\t1.0\nC12\tpoto\tfoto\t1.0\nC13\tpuka\tfuka\t1.0\nC14\tpaku\tfaku\t1.0\nC15\tpeki\tfeki\t1.0\nC16\tpoka\tfoka\t1.0\nC17\tpiko\tfiko\t1.0\nC18\tpeku\tfeku\t1.0\nC19\tpaka\tfaka\t1.0\nC20\tpoki\tfoki\t1.0\nB1\tpata\tzana\t0.0\nB2\tpeti\tqomu\t0.0\nB3\tpaka\txima\t0.0\nB4\tpito\tkyra\t0.0\nB5\tpoke\tnura\t0.0\n",
   "testdata/corpora/real_romance_4lect.tsv": "cognate_id\tlect_id\tsegments\tconfidence\nbad-000\tlatin\tm a l u\t1.0\nbad-000\tspanish\tm a l o\t1.0\nbad-000\tfrench\tm a l\t1.0\nbad-000\titalian\tm a l o\t1.0\nbear-001\tlatin\tu r s u\t1.0\nbear-001\tspanish\to s o\t1.0\nbear-001\tfrench\tu ʁ s\t1.0\nbear-001\titalian\to r s o\t1.0\nbig-002\tlatin\tg r a n d e\t1.0\nbig-002\tspanish\tg r a n d e\t1.0\nbig-002\tfrench\tɡ ʁ ɑ̃\t1.0\nbig-002\titalian\tɡ r a n d e\t1.0\nbird-003\tlatin\ta v i s\t1.0\nbird-003\tspanish\ta b e\t1.0\nbird-003\tfrench\tw a z o\t1.0\nbird-003\titalian\tu k k ɛ l l o\t1.0\nblack-004\tlatin\tn i g r u\t1.0\nblack-004\tspanish\tn e g r o\t1.0\nblack-004\tfrench\tn w a ʁ\t1.0\nblack-004\titalian\tn e r o\t1.0\nblood-005\tlatin\ts a n g u i n e\t1.0\nblood-005\tspanish\ts a n g r e\t1.0\nblood-005\tfrench\ts ɑ̃\t1.0\nblood-005\titalian\ts a ŋ ɡ w e\t1.0\nbone-006\tlatin\to s s u\t1.0\nbone-006\tspanish\tw e s o\t1.0\nbone-006\tfrench\to\t1.0\nbone-006\titalian\tɔ s s o\t1.0\nbreak-007\tlatin\tf r a n g e r e\t1.0\nbreak-007\tspanish\tr o m p e r\t1.0\nbreak-007\tfrench\tk a s e\t1.0\nbreak-007\titalian\tr o m p e r e\t1.0\nbrother-008\tlatin\tf r a t e r\t1.0\nbrother-008\tspanish\te r m a n o\t1.0\nbrother-008\tfrench\tf ʁ ɛ ʁ\t1.0\nbrother-008\titalian\tf r a t ɛ l l o\t1.0\ncat-009\tlatin\tk a t t u\t1.0\ncat-009\tspanish\tg a t o\t1.0\ncat-009\tfrench\tʃ a\t1.0\ncat-009\titalian\tɡ a t t o\t1.0\ncold-010\tlatin\tf r i g i d u\t1.0\ncold-010\tspanish\tf r i o\t1.0\ncold-010\tfrench\tf ʁ w a\t1.0\ncold-010\titalian\tf r ɛ d d o\t1.0\ncome-011\tlatin\tv e n i r e\t1.0\ncome-011\tspanish\tb e n i r\t1.0\ncome-011\tfrench\tv ə n i ʁ\t1.0\ncome-011\titalian\tv e n i r e\t1.0\ncow-012\tlatin\tv a k k a\t1.0\ncow-012\tspanish\tb a k a\t1.0\ncow-012\tfrench\tv a ʃ\t1.0\ncow-012\titalian\tm u k k a\t1.0\ndaughter-013\tlatin\tf i l i a\t1.0\ndaughter-013\tspanish\ti x a\t1.0\ndaughter-013\tfrench\tf i ʝ\t1.0\ndaughter-013\titalian\tf i ʎ a\t1.0\nday-014\tlatin\td j e\t1.0\nday-014\tspanish\td i a\t1.0\nday-014\tfrench\tʒ u ʁ\t1.0\nday-014\titalian\td ʒ o r n o\t1.0\ndie-015\tlatin\tm o r i\t1.0\ndie-015\tspanish\tm o r i r\t1.0\ndie-015\tfrench\tm u ʁ i ʁ\t1.0\ndie-015\titalian\tm o r i r e\t1.0\ndog-016\tlatin\tk a n e\t1.0\ndog-016\tspanish\tp e r r o\t1.0\ndog-016\tfrench\tʃ j ɛ̃\t1.0\ndog-016\titalian\tk a n e\t1.0\ndrink-017\tlatin\tb i b e r e\t1.0\ndrink-017\tspanish\tb e b e r\t1.0\ndrink-017\tfrench\tb w a ʁ\t1.0\ndrink-017\titalian\tb e r e\t1.0\near-018\tlatin\ta u r i s\t1.0\near-018\tspanish\to r e ʎ a\t1.0\near-018\tfrench\tɔ ʁ ɛ j\t1.0\near-018\titalian\to r ɛ k k j o\t1.0\nearth-019\tlatin\tt e r r a\t1.0\nearth-019\tspanish\tt j e r r a\t1.0\nearth-019\tfrench\tt ɛ ʁ\t1.0\nearth-019\titalian\tt ɛ r r a\t1.0\neat-020\tlatin\tk o m e d e r e\t1.0\neat-020\tspanish\tk o m e r\t1.0\neat-020\tfrench\tm ɑ̃ ʒ e\t1.0\neat-020\titalian\tm a n d ʒ a r e\t1.0\neight-021\tlatin\to k t o\t1.0\neight-021\tspanish\to t ʃ o\t1.0\neight-021\tfrench\tɥ i t\t1.0\neight-021\titalian\to t t o\t1.0\neye-022\tlatin\to k u l u\t1.0\neye-022\tspanish\to x o\t1.0\neye-022\tfrench\tœ j\t1.0\neye-022\titalian\tɔ k k j o\t1.0\nfather-023\tlatin\tp a t e r\t1.0\nfather-023\tspanish\tp a d r e\t1.0\nfather-023\tfrench\tp ɛ ʁ\t1.0\nfather-023\titalian\tp a d r e\t1.0\nfire-024\tlatin\tf o k u s\t1.0\nfire-024\tspanish\tf w e g o\t1.0\nfire-024\tfrench\tf ø\t1.0\nfire-024\titalian\tf w ɔ k o\t1.0\nfish-025\tlatin\tp i s c e\t1.0\nfish-025\tspanish\tp e θ\t1.0\nfish-025\tfrench\tp w a s ɔ̃\t1.0\nfish-025\titalian\tp e ʃ e\t1.0\nfive-026\tlatin\tk i n k w e\t1.0\nfive-026\tspanish\tθ i n k o\t1.0\nfive-026\tfrench\ts ɛ̃ k\t1.0\nfive-026\titalian\tt ʃ i ŋ k w e\t1.0\nflower-027\tlatin\tf l o r e\t1.0\nflower-027\tspanish\tf l o r\t1.0\nflower-027\tfrench\tf l œ ʁ\t1.0\nflower-027\titalian\tf j o r e\t1.0\nfoot-028\tlatin\tp e d e\t1.0\nfoot-028\tspanish\tp j e\t1.0\nfoot-028\tfrench\tp j e\t1.0\nfoot-028\titalian\tp j ɛ d e\t1.0\nfour-029\tlatin\tq u a t t u o r\t1.0\nfour-029\tspanish\tk w a t r o\t1.0\nfour-029\tfrench\tk a t ʁ\t1.0\nfour-029\titalian\tk w a t t r o\t1.0\nfruit-030\tlatin\tf r u k t u\t1.0\nfruit-030\tspanish\tf r u t o\t1.0\nfruit-030\tfrench\tf ʁ ɥ i\t1.0\nfruit-030\titalian\tf r u t t o\t1.0\ngive-031\tlatin\td a r e\t1.0\ngive-031\tspanish\td a r\t1.0\ngive-031\tfrench\td ɔ n e\t1.0\ngive-031\titalian\td a r e\t1.0\ngo-032\tlatin\ti r e\t1.0\ngo-032\tspanish\ti r\t1.0\ngo-032\tfrench\ta l e\t1.0\ngo-032\titalian\ta n d a r e\t1.0\ngood-033\tlatin\tb o n u\t1.0\ngood-033\tspanish\tb w e n o\t1.0\ngood-033\tfrench\tb ɔ̃\t1.0\ngood-033\titalian\tb w ɔ n o\t1.0\ngreen-034\tlatin\tv i r i d e\t1.0\ngreen-034\tspanish\tb e r d e\t1.0\ngreen-034\tfrench\tv ɛ ʁ\t1.0\ngreen-034\titalian\tv ɛ r d e\t1.0\nhair-035\tlatin\tk a p i l l u\t1.0\nhair-035\tspanish\tk a b e ʎ o\t1.0\nhair-035\tfrench\tʃ ə v ø\t1.0\nhair-035\titalian\tk a p ɛ l l o\t1.0\nhand-036\tlatin\tm a n u\t1.0\nhand-036\tspanish\tm a n o\t1.0\nhand-036\tfrench\tm ɛ̃\t1.0\nhand-036\titalian\tm a n o\t1.0\nhead-037\tlatin\tk a p u t\t1.0\nhead-037\tspanish\tk a b e θ a\t1.0\nhead-037\tfrench\tʃ ɛ f\t1.0\nhead-037\titalian\tt ɛ s t a\t1.0\nhear-038\tlatin\ta u d i r e\t1.0\nhear-038\tspanish\to j i r\t1.0\nhear-038\tfrench\tɑ̃ t ɑ̃ d ʁ\t1.0\nhear-038\titalian\tu d i r e\t1.0\nheart-039\tlatin\tk o r\t1.0\nheart-039\tspanish\tk o r a θ o n\t1.0\nheart-039\tfrench\tk œ ʁ\t1.0\nheart-039\titalian\tk w ɔ r e\t1.0\nhorse-040\tlatin\tk a b a l l u\t1.0\nhorse-040\tspanish\tk a b a ʎ o\t1.0\nhorse-040\tfrench\tʃ ə v a l\t1.0\nhorse-040\titalian\tk a v a l l o\t1.0\nhot-041\tlatin\tk a l i d u\t1.0\nhot-041\tspanish\tk a l j e n t e\t1.0\nhot-041\tfrench\tʃ o\t1.0\nhot-041\titalian\tk a l d o\t1.0\nking-042\tlatin\tr e g e\t1.0\nking-042\tspanish\tr e j\t1.0\nking-042\tfrench\tʁ w a\t1.0\nking-042\titalian\tr e\t1.0\nknow-043\tlatin\ts a p e r e\t1.0\nknow-043\tspanish\ts a b e r\t1.0\nknow-043\tfrench\ts a v w a ʁ\t1.0\nknow-043\titalian\ts a p e r e\t1.0\nleaf-044\tlatin\tf o l i a\t1.0\nleaf-044\tspanish\to x a\t1.0\nleaf-044\tfrench\tf œ j\t1.0\nleaf-044\titalian\tf ɔ ʎ a\t1.0\nlive-045\tlatin\tv i v e r e\t1.0\nlive-045\tspanish\tb i b i r\t1.0\nlive-045\tfrench\tv i v ʁ\t1.0\nlive-045\titalian\tv i v e r e\t1.0\nlong-046\tlatin\tl o n g u\t1.0\nlong-046\tspanish\tl a r g o\t1.0\nlong-046\tfrench\tl ɔ̃\t1.0\nlong-046\titalian\tl u ŋ ɡ o\t1.0\nlove-047\tlatin\ta m a r e\t1.0\nlove-047\tspanish\ta m a r\t1.0\nlove-047\tfrench\tɛ m e\t1.0\nlove-047\titalian\ta m a r e\t1.0\nmake-048\tlatin\tf a k e r e\t1.0\nmake-048\tspanish\ta θ e r\t1.0\nmake-048\tfrench\tf ɛ ʁ\t1.0\nmake-048\titalian\tf a r e\t1.0\nman-049\tlatin\to m o\t1.0\nman-049\tspanish\to m b r e\t1.0\nman-049\tfrench\tɔ m\t1.0\nman-049\titalian\tw ɔ m o\t1.0\nmilk-050\tlatin\tl a k t e\t1.0\nmilk-050\tspanish\tl e t ʃ e\t1.0\nmilk-050\tfrench\tl ɛ\t1.0\nmilk-050\titalian\tl a t t e\t1.0\nmonth-051\tlatin\tm e n s e\t1.0\nmonth-051\tspanish\tm e s\t1.0\nmonth-051\tfrench\tm w a\t1.0\nmonth-051\titalian\tm e s e\t1.0\nmoon-052\tlatin\tl u n a\t1.0\nmoon-052\tspanish\tl u n a\t1.0\nmoon-052\tfrench\tl y n\t1.0\nmoon-052\titalian\tl u n a\t1.0\nmother-053\tlatin\tm a t e r\t1.0\nmother-053\tspanish\tm a d r e\t1.0\nmother-053\tfrench\tm ɛ ʁ\t1.0\nmother-053\titalian\tm a d r e\t1.0\nmouse-054\tlatin\tm u r e\t1.0\nmouse-054\tspanish\tr a t o n\t1.0\nmouse-054\tfrench\ts u ʁ i\t1.0\nmouth-055\tlatin\tb u k k a\t1.0\nmouth-055\tspanish\tb o k a\t1.0\nmouth-055\tfrench\tb u ʃ\t1.0\nmouth-055\titalian\tb o k k a\t1.0\nname-056\tlatin\tn o m e n\t1.0\nname-056\tspanish\tn o m b r e\t1.0\nname-056\tfrench\tn ɔ m\t1.0\nname-056\titalian\tn o m e\t1.0\nneck-057\tlatin\tk o l l u\t1.0\nneck-057\tspanish\tk w e ʎ o\t1.0\nneck-057\tfrench\tk u\t1.0\nneck-057\titalian\tk ɔ l l o\t1.0\nnew-058\tlatin\tn o v u\t1.0\nnew-058\tspanish\tn w e β o\t1.0\nnew-058\tfrench\tn œ f\t1.0\nnew-058\titalian\tn w ɔ v o\t1.0\nnight-059\tlatin\tn o k t e\t1.0\nnight-059\tspanish\tn o t ʃ e\t1.0\nnight-059\tfrench\tn ɥ i\t1.0\nnight-059\titalian\tn ɔ t t e\t1.0\nnine-060\tlatin\tn o v e m\t1.0\nnine-060\tspanish\tn w e v e\t1.0\nnine-060\tfrench\tn œ f\t1.0\nnine-060\titalian\tn ɔ v e\t1.0\nnose-061\tlatin\tn a s u\t1.0\nnose-061\tspanish\tn a s o\t1.0\nnose-061\tfrench\tn e\t1.0\nnose-061\titalian\tn a s o\t1.0\nold-062\tlatin\tv e t u l u\t1.0\nold-062\tspanish\tb j e x o\t1.0\nold-062\tfrench\tv j ø\t1.0\nold-062\titalian\tv ɛ k k j o\t1.0\nrain-063\tlatin\tp l u v i a\t1.0\nrain-063\tspanish\tʎ u b j a\t1.0\nrain-063\tfrench\tp l ɥ i\t1.0\nrain-063\titalian\tp j ɔ d ʒ a\t1.0\nred-064\tlatin\tr u b j u\t1.0\nred-064\tspanish\tr o x o\t1.0\nred-064\tfrench\tʁ u ʒ\t1.0\nred-064\titalian\tr o s s o\t1.0\nsay-065\tlatin\td i k e r e\t1.0\nsay-065\tspanish\td e θ i r\t1.0\nsay-065\tfrench\td i ʁ\t1.0\nsay-065\titalian\td i r e\t1.0\nsee-066\tlatin\tv i d e r e\t1.0\nsee-066\tspanish\tb e r\t1.0\nsee-066\tfrench\tv w a ʁ\t1.0\nsee-066\titalian\tv e d e r e\t1.0\nseed-067\tlatin\ts e m e n\t1.0\nseed-067\tspanish\ts e m i ʎ a\t1.0\nseed-067\tfrench\tɡ ʁ ɛ n\t1.0\nseed-067\titalian\ts e m e\t1.0\nseven-068\tlatin\ts e p t e m\t1.0\nseven-068\tspanish\ts j e t e\t1.0\nseven-068\tfrench\ts ɛ t\t1.0\nseven-068\titalian\ts ɛ t t e\t1.0\nshort-069\tlatin\tk u r t u\t1.0\nshort-069\tspanish\tk o r t o\t1.0\nshort-069\tfrench\tk u ʁ\t1.0\nshort-069\titalian\tk o r t o\t1.0\nsister-070\tlatin\ts o r o r\t1.0\nsister-070\tspanish\te r m a n a\t1.0\nsister-070\tfrench\ts œ ʁ\t1.0\nsister-070\titalian\ts o r ɛ l l a\t1.0\nskin-071\tlatin\tp e l l e\t1.0\nskin-071\tspanish\tp j e l\t1.0\nskin-071\tfrench\tp o\t1.0\nskin-071\titalian\tp ɛ l l e\t1.0\nsky-072\tlatin\tk a e l u\t1.0\nsky-072\tspanish\tθ j e l o\t1.0\nsky-072\tfrench\ts j ɛ l\t1.0\nsky-072\titalian\tt ʃ ɛ l o\t1.0\nsleep-073\tlatin\td o r m i r e\t1.0\nsleep-073\tspanish\td o r m i r\t1.0\nsleep-073\tfrench\td ɔ ʁ m i ʁ\t1.0\nsleep-073\titalian\td o r m i r e\t1.0\nsmall-074\tlatin\tp a r v u\t1.0\nsmall-074\tspanish\tp e q w e ɲ o\t1.0\nsmall-074\tfrench\tp ə t i\t1.0\nsmall-074\titalian\tp i k k o l o\t1.0\nsnake-075\tlatin\ts e r p e n t e\t1.0\nsnake-075\tspanish\ts e r p j e n t e\t1.0\nsnake-075\tfrench\ts ɛ ʁ p ɑ̃\t1.0\nsnake-075\titalian\ts ɛ r p ɛ n t e\t1.0\nson-076\tlatin\tf i l i u\t1.0\nson-076\tspanish\ti x o\t1.0\nson-076\tfrench\tf i s\t1.0\nson-076\titalian\tf i ʎ o\t1.0\nspeak-077\tlatin\tl o q u i\t1.0\nspeak-077\tspanish\ta b l a r\t1.0\nspeak-077\tfrench\tp a ʁ l e\t1.0\nspeak-077\titalian\tp a r l a r e\t1.0\nstar-078\tlatin\ts t e l l a\t1.0\nstar-078\tspanish\te s t r e ʎ a\t1.0\nstar-078\tfrench\te t w a l\t1.0\nstar-078\titalian\ts t e l l a\t1.0\nstone-079\tlatin\tp e t r a\t1.0\nstone-079\tspanish\tp j e d r a\t1.0\nstone-079\tfrench\tp j ɛ ʁ\t1.0\nstone-079\titalian\tp j ɛ t r a\t1.0\nsun-080\tlatin\ts o l e\t1.0\nsun-080\tspanish\ts o l\t1.0\nsun-080\tfrench\ts ɔ l ɛ j\t1.0\nsun-080\titalian\ts o l e\t1.0\nsweet-081\tlatin\td u l k e\t1.0\nsweet-081\tspanish\td u l θ e\t1.0\ntake-082\tlatin\tp r e n d e r e\t1.0\ntake-082\tspanish\tp r e n d e r\t1.0\ntake-082\tfrench\tp ʁ ɑ̃ d ʁ\t1.0\ntake-082\titalian\tp r ɛ n d e r e\t1.0\nten-083\tlatin\td e c e m\t1.0\nten-083\tspanish\td j e θ\t1.0\nten-083\tfrench\td i s\t1.0\nten-083\titalian\td j ɛ t ʃ i\t1.0\nthree-084\tlatin\tt r e s\t1.0\nthree-084\tspanish\tt r e s\t1.0\nthree-084\tfrench\tt ʁ w a\t1.0\nthree-084\titalian\tt r e\t1.0\ntongue-085\tlatin\tl i n g u a\t1.0\ntongue-085\tspanish\tl e n g w a\t1.0\ntongue-085\tfrench\tl ɑ̃ ɡ\t1.0\ntongue-085\titalian\tl i ŋ ɡ w a\t1.0\ntooth-086\tlatin\td e n t e m\t1.0\ntooth-086\tspanish\td j e n t e\t1.0\ntooth-086\tfrench\td ɑ̃\t1.0\ntooth-086\titalian\td ɛ n t e\t1.0\ntree-087\tlatin\ta r b o r\t1.0\ntree-087\tspanish\ta r b o l\t1.0\ntree-087\tfrench\ta ʁ b ʁ\t1.0\ntree-087\titalian\ta l b e r o\t1.0\nwalk-088\tlatin\ta m b u l a r e\t1.0\nwalk-088\tspanish\ta n d a r\t1.0\nwalk-088\tfrench\tm a ʁ ʃ e\t1.0\nwalk-088\titalian\tk a m m i n a r e\t1.0\nwater-089\tlatin\ta q u a\t1.0\nwater-089\tspanish\ta g w a\t1.0\nwater-089\tfrench\to\t1.0\nwater-089\titalian\ta k k w a\t1.0\nwhite-090\tlatin\tb l a n k u\t1.0\nwhite-090\tspanish\tb l a n k o\t1.0\nwhite-090\tfrench\tb l ɑ̃\t1.0\nwhite-090\titalian\tb j a ŋ k o\t1.0\nwind-091\tlatin\tv e n t u\t1.0\nwind-091\tspanish\tb j e n t o\t1.0\nwind-091\tfrench\tv ɑ̃\t1.0\nwind-091\titalian\tv ɛ n t o\t1.0\nwolf-092\tlatin\tl u p u\t1.0\nwolf-092\tspanish\tl o b o\t1.0\nwolf-092\tfrench\tl u\t1.0\nwolf-092\titalian\tl u p o\t1.0\nwoman-093\tlatin\tf e m i n a\t1.0\nwoman-093\tspanish\te m b e r\t1.0\nwoman-093\tfrench\tf a m\t1.0\nwoman-093\titalian\tf ɛ m m i n a\t1.0\nwood-094\tlatin\tl i g n u\t1.0\nwood-094\tspanish\tl e ɲ o\t1.0\nwood-094\tfrench\tb w a\t1.0\nwood-094\titalian\tl e ɲ o\t1.0\nyear-095\tlatin\ta n n u\t1.0\nyear-095\tspanish\ta ɲ o\t1.0\nyear-095\tfrench\tɑ̃\t1.0\nyear-095\titalian\ta n n o\t1.0\n",
   "testdata/restraint/chance.tsv": "cognate_id\tlect_id\tsegments\nc000\talpha\ts e m a s\nc000\tomega\tt i m a l\nc001\talpha\ts u p o k\nc001\tomega\tl u m e\nc002\talpha\tk i m o l\nc002\tomega\tp o n o l\nc003\talpha\tw e w o\nc003\tomega\tl o m u k\nc004\talpha\ts o k e l\nc004\tomega\tw i m i s\nc005\talpha\tm a p i k\nc005\tomega\tp a t e k\nc006\talpha\tw a n a l\nc006\tomega\tl e p o k\nc007\talpha\ts e l e n\nc007\tomega\tt a n e s\nc008\talpha\tk i s u n\nc008\tomega\tt i p u l\nc009\talpha\tn u w o k\nc009\tomega\tk u l u s\nc010\talpha\tk u w u k\nc010\tomega\ts o t u n\nc011\talpha\tt a l i l\nc011\tomega\ts a l o l\nc012\talpha\tt o s u\nc012\tomega\tn i t e k\nc013\talpha\tk e k a n\nc013\tomega\ts e p i s\nc014\talpha\tl i w a n\nc014\tomega\tp e m a k\nc015\talpha\tn e m a s\nc015\tomega\tk a p o l\nc016\talpha\tn o m i s\nc016\tomega\ts i m o l\nc017\talpha\tl o p a k\nc017\tomega\tn a s i l\nc018\talpha\tk e p a l\nc018\tomega\tl u m u\nc019\talpha\tp a k u n\nc019\tomega\tp u s o\nc020\talpha\tt a l a l\nc020\tomega\tk u l u k\nc021\talpha\ts o l u s\nc021\tomega\tp e t e\nc022\talpha\tp e k a n\nc022\tomega\tt o k e\nc023\talpha\tk e w u\nc023\tomega\tw u p i\nc024\talpha\tp e s a l\nc024\tomega\tp o n u n\nc025\talpha\tn e t e s\nc025\tomega\tm o s e k\nc026\talpha\tl u k i n\nc026\tomega\tl o t u\nc027\talpha\tt o n o n\nc027\tomega\tw o s a k\nc028\talpha\tt i l u k\nc028\tomega\tm i p e n\nc029\talpha\tk i s i l\nc029\tomega\tp a s i k\nc030\talpha\ts o p e n\nc030\tomega\tw u p a k\nc031\talpha\tn o s u s\nc031\tomega\tw u m i\nc032\talpha\tn u l o n\nc032\tomega\tt o l o s\nc033\talpha\tw i s i n\nc033\tomega\tp o s o l\nc034\talpha\tp i k i l\nc034\tomega\tp o l o s\nc035\talpha\tk u w e l\nc035\tomega\tk e w i\nc036\talpha\tp a m e s\nc036\tomega\ts e n o n\nc037\talpha\tl i k u k\nc037\tomega\ts i p o\nc038\talpha\tm e p e k\nc038\tomega\tl o m o n\nc039\talpha\tw u l a k\nc039\tomega\tn u n a s\nc040\talpha\tl o m o n\nc040\tomega\tt i w a l\nc041\talpha\tm i n u k\nc041\tomega\tn e p i l\nc042\talpha\tk u s i k\nc042\tomega\tp o p a l\nc043\talpha\ts a k u l\nc043\tomega\tk o t e l\nc044\talpha\tt i n o s\nc044\tomega\ts e p a n\nc045\talpha\tm u s a k\nc045\tomega\tl o p i k\nc046\talpha\tl o s i s\nc046\tomega\tn e s a\nc047\talpha\tk i k i n\nc047\tomega\tp a k e n\nc048\talpha\tw e w e k\nc048\tomega\tk i m o s\nc049\talpha\tn o t i\nc049\tomega\tp e n i l\nc050\talpha\tw u m o\nc050\tomega\tn a m e\nc051\talpha\tm i p o\nc051\tomega\tp o s o l\nc052\talpha\tm o n e s\nc052\tomega\tk o w u n\nc053\talpha\tt o w u k\nc053\tomega\tm u s o s\nc054\talpha\tp o s a s\nc054\tomega\tn i k e n\nc055\talpha\tw o p i k\nc055\tomega\tk e p u\nc056\talpha\tp o s e\nc056\tomega\tl e t u\nc057\talpha\tp i t u l\nc057\tomega\ts u m e l\nc058\talpha\tm o l u l\nc058\tomega\tl o w u k\nc059\talpha\ts e s i k\nc059\tomega\tw a w a l\nc060\talpha\tk e k a k\nc060\tomega\tl u t u s\nc061\talpha\tl a k i n\nc061\tomega\tn a n o n\nc062\talpha\tt e w a l\nc062\tomega\ts o w u l\nc063\talpha\tl e s a\nc063\tomega\tn a s e n\nc064\talpha\tn o m i n\nc064\tomega\tk e m o\nc065\talpha\tl a t o n\nc065\tomega\ts e w o\nc066\talpha\tl o t a l\nc066\tomega\ts o l e k\nc067\talpha\tl a k a k\nc067\tomega\tl o n u s\nc068\talpha\tn a p i k\nc068\tomega\tw a w o s\nc069\talpha\tm i m u k\nc069\tomega\tp i n e\nc070\talpha\ts i l o n\nc070\tomega\tm u s o\nc071\talpha\tt a p o n\nc071\tomega\tw e n e k\nc072\talpha\tk e l i n\nc072\tomega\tm u t u k\nc073\talpha\tl i w u n\nc073\tomega\tt u p o l\nc074\talpha\tp e l i s\nc074\tomega\tw u s i l\nc075\talpha\tm u t u s\nc075\tomega\tl u w a\nc076\talpha\tn e s e\nc076\tomega\tt i k u l\nc077\talpha\tp i t o n\nc077\tomega\tw o l e n\nc078\talpha\tm o n u\nc078\tomega\tl u t e k\nc079\talpha\tw u m u n\nc079\tomega\tl a l a n\n",
@@ -31,7 +33,31 @@ const CORPORA = {
   "experiments/tone_vietnamese_like/cognates.tsv": "gloss\thanoi\thanoi_tone\tsaigon\tsaigon_tone\none\tmot\t- 6 -\tmot\t- 5 -\ntwo\thai\t- - 1\thai\t- - 1\nthree\tba\t- 1\tba\t- 1\nfour\tbon\t- 5 -\tbon\t- 4 -\nfive\tnam\t- 1 -\tnam\t- 1 -\nsix\tsau\t- - 5\tsau\t- - 4\nseven\tbay\t- 3 -\tbay\t- 2 -\neight\ttam\t- 2 -\ttam\t- 1 -\nnine\ttin\t- 5 -\ttin\t- 4 -\nten\tmuoi\t- - - 3\tmuoi\t- - - 2\nhundred\ttram\t- - 1 -\ttram\t- - 1 -\nmother\tme\t- 4\tme\t- 4\nfather\tcha\t- - 1\tcha\t- - 1\nchild\tcon\t- 1 -\tcon\t- 1 -\nperson\tnguoi\t- - - - 3\tnguoi\t- - - - 2\nman\tdan\t- 1 -\tdan\t- 1 -\nwoman\tba\t- 2\tba\t- 1\nwater\tnuoc\t- - 5 -\tnuoc\t- - 4 -\nfire\tlua\t- - 3\tlua\t- - 2\nstone\tda\t- 2\tda\t- 1\nhouse\tnha\t- - 1\tnha\t- - 1\ntree\tcay\t- 1 -\tcay\t- 1 -\nleaf\tla\t- 2\tla\t- 1\nfruit\tqua\t- - 3\tqua\t- - 2\nrice\tcom\t- 1 -\tcom\t- 1 -\nbook\tsach\t- 5 - -\tsach\t- 4 - -\npen\tbut\t- 5 -\tbut\t- 4 -\nschool\ttruong\t- - - 3 - -\ttruong\t- - - 2 - -\nroad\tduong\t- - 1 - -\tduong\t- - 1 - -\nday\tngay\t- - 3 -\tngay\t- - 2 -\nnight\tdem\t- 1 -\tdem\t- 1 -\nmorning\tsang\t- 5 - -\tsang\t- 4 - -\nsun\tmat\t- 5 -\tmat\t- 4 -\nmoon\ttrang\t- - 1 - -\ttrang\t- - 1 - -\nstar\tsao\t- - 1\tsao\t- - 1\nsky\ttroi\t- - - 3\ttroi\t- - - 2\nsea\tbien\t- - 3 -\tbien\t- - 2 -\nmountain\tnui\t- - 5\tnui\t- - 4\nriver\tsong\t- 1 - -\tsong\t- 1 - -\ndog\tcho\t- - 5\tcho\t- - 4\ncat\tmeo\t- - 1\tmeo\t- - 1\nbird\tchim\t- - 1 -\tchim\t- - 1 -\nfish\tca\t- 5\tca\t- 4\ncow\tbo\t- 1\tbo\t- 1\npig\tlon\t- 5 -\tlon\t- 4 -\nhead\tdau\t- - 2\tdau\t- - 1\neye\tmat\t- 5 -\tmat\t- 4 -\near\ttai\t- - 1\ttai\t- - 1\nnose\tmui\t- - 3\tmui\t- - 2\nmouth\tmieng\t- - 4 - -\tmieng\t- - 4 - -\ntongue\tluoi\t- - - 3\tluoi\t- - - 2\ntooth\trang\t- 1 - -\trang\t- 1 - -\nhand\ttay\t- 1 -\ttay\t- 1 -\nfoot\tchan\t- - 1 -\tchan\t- - 1 -\nred\tdo\t- 2\tdo\t- 1\nwhite\ttrang\t- - 5 - -\ttrang\t- - 4 - -\nblack\tden\t- 1 -\tden\t- 1 -\nblue\txanh\t- 1 - -\txanh\t- 1 - -\nbig\tto\t- 1\tto\t- 1\nsmall\tnho\t- - 2\tnho\t- - 1\nnew\tmoi\t- - 5\tmoi\t- - 4\nold\tcu\t- 2\tcu\t- 1\ngood\ttot\t- 5 -\ttot\t- 4 -\nbad\txau\t- - 5\txau\t- - 4\nhot\tnong\t- 1 - -\tnong\t- 1 - -\ncold\tlanh\t- 4 - -\tlanh\t- 4 - -\ngo\tdi\t- 1\tdi\t- 1\ncome\tden\t- 5 -\tden\t- 4 -\neat\tan\t1 -\tan\t1 -\ndrink\tuong\t- 5 - -\tuong\t- 4 - -\nsleep\tngu\t- - 3\tngu\t- - 2\nsee\tthay\t- - 5 -\tthay\t- - 4 -\nhear\tnghe\t- - - 1\tnghe\t- - - 1\nspeak\tnoi\t- - 5\tnoi\t- - 4\n",
   "experiments/tone_yoruba_like/cognates.tsv": "gloss\tstandard\tekiti\nhead\tori⁵⁵\tori³³\neye\toju³³\toju¹¹\nnose\timu⁵⁵\timu³³\nmouth\tenu³³\tenu¹¹\ntongue\tahon³³\tahon¹¹\ntooth\tehin³³\tehin¹¹\near\teti³³\teti¹¹\nhair\tirun³³\tirun¹¹\nneck\torun³³\torun¹¹\narm\tapa⁵⁵\tapa³³\nhand\towo⁵⁵\towo³³\nfinger\tika⁵⁵\tika³³\nleg\tese⁵⁵\tese³³\nfoot\tese⁵⁵\tese³³\nback\tehin⁵⁵\tehin³³\nchest\taya³³\taya¹¹\nbelly\tinu³³\tinu¹¹\nheart\tokan⁵⁵\tokan³³\nblood\teje⁵⁵\teje³³\nbone\tegungun³³\tegungun¹¹\nskin\tawo³³\tawo¹¹\nwater\tomi³³\tomi¹¹\nfire\tina³³\tina¹¹\nsun\toorun³³\toorun¹¹\nmoon\tosupa⁵⁵\tosupa³³\nstar\tirawo⁵⁵\tirawo³³\nsky\torun⁵⁵\torun³³\nearth\tile⁵⁵\tile³³\nstone\tokuta⁵⁵\tokuta³³\nroad\tona⁵⁵\tona³³\nhouse\tile³³\tile¹¹\nman\tokunrin⁵⁵\tokunrin³³\nwoman\tobinrin⁵⁵\tobinrin³³\nchild\tomo³³\tomo¹¹\nmother\tiya³³\tiya¹¹\nfather\tbaba³³\tbaba¹¹\nfriend\tore⁵⁵\tore³³\ndog\taja³³\taja¹¹\ncat\tologbo³³\tologbo¹¹\nhorse\tesin³³\tesin¹¹\ncow\tmalu⁵⁵\tmalu³³\nbird\teye⁵⁵\teye³³\nfish\teja³³\teja¹¹\nsnake\tejo⁵⁵\tejo³³\nrat\teku⁵⁵\teku³³\ntree\tigi³³\tigi¹¹\nleaf\tewe⁵⁵\tewe³³\nfruit\teso³³\teso¹¹\nseed\tirugbin⁵⁵\tirugbin³³\ngrass\tkoriko⁵⁵\tkoriko³³\nsalt\tiyo⁵⁵\tiyo³³\noil\tepo⁵⁵\tepo³³\nfood\tounje⁵⁵\tounje³³\nrice\tiresi⁵⁵\tiresi³³\nyam\tisu³³\tisu¹¹\ncorn\tagbado⁵⁵\tagbado³³\none\teni⁵⁵\teni³³\ntwo\teji⁵⁵\teji³³\nthree\teta⁵⁵\teta³³\nfour\terin⁵⁵\terin³³\nfive\tarun⁵⁵\tarun³³\nsix\tefa⁵⁵\tefa³³\nseven\teje⁵⁵\teje³³\nday\tojo³³\tojo¹¹\nnight\toru⁵⁵\toru³³\nyear\todun⁵⁵\todun³³\nname\toruko⁵⁵\toruko³³\nword\toro⁵⁵\toro³³\ngo\tlo³³\tlo¹¹\ncome\twa³³\twa¹¹\neat\tje³³\tje¹¹\ndrink\tmu³³\tmu¹¹\nsee\tri³³\tri¹¹\nhear\tgbo³³\tgbo¹¹\nspeak\tsoro³³\tsoro¹¹\nsleep\tsun³³\tsun¹¹\nsit\tjoko⁵⁵\tjoko³³\nstand\tduro⁵⁵\tduro³³\nwalk\trin³³\trin¹¹\nrun\tsare⁵⁵\tsare³³\ndie\tku³³\tku¹¹\nlive\tgbe³³\tgbe¹¹\ngive\tfun³³\tfun¹¹\ntake\tgba³³\tgba¹¹\n",
   "experiments/turkish_azerbaijani/cognates.tsv": "gloss\tturkish\tazerbaijani\tturkish_breaks\tazerbaijani_breaks\ntwo\tiki\tiki\t-\t-\nthree\tytʃ\tytʃ\t-\t-\nfour\tdørt\tdørd\t-\t-\nfive\tbeʃ\tbeʃ\t-\t-\nsix\taltɯ\taltɯ\t-\t-\nseven\tjedi\tjeddi\t-\t-\neight\tsekiz\tsəkkiz\t-\t-\nnine\tdokuz\tdoɡɡuz\t-\t-\neye\tɟøz\tɟøz\t-\t-\near\tkulak\tɡulaχ\t-\t-\ntooth\tdiʃ\tdiʃ\t-\t-\ntongue\tdil\tdil\t-\t-\nhead\tbaʃ\tbaʃ\t-\t-\nhand\tel\təl\t-\t-\narm\tkol\tɡol\t-\t-\nfoot\tajak\tajaχ\t-\t-\nblood\tkan\tɡan\t-\t-\nname\tad\tad\t-\t-\nstone\ttaʃ\tdaʃ\t-\t-\nmountain\tdaː\tdaɣ\t-\t-\nlake\tɟøl\tɟøl\t-\t-\nsnow\tkar\tɡar\t-\t-\nsun\tɟyn\tɟyn\t-\t-\nfire\tod\tod\t-\t-\nhorse\tat\tat\t-\t-\ndog\tkøpec\tkøpək\t-\t-\nfish\tbalɯk\tbalɯχ\t-\t-\nhouse\tev\tev\t-\t-\nroad\tjol\tjol\t-\t-\nwhite\tak\taɣ\t-\t-\nblack\tkara\tɡara\t-\t-\nbig\tbyjyc\tbøjyc\t-\t-\nnew\tjeni\tjeni\t-\t-\ncome\tɟelmec\tɟælmæc\t3\t3\ngo\tɟitmec\tɟetmæc\t3\t3\neat\tjemec\tjemæc\t2\t2\ndrink\titʃmec\titʃmæc\t2\t2\nsee\tɟørmec\tɟørmæc\t3\t3\nknow\tbilmec\tbilmæc\t3\t3\ndie\tølmec\tølmæc\t2\t2\ngive\tvermec\tvermæc\t3\t3\n",
-  "experiments/umlaut_synthetic/cognates.tsv": "gloss\tproto\tderived\nu1\tpati\tpæti\nu2\tbani\tbæni\nu3\tkati\tkæti\nu4\tdani\tdæni\nu5\tgati\tgæti\nu6\tpabe\tpæbe\nu7\tbade\tbæde\nu8\tkame\tkæme\nu9\tdape\tdæpe\nu10\tgabe\tgæbe\nn1\tpato\tpato\nn2\tbado\tbado\nn3\tkako\tkako\nn4\tdago\tdago\nn5\tgamo\tgamo\nn6\tpapu\tpapu\nn7\tbabu\tbabu\nn8\tkamu\tkamu\nn9\tdatu\tdatu\nn10\tgapu\tgapu\nc1\tpiti\tpiti\nc2\tbiki\tbiki\nc3\tkiti\tkiti\nc4\tdiki\tdiki\nc5\tgidi\tgidi\nc6\tpito\tpito\nc7\tbito\tbito\nc8\tkito\tkito\nc9\tduki\tduki\nc10\tgumi\tgumi\nc11\tpuki\tpuki\nc12\tbuti\tbuti\nc13\tkuti\tkuti\nc14\tdudu\tdudu\nc15\tgudu\tgudu\nc16\tpupu\tpupu\nc17\tbubu\tbubu\nc18\tkuku\tkuku\nc19\tduma\tduma\nc20\tgutu\tgutu\n"
+  "experiments/umlaut_synthetic/cognates.tsv": "gloss\tproto\tderived\nu1\tpati\tpæti\nu2\tbani\tbæni\nu3\tkati\tkæti\nu4\tdani\tdæni\nu5\tgati\tgæti\nu6\tpabe\tpæbe\nu7\tbade\tbæde\nu8\tkame\tkæme\nu9\tdape\tdæpe\nu10\tgabe\tgæbe\nn1\tpato\tpato\nn2\tbado\tbado\nn3\tkako\tkako\nn4\tdago\tdago\nn5\tgamo\tgamo\nn6\tpapu\tpapu\nn7\tbabu\tbabu\nn8\tkamu\tkamu\nn9\tdatu\tdatu\nn10\tgapu\tgapu\nc1\tpiti\tpiti\nc2\tbiki\tbiki\nc3\tkiti\tkiti\nc4\tdiki\tdiki\nc5\tgidi\tgidi\nc6\tpito\tpito\nc7\tbito\tbito\nc8\tkito\tkito\nc9\tduki\tduki\nc10\tgumi\tgumi\nc11\tpuki\tpuki\nc12\tbuti\tbuti\nc13\tkuti\tkuti\nc14\tdudu\tdudu\nc15\tgudu\tgudu\nc16\tpupu\tpupu\nc17\tbubu\tbubu\nc18\tkuku\tkuku\nc19\tduma\tduma\nc20\tgutu\tgutu\n",
+  "testdata/soundlaws/compensatory_lengthening.tsv": "cognate_id\tlect_id\tsegments\ngoose\tpgmc\tg a n s\ngoose\toe\tg oː s\ntooth\tpgmc\tt a n θ\ntooth\toe\tt oː θ\nother\tpgmc\ta n θ a r\nother\toe\toː θ e r\ngod\tpgmc\ta n s u\ngod\toe\toː s\nsoft\tpgmc\ts a m f t\nsoft\toe\ts oː f t\nus\tpgmc\tu n s\nus\toe\tuː s\nmouth\tpgmc\tm u n θ\nmouth\toe\tm uː θ\nsouth\tpgmc\ts u n θ\nsouth\toe\ts uː θ\nknown\tpgmc\tk u n θ\nknown\toe\tk uː θ\nyouth\tpgmc\tj u n θ\nyouth\toe\tj uː θ\nfive\tpgmc\tf i m f\nfive\toe\tf iː f\nfifth\tpgmc\tf i m f t\nfifth\toe\tf iː f t\nstrong\tpgmc\ts w i n θ\nstrong\toe\ts w iː θ\nhand\tpgmc\th a n d\nhand\toe\th a n d\nland\tpgmc\tl a n d\nland\toe\tl a n d\nbind\tpgmc\tb i n d\nbind\toe\tb i n d\nlong\tpgmc\tl a n g\nlong\toe\tl a n g\ndrink\tpgmc\td r i n k\ndrink\toe\td r i n k\nlamb\tpgmc\tl a m b\nlamb\toe\tl a m b\nstand\tpgmc\ts t a n d\nstand\toe\ts t a n d\nwind\tpgmc\tw i n d\nwind\toe\tw i n d\nwound\tpgmc\tw u n d\nwound\toe\tw u n d\nbank\tpgmc\tb a n k\nbank\toe\tb a n k\nsing\tpgmc\ts i n g\nsing\toe\ts i n g\nunder\tpgmc\tu n d a r\nunder\toe\tu n d e r\nman\tpgmc\tm a n\nman\toe\tm a n\nname\tpgmc\tn a m a\nname\toe\tn a m a\nson\tpgmc\ts u n u\nson\toe\ts u n u\nmoon\tpgmc\tm eː n a\nmoon\toe\tm oː n a\nhoney\tpgmc\th u n a g\nhoney\toe\th u n e g\n",
+  "testdata/soundlaws/conditioned_confound.tsv": "cognate_id\tlect_id\tsegments\nw01\tA\tn k i\nw01\tB\tn tʃ i\nw02\tA\tn k i\nw02\tB\tn tʃ i\nw03\tA\tn k i\nw03\tB\tn tʃ i\nw04\tA\tn k i\nw04\tB\tn tʃ i\nw05\tA\tn k e\nw05\tB\tn tʃ e\nw06\tA\tn k e\nw06\tB\tn tʃ e\nw07\tA\tn k e\nw07\tB\tn tʃ e\nw08\tA\tn k e\nw08\tB\tn tʃ e\nw09\tA\ts k u\nw09\tB\ts k u\nw10\tA\ts k u\nw10\tB\ts k u\nw11\tA\ts k u\nw11\tB\ts k u\nw12\tA\ts k u\nw12\tB\ts k u\nw13\tA\ts k o\nw13\tB\ts k o\nw14\tA\ts k o\nw14\tB\ts k o\nw15\tA\ts k o\nw15\tB\ts k o\nw16\tA\ts k o\nw16\tB\ts k o\n",
+  "testdata/soundlaws/graded_0_unconditioned.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p e\nw00\tdaughter\tk a f e\nw01\tproto\tk a p i\nw01\tdaughter\tk a f i\nw02\tproto\tk a p o\nw02\tdaughter\tk a f o\nw03\tproto\tk a p u\nw03\tdaughter\tk a f u\nw04\tproto\tk e p a\nw04\tdaughter\tk e f a\nw05\tproto\tk e p i\nw05\tdaughter\tk e f i\nw06\tproto\tk e p o\nw06\tdaughter\tk e f o\nw07\tproto\tk e p u\nw07\tdaughter\tk e f u\nw08\tproto\tk i p a\nw08\tdaughter\tk i f a\nw09\tproto\tk i p e\nw09\tdaughter\tk i f e\nw10\tproto\tk i p o\nw10\tdaughter\tk i f o\nw11\tproto\tk i p u\nw11\tdaughter\tk i f u\nw12\tproto\tk o p a\nw12\tdaughter\tk o f a\nw13\tproto\tk o p e\nw13\tdaughter\tk o f e\nw14\tproto\tk o p i\nw14\tdaughter\tk o f i\nw15\tproto\tk o p u\nw15\tdaughter\tk o f u\nw16\tproto\tk u p a\nw16\tdaughter\tk u f a\nw17\tproto\tk u p e\nw17\tdaughter\tk u f e\nw18\tproto\tk u p i\nw18\tdaughter\tk u f i\nw19\tproto\tk u p o\nw19\tdaughter\tk u f o\nw20\tproto\tt a p e\nw20\tdaughter\tt a f e\nw21\tproto\tt a p i\nw21\tdaughter\tt a f i\nw22\tproto\tt a p o\nw22\tdaughter\tt a f o\nw23\tproto\tt a p u\nw23\tdaughter\tt a f u\nw24\tproto\tt e p a\nw24\tdaughter\tt e f a\nw25\tproto\tt e p i\nw25\tdaughter\tt e f i\nw26\tproto\tt e p o\nw26\tdaughter\tt e f o\nw27\tproto\tt e p u\nw27\tdaughter\tt e f u\nw28\tproto\tt i p a\nw28\tdaughter\tt i f a\nw29\tproto\tt i p e\nw29\tdaughter\tt i f e\nw30\tproto\tt i p o\nw30\tdaughter\tt i f o\nw31\tproto\tt i p u\nw31\tdaughter\tt i f u\nw32\tproto\tt o p a\nw32\tdaughter\tt o f a\nw33\tproto\tt o p e\nw33\tdaughter\tt o f e\nw34\tproto\tt o p i\nw34\tdaughter\tt o f i\nw35\tproto\tt o p u\nw35\tdaughter\tt o f u\nw36\tproto\tt u p a\nw36\tdaughter\tt u f a\nw37\tproto\tt u p e\nw37\tdaughter\tt u f e\nw38\tproto\tt u p i\nw38\tdaughter\tt u f i\nw39\tproto\tt u p o\nw39\tdaughter\tt u f o\n",
+  "testdata/soundlaws/graded_2_position.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p e p\nw00\tdaughter\tk a p e f\nw01\tproto\tk a p i p\nw01\tdaughter\tk a p i f\nw02\tproto\tk a p o p\nw02\tdaughter\tk a p o f\nw03\tproto\tk a p u p\nw03\tdaughter\tk a p u f\nw04\tproto\tk e p a p\nw04\tdaughter\tk e p a f\nw05\tproto\tk e p i p\nw05\tdaughter\tk e p i f\nw06\tproto\tk e p o p\nw06\tdaughter\tk e p o f\nw07\tproto\tk e p u p\nw07\tdaughter\tk e p u f\nw08\tproto\tk i p a p\nw08\tdaughter\tk i p a f\nw09\tproto\tk i p e p\nw09\tdaughter\tk i p e f\nw10\tproto\tk i p o p\nw10\tdaughter\tk i p o f\nw11\tproto\tk i p u p\nw11\tdaughter\tk i p u f\nw12\tproto\tk o p a p\nw12\tdaughter\tk o p a f\nw13\tproto\tk o p e p\nw13\tdaughter\tk o p e f\nw14\tproto\tk o p i p\nw14\tdaughter\tk o p i f\nw15\tproto\tk o p u p\nw15\tdaughter\tk o p u f\nw16\tproto\tk u p a p\nw16\tdaughter\tk u p a f\nw17\tproto\tk u p e p\nw17\tdaughter\tk u p e f\nw18\tproto\tk u p i p\nw18\tdaughter\tk u p i f\nw19\tproto\tk u p o p\nw19\tdaughter\tk u p o f\nw20\tproto\tt a p e p\nw20\tdaughter\tt a p e f\nw21\tproto\tt a p i p\nw21\tdaughter\tt a p i f\nw22\tproto\tt a p o p\nw22\tdaughter\tt a p o f\nw23\tproto\tt a p u p\nw23\tdaughter\tt a p u f\nw24\tproto\tt e p a p\nw24\tdaughter\tt e p a f\nw25\tproto\tt e p i p\nw25\tdaughter\tt e p i f\nw26\tproto\tt e p o p\nw26\tdaughter\tt e p o f\nw27\tproto\tt e p u p\nw27\tdaughter\tt e p u f\nw28\tproto\tt i p a p\nw28\tdaughter\tt i p a f\nw29\tproto\tt i p e p\nw29\tdaughter\tt i p e f\nw30\tproto\tt i p o p\nw30\tdaughter\tt i p o f\nw31\tproto\tt i p u p\nw31\tdaughter\tt i p u f\nw32\tproto\tt o p a p\nw32\tdaughter\tt o p a f\nw33\tproto\tt o p e p\nw33\tdaughter\tt o p e f\nw34\tproto\tt o p i p\nw34\tdaughter\tt o p i f\nw35\tproto\tt o p u p\nw35\tdaughter\tt o p u f\nw36\tproto\tt u p a p\nw36\tdaughter\tt u p a f\nw37\tproto\tt u p e p\nw37\tdaughter\tt u p e f\nw38\tproto\tt u p i p\nw38\tdaughter\tt u p i f\nw39\tproto\tt u p o p\nw39\tdaughter\tt u p o f\n",
+  "testdata/soundlaws/graded_3_stress.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p ˈe\nw00\tdaughter\tk a p e\nw01\tproto\tk ˈa p i\nw01\tdaughter\tk a f i\nw02\tproto\tk a p ˈo\nw02\tdaughter\tk a p o\nw03\tproto\tk ˈa p u\nw03\tdaughter\tk a f u\nw04\tproto\tk ˈe p a\nw04\tdaughter\tk e f a\nw05\tproto\tk ˈe p i\nw05\tdaughter\tk e f i\nw06\tproto\tk e p ˈo\nw06\tdaughter\tk e p o\nw07\tproto\tk ˈe p u\nw07\tdaughter\tk e f u\nw08\tproto\tk ˈi p a\nw08\tdaughter\tk i f a\nw09\tproto\tk i p ˈe\nw09\tdaughter\tk i p e\nw10\tproto\tk i p ˈo\nw10\tdaughter\tk i p o\nw11\tproto\tk ˈi p u\nw11\tdaughter\tk i f u\nw12\tproto\tk ˈo p a\nw12\tdaughter\tk o f a\nw13\tproto\tk o p ˈe\nw13\tdaughter\tk o p e\nw14\tproto\tk ˈo p i\nw14\tdaughter\tk o f i\nw15\tproto\tk ˈo p u\nw15\tdaughter\tk o f u\nw16\tproto\tk ˈu p a\nw16\tdaughter\tk u f a\nw17\tproto\tk u p ˈe\nw17\tdaughter\tk u p e\nw18\tproto\tk ˈu p i\nw18\tdaughter\tk u f i\nw19\tproto\tk u p ˈo\nw19\tdaughter\tk u p o\nw20\tproto\tt ˈa p e\nw20\tdaughter\tt a f e\nw21\tproto\tt a p ˈi\nw21\tdaughter\tt a p i\nw22\tproto\tt ˈa p o\nw22\tdaughter\tt a f o\nw23\tproto\tt a p ˈu\nw23\tdaughter\tt a p u\nw24\tproto\tt e p ˈa\nw24\tdaughter\tt e p a\nw25\tproto\tt e p ˈi\nw25\tdaughter\tt e p i\nw26\tproto\tt ˈe p o\nw26\tdaughter\tt e f o\nw27\tproto\tt e p ˈu\nw27\tdaughter\tt e p u\nw28\tproto\tt i p ˈa\nw28\tdaughter\tt i p a\nw29\tproto\tt ˈi p e\nw29\tdaughter\tt i f e\nw30\tproto\tt ˈi p o\nw30\tdaughter\tt i f o\nw31\tproto\tt i p ˈu\nw31\tdaughter\tt i p u\nw32\tproto\tt o p ˈa\nw32\tdaughter\tt o p a\nw33\tproto\tt ˈo p e\nw33\tdaughter\tt o f e\nw34\tproto\tt o p ˈi\nw34\tdaughter\tt o p i\nw35\tproto\tt o p ˈu\nw35\tdaughter\tt o p u\nw36\tproto\tt u p ˈa\nw36\tdaughter\tt u p a\nw37\tproto\tt ˈu p e\nw37\tdaughter\tt u f e\nw38\tproto\tt u p ˈi\nw38\tdaughter\tt u p i\nw39\tproto\tt ˈu p o\nw39\tdaughter\tt u f o\n",
+  "testdata/soundlaws/graded_4_conjunction.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk p e a\nw00\tdaughter\tk p e a\nw01\tproto\tn p i a\nw01\tdaughter\tn f i a\nw02\tproto\tk p o a\nw02\tdaughter\tk p o a\nw03\tproto\tn p e a\nw03\tdaughter\tn f e a\nw04\tproto\tk p e e\nw04\tdaughter\tk p e e\nw05\tproto\tk p i e\nw05\tdaughter\tk p i e\nw06\tproto\tn p e e\nw06\tdaughter\tn f e e\nw07\tproto\tk p e e\nw07\tdaughter\tk p e e\nw08\tproto\tn p o i\nw08\tdaughter\tn p o i\nw09\tproto\tk p e i\nw09\tdaughter\tk p e i\nw10\tproto\tk p e i\nw10\tdaughter\tk p e i\nw11\tproto\tn p o i\nw11\tdaughter\tn p o i\nw12\tproto\tk p o o\nw12\tdaughter\tk p o o\nw13\tproto\tn p e o\nw13\tdaughter\tn f e o\nw14\tproto\tk p i o\nw14\tdaughter\tk p i o\nw15\tproto\tk p o o\nw15\tdaughter\tk p o o\nw16\tproto\tn p e u\nw16\tdaughter\tn f e u\nw17\tproto\tk p e u\nw17\tdaughter\tk p e u\nw18\tproto\tn p i u\nw18\tdaughter\tn f i u\nw19\tproto\tk p o u\nw19\tdaughter\tk p o u\nw20\tproto\tk p e a\nw20\tdaughter\tk p e a\nw21\tproto\tn p i a\nw21\tdaughter\tn f i a\nw22\tproto\tk p o a\nw22\tdaughter\tk p o a\nw23\tproto\tn p e a\nw23\tdaughter\tn f e a\nw24\tproto\tk p e e\nw24\tdaughter\tk p e e\nw25\tproto\tk p i e\nw25\tdaughter\tk p i e\nw26\tproto\tn p e e\nw26\tdaughter\tn f e e\nw27\tproto\tk p e e\nw27\tdaughter\tk p e e\nw28\tproto\tn p o i\nw28\tdaughter\tn p o i\nw29\tproto\tk p e i\nw29\tdaughter\tk p e i\nw30\tproto\tk p e i\nw30\tdaughter\tk p e i\nw31\tproto\tn p o i\nw31\tdaughter\tn p o i\nw32\tproto\tk p o o\nw32\tdaughter\tk p o o\nw33\tproto\tn p e o\nw33\tdaughter\tn f e o\nw34\tproto\tk p i o\nw34\tdaughter\tk p i o\nw35\tproto\tk p o o\nw35\tdaughter\tk p o o\nw36\tproto\tn p e u\nw36\tdaughter\tn f e u\nw37\tproto\tk p e u\nw37\tdaughter\tk p e u\nw38\tproto\tn p i u\nw38\tdaughter\tn f i u\nw39\tproto\tk p o u\nw39\tdaughter\tk p o u\n",
+  "testdata/soundlaws/graded_5_distance_two.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk l a p e\nw00\tdaughter\tk l a p e\nw01\tproto\tk n a p i\nw01\tdaughter\tk n a f i\nw02\tproto\tk l a p o\nw02\tdaughter\tk l a p o\nw03\tproto\tk n a p u\nw03\tdaughter\tk n a f u\nw04\tproto\tk l a p a\nw04\tdaughter\tk l a p a\nw05\tproto\tk l a p i\nw05\tdaughter\tk l a p i\nw06\tproto\tk n a p o\nw06\tdaughter\tk n a f o\nw07\tproto\tk l a p u\nw07\tdaughter\tk l a p u\nw08\tproto\tk n a p a\nw08\tdaughter\tk n a f a\nw09\tproto\tk l a p e\nw09\tdaughter\tk l a p e\nw10\tproto\tk l a p o\nw10\tdaughter\tk l a p o\nw11\tproto\tk n a p u\nw11\tdaughter\tk n a f u\nw12\tproto\tk l a p a\nw12\tdaughter\tk l a p a\nw13\tproto\tk n a p e\nw13\tdaughter\tk n a f e\nw14\tproto\tk l a p i\nw14\tdaughter\tk l a p i\nw15\tproto\tk l a p u\nw15\tdaughter\tk l a p u\nw16\tproto\tk n a p a\nw16\tdaughter\tk n a f a\nw17\tproto\tk l a p e\nw17\tdaughter\tk l a p e\nw18\tproto\tk n a p i\nw18\tdaughter\tk n a f i\nw19\tproto\tk l a p o\nw19\tdaughter\tk l a p o\nw20\tproto\tt l a p e\nw20\tdaughter\tt l a p e\nw21\tproto\tt n a p i\nw21\tdaughter\tt n a f i\nw22\tproto\tt l a p o\nw22\tdaughter\tt l a p o\nw23\tproto\tt n a p u\nw23\tdaughter\tt n a f u\nw24\tproto\tt l a p a\nw24\tdaughter\tt l a p a\nw25\tproto\tt l a p i\nw25\tdaughter\tt l a p i\nw26\tproto\tt n a p o\nw26\tdaughter\tt n a f o\nw27\tproto\tt l a p u\nw27\tdaughter\tt l a p u\nw28\tproto\tt n a p a\nw28\tdaughter\tt n a f a\nw29\tproto\tt l a p e\nw29\tdaughter\tt l a p e\nw30\tproto\tt l a p o\nw30\tdaughter\tt l a p o\nw31\tproto\tt n a p u\nw31\tdaughter\tt n a f u\nw32\tproto\tt l a p a\nw32\tdaughter\tt l a p a\nw33\tproto\tt n a p e\nw33\tdaughter\tt n a f e\nw34\tproto\tt l a p i\nw34\tdaughter\tt l a p i\nw35\tproto\tt l a p u\nw35\tdaughter\tt l a p u\nw36\tproto\tt n a p a\nw36\tdaughter\tt n a f a\nw37\tproto\tt l a p e\nw37\tdaughter\tt l a p e\nw38\tproto\tt n a p i\nw38\tdaughter\tt n a f i\nw39\tproto\tt l a p o\nw39\tdaughter\tt l a p o\n",
+  "testdata/soundlaws/graded_6_existential.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p e t a l e\nw00\tdaughter\tk a p e t a l e\nw01\tproto\tk a p i t a s e m o\nw01\tdaughter\tk a f i t a s e m o\nw02\tproto\tk a p o l a\nw02\tdaughter\tk a p o l a\nw03\tproto\tk a p u t a m e\nw03\tdaughter\tk a f u t a m e\nw04\tproto\tk e p a t a l e\nw04\tdaughter\tk e p a t a l e\nw05\tproto\tk e p i l a\nw05\tdaughter\tk e p i l a\nw06\tproto\tk e p o t a m e\nw06\tdaughter\tk e f o t a m e\nw07\tproto\tk e p u t a s e l o\nw07\tdaughter\tk e p u t a s e l o\nw08\tproto\tk i p a t a s e m o\nw08\tdaughter\tk i f a t a s e m o\nw09\tproto\tk i p e l a\nw09\tdaughter\tk i p e l a\nw10\tproto\tk i p o t a s e l o\nw10\tdaughter\tk i p o t a s e l o\nw11\tproto\tk i p u m a\nw11\tdaughter\tk i f u m a\nw12\tproto\tk o p a l a\nw12\tdaughter\tk o p a l a\nw13\tproto\tk o p e t a m e\nw13\tdaughter\tk o f e t a m e\nw14\tproto\tk o p i t a s e l o\nw14\tdaughter\tk o p i t a s e l o\nw15\tproto\tk o p u t a l e\nw15\tdaughter\tk o p u t a l e\nw16\tproto\tk u p a t a m e\nw16\tdaughter\tk u f a t a m e\nw17\tproto\tk u p e t a s e l o\nw17\tdaughter\tk u p e t a s e l o\nw18\tproto\tk u p i m a\nw18\tdaughter\tk u f i m a\nw19\tproto\tk u p o t a l e\nw19\tdaughter\tk u p o t a l e\nw20\tproto\tt a p e t a l e\nw20\tdaughter\tt a p e t a l e\nw21\tproto\tt a p i t a s e m o\nw21\tdaughter\tt a f i t a s e m o\nw22\tproto\tt a p o l a\nw22\tdaughter\tt a p o l a\nw23\tproto\tt a p u t a m e\nw23\tdaughter\tt a f u t a m e\nw24\tproto\tt e p a t a l e\nw24\tdaughter\tt e p a t a l e\nw25\tproto\tt e p i l a\nw25\tdaughter\tt e p i l a\nw26\tproto\tt e p o t a m e\nw26\tdaughter\tt e f o t a m e\nw27\tproto\tt e p u t a s e l o\nw27\tdaughter\tt e p u t a s e l o\nw28\tproto\tt i p a t a s e m o\nw28\tdaughter\tt i f a t a s e m o\nw29\tproto\tt i p e l a\nw29\tdaughter\tt i p e l a\nw30\tproto\tt i p o t a s e l o\nw30\tdaughter\tt i p o t a s e l o\nw31\tproto\tt i p u m a\nw31\tdaughter\tt i f u m a\nw32\tproto\tt o p a l a\nw32\tdaughter\tt o p a l a\nw33\tproto\tt o p e t a m e\nw33\tdaughter\tt o f e t a m e\nw34\tproto\tt o p i t a s e l o\nw34\tdaughter\tt o p i t a s e l o\nw35\tproto\tt o p u t a l e\nw35\tdaughter\tt o p u t a l e\nw36\tproto\tt u p a t a m e\nw36\tdaughter\tt u f a t a m e\nw37\tproto\tt u p e t a s e l o\nw37\tdaughter\tt u p e t a s e l o\nw38\tproto\tt u p i m a\nw38\tdaughter\tt u f i m a\nw39\tproto\tt u p o t a l e\nw39\tdaughter\tt u p o t a l e\n",
+  "testdata/soundlaws/graded_7_disjunction.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a e p e\nw00\tdaughter\tk a e p e\nw01\tproto\tk a o p i\nw01\tdaughter\tk a o p i\nw02\tproto\tk a i p o\nw02\tdaughter\tk a i f o\nw03\tproto\tk a n p u\nw03\tdaughter\tk a n p u\nw04\tproto\tk e r p a\nw04\tdaughter\tk e r f a\nw05\tproto\tk e o p i\nw05\tdaughter\tk e o p i\nw06\tproto\tk e i p o\nw06\tdaughter\tk e i f o\nw07\tproto\tk e n p u\nw07\tdaughter\tk e n p u\nw08\tproto\tk i r p a\nw08\tdaughter\tk i r f a\nw09\tproto\tk i e p e\nw09\tdaughter\tk i e p e\nw10\tproto\tk i i p o\nw10\tdaughter\tk i i f o\nw11\tproto\tk i n p u\nw11\tdaughter\tk i n p u\nw12\tproto\tk o r p a\nw12\tdaughter\tk o r f a\nw13\tproto\tk o e p e\nw13\tdaughter\tk o e p e\nw14\tproto\tk o o p i\nw14\tdaughter\tk o o p i\nw15\tproto\tk o n p u\nw15\tdaughter\tk o n p u\nw16\tproto\tk u r p a\nw16\tdaughter\tk u r f a\nw17\tproto\tk u e p e\nw17\tdaughter\tk u e p e\nw18\tproto\tk u o p i\nw18\tdaughter\tk u o p i\nw19\tproto\tk u i p o\nw19\tdaughter\tk u i f o\nw20\tproto\tt a k p e\nw20\tdaughter\tt a k f e\nw21\tproto\tt a s p i\nw21\tdaughter\tt a s p i\nw22\tproto\tt a a p o\nw22\tdaughter\tt a a p o\nw23\tproto\tt a u p u\nw23\tdaughter\tt a u f u\nw24\tproto\tt e l p a\nw24\tdaughter\tt e l p a\nw25\tproto\tt e s p i\nw25\tdaughter\tt e s p i\nw26\tproto\tt e a p o\nw26\tdaughter\tt e a p o\nw27\tproto\tt e u p u\nw27\tdaughter\tt e u f u\nw28\tproto\tt i l p a\nw28\tdaughter\tt i l p a\nw29\tproto\tt i k p e\nw29\tdaughter\tt i k f e\nw30\tproto\tt i a p o\nw30\tdaughter\tt i a p o\nw31\tproto\tt i u p u\nw31\tdaughter\tt i u f u\nw32\tproto\tt o l p a\nw32\tdaughter\tt o l p a\nw33\tproto\tt o k p e\nw33\tdaughter\tt o k f e\nw34\tproto\tt o s p i\nw34\tdaughter\tt o s p i\nw35\tproto\tt o u p u\nw35\tdaughter\tt o u f u\nw36\tproto\tt u l p a\nw36\tdaughter\tt u l p a\nw37\tproto\tt u k p e\nw37\tdaughter\tt u k f e\nw38\tproto\tt u s p i\nw38\tdaughter\tt u s p i\nw39\tproto\tt u a p o\nw39\tdaughter\tt u a p o\n",
+  "testdata/soundlaws/graded_8_weight.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a s p e\nw00\tdaughter\tk a s f e\nw01\tproto\tk r a p i\nw01\tdaughter\tk r a p i\nw02\tproto\tk aː p o\nw02\tdaughter\tk aː f o\nw03\tproto\tk r a r p u\nw03\tdaughter\tk r a r f u\nw04\tproto\tk r eː p a\nw04\tdaughter\tk r eː f a\nw05\tproto\tk r e p i\nw05\tdaughter\tk r e p i\nw06\tproto\tk eː p o\nw06\tdaughter\tk eː f o\nw07\tproto\tk r e r p u\nw07\tdaughter\tk r e r f u\nw08\tproto\tk r iː p a\nw08\tdaughter\tk r iː f a\nw09\tproto\tk i s p e\nw09\tdaughter\tk i s f e\nw10\tproto\tk iː p o\nw10\tdaughter\tk iː f o\nw11\tproto\tk r i r p u\nw11\tdaughter\tk r i r f u\nw12\tproto\tk r oː p a\nw12\tdaughter\tk r oː f a\nw13\tproto\tk o s p e\nw13\tdaughter\tk o s f e\nw14\tproto\tk r o p i\nw14\tdaughter\tk r o p i\nw15\tproto\tk r o r p u\nw15\tdaughter\tk r o r f u\nw16\tproto\tk r uː p a\nw16\tdaughter\tk r uː f a\nw17\tproto\tk u s p e\nw17\tdaughter\tk u s f e\nw18\tproto\tk r u p i\nw18\tdaughter\tk r u p i\nw19\tproto\tk uː p o\nw19\tdaughter\tk uː f o\nw20\tproto\tt r aː p e\nw20\tdaughter\tt r aː f e\nw21\tproto\tt a l p i\nw21\tdaughter\tt a l f i\nw22\tproto\tt r a p o\nw22\tdaughter\tt r a p o\nw23\tproto\tt aː p u\nw23\tdaughter\tt aː f u\nw24\tproto\tt e p a\nw24\tdaughter\tt e p a\nw25\tproto\tt e l p i\nw25\tdaughter\tt e l f i\nw26\tproto\tt r e p o\nw26\tdaughter\tt r e p o\nw27\tproto\tt eː p u\nw27\tdaughter\tt eː f u\nw28\tproto\tt i p a\nw28\tdaughter\tt i p a\nw29\tproto\tt r iː p e\nw29\tdaughter\tt r iː f e\nw30\tproto\tt r i p o\nw30\tdaughter\tt r i p o\nw31\tproto\tt iː p u\nw31\tdaughter\tt iː f u\nw32\tproto\tt o p a\nw32\tdaughter\tt o p a\nw33\tproto\tt r oː p e\nw33\tdaughter\tt r oː f e\nw34\tproto\tt o l p i\nw34\tdaughter\tt o l f i\nw35\tproto\tt oː p u\nw35\tdaughter\tt oː f u\nw36\tproto\tt u p a\nw36\tdaughter\tt u p a\nw37\tproto\tt r uː p e\nw37\tdaughter\tt r uː f e\nw38\tproto\tt u l p i\nw38\tdaughter\tt u l f i\nw39\tproto\tt r u p o\nw39\tdaughter\tt r u p o\n",
+  "testdata/soundlaws/graded_9_lost_trigger.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p e\nw00\tdaughter\tk a f\nw01\tproto\tk a p i\nw01\tdaughter\tk a f\nw02\tproto\tk a p o\nw02\tdaughter\tk a p\nw03\tproto\tk a p u\nw03\tdaughter\tk a p\nw04\tproto\tk e p a\nw04\tdaughter\tk e p\nw05\tproto\tk e p i\nw05\tdaughter\tk e f\nw06\tproto\tk e p o\nw06\tdaughter\tk e p\nw07\tproto\tk e p u\nw07\tdaughter\tk e p\nw08\tproto\tk i p a\nw08\tdaughter\tk i p\nw09\tproto\tk i p e\nw09\tdaughter\tk i f\nw10\tproto\tk i p o\nw10\tdaughter\tk i p\nw11\tproto\tk i p u\nw11\tdaughter\tk i p\nw12\tproto\tk o p a\nw12\tdaughter\tk o p\nw13\tproto\tk o p e\nw13\tdaughter\tk o f\nw14\tproto\tk o p i\nw14\tdaughter\tk o f\nw15\tproto\tk o p u\nw15\tdaughter\tk o p\nw16\tproto\tk u p a\nw16\tdaughter\tk u p\nw17\tproto\tk u p e\nw17\tdaughter\tk u f\nw18\tproto\tk u p i\nw18\tdaughter\tk u f\nw19\tproto\tk u p o\nw19\tdaughter\tk u p\nw20\tproto\tt a p e\nw20\tdaughter\tt a f\nw21\tproto\tt a p i\nw21\tdaughter\tt a f\nw22\tproto\tt a p o\nw22\tdaughter\tt a p\nw23\tproto\tt a p u\nw23\tdaughter\tt a p\nw24\tproto\tt e p a\nw24\tdaughter\tt e p\nw25\tproto\tt e p i\nw25\tdaughter\tt e f\nw26\tproto\tt e p o\nw26\tdaughter\tt e p\nw27\tproto\tt e p u\nw27\tdaughter\tt e p\nw28\tproto\tt i p a\nw28\tdaughter\tt i p\nw29\tproto\tt i p e\nw29\tdaughter\tt i f\nw30\tproto\tt i p o\nw30\tdaughter\tt i p\nw31\tproto\tt i p u\nw31\tdaughter\tt i p\nw32\tproto\tt o p a\nw32\tdaughter\tt o p\nw33\tproto\tt o p e\nw33\tdaughter\tt o f\nw34\tproto\tt o p i\nw34\tdaughter\tt o f\nw35\tproto\tt o p u\nw35\tdaughter\tt o p\nw36\tproto\tt u p a\nw36\tdaughter\tt u p\nw37\tproto\tt u p e\nw37\tdaughter\tt u f\nw38\tproto\tt u p i\nw38\tdaughter\tt u f\nw39\tproto\tt u p o\nw39\tdaughter\tt u p\n",
+  "testdata/soundlaws/grassmann.tsv": "cognate_id\tlect_id\tsegments\nhair\tgreek\tb e d bʰ i\nhair\tpie\tbʰ e d bʰ i\nbind\tgreek\tb a n dʰ o\nbind\tpie\tbʰ a n dʰ o\ntomb\tgreek\tt a p tʰ o\ntomb\tpie\ttʰ a p tʰ o\nnurse\tgreek\tt r e pʰ o\nnurse\tpie\ttʰ r e pʰ o\nrun\tgreek\tt r e kʰ o\nrun\tpie\ttʰ r e kʰ o\nsacrifice\tgreek\tt u o tʰ i\nsacrifice\tpie\ttʰ u o tʰ i\nseek\tgreek\tt e l e tʰ o\nseek\tpie\ttʰ e l e tʰ o\nmarvel\tgreek\tt a u m a tʰ o\nmarvel\tpie\ttʰ a u m a tʰ o\nhave\tgreek\tg e kʰ o\nhave\tpie\tgʰ e kʰ o\npour\tgreek\tk e u dʰ o\npour\tpie\tkʰ e u dʰ o\ngrow\tgreek\tp u tʰ o\ngrow\tpie\tpʰ u tʰ o\nburn\tgreek\td a p tʰ o\nburn\tpie\tdʰ a p tʰ o\nhide\tgreek\tk a l pʰ o\nhide\tpie\tkʰ a l pʰ o\nhold\tgreek\tk e r tʰ o\nhold\tpie\tkʰ e r tʰ o\ncolour\tgreek\tk r o m a tʰ o\ncolour\tpie\tkʰ r o m a tʰ o\ncover\tgreek\tk a l u pʰ o\ncover\tpie\tkʰ a l u pʰ o\nplace\tgreek\ttʰ e s o\nplace\tpie\ttʰ e s o\nflee\tgreek\tpʰ e u g o\nflee\tpie\tpʰ e u g o\ncarry\tgreek\tpʰ e r o\ncarry\tpie\tpʰ e r o\nsay\tgreek\tpʰ a m i\nsay\tpie\tpʰ a m i\nwarm\tgreek\ttʰ e r m o\nwarm\tpie\ttʰ e r m o\nbeast\tgreek\ttʰ e r i o\nbeast\tpie\ttʰ e r i o\ngold\tgreek\tkʰ r u s o\ngold\tpie\tkʰ r u s o\nhand\tgreek\tkʰ e i r o\nhand\tpie\tkʰ e i r o\ngod\tgreek\ttʰ e o s\ngod\tpie\ttʰ e o s\ndoor\tgreek\ttʰ u r a\ndoor\tpie\ttʰ u r a\nsoul\tgreek\ttʰ u m o s\nsoul\tpie\ttʰ u m o s\nleaf\tgreek\tpʰ u l o n\nleaf\tpie\tpʰ u l o n\nmind\tgreek\tpʰ r e n o s\nmind\tpie\tpʰ r e n o s\ntime\tgreek\tkʰ r o n o s\ntime\tpie\tkʰ r o n o s\nstand\tgreek\ts tʰ a t o\nstand\tpie\ts tʰ a t o\ntame\tgreek\ttʰ a m p o\ntame\tpie\ttʰ a m p o\ncut\tgreek\ttʰ e k o\ncut\tpie\ttʰ e k o\nstrike\tgreek\ttʰ u p t o\nstrike\tpie\ttʰ u p t o\nbend\tgreek\tkʰ a m p t o\nbend\tpie\tkʰ a m p t o\nguard\tgreek\tpʰ u l a k o\nguard\tpie\tpʰ u l a k o\nweave\tgreek\tpʰ a r t o\nweave\tpie\tpʰ a r t o\nbear\tgreek\tpʰ e r t o\nbear\tpie\tpʰ e r t o\n",
+  "testdata/soundlaws/great_vowel_shift.tsv": "cognate_id\tlect_id\tsegments\ntime\tmiddle_english\tt iː m ə\ntime\tmodern_english\tt a ɪ m\nmine\tmiddle_english\tm iː n\nmine\tmodern_english\tm a ɪ n\nwife\tmiddle_english\tw iː f\nwife\tmodern_english\tw a ɪ f\nride\tmiddle_english\tr iː d ə\nride\tmodern_english\tr a ɪ d\nfive\tmiddle_english\tf iː v ə\nfive\tmodern_english\tf a ɪ v\nlife\tmiddle_english\tl iː f\nlife\tmodern_english\tl a ɪ f\nwide\tmiddle_english\tw iː d ə\nwide\tmodern_english\tw a ɪ d\nchild\tmiddle_english\ttʃ iː l d\nchild\tmodern_english\ttʃ a ɪ l d\nsee\tmiddle_english\ts eː\nsee\tmodern_english\ts iː\nfeet\tmiddle_english\tf eː t\nfeet\tmodern_english\tf iː t\ngreen\tmiddle_english\tg r eː n ə\ngreen\tmodern_english\tg r iː n\ndeep\tmiddle_english\td eː p\ndeep\tmodern_english\td iː p\nsweet\tmiddle_english\ts w eː t ə\nsweet\tmodern_english\ts w iː t\nqueen\tmiddle_english\tk w eː n ə\nqueen\tmodern_english\tk w iː n\nkeep\tmiddle_english\tk eː p ə\nkeep\tmodern_english\tk iː p\ntree\tmiddle_english\tt r eː\ntree\tmodern_english\tt r iː\nname\tmiddle_english\tn aː m ə\nname\tmodern_english\tn e ɪ m\nmake\tmiddle_english\tm aː k ə\nmake\tmodern_english\tm e ɪ k\ntake\tmiddle_english\tt aː k ə\ntake\tmodern_english\tt e ɪ k\nlake\tmiddle_english\tl aː k ə\nlake\tmodern_english\tl e ɪ k\nbake\tmiddle_english\tb aː k ə\nbake\tmodern_english\tb e ɪ k\ntale\tmiddle_english\tt aː l ə\ntale\tmodern_english\tt e ɪ l\nwhale\tmiddle_english\th w aː l ə\nwhale\tmodern_english\tw e ɪ l\nmoon\tmiddle_english\tm oː n ə\nmoon\tmodern_english\tm uː n\nfood\tmiddle_english\tf oː d ə\nfood\tmodern_english\tf uː d\nroot\tmiddle_english\tr oː t ə\nroot\tmodern_english\tr uː t\ngoose\tmiddle_english\tg oː s\ngoose\tmodern_english\tg uː s\ntooth\tmiddle_english\tt oː θ\ntooth\tmodern_english\tt uː θ\nsoon\tmiddle_english\ts oː n ə\nsoon\tmodern_english\ts uː n\ndoom\tmiddle_english\td oː m\ndoom\tmodern_english\td uː m\nhouse\tmiddle_english\th uː s\nhouse\tmodern_english\th a ʊ s\nmouse\tmiddle_english\tm uː s\nmouse\tmodern_english\tm a ʊ s\nout\tmiddle_english\tuː t\nout\tmodern_english\ta ʊ t\nnow\tmiddle_english\tn uː\nnow\tmodern_english\tn a ʊ\ncow\tmiddle_english\tk uː\ncow\tmodern_english\tk a ʊ\nloud\tmiddle_english\tl uː d ə\nloud\tmodern_english\tl a ʊ d\ntown\tmiddle_english\tt uː n\ntown\tmodern_english\tt a ʊ n\nsouth\tmiddle_english\ts uː θ\nsouth\tmodern_english\ts a ʊ θ\n",
+  "testdata/soundlaws/lenition.tsv": "cognate_id\tlect_id\tsegments\nlife\tlatin\tw i t a\nlife\tspanish\tb i d a\nfriend\tlatin\ta m i k u\nfriend\tspanish\ta m i ɣ o\nwheat\tlatin\tt r i t i k u\nwheat\tspanish\tt r i ɣ o\nfire\tlatin\tf o k u\nfire\tspanish\tf w e ɣ o\nlake\tlatin\tl a k u\nlake\tspanish\tl a ɣ o\nwolf\tlatin\tl u p u\nwolf\tspanish\tl o b o\nknow\tlatin\ts a p e r e\nknow\tspanish\ts a b e r\ngoat\tlatin\tk a p r a\ngoat\tspanish\tk a b r a\nthread\tlatin\tf i l u\nthread\tspanish\ti l o\nmature\tlatin\tm a t u r u\nmature\tspanish\tm a d u r o\nwheel\tlatin\tr o t a\nwheel\tspanish\tr w e d a\nstand\tlatin\ts t a t u\nstand\tspanish\te s t a d o\nsilver\tlatin\ta r g e n t u\nsilver\tspanish\tp l a t a\nbitter\tlatin\ta m a r u\nbitter\tspanish\ta m a r ɣ o\nfield\tlatin\tk a m p u\nfield\tspanish\tk a m p o\nhundred\tlatin\tk e n t u\nhundred\tspanish\tθ j e n t o\nsaint\tlatin\ts a n k t u\nsaint\tspanish\ts a n t o\npart\tlatin\tp a r t e\npart\tspanish\tp a r t e\nhigh\tlatin\ta l t u\nhigh\tspanish\ta l t o\nhorse\tlatin\tk a b a l l u\nhorse\tspanish\tk a b a ʎ o\nopen\tlatin\ta p e r t u\nopen\tspanish\ta b j e r t o\nfifth\tlatin\tk w i n t u\nfifth\tspanish\tk i n t o\nbreak\tlatin\tr u p t u\nbreak\tspanish\tr o t o\npoint\tlatin\tp u n k t u\npoint\tspanish\tp u n t o\n",
+  "testdata/soundlaws/metathesis_adjacent.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tp a s k a\nw00\tdaughter\tp a k s a\nw01\tproto\tp a s k e\nw01\tdaughter\tp a k s e\nw02\tproto\tp a s k i\nw02\tdaughter\tp a k s i\nw03\tproto\tp a s k o\nw03\tdaughter\tp a k s o\nw04\tproto\tp a s k u\nw04\tdaughter\tp a k s u\nw05\tproto\tp e s k a\nw05\tdaughter\tp e k s a\nw06\tproto\tp e s k e\nw06\tdaughter\tp e k s e\nw07\tproto\tp e s k i\nw07\tdaughter\tp e k s i\nw08\tproto\tp e s k o\nw08\tdaughter\tp e k s o\nw09\tproto\tp e s k u\nw09\tdaughter\tp e k s u\nw10\tproto\tp i s k a\nw10\tdaughter\tp i k s a\nw11\tproto\tp i s k e\nw11\tdaughter\tp i k s e\nw12\tproto\tp i s k i\nw12\tdaughter\tp i k s i\nw13\tproto\tp i s k o\nw13\tdaughter\tp i k s o\nw14\tproto\tp i s k u\nw14\tdaughter\tp i k s u\nw15\tproto\tp o s k a\nw15\tdaughter\tp o k s a\nw16\tproto\tp o s k e\nw16\tdaughter\tp o k s e\nw17\tproto\tp o s k i\nw17\tdaughter\tp o k s i\nw18\tproto\tp o s k o\nw18\tdaughter\tp o k s o\nw19\tproto\tp o s k u\nw19\tdaughter\tp o k s u\nc00\tproto\tp a l a\nc00\tdaughter\tp a l a\nc01\tproto\tp e l e\nc01\tdaughter\tp e l e\nc02\tproto\tp i l i\nc02\tdaughter\tp i l i\nc03\tproto\tp o l o\nc03\tdaughter\tp o l o\nc04\tproto\tp u l u\nc04\tdaughter\tp u l u\nc05\tproto\tt a l a\nc05\tdaughter\tt a l a\nc06\tproto\tt e l e\nc06\tdaughter\tt e l e\nc07\tproto\tt i l i\nc07\tdaughter\tt i l i\nc08\tproto\tt o l o\nc08\tdaughter\tt o l o\nc09\tproto\tt u l u\nc09\tdaughter\tt u l u\n",
+  "testdata/soundlaws/metathesis_distant.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tp a r a k u l o\nw00\tdaughter\tp a l a k u r o\nw01\tproto\tp e r a k u l o\nw01\tdaughter\tp e l a k u r o\nw02\tproto\tp i r a k u l o\nw02\tdaughter\tp i l a k u r o\nw03\tproto\tp o r a k u l o\nw03\tdaughter\tp o l a k u r o\nw04\tproto\tp u r a k u l o\nw04\tdaughter\tp u l a k u r o\nw05\tproto\tt a r a k u l o\nw05\tdaughter\tt a l a k u r o\nw06\tproto\tt e r a k u l o\nw06\tdaughter\tt e l a k u r o\nw07\tproto\tt i r a k u l o\nw07\tdaughter\tt i l a k u r o\nw08\tproto\tt o r a k u l o\nw08\tdaughter\tt o l a k u r o\nw09\tproto\tt u r a k u l o\nw09\tdaughter\tt u l a k u r o\nw10\tproto\tk a r a k u l o\nw10\tdaughter\tk a l a k u r o\nw11\tproto\tk e r a k u l o\nw11\tdaughter\tk e l a k u r o\nw12\tproto\tk i r a k u l o\nw12\tdaughter\tk i l a k u r o\nw13\tproto\tk o r a k u l o\nw13\tdaughter\tk o l a k u r o\nw14\tproto\tk u r a k u l o\nw14\tdaughter\tk u l a k u r o\nw15\tproto\tm a r a k u l o\nw15\tdaughter\tm a l a k u r o\nw16\tproto\tm e r a k u l o\nw16\tdaughter\tm e l a k u r o\nw17\tproto\tm i r a k u l o\nw17\tdaughter\tm i l a k u r o\nw18\tproto\tm o r a k u l o\nw18\tdaughter\tm o l a k u r o\nw19\tproto\tm u r a k u l o\nw19\tdaughter\tm u l a k u r o\nc00\tproto\tp a m a n u\nc00\tdaughter\tp a m a n u\nc01\tproto\tp e m a n u\nc01\tdaughter\tp e m a n u\nc02\tproto\tp i m a n u\nc02\tdaughter\tp i m a n u\nc03\tproto\tp o m a n u\nc03\tdaughter\tp o m a n u\nc04\tproto\tp u m a n u\nc04\tdaughter\tp u m a n u\nc05\tproto\tt a m a n u\nc05\tdaughter\tt a m a n u\nc06\tproto\tt e m a n u\nc06\tdaughter\tt e m a n u\nc07\tproto\tt i m a n u\nc07\tdaughter\tt i m a n u\nc08\tproto\tt o m a n u\nc08\tdaughter\tt o m a n u\nc09\tproto\tt u m a n u\nc09\tdaughter\tt u m a n u\n",
+  "testdata/soundlaws/morphological_rhotacism.tsv": "cognate_id\tlect_id\tsegments\tbreaks\ninternal00\told_latin\td o s e t e r\t\ninternal00\tlatin\td o r e t e r\t\nseam00\told_latin\td o s e t e r\t2\nseam00\tlatin\td o s e t e r\t2\ninternal01\told_latin\tn o s a t e r\t\ninternal01\tlatin\tn o r a t e r\t\nseam01\told_latin\tn o s a t e r\t2\nseam01\tlatin\tn o s a t e r\t2\ninternal02\told_latin\tt o s u t e r\t\ninternal02\tlatin\tt o r u t e r\t\nseam02\told_latin\tt o s u t e r\t2\nseam02\tlatin\tt o s u t e r\t2\ninternal03\told_latin\tp o s i t e r\t\ninternal03\tlatin\tp o r i t e r\t\nseam03\told_latin\tp o s i t e r\t2\nseam03\tlatin\tp o s i t e r\t2\ninternal04\told_latin\td e s o t e r\t\ninternal04\tlatin\td e r o t e r\t\nseam04\told_latin\td e s o t e r\t2\nseam04\tlatin\td e s o t e r\t2\ninternal05\told_latin\tn e s a t e r\t\ninternal05\tlatin\tn e r a t e r\t\nseam05\told_latin\tn e s a t e r\t2\nseam05\tlatin\tn e s a t e r\t2\ninternal06\told_latin\tt e s u t e r\t\ninternal06\tlatin\tt e r u t e r\t\nseam06\told_latin\tt e s u t e r\t2\nseam06\tlatin\tt e s u t e r\t2\ninternal07\told_latin\tp e s i t e r\t\ninternal07\tlatin\tp e r i t e r\t\nseam07\told_latin\tp e s i t e r\t2\nseam07\tlatin\tp e s i t e r\t2\ninternal08\told_latin\td a s o t e r\t\ninternal08\tlatin\td a r o t e r\t\nseam08\told_latin\td a s o t e r\t2\nseam08\tlatin\td a s o t e r\t2\ninternal09\told_latin\tn a s e t e r\t\ninternal09\tlatin\tn a r e t e r\t\nseam09\told_latin\tn a s e t e r\t2\nseam09\tlatin\tn a s e t e r\t2\ninternal10\told_latin\tt a s u t e r\t\ninternal10\tlatin\tt a r u t e r\t\nseam10\told_latin\tt a s u t e r\t2\nseam10\tlatin\tt a s u t e r\t2\ninternal11\told_latin\tp a s i t e r\t\ninternal11\tlatin\tp a r i t e r\t\nseam11\told_latin\tp a s i t e r\t2\nseam11\tlatin\tp a s i t e r\t2\ninternal12\told_latin\td u s o t e r\t\ninternal12\tlatin\td u r o t e r\t\nseam12\told_latin\td u s o t e r\t2\nseam12\tlatin\td u s o t e r\t2\ninternal13\told_latin\tn u s e t e r\t\ninternal13\tlatin\tn u r e t e r\t\nseam13\told_latin\tn u s e t e r\t2\nseam13\tlatin\tn u s e t e r\t2\ninternal14\told_latin\tt u s a t e r\t\ninternal14\tlatin\tt u r a t e r\t\nseam14\told_latin\tt u s a t e r\t2\nseam14\tlatin\tt u s a t e r\t2\ninternal15\told_latin\tp u s i t e r\t\ninternal15\tlatin\tp u r i t e r\t\nseam15\told_latin\tp u s i t e r\t2\nseam15\tlatin\tp u s i t e r\t2\ninitial00\told_latin\ts o d e\t\ninitial00\tlatin\ts o d e\t\nfinal00\told_latin\td o d e s\t\nfinal00\tlatin\td o d e s\t\ncluster00\told_latin\td o s t e\t\ncluster00\tlatin\td o s t e\t\ninitial01\told_latin\ts o n a\t\ninitial01\tlatin\ts o n a\t\nfinal01\told_latin\tn o n a s\t\nfinal01\tlatin\tn o n a s\t\ncluster01\told_latin\tn o s t a\t\ncluster01\tlatin\tn o s t a\t\ninitial02\told_latin\ts o t u\t\ninitial02\tlatin\ts o t u\t\nfinal02\told_latin\tt o t u s\t\nfinal02\tlatin\tt o t u s\t\ncluster02\told_latin\tt o s t u\t\ncluster02\tlatin\tt o s t u\t\ninitial03\told_latin\ts o p i\t\ninitial03\tlatin\ts o p i\t\nfinal03\told_latin\tp o p i s\t\nfinal03\tlatin\tp o p i s\t\ncluster03\told_latin\tp o s t i\t\ncluster03\tlatin\tp o s t i\t\ninitial04\told_latin\ts e d o\t\ninitial04\tlatin\ts e d o\t\nfinal04\told_latin\td e d o s\t\nfinal04\tlatin\td e d o s\t\ncluster04\told_latin\td e s t o\t\ncluster04\tlatin\td e s t o\t\ninitial05\told_latin\ts e n a\t\ninitial05\tlatin\ts e n a\t\nfinal05\told_latin\tn e n a s\t\nfinal05\tlatin\tn e n a s\t\ncluster05\told_latin\tn e s t a\t\ncluster05\tlatin\tn e s t a\t\ninitial06\told_latin\ts e t u\t\ninitial06\tlatin\ts e t u\t\nfinal06\told_latin\tt e t u s\t\nfinal06\tlatin\tt e t u s\t\ncluster06\told_latin\tt e s t u\t\ncluster06\tlatin\tt e s t u\t\ninitial07\told_latin\ts e p i\t\ninitial07\tlatin\ts e p i\t\nfinal07\told_latin\tp e p i s\t\nfinal07\tlatin\tp e p i s\t\ncluster07\told_latin\tp e s t i\t\ncluster07\tlatin\tp e s t i\t\n",
+  "testdata/soundlaws/opaque_umlaut.tsv": "cognate_id\tlect_id\tsegments\nguest-i\tgothic\tg a s t i\nguest-i\tohg\tg e s t i\nguest-i\toe\tg e s t\nguest-a\tgothic\tg a s t a\nguest-a\tohg\tg a s t a\nguest-a\toe\tg a s t\nband-i\tgothic\tb a n d i\nband-i\tohg\tb e n d i\nband-i\toe\tb e n d\nband-a\tgothic\tb a n d a\nband-a\tohg\tb a n d a\nband-a\toe\tb a n d\ncraft-i\tgothic\tk r a f t i\ncraft-i\tohg\tk r e f t i\ncraft-i\toe\tk r e f t\ncraft-a\tgothic\tk r a f t a\ncraft-a\tohg\tk r a f t a\ncraft-a\toe\tk r a f t\nnight-i\tgothic\tn a x t i\nnight-i\tohg\tn e x t i\nnight-i\toe\tn e x t\nnight-a\tgothic\tn a x t a\nnight-a\tohg\tn a x t a\nnight-a\toe\tn a x t\nlamb-i\tgothic\tl a m b i\nlamb-i\tohg\tl e m b i\nlamb-i\toe\tl e m b\nlamb-a\tgothic\tl a m b a\nlamb-a\tohg\tl a m b a\nlamb-a\toe\tl a m b\nmouse-i\tgothic\tm uː s i\nmouse-i\tohg\tm yː s i\nmouse-i\toe\tm yː s\nmouse-a\tgothic\tm uː s a\nmouse-a\tohg\tm uː s a\nmouse-a\toe\tm uː s\nlouse-i\tgothic\tl uː s i\nlouse-i\tohg\tl yː s i\nlouse-i\toe\tl yː s\nlouse-a\tgothic\tl uː s a\nlouse-a\tohg\tl uː s a\nlouse-a\toe\tl uː s\nhide-i\tgothic\th uː d i\nhide-i\tohg\th yː d i\nhide-i\toe\th yː d\nhide-a\tgothic\th uː d a\nhide-a\tohg\th uː d a\nhide-a\toe\th uː d\nburg-i\tgothic\tb u r g i\nburg-i\tohg\tb y r g i\nburg-i\toe\tb y r g\nburg-a\tgothic\tb u r g a\nburg-a\tohg\tb u r g a\nburg-a\toe\tb u r g\nkin-i\tgothic\tk u n i\nkin-i\tohg\tk y n i\nkin-i\toe\tk y n\nkin-a\tgothic\tk u n a\nkin-a\tohg\tk u n a\nkin-a\toe\tk u n\nfoot-i\tgothic\tf oː t i\nfoot-i\tohg\tf øː t i\nfoot-i\toe\tf øː t\nfoot-a\tgothic\tf oː t a\nfoot-a\tohg\tf oː t a\nfoot-a\toe\tf oː t\ngoose-i\tgothic\tg oː s i\ngoose-i\tohg\tg øː s i\ngoose-i\toe\tg øː s\ngoose-a\tgothic\tg oː s a\ngoose-a\tohg\tg oː s a\ngoose-a\toe\tg oː s\ntooth-i\tgothic\tt oː θ i\ntooth-i\tohg\tt øː θ i\ntooth-i\toe\tt øː θ\ntooth-a\tgothic\tt oː θ a\ntooth-a\tohg\tt oː θ a\ntooth-a\toe\tt oː θ\nbook-i\tgothic\tb oː k i\nbook-i\tohg\tb øː k i\nbook-i\toe\tb øː k\nbook-a\tgothic\tb oː k a\nbook-a\tohg\tb oː k a\nbook-a\toe\tb oː k\nhand-i\tgothic\th a n d i\nhand-i\tohg\th e n d i\nhand-i\toe\th e n d\nhand-a\tgothic\th a n d a\nhand-a\tohg\th a n d a\nhand-a\toe\th a n d\nman-i\tgothic\tm a n i\nman-i\tohg\tm e n i\nman-i\toe\tm e n\nman-a\tgothic\tm a n a\nman-a\tohg\tm a n a\nman-a\toe\tm a n\nland-i\tgothic\tl a n d i\nland-i\tohg\tl e n d i\nland-i\toe\tl e n d\nland-a\tgothic\tl a n d a\nland-a\tohg\tl a n d a\nland-a\toe\tl a n d\ncomb-i\tgothic\tk a m b i\ncomb-i\tohg\tk e m b i\ncomb-i\toe\tk e m b\ncomb-a\tgothic\tk a m b a\ncomb-a\tohg\tk a m b a\ncomb-a\toe\tk a m b\nlong-i\tgothic\tl a n g i\nlong-i\tohg\tl e n g i\nlong-i\toe\tl e n g\nlong-a\tgothic\tl a n g a\nlong-a\tohg\tl a n g a\nlong-a\toe\tl a n g\nstrong-i\tgothic\ts t r a n g i\nstrong-i\tohg\ts t r e n g i\nstrong-i\toe\ts t r e n g\nstrong-a\tgothic\ts t r a n g a\nstrong-a\tohg\ts t r a n g a\nstrong-a\toe\ts t r a n g\nneck-i\tgothic\th a l s i\nneck-i\tohg\th e l s i\nneck-i\toe\th e l s\nneck-a\tgothic\th a l s a\nneck-a\tohg\th a l s a\nneck-a\toe\th a l s\ncold-i\tgothic\tk a l d i\ncold-i\tohg\tk e l d i\ncold-i\toe\tk e l d\ncold-a\tgothic\tk a l d a\ncold-a\tohg\tk a l d a\ncold-a\toe\tk a l d\narm-i\tgothic\ta r m i\narm-i\tohg\te r m i\narm-i\toe\te r m\narm-a\tgothic\ta r m a\narm-a\tohg\ta r m a\narm-a\toe\ta r m\nsong-i\tgothic\ts a n g i\nsong-i\tohg\ts e n g i\nsong-i\toe\ts e n g\nsong-a\tgothic\ts a n g a\nsong-a\tohg\ts a n g a\nsong-a\toe\ts a n g\n",
+  "testdata/soundlaws/place_assimilation.tsv": "cognate_id\tlect_id\tsegments\na00\tproto\tt a n p e\na00\tdaughter\tt a m p e\na01\tproto\tk a n p i\na01\tdaughter\tk a m p i\na02\tproto\ts a n p o\na02\tdaughter\ts a m p o\na03\tproto\tl a n p u\na03\tdaughter\tl a m p u\na04\tproto\tw e n p a\na04\tdaughter\tw e m p a\na05\tproto\tt a n b e\na05\tdaughter\tt a m b e\na06\tproto\tk a n b i\na06\tdaughter\tk a m b i\na07\tproto\ts a n b o\na07\tdaughter\ts a m b o\na08\tproto\tl a n b u\na08\tdaughter\tl a m b u\na09\tproto\tw e n b a\na09\tdaughter\tw e m b a\na10\tproto\tt a n f e\na10\tdaughter\tt a m f e\na11\tproto\tk a n f i\na11\tdaughter\tk a m f i\na12\tproto\ts a n f o\na12\tdaughter\ts a m f o\na13\tproto\tl a n f u\na13\tdaughter\tl a m f u\na14\tproto\tw e n f a\na14\tdaughter\tw e m f a\na15\tproto\tt a n t e\na15\tdaughter\tt a n t e\na16\tproto\tk a n t i\na16\tdaughter\tk a n t i\na17\tproto\ts a n t o\na17\tdaughter\ts a n t o\na18\tproto\tl a n t u\na18\tdaughter\tl a n t u\na19\tproto\tw e n t a\na19\tdaughter\tw e n t a\na20\tproto\tt a n d e\na20\tdaughter\tt a n d e\na21\tproto\tk a n d i\na21\tdaughter\tk a n d i\na22\tproto\ts a n d o\na22\tdaughter\ts a n d o\na23\tproto\tl a n d u\na23\tdaughter\tl a n d u\na24\tproto\tw e n d a\na24\tdaughter\tw e n d a\na25\tproto\tt a n s e\na25\tdaughter\tt a n s e\na26\tproto\tk a n s i\na26\tdaughter\tk a n s i\na27\tproto\ts a n s o\na27\tdaughter\ts a n s o\na28\tproto\tl a n s u\na28\tdaughter\tl a n s u\na29\tproto\tw e n s a\na29\tdaughter\tw e n s a\na30\tproto\tt a n k e\na30\tdaughter\tt a ŋ k e\na31\tproto\tk a n k i\na31\tdaughter\tk a ŋ k i\na32\tproto\ts a n k o\na32\tdaughter\ts a ŋ k o\na33\tproto\tl a n k u\na33\tdaughter\tl a ŋ k u\na34\tproto\tw e n k a\na34\tdaughter\tw e ŋ k a\na35\tproto\tt a n g e\na35\tdaughter\tt a ŋ g e\na36\tproto\tk a n g i\na36\tdaughter\tk a ŋ g i\na37\tproto\ts a n g o\na37\tdaughter\ts a ŋ g o\na38\tproto\tl a n g u\na38\tdaughter\tl a ŋ g u\na39\tproto\tw e n g a\na39\tdaughter\tw e ŋ g a\n",
+  "testdata/soundlaws/place_dissimilation.tsv": "cognate_id\tlect_id\tsegments\nd00\tproto\tp a l e m a\nd00\tdaughter\tt a l e m a\nd01\tproto\tp a l i t a m e\nd01\tdaughter\tt a l i t a m e\nd02\tproto\tp a l o m a\nd02\tdaughter\tt a l o m a\nd03\tproto\tp a l u t a m e\nd03\tdaughter\tt a l u t a m e\nd04\tproto\tp e l a m a\nd04\tdaughter\tt e l a m a\nd05\tproto\tp e l i t a m e\nd05\tdaughter\tt e l i t a m e\nd06\tproto\tp a l e p a\nd06\tdaughter\tt a l e p a\nd07\tproto\tp a l i t a p e\nd07\tdaughter\tt a l i t a p e\nd08\tproto\tp a l o p a\nd08\tdaughter\tt a l o p a\nd09\tproto\tp a l u t a p e\nd09\tdaughter\tt a l u t a p e\nd10\tproto\tp e l a p a\nd10\tdaughter\tt e l a p a\nd11\tproto\tp e l i t a p e\nd11\tdaughter\tt e l i t a p e\nd12\tproto\tp a l e b a\nd12\tdaughter\tt a l e b a\nd13\tproto\tp a l i t a b e\nd13\tdaughter\tt a l i t a b e\nd14\tproto\tp a l o b a\nd14\tdaughter\tt a l o b a\nd15\tproto\tp a l u t a b e\nd15\tdaughter\tt a l u t a b e\nd16\tproto\tp e l a b a\nd16\tdaughter\tt e l a b a\nd17\tproto\tp e l i t a b e\nd17\tdaughter\tt e l i t a b e\nd18\tproto\tp a l e n a\nd18\tdaughter\tp a l e n a\nd19\tproto\tp a l i t a n e\nd19\tdaughter\tp a l i t a n e\nd20\tproto\tp a l o n a\nd20\tdaughter\tp a l o n a\nd21\tproto\tp a l u t a n e\nd21\tdaughter\tp a l u t a n e\nd22\tproto\tp e l a n a\nd22\tdaughter\tp e l a n a\nd23\tproto\tp e l i t a n e\nd23\tdaughter\tp e l i t a n e\nd24\tproto\tp a l e t a\nd24\tdaughter\tp a l e t a\nd25\tproto\tp a l i t a t e\nd25\tdaughter\tp a l i t a t e\nd26\tproto\tp a l o t a\nd26\tdaughter\tp a l o t a\nd27\tproto\tp a l u t a t e\nd27\tdaughter\tp a l u t a t e\nd28\tproto\tp e l a t a\nd28\tdaughter\tp e l a t a\nd29\tproto\tp e l i t a t e\nd29\tdaughter\tp e l i t a t e\nd30\tproto\tp a l e s a\nd30\tdaughter\tp a l e s a\nd31\tproto\tp a l i t a s e\nd31\tdaughter\tp a l i t a s e\nd32\tproto\tp a l o s a\nd32\tdaughter\tp a l o s a\nd33\tproto\tp a l u t a s e\nd33\tdaughter\tp a l u t a s e\nd34\tproto\tp e l a s a\nd34\tdaughter\tp e l a s a\nd35\tproto\tp e l i t a s e\nd35\tdaughter\tp e l i t a s e\n",
+  "testdata/soundlaws/rhotacism.tsv": "cognate_id\tlect_id\tsegments\nhonour\tlatin\th o n o r i s\nhonour\told_latin\th o n o s i s\ngenus\tlatin\tg e n e r i s\ngenus\told_latin\tg e n e s i s\ntime\tlatin\tt e m p o r i s\ntime\told_latin\tt e m p o s i s\nbody\tlatin\tk o r p o r i s\nbody\told_latin\tk o r p o s i s\nflower\tlatin\tf l o r i s\nflower\told_latin\tf l o s i s\nash\tlatin\tk i n e r i s\nash\told_latin\tk i n i s i s\nlaw\tlatin\tl e g e r i s\nlaw\told_latin\tl e g e s i s\nseed\tlatin\ts e m e r i s\nseed\told_latin\ts e m e s i s\ndust\tlatin\tp u l w e r i s\ndust\told_latin\tp u l w e s i s\ni_was\tlatin\te r a m\ni_was\told_latin\te s a m\nto_be\tlatin\te r e\nto_be\told_latin\te s e\nmore\tlatin\tm a y o r e m\nmore\told_latin\tm a y o s e m\nchoose\tlatin\tg e r o\nchoose\told_latin\tg e s o\nnose\tlatin\tn a r u s\nnose\told_latin\tn a s u s\nsix\tlatin\ts e k s\nsix\told_latin\ts e k s\nsalt\tlatin\ts a l\nsalt\told_latin\ts a l\nsit\tlatin\ts e d e o\nsit\told_latin\ts e d e o\nsun\tlatin\ts o l\nsun\told_latin\ts o l\nseven\tlatin\ts e p t e m\nseven\told_latin\ts e p t e m\nwolf\tlatin\tl u p u s\nwolf\told_latin\tl u p u s\nfield\tlatin\tk a m p u s\nfield\told_latin\tk a m p u s\ngod\tlatin\td e u s\ngod\told_latin\td e u s\nmouth\tlatin\to s\nmouth\told_latin\to s\ncamp\tlatin\tk a s t r a\ncamp\told_latin\tk a s t r a\nevening\tlatin\tw e s p e r\nevening\told_latin\tw e s p e r\nwitness\tlatin\tt e s t i s\nwitness\told_latin\tt e s t i s\nmix\tlatin\tm i s k e o\nmix\told_latin\tm i s k e o\njust\tlatin\ty u s t u s\njust\told_latin\ty u s t u s\nrough\tlatin\ta s p e r\nrough\told_latin\ta s p e r\nmaster\tlatin\tm a g i s t e r\nmaster\told_latin\tm a g i s t e r\nhospital\tlatin\th o s p e s\nhospital\told_latin\th o s p e s\n",
+  "testdata/soundlaws/rhotacism_reordered.tsv": "cognate_id\tlect_id\tsegments\nhonour\told_latin\th o n o s i s\nhonour\tlatin\th o n o r i s\ngenus\told_latin\tg e n e s i s\ngenus\tlatin\tg e n e r i s\ntime\told_latin\tt e m p o s i s\ntime\tlatin\tt e m p o r i s\nbody\told_latin\tk o r p o s i s\nbody\tlatin\tk o r p o r i s\nflower\told_latin\tf l o s i s\nflower\tlatin\tf l o r i s\nash\told_latin\tk i n i s i s\nash\tlatin\tk i n e r i s\nlaw\told_latin\tl e g e s i s\nlaw\tlatin\tl e g e r i s\nseed\told_latin\ts e m e s i s\nseed\tlatin\ts e m e r i s\ndust\told_latin\tp u l w e s i s\ndust\tlatin\tp u l w e r i s\ni_was\told_latin\te s a m\ni_was\tlatin\te r a m\nto_be\told_latin\te s e\nto_be\tlatin\te r e\nmore\told_latin\tm a y o s e m\nmore\tlatin\tm a y o r e m\nchoose\told_latin\tg e s o\nchoose\tlatin\tg e r o\nnose\told_latin\tn a s u s\nnose\tlatin\tn a r u s\nsix\told_latin\ts e k s\nsix\tlatin\ts e k s\nsalt\told_latin\ts a l\nsalt\tlatin\ts a l\nsit\told_latin\ts e d e o\nsit\tlatin\ts e d e o\nsun\told_latin\ts o l\nsun\tlatin\ts o l\nseven\told_latin\ts e p t e m\nseven\tlatin\ts e p t e m\nwolf\told_latin\tl u p u s\nwolf\tlatin\tl u p u s\nfield\told_latin\tk a m p u s\nfield\tlatin\tk a m p u s\ngod\told_latin\td e u s\ngod\tlatin\td e u s\nmouth\told_latin\to s\nmouth\tlatin\to s\ncamp\told_latin\tk a s t r a\ncamp\tlatin\tk a s t r a\nevening\told_latin\tw e s p e r\nevening\tlatin\tw e s p e r\nwitness\told_latin\tt e s t i s\nwitness\tlatin\tt e s t i s\nmix\told_latin\tm i s k e o\nmix\tlatin\tm i s k e o\njust\told_latin\ty u s t u s\njust\tlatin\ty u s t u s\nrough\told_latin\ta s p e r\nrough\tlatin\ta s p e r\nmaster\told_latin\tm a g i s t e r\nmaster\tlatin\tm a g i s t e r\nhospital\told_latin\th o s p e s\nhospital\tlatin\th o s p e s\n",
+  "testdata/soundlaws/rounding_harmony.tsv": "cognate_id\tlect_id\tsegments\nw00\tproto\tk a p y\nw00\tdaughter\tk a f y\nw01\tproto\tk o p y\nw01\tdaughter\tk o f y\nw02\tproto\tk a p ø\nw02\tdaughter\tk a f ø\nw03\tproto\tk o p ø\nw03\tdaughter\tk o f ø\nw04\tproto\tk a p i\nw04\tdaughter\tk a p i\nw05\tproto\tk o p i\nw05\tdaughter\tk o p i\nw06\tproto\tk a p e\nw06\tdaughter\tk a p e\nw07\tproto\tk o p e\nw07\tdaughter\tk o p e\nw08\tproto\tt a p y\nw08\tdaughter\tt a f y\nw09\tproto\tt o p y\nw09\tdaughter\tt o f y\nw10\tproto\tt a p ø\nw10\tdaughter\tt a f ø\nw11\tproto\tt o p ø\nw11\tdaughter\tt o f ø\nw12\tproto\tt a p i\nw12\tdaughter\tt a p i\nw13\tproto\tt o p i\nw13\tdaughter\tt o p i\nw14\tproto\tt a p e\nw14\tdaughter\tt a p e\nw15\tproto\tt o p e\nw15\tdaughter\tt o p e\nw16\tproto\tm a p y\nw16\tdaughter\tm a f y\nw17\tproto\tm o p y\nw17\tdaughter\tm o f y\nw18\tproto\tm a p ø\nw18\tdaughter\tm a f ø\nw19\tproto\tm o p ø\nw19\tdaughter\tm o f ø\nw20\tproto\tm a p i\nw20\tdaughter\tm a p i\nw21\tproto\tm o p i\nw21\tdaughter\tm o p i\nw22\tproto\tm a p e\nw22\tdaughter\tm a p e\nw23\tproto\tm o p e\nw23\tdaughter\tm o p e\nw24\tproto\tn a p y\nw24\tdaughter\tn a f y\nw25\tproto\tn o p y\nw25\tdaughter\tn o f y\nw26\tproto\tn a p ø\nw26\tdaughter\tn a f ø\nw27\tproto\tn o p ø\nw27\tdaughter\tn o f ø\nw28\tproto\tn a p i\nw28\tdaughter\tn a p i\nw29\tproto\tn o p i\nw29\tdaughter\tn o p i\nw30\tproto\tn a p e\nw30\tdaughter\tn a p e\nw31\tproto\tn o p e\nw31\tdaughter\tn o p e\nw32\tproto\tl a p y\nw32\tdaughter\tl a f y\nw33\tproto\tl o p y\nw33\tdaughter\tl o f y\nw34\tproto\tl a p ø\nw34\tdaughter\tl a f ø\nw35\tproto\tl o p ø\nw35\tdaughter\tl o f ø\nw36\tproto\tl a p i\nw36\tdaughter\tl a p i\nw37\tproto\tl o p i\nw37\tdaughter\tl o p i\nw38\tproto\tl a p e\nw38\tdaughter\tl a p e\nw39\tproto\tl o p e\nw39\tdaughter\tl o p e\nw40\tproto\ts a p y\nw40\tdaughter\ts a f y\nw41\tproto\ts o p y\nw41\tdaughter\ts o f y\nw42\tproto\ts a p ø\nw42\tdaughter\ts a f ø\nw43\tproto\ts o p ø\nw43\tdaughter\ts o f ø\nw44\tproto\ts a p i\nw44\tdaughter\ts a p i\nw45\tproto\ts o p i\nw45\tdaughter\ts o p i\nw46\tproto\ts a p e\nw46\tdaughter\ts a p e\nw47\tproto\ts o p e\nw47\tdaughter\ts o p e\n",
+  "testdata/soundlaws/verner.tsv": "cognate_id\tlect_id\tsegments\nbrother-fore\tgothic\tb r a θ e r\nbrother-fore\tpgmc\tb r ˈa θ e r\nbrother-aft\tgothic\tb r a d e r\nbrother-aft\tpgmc\tb r a θ ˈe r\nfather-fore\tgothic\tf a θ e r\nfather-fore\tpgmc\tf ˈa θ e r\nfather-aft\tgothic\tf a d e r\nfather-aft\tpgmc\tf a θ ˈe r\nmother-fore\tgothic\tm o θ e r\nmother-fore\tpgmc\tm ˈo θ e r\nmother-aft\tgothic\tm o d e r\nmother-aft\tpgmc\tm o θ ˈe r\nweather-fore\tgothic\tw e θ u r\nweather-fore\tpgmc\tw ˈe θ u r\nweather-aft\tgothic\tw e d u r\nweather-aft\tpgmc\tw e θ ˈu r\nleather-fore\tgothic\tl e θ u r\nleather-fore\tpgmc\tl ˈe θ u r\nleather-aft\tgothic\tl e d u r\nleather-aft\tpgmc\tl e θ ˈu r\nhundred-fore\tgothic\th u θ u n\nhundred-fore\tpgmc\th ˈu θ u n\nhundred-aft\tgothic\th u d u n\nhundred-aft\tpgmc\th u θ ˈu n\nwolf-fore\tgothic\tw u f a z\nwolf-fore\tpgmc\tw ˈu f a z\nwolf-aft\tgothic\tw u b a z\nwolf-aft\tpgmc\tw u f ˈa z\nhalf-fore\tgothic\th a f a z\nhalf-fore\tpgmc\th ˈa f a z\nhalf-aft\tgothic\th a b a z\nhalf-aft\tpgmc\th a f ˈa z\nraven-fore\tgothic\tr a f a n\nraven-fore\tpgmc\tr ˈa f a n\nraven-aft\tgothic\tr a b a n\nraven-aft\tpgmc\tr a f ˈa n\nseven-fore\tgothic\ts e f u n\nseven-fore\tpgmc\ts ˈe f u n\nseven-aft\tgothic\ts e b u n\nseven-aft\tpgmc\ts e f ˈu n\ndraw-fore\tgothic\td r a x a n\ndraw-fore\tpgmc\td r ˈa x a n\ndraw-aft\tgothic\td r a g a n\ndraw-aft\tpgmc\td r a x ˈa n\nslay-fore\tgothic\ts l a x a n\nslay-fore\tpgmc\ts l ˈa x a n\nslay-aft\tgothic\ts l a g a n\nslay-aft\tpgmc\ts l a x ˈa n\nsee-fore\tgothic\ts e x a n\nsee-fore\tpgmc\ts ˈe x a n\nsee-aft\tgothic\ts e g a n\nsee-aft\tpgmc\ts e x ˈa n\nlaw-fore\tgothic\tl a x a m\nlaw-fore\tpgmc\tl ˈa x a m\nlaw-aft\tgothic\tl a g a m\nlaw-aft\tpgmc\tl a x ˈa m\nchoose-fore\tgothic\tk e s a n\nchoose-fore\tpgmc\tk ˈe s a n\nchoose-aft\tgothic\tk e z a n\nchoose-aft\tpgmc\tk e s ˈa n\nwas-fore\tgothic\tw a s u m\nwas-fore\tpgmc\tw ˈa s u m\nwas-aft\tgothic\tw a z u m\nwas-aft\tpgmc\tw a s ˈu m\nfreeze-fore\tgothic\tf r e s a n\nfreeze-fore\tpgmc\tf r ˈe s a n\nfreeze-aft\tgothic\tf r e z a n\nfreeze-aft\tpgmc\tf r e s ˈa n\nlose-fore\tgothic\tl o s a n\nlose-fore\tpgmc\tl ˈo s a n\nlose-aft\tgothic\tl o z a n\nlose-aft\tpgmc\tl o s ˈa n\nrise-fore\tgothic\tr i s a n\nrise-fore\tpgmc\tr ˈi s a n\nrise-aft\tgothic\tr i z a n\nrise-aft\tpgmc\tr i s ˈa n\nhare-fore\tgothic\th a s a n\nhare-fore\tpgmc\th ˈa s a n\nhare-aft\tgothic\th a z a n\nhare-aft\tpgmc\th a s ˈa n\n"
 };
 
 const CORPUS_LIST = [
@@ -41,15 +67,35 @@ const CORPUS_LIST = [
     "description": "Two closely related lects. A first look at what a correspondence class is.",
     "group": "Start here",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 48 classes · 3 conditioned · cost/segment −1.77"
   },
   {
     "path": "experiments/latin_spanish/cognates.tsv",
     "label": "Latin and Spanish",
-    "description": "97 cognates, 22 conditioned classes. The environments are discovered, not declared.",
+    "description": "The environments are discovered, not declared: no rule list is supplied anywhere, and none of the conditioning below was named in advance.",
     "group": "Start here",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 97 cognate sets · 96 classes · 10 conditioned · cost/segment −1.96"
+  },
+  {
+    "path": "testdata/soundlaws/grimm.tsv",
+    "label": "Grimm's Law",
+    "description": "Three shifts running at once and not one of them conditioned. Finding a single correspondence proves little; the claim is the chain shift whole, and every rung of it flat.",
+    "group": "Start here",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 29 cognate sets · 43 classes · 4 conditioned · cost/segment −1.57"
+  },
+  {
+    "path": "testdata/soundlaws/graded_1_adjacent.tsv",
+    "label": "One change, one adjacent trigger",
+    "description": "The same shape with conditioning that is really there, so the environment has to be recovered rather than declined.",
+    "group": "Start here",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.54"
   },
   {
     "path": "experiments/contaminated_cognates_synthetic/cognates.tsv",
@@ -57,7 +103,8 @@ const CORPUS_LIST = [
     "description": "Confidence weighting and outlier ranking on deliberately noisy data.",
     "group": "Start here",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 25 cognate sets · 9 classes · none conditioned · cost/segment −0.86"
   },
   {
     "path": "testdata/corpora/real_romance_4lect.tsv",
@@ -65,23 +112,26 @@ const CORPUS_LIST = [
     "description": "Latin, Spanish, French and Italian reconciled into classes binding all four.",
     "group": "Start here",
     "format": "tsv",
-    "readable": true
+    "readable": true,
+    "stats": "4 lects · 96 cognate sets · 164 classes · 15 conditioned · cost/segment −1.65"
   },
   {
     "path": "testdata/restraint/chance.tsv",
     "label": "Two unrelated lects",
-    "description": "79 accidental correspondences and no selected environment, from wordlists with no history between them. The pairings match their shuffled baseline.",
+    "description": "Accidental correspondences and no selected environment, from wordlists with no history between them. The pairings match their shuffled baseline.",
     "group": "Start here",
     "format": "tsv",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 80 cognate sets · 95 classes · none conditioned · cost/segment −0.33"
   },
   {
     "path": "testdata/soundlaws/final_devoicing.tsv",
     "label": "German final devoicing",
-    "description": "A neutralisation: /t/ and /d/ merge word-finally, so the four environments reported for it are correlates. All four fall below the baseline.",
+    "description": "A neutralisation: /t/ and /d/ merge word-finally, so every environment reported for it is a correlate, and each falls below the baseline.",
     "group": "Start here",
     "format": "tsv",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 37 cognate sets · 43 classes · 6 conditioned · cost/segment −1.70"
   },
   {
     "path": "testdata/diagnostics/drift.tsv",
@@ -89,7 +139,224 @@ const CORPUS_LIST = [
     "description": "The same forty words segmented two ways. Reads as deaffrication, loss of aspiration and loss of length -- none of which happened, and nothing catches it.",
     "group": "Start here",
     "format": "tsv",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 17 classes · 2 conditioned · cost/segment −1.72"
+  },
+  {
+    "path": "testdata/soundlaws/compensatory_lengthening.tsv",
+    "label": "compensatory lengthening",
+    "description": "A lost segment paid for by the vowel before it.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 26 classes · 2 conditioned · cost/segment −1.91"
+  },
+  {
+    "path": "testdata/soundlaws/conditioned_confound.tsv",
+    "label": "conditioned confound",
+    "description": "Two environments the corpus cannot tell apart, and says so.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 16 cognate sets · 8 classes · 2 conditioned · cost/segment −1.63"
+  },
+  {
+    "path": "testdata/soundlaws/graded_0_unconditioned.tsv",
+    "label": "graded 0 unconditioned",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 8 classes · none conditioned · cost/segment −1.16"
+  },
+  {
+    "path": "testdata/soundlaws/graded_2_position.tsv",
+    "label": "graded 2 position",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.57"
+  },
+  {
+    "path": "testdata/soundlaws/graded_3_stress.tsv",
+    "label": "graded 3 stress",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 9 classes · 1 conditioned · cost/segment −1.16"
+  },
+  {
+    "path": "testdata/soundlaws/graded_4_conjunction.tsv",
+    "label": "graded 4 conjunction",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 9 classes · 3 conditioned · cost/segment −1.51"
+  },
+  {
+    "path": "testdata/soundlaws/graded_5_distance_two.tsv",
+    "label": "graded 5 distance two",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 11 classes · 1 conditioned · cost/segment −1.72"
+  },
+  {
+    "path": "testdata/soundlaws/graded_6_existential.tsv",
+    "label": "graded 6 existential",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 12 classes · 1 conditioned · cost/segment −1.45"
+  },
+  {
+    "path": "testdata/soundlaws/graded_7_disjunction.tsv",
+    "label": "graded 7 disjunction",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 13 classes · 4 conditioned · cost/segment −1.45"
+  },
+  {
+    "path": "testdata/soundlaws/graded_8_weight.tsv",
+    "label": "graded 8 weight",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 17 classes · 1 conditioned · cost/segment −1.50"
+  },
+  {
+    "path": "testdata/soundlaws/graded_9_lost_trigger.tsv",
+    "label": "graded 9 lost trigger",
+    "description": "A rung on the conditioning ladder: the same corpus shape with the environment made harder to state.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 14 classes · 2 conditioned · cost/segment −1.07"
+  },
+  {
+    "path": "testdata/soundlaws/grassmann.tsv",
+    "label": "grassmann",
+    "description": "Of two aspirates in a word the first loses aspiration. Needs an existential environment: the trigger is neither adjacent nor at a fixed distance.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 38 cognate sets · 26 classes · 3 conditioned · cost/segment −1.64"
+  },
+  {
+    "path": "testdata/soundlaws/great_vowel_shift.tsv",
+    "label": "great vowel shift",
+    "description": "English. A chain shift with no conditioning anywhere in it.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 38 cognate sets · 26 classes · none conditioned · cost/segment −2.18"
+  },
+  {
+    "path": "testdata/soundlaws/lenition.tsv",
+    "label": "lenition",
+    "description": "Western Romance. Voiceless stops voice between vowels and nowhere else.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 24 cognate sets · 40 classes · 4 conditioned · cost/segment −1.61"
+  },
+  {
+    "path": "testdata/soundlaws/metathesis_adjacent.tsv",
+    "label": "metathesis adjacent",
+    "description": "Two segments swap. One event, not two substitutions.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 10 classes · none conditioned · cost/segment −1.51"
+  },
+  {
+    "path": "testdata/soundlaws/metathesis_distant.tsv",
+    "label": "metathesis distant",
+    "description": "The same, over a longer span.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 14 classes · none conditioned · cost/segment −1.05"
+  },
+  {
+    "path": "testdata/soundlaws/morphological_rhotacism.tsv",
+    "label": "morphological rhotacism",
+    "description": "Rhotacism where the boundary is morphological, supplied by the corpus and never inferred.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 56 cognate sets · 12 classes · 4 conditioned · cost/segment −1.56"
+  },
+  {
+    "path": "testdata/soundlaws/opaque_umlaut.tsv",
+    "label": "opaque umlaut",
+    "description": "The trigger is gone from the surface by the time the change is visible.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "3 lects · 48 cognate sets · 24 classes · 3 conditioned · cost/segment −1.85"
+  },
+  {
+    "path": "testdata/soundlaws/place_assimilation.tsv",
+    "label": "place assimilation",
+    "description": "A nasal takes the place of what follows it.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 18 classes · 2 conditioned · cost/segment −2.03"
+  },
+  {
+    "path": "testdata/soundlaws/place_dissimilation.tsv",
+    "label": "place dissimilation",
+    "description": "Two like places, and one of them moves.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 36 cognate sets · 13 classes · 2 conditioned · cost/segment −1.57"
+  },
+  {
+    "path": "testdata/soundlaws/rhotacism.tsv",
+    "label": "rhotacism",
+    "description": "Latin. /s/ to /r/ between vowels, with the three environments that do not rhotacise present so the wrong answer is available.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.79"
+  },
+  {
+    "path": "testdata/soundlaws/rhotacism_reordered.tsv",
+    "label": "rhotacism reordered",
+    "description": "The same corpus with each set's rows swapped. Row order is not data and must not move the model.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.79"
+  },
+  {
+    "path": "testdata/soundlaws/rounding_harmony.tsv",
+    "label": "rounding harmony",
+    "description": "Rounding spreads across a word.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 48 cognate sets · 14 classes · 1 conditioned · cost/segment −1.85"
+  },
+  {
+    "path": "testdata/soundlaws/verner.tsv",
+    "label": "verner",
+    "description": "The residue Grimm's Law leaves over, conditioned by where the accent was.",
+    "group": "Sound laws",
+    "format": "tsv",
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 23 classes · 5 conditioned · cost/segment −1.89"
   },
   {
     "path": "experiments/arabic_hebrew/cognates.tsv",
@@ -97,7 +364,8 @@ const CORPUS_LIST = [
     "description": "Semitic, with conditioned classes.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 32 cognate sets · 43 classes · 5 conditioned · cost/segment −1.51"
   },
   {
     "path": "experiments/georgian_svan/cognates.tsv",
@@ -105,7 +373,8 @@ const CORPUS_LIST = [
     "description": "Kartvelian. The richest conditioning in the set.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 75 classes · 3 conditioned · cost/segment −1.08"
   },
   {
     "path": "experiments/harmony_synthetic/cognates.tsv",
@@ -113,7 +382,8 @@ const CORPUS_LIST = [
     "description": "Vowel harmony, synthetic.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 45 cognate sets · 14 classes · 2 conditioned · cost/segment −1.35"
   },
   {
     "path": "experiments/latin_french/cognates.tsv",
@@ -121,7 +391,8 @@ const CORPUS_LIST = [
     "description": "Romance, a second daughter for comparison.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 96 cognate sets · 107 classes · 2 conditioned · cost/segment −1.25"
   },
   {
     "path": "experiments/latin_italian/cognates.tsv",
@@ -129,7 +400,8 @@ const CORPUS_LIST = [
     "description": "Romance, a third daughter.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 95 cognate sets · 96 classes · 11 conditioned · cost/segment −2.11"
   },
   {
     "path": "experiments/length_conditioned_synthetic/cognates.tsv",
@@ -137,7 +409,8 @@ const CORPUS_LIST = [
     "description": "Length conditioning, synthetic.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 13 classes · 1 conditioned · cost/segment −1.25"
   },
   {
     "path": "experiments/mandarin_historical/cognates.tsv",
@@ -145,7 +418,8 @@ const CORPUS_LIST = [
     "description": "Middle Chinese and Mandarin, tone held in separate columns.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 65 classes · 3 conditioned · cost/segment −2.09"
   },
   {
     "path": "experiments/navajo_chipewyan/cognates.tsv",
@@ -153,7 +427,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 32 cognate sets · 64 classes · 1 conditioned · cost/segment −1.44"
   },
   {
     "path": "experiments/oe_english/cognates.tsv",
@@ -161,7 +436,8 @@ const CORPUS_LIST = [
     "description": "Old English against the modern language.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 100 cognate sets · 81 classes · 12 conditioned · cost/segment −2.48"
   },
   {
     "path": "experiments/ppn_hawaiian/cognates.tsv",
@@ -169,7 +445,8 @@ const CORPUS_LIST = [
     "description": "Proto-Polynesian and Hawaiian.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 96 cognate sets · 41 classes · 2 conditioned · cost/segment −1.89"
   },
   {
     "path": "experiments/swahili_zulu/cognates.tsv",
@@ -177,7 +454,8 @@ const CORPUS_LIST = [
     "description": "Bantu.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 57 classes · none conditioned · cost/segment −1.49"
   },
   {
     "path": "experiments/tone_3way_synthetic/cognates.tsv",
@@ -185,7 +463,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "3 lects · 80 cognate sets · 9 classes · none conditioned · cost/segment −1.88"
   },
   {
     "path": "experiments/tone_chinese_like/cognates.tsv",
@@ -193,7 +472,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 73 cognate sets · 69 classes · 8 conditioned · cost/segment −2.41"
   },
   {
     "path": "experiments/tone_chinese_like_clean/cognates.tsv",
@@ -201,7 +481,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 80 cognate sets · 9 classes · none conditioned · cost/segment −1.76"
   },
   {
     "path": "experiments/tone_synthetic/cognates.tsv",
@@ -209,7 +490,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 30 cognate sets · 8 classes · none conditioned · cost/segment −1.20"
   },
   {
     "path": "experiments/tone_vietnamese_like/cognates.tsv",
@@ -217,7 +499,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 74 cognate sets · 19 classes · none conditioned · cost/segment −2.63"
   },
   {
     "path": "experiments/tone_yoruba_like/cognates.tsv",
@@ -225,7 +508,8 @@ const CORPUS_LIST = [
     "description": "",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 84 cognate sets · 21 classes · none conditioned · cost/segment −2.02"
   },
   {
     "path": "experiments/turkish_azerbaijani/cognates.tsv",
@@ -233,7 +517,8 @@ const CORPUS_LIST = [
     "description": "Turkic, closely related.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 41 cognate sets · 38 classes · 3 conditioned · cost/segment −2.04"
   },
   {
     "path": "experiments/umlaut_synthetic/cognates.tsv",
@@ -241,7 +526,8 @@ const CORPUS_LIST = [
     "description": "Umlaut, synthetic.",
     "group": "More corpora",
     "format": "wide",
-    "readable": true
+    "readable": true,
+    "stats": "2 lects · 40 cognate sets · 14 classes · 1 conditioned · cost/segment −1.46"
   },
   {
     "path": "experiments/morph_boundary_synthetic/cognates.tsv",
