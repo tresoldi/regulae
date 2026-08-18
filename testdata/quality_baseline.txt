@@ -29,6 +29,7 @@ testdata/soundlaws/verner.tsv                          4   0.50   1.00     0    
 testdata/restraint/chance.tsv                          0    n/a   1.00     0    n/a    n/a
 testdata/restraint/contact.tsv                         0    n/a   1.00     0    n/a    n/a
 testdata/restraint/diffusion.tsv                       0    n/a   1.00     0    n/a    n/a
+testdata/restraint/merger_gap.tsv                      1   0.00   1.00     0    n/a   1.00
 testdata/restraint/sparse_008.tsv                      0    n/a   1.00     0    n/a    n/a
 testdata/restraint/sparse_016.tsv                      2   0.50   1.00     0    n/a   1.00
 testdata/restraint/sparse_032.tsv                      2   0.50   1.00     0    n/a   1.50
@@ -64,7 +65,7 @@ testdata/corpora/tonal_multilect.tsv                   0    n/a   1.00     0    
 testdata/corpora/tonogenesis_cldf.tsv                  0    n/a   1.00     2   1.00    n/a
 testdata/corpora/tonogenesis_internal.tsv              0    n/a   1.00     4   1.00    n/a
 
-TOTAL identity            36.0 / 93.0     = 0.3871
-TOTAL fragmentation    12007.0 / 12036.0  = 0.9976
+TOTAL identity            36.0 / 94.0     = 0.3830
+TOTAL fragmentation    12167.0 / 12196.0  = 0.9976
 TOTAL density             18.0 / 25.0     = 0.7200
-TOTAL conjuncts          114.0 / 93.0     = 1.2258
+TOTAL conjuncts          115.0 / 94.0     = 1.2234

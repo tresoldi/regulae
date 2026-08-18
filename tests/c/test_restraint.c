@@ -18,11 +18,14 @@
  * reads as a finding.
  *
  * The corpora are under testdata/restraint/ and none of them contains a
- * conditioned sound law. Three have a right answer of "no environment"; one
- * has a right answer regulae cannot give, and is here so that what it does
- * give is on record; and the last is a ladder that says how much evidence the
- * search needs before it can see a rule at all, which is the same question
- * asked from the other side. */
+ * conditioned sound law. Four have a right answer of "no environment" and
+ * regulae gives it for three; one has a right answer regulae cannot give, and
+ * is here so that what it does give is on record; and the last is a ladder
+ * that says how much evidence the search needs before it can see a rule at
+ * all, which is the same question asked from the other side.
+ *
+ * The one it fails is merger_gap, and the assertion below is written to the
+ * behaviour rather than to the intention. */
 
 static rg_corpus *load(const char *directory, const char *name) {
     rg_corpus *corpus = 0;
@@ -391,10 +394,56 @@ static void test_a_neutralisation_keeps_stable_surface_correlates_explicit(rg_co
     rg_corpus_free(corpus);
 }
 
+/* A merger with a gap in the proto lexicon, and the only fixture here that
+ * regulae currently fails.
+ *
+ * Proto *o and *a both give daughter /a/, unconditionally, and *k gives x
+ * everywhere. There is no conditioned change in the corpus. What there is, is
+ * an accident: *o happens to occur only before a labial, because that is where
+ * the words carrying it happen to be. So among daughter /a/ before a labial,
+ * the proto source is *o -- true, useful to a reconstructor, and not a sound
+ * law.
+ *
+ * regulae publishes it as one, at the strongest score in the corpus, and every
+ * safeguard agrees: the shuffled baseline says it stands, held-out prediction
+ * confirms it with a positive gain, and environment_alternatives is 0. None of
+ * them is malfunctioning. The rule generalises, because a retrodiction does.
+ *
+ * The cause is that `target_side` in model_context.c means both "the
+ * environment was read from the target form" and "the target grapheme is the
+ * pivot", so a target-side row states P(source | target) while a source-side
+ * row states P(target | source), and the two are published in one table in one
+ * format. The test asserts what is published today rather than what should be,
+ * because a fixture that cannot fail tests nothing and a test that hides a
+ * difference is worse than no test. When M8's direction typing lands, the
+ * count below goes to zero for changes and the row reappears as ancestry. */
+static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_context *ctx) {
+    rg_corpus *corpus = load("restraint", "merger_gap");
+    rg_multi_model *model = train(ctx, corpus, SHUFFLES);
+    const rg_corpus_fit *fit = rg_multi_model_fit(model);
+
+    /* Unmistakably one language pair, so the finding cannot be waved away as
+     * noise on data that was never related. */
+    assert(fit->cost_per_segment_z < -10.0);
+
+    /* Both unconditioned mergers are found, which is the whole of the right
+     * answer. */
+    assert(has_correspondence(model, "a", "o"));
+    assert(has_correspondence(model, "a", "a"));
+    assert(has_correspondence(model, "x", "k"));
+
+    /* And this is the part that is wrong. The correct value is 0. */
+    assert(fit->conditioned_class_count == 1);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     test_unrelated_lects_are_not_distinguishable_from_their_own_shuffles(ctx);
+    test_a_lexical_gap_in_the_source_is_published_as_conditioning(ctx);
     test_a_lexically_diffused_change_gets_no_environment(ctx);
     test_a_borrowed_stratum_comes_out_as_a_second_correspondence_set(ctx);
     test_a_borrowed_half_is_reported_and_the_split_is_visible(ctx);

@@ -4,6 +4,10 @@ Corpora that contain no conditioned sound law, and one ladder that says how
 much evidence it takes before regulae can see one that is there.
 `tests/c/test_restraint.c` asserts what regulae must **not** find in each.
 
+One of them, `merger_gap.tsv`, regulae currently fails, and its section says so
+in full. A directory of restraint fixtures that all pass is a directory that
+has stopped looking.
+
 Everything else in `testdata/` asks whether a discovery can be made. These ask
 whether it can be declined, which is the harder half of being useful. A method
 that misses a correspondence costs its user an afternoon. A method that invents
@@ -159,6 +163,51 @@ and half did not, so half align one way and half the other. What a high
 separation says is that the corpus is not one thing. Which of the four reasons
 it is — a borrowed layer, a block of bad judgements, two sources, or an
 unfinished change — nothing in the distribution of segments can say.
+
+## `merger_gap.tsv` — a gap in the proto lexicon, read as an environment
+
+Forty sets. Proto \*o and \*a both give daughter /a/, and \*k gives x. All three
+are unconditioned; there is no conditioned sound law anywhere in the corpus.
+
+The accident is that \*o occurs only before a labial. Not because anything
+conditioned it — because the sixteen words that happen to carry \*o happen to be
+those words. Real lexicons are full of gaps like this, and a proto segment with
+a skewed distribution is the normal case rather than a contrived one.
+
+So among daughter /a/ before a labial, the proto source is \*o. That is true,
+and a reconstructor wants it. It is not a sound change, and regulae publishes
+it as one:
+
+```
+count=16 vs 21 as #0   daughter:a ~ proto:o   [daughter fol[labial:+]]
+   dBIC=−40.4   margin=7.13   STANDS   predictive=confirmed gain=+0.705
+```
+
+**Every safeguard agrees with it, and none of them is malfunctioning.** The
+shuffled baseline says it stands, because it is not noise. Held-out prediction
+confirms it, because a retrodiction generalises exactly as well as a law does.
+`environment_alternatives` reads 0, because no rival feature carves the split
+differently. The rule is real. It is answering a different question from the
+one the table's format implies.
+
+The cause is in `model_context.c`: `target_side` means both *the environment
+was read from the target form* and *the target grapheme is the pivot*, so a
+target-side row states P(source | target) — which reflex descends from what —
+while a source-side row states P(target | source), a conditioned change. Both
+land in one table in one format, and nothing on the row says which.
+
+Note that historical direction cannot be the discriminator. The pairwise source
+lect is whichever sorts first, so `grimm` and `verner` both train
+daughter-to-ancestor; regulae does not know which lect is ancestral and must
+not start guessing. The discriminator is which conditional the environment
+informs. Here P(daughter | proto \*o) is degenerate before any environment is
+applied — \*o gives /a/ and nothing else — so there is no uncertainty for an
+environment to reduce, and a row conditioning that direction cannot be a change
+whatever it scores.
+
+`test_a_lexical_gap_in_the_source_is_published_as_conditioning` asserts the
+count that is published rather than the count that is right, and says so. M8's
+direction typing is what should change it.
 
 ## `sparse_008` … `sparse_128` — the evidence floor
 

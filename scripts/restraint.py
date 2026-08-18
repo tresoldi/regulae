@@ -7,15 +7,19 @@ in the safe direction: a missed correspondence costs an afternoon, an invented
 one costs a paper, and the second failure is the one that does not announce
 itself. Spurious conditioning reads exactly like discovery.
 
-Five shapes, and none of them contains a conditioned sound law:
+Six shapes, and none of them contains a conditioned sound law:
 
     chance      -- two lects with no historical connection at all
     contact     -- two unrelated lects, half of one borrowed from the other
     diffusion   -- a real change spread over the lexicon at random
+    merger_gap  -- an unconditioned merger whose source has a lexical gap
     stratum     -- two correspondence sets in one pair, as borrowing leaves them
     sparse_*    -- one real conditioned change, at five corpus sizes
 
-Three of them have a right answer of "no conditioned rule". `contact` has a
+Four of them have a right answer of "no conditioned rule", and regulae gives it
+for three. `merger_gap` is the one it fails, and it fails it at the strongest
+score in the corpus with every safeguard agreeing; the README says why, and the
+cause is a conflation in the search rather than a threshold. `contact` has a
 right answer regulae cannot give -- the correspondences are real and their
 origin is not in the data -- and is here so that what it does give is on
 record. The ladder's right answer changes with the rung, which is the point:
@@ -314,11 +318,74 @@ def contact():
     write("contact", rows, "half the wordlist borrowed, half unrelated")
 
 
+# ---------------------------------------------------------------- merger_gap
+
+# The one fixture here written by hand rather than sampled. The others need
+# their forms to carry no correlation at all, which is what the LCG buys; this
+# one needs the opposite -- a distribution that is skewed all the way, because
+# a lexical gap is not a random draw. Sampling it would be sampling until the
+# gap appeared, which is the same as writing it down.
+MERGER_GAP = [
+    # *o, and every one of them before a labial.
+    ("root", "r o p u"), ("fall", "t o p a"), ("bark", "k o b i"),
+    ("sleep", "s o m u"), ("flat", "n o p i"), ("leaf", "l o b e"),
+    ("strike", "d o p a"), ("resin", "g o m u"), ("small", "t o b i"),
+    ("thunder", "r o m a"), ("belly", "k o p u"), ("above", "s o b e"),
+    ("name", "n o m i"), ("wide", "l o p a"), ("deep", "d o b u"),
+    ("seed", "g o m a"),
+    # *a, and never before a labial. That is what makes the gap a gap.
+    ("tooth", "r a t i"), ("stone", "k a d e"), ("salt", "s a l u"),
+    ("night", "n a t e"), ("lake", "l a k i"), ("day", "d a g u"),
+    ("body", "t a n u"), ("sand", "g a r i"), ("seven", "s a t e"),
+    ("shell", "r a k u"), ("river", "n a d i"), ("road", "k a l u"),
+    ("father", "t a d e"), ("sky", "l a g i"), ("gift", "d a n u"),
+    ("rise", "s a g i"),
+    # Other vowels, so *k > x has room to be seen as the unconditioned change
+    # it is and the corpus is unmistakably one language pair.
+    ("bird", "p i t i"), ("fly", "m u k e"), ("star", "s i n i"),
+    ("dog", "k u r i"), ("green", "b e l u"), ("hit", "t u k i"),
+    ("thin", "m i n e"), ("fish", "p e s u"),
+]
+
+LABIALS = frozenset("pbm")
+
+
+def merger_gap():
+    """A merger whose source has a gap in the lexicon, and no conditioning.
+
+    Proto *o and *a both give /a/; *k gives x. All three unconditioned. The
+    only structure is that *o occurs solely before a labial, so among daughter
+    /a/ before a labial the proto source is *o -- true, wanted by a
+    reconstructor, and not a sound change.
+
+    The gap is asserted rather than trusted, in both directions, because the
+    fixture is worthless if a later edit puts one *a before a labial: the
+    tempting wrong answer stops being perfectly supported and the corpus
+    quietly starts passing.
+    """
+    rows = []
+    for gloss, proto in MERGER_GAP:
+        segments = proto.split()
+        for i, segment in enumerate(segments):
+            following = segments[i + 1] if i + 1 < len(segments) else None
+            assert not (segment == "a" and following in LABIALS), \
+                f"{gloss}: proto *a before a labial closes the gap"
+            assert not (segment == "o" and following not in LABIALS), \
+                f"{gloss}: proto *o away from a labial closes the gap"
+        daughter = " ".join(
+            {"o": "a", "k": "x"}.get(segment, segment) for segment in segments
+        )
+        rows.append((gloss, "proto", proto))
+        rows.append((gloss, "daughter", daughter))
+    write("merger_gap", rows, "unconditioned merger, gapped source distribution")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     chance()
     contact()
     diffusion()
+    merger_gap()
     stratum()
     sparse()
     return 0

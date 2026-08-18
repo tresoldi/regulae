@@ -56,6 +56,7 @@
      0  ca59d239d13e9fe105b99851ce39b5615e1cfd47dd6a72b480fb0c914a40ec49  testdata/restraint/chance.tsv
      0  3ba6717857b935e47045bc889962f01599f7ce1feab526233d9f5288782bb592  testdata/restraint/contact.tsv
      0  fa192fac35e5e2c3ddcdbc7bfb147e2f2f978e13bb4b2738cdc8ba190cd12e1d  testdata/restraint/diffusion.tsv
+     0  f69f87fb11fa97a611dd151a7b881648ca3b2e18a0a99fa771956411d955a3ff  testdata/restraint/merger_gap.tsv
      0  f9f1127bd5c65135dce37436aac10b68556bbd541752a788390d17ab73c4ec94  testdata/restraint/sparse_008.tsv
      0  353ea4642c70a70aaa959a883c5f9684d89df25206b829bc9055f172e7469c2b  testdata/restraint/sparse_016.tsv
      0  82188042679f31327a22b26e4bb34a0f70ef293048a304642425119f30f26273  testdata/restraint/sparse_032.tsv
