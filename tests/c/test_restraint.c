@@ -77,6 +77,63 @@ static int has_correspondence(const rg_multi_model *model, const char *a, const 
     return 0;
 }
 
+
+/* Conditioned rows whose segment tuple carries both graphemes -- how many rows
+ * one correspondence is stated across, and how much evidence the largest of
+ * them carries. */
+static size_t conditioned_rows_naming(const rg_multi_model *model, const char *a,
+                                      const char *b, double *out_largest) {
+    size_t i;
+    size_t found = 0;
+    double largest = 0.0;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        int seen_a = 0;
+        int seen_b = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], a) == 0) {
+                seen_a = 1;
+            }
+            if (strcmp(row->graphemes[j], b) == 0) {
+                seen_b = 1;
+            }
+        }
+        if (seen_a && seen_b) {
+            found++;
+            if (row->count > largest) {
+                largest = row->count;
+            }
+        }
+    }
+    if (out_largest != 0) {
+        *out_largest = largest;
+    }
+    return found;
+}
+
+
+/* Whether any committed environment names this feature in the next syllable --
+ * the slot umlaut and vowel harmony live in, which `names_feature` (immediate
+ * neighbours only) cannot see. */
+static int names_next_syllable_feature(const rg_multi_model *model, const char *feature) {
+    size_t i;
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t j;
+        for (j = 0; j < row->segment_count; j++) {
+            const rg_context_spec *c = &row->contexts[j];
+            size_t k;
+            for (k = 0; k < c->next_syllable_count; k++) {
+                if (strcmp(c->next_syllable[k].feature, feature) == 0) {
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
+
 /* Two lects with no historical connection, drawn from one inventory and one
  * set of word shapes -- which is the hard version rather than the easy one.
  * Neighbouring languages share phonotactics whether or not they share an
@@ -439,6 +496,107 @@ static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_con
     rg_corpus_free(corpus);
 }
 
+
+/* One conditioned change, at four lect counts, over the same words.
+ *
+ * `arity_2` through `arity_5` are projections of one five-lect corpus onto its
+ * first N lects, so a rung differs from the one below it in how many languages
+ * are in the sample and in nothing else -- what `sparse_*` does for corpus
+ * size. Lect `a` keeps /k/; every other lect backs it to /q/ before a back
+ * vowel and keeps /k/ before a front one. The change is deterministic and
+ * exceptionless in every rung, and every rung carries roughly the same number
+ * of words showing it, attested by one more language each time.
+ *
+ * So the right answer is the same at every rung and the evidence for it only
+ * grows. What regulae does instead is the finding: the correspondence is
+ * stated across more and thinner rows at each rung -- two rows at two lects,
+ * six at three, seven at four -- and at five lects the conditioning search
+ * commits nothing at all.
+ *
+ * The cause is in `multilect_classes.c`. A class-level split is priced by the
+ * number of distinct *sister tuples* in the pivot bucket, and a sister tuple
+ * is the full list of (lect, grapheme) pairs -- so it counts which lects a
+ * cognate set happened to cover, and any one-off reflex in any one sister,
+ * alongside the correspondence itself. Corrected BIC charges `K−1` parameters
+ * for a split, and `K` therefore grows with the sample rather than with the
+ * structure, while a binary environment can only ever buy about one bit per
+ * observation. Adding a language subtracts evidence.
+ *
+ * The assertions are written to the behaviour rather than to the intention,
+ * like `merger_gap` above: a fixture that cannot fail tests nothing. When the
+ * outcome alphabet stops counting the sampling, `arity_5` publishes the rule
+ * and the row counts stop falling. */
+static void test_adding_a_lect_costs_the_conditioned_rule(rg_context *ctx) {
+    static const char *const rungs[] = {"arity_2", "arity_3", "arity_4", "arity_5"};
+    /* Rows the change is stated across, and the evidence the largest carries.
+     * Both are wrong, and they are wrong in the same direction: the rule is
+     * one rule at every rung and its support is being divided, not lost. */
+    static const size_t expected_rows[] = {2, 3, 2, 0};
+    static const double expected_largest[] = {54.0, 7.0, 6.0, 0.0};
+    size_t rung;
+
+    for (rung = 0; rung < sizeof(rungs) / sizeof(rungs[0]); rung++) {
+        rg_corpus *corpus = load("restraint", rungs[rung]);
+        rg_multi_model *model = train(ctx, corpus, 0);
+        double largest = 0.0;
+        size_t rows = conditioned_rows_naming(model, "k", "q", &largest);
+
+        /* The change is in the corpus at every rung, whatever the conditioning
+         * search does with it, so the silence at five lects cannot be read as
+         * the corpus not carrying it. */
+        assert(has_correspondence(model, "k", "q"));
+        assert(rows == expected_rows[rung]);
+        assert(largest == expected_largest[rung]);
+
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
+/* The evidence floor for a trigger one syllable away.
+ *
+ * `sparse_*` measures the floor for a change conditioned by the immediate
+ * neighbour. Umlaut, vowel harmony, Verner's Law and dissimilation at a
+ * distance are not that shape, and the search prices and gates those
+ * candidates separately: `long_range_min_split_observations` requires five
+ * observations on each side of the split where an immediate neighbour requires
+ * three.
+ *
+ * That gate, not the criterion, is what decides here. At four a side the
+ * candidate is never scored at all -- the best split in the bucket has a
+ * likelihood gain of exactly zero, because no long-range predicate survives
+ * the gate to be tried. At five a side the same predicate commits at
+ * dBIC −7.2, which is a comfortable margin rather than a marginal pass: the
+ * step is a gate, not a floor the evidence climbs.
+ *
+ * It is worth knowing next to the eight-and-eight the guide quotes, because a
+ * change over a natural class is divided by the size of that class first. A
+ * distance-conditioned change over four vowel qualities needs forty examples
+ * before any one of its correspondences can be conditioned at all, and
+ * `soundlaws/opaque_umlaut.tsv` is that arithmetic on curated material. */
+static void test_a_trigger_a_syllable_away_needs_five_a_side(rg_context *ctx) {
+    static const char *const rungs[] = {"distant_003", "distant_004",
+                                        "distant_005", "distant_008"};
+    static const size_t expected[] = {0, 0, 1, 1};
+    size_t rung;
+
+    for (rung = 0; rung < sizeof(rungs) / sizeof(rungs[0]); rung++) {
+        rg_corpus *corpus = load("restraint", rungs[rung]);
+        rg_multi_model *model = train(ctx, corpus, 0);
+
+        /* The correspondence is there at every rung; only the environment
+         * comes and goes. */
+        assert(has_correspondence(model, "y", "u"));
+        assert(rg_multi_model_conditioned_class_count(model) == expected[rung]);
+        if (expected[rung] > 0) {
+            assert(names_next_syllable_feature(model, "close"));
+        }
+
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -450,6 +608,8 @@ int main(void) {
     test_the_split_statistic_says_two_populations_and_not_why(ctx);
     test_sixteen_sets_recover_the_conditioned_surface_contrast(ctx);
     test_a_neutralisation_keeps_stable_surface_correlates_explicit(ctx);
+    test_adding_a_lect_costs_the_conditioned_rule(ctx);
+    test_a_trigger_a_syllable_away_needs_five_a_side(ctx);
     rg_context_free(ctx);
     printf("restraint tests passed\n");
     return 0;

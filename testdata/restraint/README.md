@@ -1,7 +1,8 @@
 # Restraint fixtures
 
-Corpora that contain no conditioned sound law, and one ladder that says how
-much evidence it takes before regulae can see one that is there.
+Corpora that contain no conditioned sound law, and three ladders that say how
+much evidence it takes before regulae can see one that is there — in cognate
+sets, in languages, and in how far from the segment its trigger sits.
 `tests/c/test_restraint.c` asserts what regulae must **not** find in each.
 
 One of them, `merger_gap.tsv`, regulae currently fails, and its section says so
@@ -244,6 +245,90 @@ choose a historical interpretation among stable correlates.
 Eight examples of a change and eight counterexamples, then. Below that, run
 the baseline and expect to be told nothing; above it, expect the search to be
 right about which rule is which but not yet about which came first.
+
+## `arity_2` … `arity_5` — one change, at four lect counts
+
+Four projections of one five-lect corpus onto its first N lects. Lect `a` keeps
+/k/; every other lect backs it to /q/ before a back vowel and keeps /k/ before a
+front one, which is Turkic velar-uvular allophony and the commonest shape a
+multi-lect conditioning search is asked to find. The change is deterministic and
+exceptionless in every rung, and a rung differs from the one below it in how
+many languages attest it and in nothing else — the discipline `sparse_*` applies
+to corpus size, applied to arity.
+
+Two nuisances are in the corpus because real wordlists have them, and neither
+touches the rule or correlates with the vowel that conditions it. A one-in-
+sixteen chance that a segment in one lect is written as some other segment — a
+loan, a misjudged cognate, a transcription variant — gives the correspondence
+table the tail of one-off reflexes every real table has. A one-in-four chance
+that a lect is missing from a set gives the ragged coverage every real wordlist
+has.
+
+The right answer is the same at every rung, and the evidence for it only grows.
+What comes out instead:
+
+| rung | sets | classes | conditioned | rows stating /k ~ q/ | largest such row |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `arity_2` | 126 | 55 | 3 | 2 | 54 |
+| `arity_3` | 146 | 142 | 7 | 3 | 7 |
+| `arity_4` | 157 | 235 | 7 | 2 | 6 |
+| `arity_5` | 158 | 293 | **0** | 0 | — |
+
+**Adding a language subtracts evidence.** The same rule, attested by one more
+lect each time, is stated across thinner and thinner rows until the search stops
+committing anything.
+
+The cause is in `multilect_classes.c`, and it is one mechanism with two
+symptoms. A class-level split is priced by the number of distinct *sister
+tuples* in the pivot bucket, and a sister tuple is the full list of
+(lect, grapheme) pairs — so it counts which lects a cognate set happened to
+cover, and any one-off reflex in any one sister, alongside the correspondence
+itself. Corrected BIC charges `K−1` parameters for a split. `K` therefore grows
+with the sample rather than with the structure, while a binary environment can
+only ever buy about one bit per observation, so the charge outruns anything the
+evidence can pay. The same tuple identity is what publishes one correspondence
+across several rows.
+
+This is not the fragmentation hypothesis the roadmap tested and refuted. That
+one aliased each partial tuple to its *unique widest compatible parent*, which
+cannot reach the tail: on a four-lect Turkic pivot with nineteen sister keys,
+two have a unique widest parent, ten are compatible with several and seven with
+none, so the alias moves `K` from 19 to 17. The keys that dominate the charge
+are exactly the ones no parent can absorb.
+
+`test_adding_a_lect_costs_the_conditioned_rule` asserts the counts that are
+published rather than the counts that are right, and says which is which.
+
+## `distant_003` … `distant_008` — the floor for a trigger one syllable away
+
+`sparse_*` measures the evidence floor for a change conditioned by the immediate
+neighbour. Umlaut, vowel harmony, Verner's Law and dissimilation at a distance
+are not that shape, and the search prices and gates those candidates
+separately. This ladder asks them the same question, so the two numbers can be
+read side by side. Proto /u/ answers daughter /y/ when the next syllable holds
+/i/ and stays /u/ when it holds /a/.
+
+| pairs a side | rules found | the intended rule | dBIC |
+| ---: | ---: | --- | ---: |
+| 3 | 0 | — | — |
+| 4 | 0 | — | — |
+| 5 | 1 | found | −7.2 |
+| 8 | 1 | found | −14.4 |
+
+**The step is a gate, not a floor the evidence climbs.**
+`long_range_min_split_observations` is 5 against 3 for an immediate neighbour,
+and it is applied per side. At four a side the best split in the bucket has a
+likelihood gain of exactly zero — no long-range predicate survives the gate to
+be scored at all. At five a side the same predicate commits at −7.2, which is a
+comfortable margin rather than a marginal pass. Adding one minimal pair to
+`soundlaws/opaque_umlaut.tsv` is enough to make its `oː ~ øː` environment
+appear, for the same reason.
+
+Worth knowing next to the eight-and-eight the guide quotes, which is measured on
+`sparse_*` and so on an immediate neighbour. A change over a natural class is
+divided by the size of that class before the search sees it, so a distance-
+conditioned change over four vowel qualities needs forty examples before any one
+of its correspondences can be conditioned at all.
 
 ## The fixture in `soundlaws/` that marks the surface/historical boundary
 

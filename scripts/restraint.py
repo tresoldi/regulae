@@ -15,6 +15,8 @@ Six shapes, and none of them contains a conditioned sound law:
     merger_gap  -- an unconditioned merger whose source has a lexical gap
     stratum     -- two correspondence sets in one pair, as borrowing leaves them
     sparse_*    -- one real conditioned change, at five corpus sizes
+    arity_*     -- one real conditioned change, at four lect counts
+    distant_*   -- one real conditioned change, trigger a syllable away
 
 Four of them have a right answer of "no conditioned rule", and regulae gives it
 for three. `merger_gap` is the one it fails, and it fails it at the strongest
@@ -380,6 +382,106 @@ def merger_gap():
     write("merger_gap", rows, "unconditioned merger, gapped source distribution")
 
 
+
+# ---------------------------------------------------------------- arity
+
+def arity():
+    """One conditioned change, at four lect counts, over the same words.
+
+    Every rung is a projection of one five-lect corpus onto its first N lects,
+    so a rung differs from the one below it in how many languages are in the
+    sample and in nothing else -- the same discipline `sparse_*` applies to
+    corpus size. The change is deterministic and exceptionless in every rung:
+    lect `a` keeps /k/, and every other lect backs it to /q/ before a back
+    vowel and keeps /k/ before a front one. That is Turkic velar-uvular
+    allophony, which is the commonest shape a multi-lect conditioning search
+    will be asked to find.
+
+    Two nuisances are in the corpus because real wordlists have them, and
+    neither touches the rule. A one-in-sixteen chance that a segment in one
+    lect is written as some other segment -- a loan, a misjudged cognate, a
+    transcription variant -- gives the correspondence table the tail of one-off
+    reflexes every real table has. A one-in-four chance that a lect is missing
+    from a set gives the ragged coverage every real wordlist has. Neither is
+    correlated with the vowel that conditions the change.
+
+    The right answer is the same at every rung, because the rungs hold the same
+    change with more languages attesting it: the conditioned split on the
+    following vowel. regulae gives it at two lects and loses it at three, and
+    the reason is that the class-level criterion prices a split by the number of
+    distinct SISTER TUPLES in the pivot -- which counts the coverage pattern and
+    the one-off reflexes alongside the correspondence, and so grows with the
+    sample rather than with the structure.
+    """
+    rng = Lcg(4409)
+    lects = ["a", "b", "c", "d", "e"]
+    back = ["a", "o", "u"]
+    front = ["e", "i", "y"]
+    others = ["t", "n", "s", "l", "m", "r", "p", "b"]
+    # Everything random is drawn once, for the five-lect corpus, so that a
+    # rung really is a column subset of the rung above it.
+    sets = []
+    for i in range(160):
+        is_back = i % 2 == 0
+        harmony = back if is_back else front
+        v1, v2 = rng.pick(harmony), rng.pick(harmony)
+        medial = rng.pick(others)
+        forms = {}
+        for lect in lects:
+            velar = "k" if lect == "a" or not is_back else "q"
+            forms[lect] = [velar, v1, medial, v2]
+        for lect in lects:
+            for slot in range(4):
+                if rng.next() % 16 == 0:
+                    forms[lect][slot] = rng.pick(others + back + front)
+        present = {lect: lect == "a" or rng.next() % 4 != 0 for lect in lects}
+        sets.append((f"h{i:03d}", forms, present))
+
+    for width in (2, 3, 4, 5):
+        keep = lects[:width]
+        rows = []
+        changed = 0
+        for cid, forms, present in sets:
+            here = [lect for lect in keep if present[lect]]
+            if len(here) < 2:
+                continue
+            changed += any(forms[lect][0] == "q" for lect in here)
+            for lect in here:
+                rows.append((cid, lect, " ".join(forms[lect])))
+        write(f"arity_{width}", rows, f"{width} lects, {changed} showing the change")
+
+
+# ---------------------------------------------------------------- distant
+
+def distant():
+    """The same ladder as `sparse_*`, for a trigger one syllable away.
+
+    `sparse_*` measures the evidence floor for a change conditioned by the
+    immediate neighbour and finds eight examples and eight counterexamples.
+    Umlaut, vowel harmony, Verner's Law and dissimilation at distance are not
+    that shape: their trigger sits in another syllable, and the search prices
+    and gates those candidates separately. This ladder asks the same question of
+    them, so the two numbers can be compared.
+
+    Proto /u/ answers daughter /y/ when the next syllable holds /i/, and stays
+    /u/ when it holds /a/. Deterministic, exceptionless, and stated on a slot
+    the candidate vocabulary carries. Every rung is a prefix of the same word
+    list.
+    """
+    rng = Lcg(6607)
+    frames = []
+    for i in range(8):
+        frames.append((rng.pick(ONSETS), rng.pick(["t", "s", "n", "m", "l", "r"])))
+    for size in (3, 4, 5, 8):
+        rows = []
+        for i, (onset, medial) in enumerate(frames[:size]):
+            rows.append((f"i{i:02d}", "proto", f"{onset} u {medial} i"))
+            rows.append((f"i{i:02d}", "daughter", f"{onset} y {medial} i"))
+            rows.append((f"a{i:02d}", "proto", f"{onset} u {medial} a"))
+            rows.append((f"a{i:02d}", "daughter", f"{onset} u {medial} a"))
+        write(f"distant_{size:03d}", rows, f"{size} showing the change, {size} not")
+
+
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
     chance()
@@ -388,6 +490,8 @@ def main():
     merger_gap()
     stratum()
     sparse()
+    arity()
+    distant()
     return 0
 
 

@@ -53,9 +53,17 @@
      0  9a7b9554cdc02f7e54c71c0ff2344a4907d1c8d2a74853ec7580a4e9f0dafc98  testdata/diagnostics/contaminated.tsv
      0  cc793fe88842cb73192c4acfdaff9e407217601017f29f0bd9bb46aaa60316f4  testdata/diagnostics/drift.tsv
      0  878755174df3808654346dec7c3f293f87e656229a1454115d0094058d69e26c  testdata/diagnostics/partial.tsv
+     0  281d83effe5ea7085f57719153fc4879b8570db7852b57afa5268a55cc890120  testdata/restraint/arity_2.tsv
+     0  343fb379b3bfb3a6487013bbe4146172dcc963a1ca76ec56b973de0a6fd68f83  testdata/restraint/arity_3.tsv
+     0  5d44e9af0e40569ad46aec69118a019d4c283831ea5cd120423684bce0d13cc7  testdata/restraint/arity_4.tsv
+     0  949a6f622f4c542c2e8082c6899ad1197b66a60c703e53adcb2182dd9fb2d585  testdata/restraint/arity_5.tsv
      0  30d725289b7d884e67453b63576259f9d7a4dcc3140756ede867df7c2fcdb297  testdata/restraint/chance.tsv
      0  565e08c22ec456b5e794abf9de88694c948c2855e13e099776b705cb981700ed  testdata/restraint/contact.tsv
      0  09c48b4e5049b1f11c40c824ca5a113683b8fa0e6311e2a4b426d892b737c6d9  testdata/restraint/diffusion.tsv
+     0  0175cadc2b60d9a61fa9f89053a7743639c2758913398ea122675b3316bd8ec7  testdata/restraint/distant_003.tsv
+     0  5445c38f6be4b6d68de7850a853c5d486f83e600eb5de06a92dbf1d66ff73ea6  testdata/restraint/distant_004.tsv
+     0  5f33cbf88814fc05f2bffb8effa65af6d79ac47608e29b296b08c3489523dff9  testdata/restraint/distant_005.tsv
+     0  0900e21924ffe7c4bc4e84e52dd45655efe6ff16baabcc3483f7abb5ba534e3d  testdata/restraint/distant_008.tsv
      0  971da4a32d77a2526259319cfdf7d643325e3f04d3059e32ef79c7c541c61ac1  testdata/restraint/merger_gap.tsv
      0  c11784ec2851e604234029789cdccac6b7951e4db6e2823691ad6802b739cab7  testdata/restraint/sparse_008.tsv
      0  95ed0355e6a7465e146124bf13f7cf7be60941af00b9b5ac2f2bcd4e2de5601f  testdata/restraint/sparse_016.tsv
