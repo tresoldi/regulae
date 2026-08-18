@@ -1240,6 +1240,54 @@ static rg_status merge_committed_splits(
         }
         count++;
     }
+
+    /* An environment on a second lect is not the second half of a condition.
+     *
+     * The search runs one pivot per (lect, grapheme), so a correspondence both
+     * of its lects can condition is found twice, and each split writes its
+     * environment into its own pivot's slot. The row then carries two
+     * environments side by side, which reads as a conjunction -- when what
+     * happened is that two independent searches described the same
+     * observations equally well, and the data cannot say which is doing the
+     * work.
+     *
+     * That is exactly what environment_alternatives means, and the per-search
+     * detector cannot see it: `rg_split_environment_alternatives` compares
+     * candidates within one pivot's own list, and the rival came from another
+     * pivot's. On verner `gothic fol[vowel:+]` and `pgmc
+     * fol-stress[stress:primary]` each cover all six observations, and the
+     * stress one is Verner's Law while the other is a correlate; on rhotacism
+     * `latin prev-syl[syllable_shape:open]` and `old_latin pre[vowel:+]
+     * fol[vowel:+]` each cover all fourteen, and the intervocalic one is the
+     * law. Both rows read as one two-part condition and neither is one, and
+     * both reported 0 rival environments.
+     *
+     * Counted from the finished class rather than tracked through the merge:
+     * every slot holds at most one environment, the widest its pivot committed,
+     * so the rivals are just the constraints standing outside the slot whose
+     * coverage the class reports. */
+    {
+        size_t entry;
+        for (entry = 0; entry < count; entry++) {
+            const char *reporting;
+            size_t slot;
+            if (merged[entry].contrast_split >= state->committed_count) {
+                continue;
+            }
+            reporting = state->committed[merged[entry].contrast_split].pivot_lect;
+            if (reporting == 0) {
+                continue;
+            }
+            for (slot = 0; slot < merged[entry].segment_count; slot++) {
+                if (strcmp(merged[entry].lects[slot], reporting) == 0) {
+                    continue;
+                }
+                merged[entry].environment_alternatives +=
+                    (int)rg_context_spec_constraint_count(&merged[entry].contexts[slot]);
+            }
+        }
+    }
+
     *out = merged;
     *out_count = count;
     return RG_OK;

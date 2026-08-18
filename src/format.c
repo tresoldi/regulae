@@ -770,9 +770,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         if (row->environment_alternatives > 0) {
             /* Another neighbour's feature carves this split the same way; the
              * named environment is one of several the corpus supports. */
-            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve it the same]",
+            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve%s it the same]",
                             row->environment_alternatives,
-                            row->environment_alternatives == 1 ? "" : "s");
+                            row->environment_alternatives == 1 ? "" : "s",
+                            row->environment_alternatives == 1 ? "s" : "");
         }
         /* Two in five committed rules are X ~ X. Most are the retention side
          * of a real split, with the change sitting in the contrast class, and
@@ -835,9 +836,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
         if (row->rule.environment_alternatives > 0) {
             /* The corpus cannot tell this environment from another segment's
              * feature; the named conditioner is one of several it supports. */
-            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve it the same]",
+            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve%s it the same]",
                             row->rule.environment_alternatives,
-                            row->rule.environment_alternatives == 1 ? "" : "s");
+                            row->rule.environment_alternatives == 1 ? "" : "s",
+                            row->rule.environment_alternatives == 1 ? "s" : "");
         }
         builder_append(&builder, "\n");
     }
