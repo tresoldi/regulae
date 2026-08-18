@@ -73,10 +73,11 @@ testdata/corpora/stress_dimension_target.tsv           0    n/a   1.00     4   1
 testdata/corpora/syllable_breaks_column.tsv            0    n/a   1.00     0    n/a    n/a
 testdata/corpora/three_lect_basic.tsv                  0    n/a   1.00     0    n/a    n/a
 testdata/corpora/tonal_multilect.tsv                   0    n/a   1.00     0    n/a    n/a
+testdata/corpora/tone_three_lect.tsv                   0    n/a   1.00    12   0.00    n/a
 testdata/corpora/tonogenesis_cldf.tsv                  0    n/a   1.00     2   1.00    n/a
 testdata/corpora/tonogenesis_internal.tsv              0    n/a   1.00     4   1.00    n/a
 
 TOTAL identity            64.0 / 144.0    = 0.4444
-TOTAL fragmentation    15839.0 / 16886.0  = 0.9380
-TOTAL density             18.0 / 25.0     = 0.7200
+TOTAL fragmentation    15871.0 / 16918.0  = 0.9381
+TOTAL density             18.0 / 37.0     = 0.4865
 TOTAL conjuncts          176.0 / 144.0    = 1.2222

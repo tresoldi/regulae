@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 38
+#define RG_ABI_VERSION 39
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -729,10 +729,35 @@ typedef struct rg_multi_pair_model_row {
  * looks like.
  *
  * `evidence.decision_index` is the order to read them in. */
+
+/* The suprasegmentals one segment of a class carries, parallel to `graphemes`.
+ *
+ * Each is "" when the segment carries none. They are part of the class's
+ * outcome identity, not of its environment: a class of the same graphemes
+ * under a different tone is a different class, so `north:a central:a south:a`
+ * with tones `⁵⁵ ⁵⁵ ³³` and the same tuple with `¹¹ ³³ ¹¹` are two rows. For
+ * Sinitic, Hmong-Mien, Tai-Kadai, Bantu register and much of Otomanguean the
+ * tone correspondence set *is* the correspondence set, and before ABI 39 it had
+ * no class row at any arity -- the tone reached per-pair count tables and
+ * directed cross-dimensional rules but was dropped at reconciliation. */
+typedef struct rg_suprasegmentals {
+    const char *tone;
+    const char *length;
+    const char *stress;
+} rg_suprasegmentals;
+
 typedef struct rg_multi_class_row {
     int class_id;
     const char *const *lect_ids;
     const char *const *graphemes;
+    /* Parallel to `graphemes`, one per segment; see rg_suprasegmentals. Carried
+     * on an unconditioned class, where the suprasegmentals are part of the
+     * reconciled outcome. NULL on a conditioned class: its outcome is the
+     * segmental split, and a suprasegmental predicted by an environment is a
+     * cross-dimensional rule (rg_cross_dimensional_row), not a class. Also NULL
+     * on the empty model. When present, every segment has an entry, its fields
+     * "" where the segment carries no tone, length or stress. */
+    const rg_suprasegmentals *suprasegmentals;
     const rg_context_spec *contexts;
     size_t segment_count;
     double count;

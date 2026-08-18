@@ -331,6 +331,7 @@ if(REGULAE_BUILD_TESTS)
     target_compile_definitions(test_pairwise_model PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 
     add_executable(test_multilect_model tests/c/test_multilect_model.c)
+    target_compile_definitions(test_multilect_model PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_multilect_model PRIVATE regulae::regulae)
     add_test(NAME multilect_model COMMAND test_multilect_model)
 

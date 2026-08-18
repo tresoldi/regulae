@@ -3,6 +3,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -321,6 +322,69 @@ static void test_multi_lect_deletion_class(rg_context *ctx, const rg_train_optio
     }
 }
 
+/* A tone correspondence set is a correspondence set, and gets a class row.
+ *
+ * `tone_three_lect.tsv` has one vowel /a/ in every set carrying a tone that
+ * corresponds regularly but non-trivially across three lects: high in north and
+ * central is mid in south (⁵⁵ ⁵⁵ ³³), and low in north is mid in central and
+ * low in south (¹¹ ³³ ¹¹). The segments are identical across lects, so a
+ * segment-only class table has only the trivial /a ~ a ~ a/ to publish and the
+ * tone correspondence -- the whole point of a Sinitic or Hmong-Mien sample --
+ * would be invisible. Because the suprasegmentals are part of the reconciled
+ * outcome identity (ABI 39), the two tone patterns are two class rows, each
+ * carrying its tone. */
+static void test_tone_correspondence_is_a_class(rg_context *ctx, const rg_train_options *options) {
+    char path[512];
+    rg_corpus *corpus = 0;
+    rg_multi_model *model = 0;
+    size_t count = 0;
+    const rg_multi_class_row *rows;
+    size_t i;
+    int saw_high = 0;
+    int saw_low = 0;
+
+    snprintf(path, sizeof(path), "%s/testdata/corpora/tone_three_lect.tsv", REGULAE_SOURCE_DIR);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), options, &model) == RG_OK);
+
+    rows = rg_multi_model_unconditioned_classes(model, &count);
+    for (i = 0; i < count; i++) {
+        const rg_multi_class_row *row = &rows[i];
+        int all_a = 1;
+        size_t j;
+        if (row->segment_count != 3 || row->suprasegmentals == 0) {
+            continue;
+        }
+        for (j = 0; j < 3; j++) {
+            if (strcmp(row->graphemes[j], "a") != 0) {
+                all_a = 0;
+            }
+        }
+        if (!all_a) {
+            continue;
+        }
+        /* Segments are ordered by lect id: central, north, south. */
+        if (strcmp(row->suprasegmentals[0].tone, "\xe2\x81\xb5\xe2\x81\xb5") == 0 &&
+            strcmp(row->suprasegmentals[1].tone, "\xe2\x81\xb5\xe2\x81\xb5") == 0 &&
+            strcmp(row->suprasegmentals[2].tone, "\xc2\xb3\xc2\xb3") == 0) {
+            saw_high = 1;
+        }
+        if (strcmp(row->suprasegmentals[0].tone, "\xc2\xb3\xc2\xb3") == 0 &&
+            strcmp(row->suprasegmentals[1].tone, "\xc2\xb9\xc2\xb9") == 0 &&
+            strcmp(row->suprasegmentals[2].tone, "\xc2\xb9\xc2\xb9") == 0) {
+            saw_low = 1;
+        }
+    }
+    /* Both tone correspondences are published, each as its own class -- the
+     * same graphemes under a different tone are not one class. */
+    assert(saw_high);
+    assert(saw_low);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     rg_train_options options;
@@ -350,6 +414,7 @@ int main(void) {
     test_conditioned_palatalization(ctx, &options);
     test_supporting_sets_are_distinct(ctx, &options);
     test_multi_lect_deletion_class(ctx, &options);
+    test_tone_correspondence_is_a_class(ctx, &options);
 
     forms1[0].lect_id = "A";
     forms1[0].form = form("A", a1, 2);

@@ -202,6 +202,20 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
         }
         cJSON_AddStringToObject(entry, "lect", row->lect_ids[i]);
         cJSON_AddStringToObject(entry, "grapheme", row->graphemes[i]);
+        /* Suprasegmentals only when carried, so a segmental corpus's model is
+         * byte-for-byte what it was and only tonal corpora gain the fields. */
+        if (row->suprasegmentals != 0) {
+            const rg_suprasegmentals *s = &row->suprasegmentals[i];
+            if (s->tone[0] != '\0') {
+                cJSON_AddStringToObject(entry, "tone", s->tone);
+            }
+            if (s->length[0] != '\0') {
+                cJSON_AddStringToObject(entry, "length", s->length);
+            }
+            if (s->stress[0] != '\0') {
+                cJSON_AddStringToObject(entry, "stress", s->stress);
+            }
+        }
         if (with_contexts && row->contexts != 0) {
             cJSON_AddItemToObject(entry, "context", json_context(&row->contexts[i]));
         }

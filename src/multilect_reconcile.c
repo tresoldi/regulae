@@ -4,10 +4,72 @@
 #include <stdlib.h>
 #include <string.h>
 
+static char *supra_field_dup(const char *value) {
+    return rg_strdup_internal(value != 0 ? value : "");
+}
+
+rg_status seg_supra_set_internal(seg_supra *out, const rg_segment *segment) {
+    memset(out, 0, sizeof(*out));
+    out->tone = supra_field_dup(segment != 0 ? segment->tone : 0);
+    out->length = supra_field_dup(segment != 0 ? segment->length : 0);
+    out->stress = supra_field_dup(segment != 0 ? segment->stress : 0);
+    if (out->tone == 0 || out->length == 0 || out->stress == 0) {
+        free(out->tone);
+        free(out->length);
+        free(out->stress);
+        memset(out, 0, sizeof(*out));
+        return RG_ERR_OOM;
+    }
+    return RG_OK;
+}
+
+void seg_supra_free_array_internal(seg_supra *items, size_t count) {
+    size_t i;
+    if (items == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        free(items[i].tone);
+        free(items[i].length);
+        free(items[i].stress);
+    }
+    free(items);
+}
+
+seg_supra *seg_supra_dup_array_internal(const seg_supra *items, size_t count) {
+    seg_supra *copy;
+    size_t i;
+    copy = (seg_supra *)calloc(count == 0 ? 1 : count, sizeof(*copy));
+    if (copy == 0) {
+        return 0;
+    }
+    for (i = 0; i < count; i++) {
+        copy[i].tone = rg_strdup_internal(items[i].tone);
+        copy[i].length = rg_strdup_internal(items[i].length);
+        copy[i].stress = rg_strdup_internal(items[i].stress);
+        if (copy[i].tone == 0 || copy[i].length == 0 || copy[i].stress == 0) {
+            seg_supra_free_array_internal(copy, i + 1);
+            return 0;
+        }
+    }
+    return copy;
+}
+
+int seg_supra_equal_internal(const seg_supra *a, const seg_supra *b) {
+    return strcmp(a->tone, b->tone) == 0 &&
+           strcmp(a->length, b->length) == 0 &&
+           strcmp(a->stress, b->stress) == 0;
+}
+
+int seg_supra_is_bare_internal(const seg_supra *s) {
+    return s->tone[0] == '\0' && s->length[0] == '\0' && s->stress[0] == '\0';
+}
+
 typedef struct class_bucket {
     size_t origin;
     char **lect_ids;
     char **graphemes;
+    seg_supra *supra;
     size_t segment_count;
     double count;
     char *participant_key;
@@ -28,6 +90,7 @@ static void class_bucket_clear(class_bucket *bucket) {
     }
     string_array_clear(bucket->lect_ids, bucket->segment_count);
     string_array_clear(bucket->graphemes, bucket->segment_count);
+    seg_supra_free_array_internal(bucket->supra, bucket->segment_count);
     free(bucket->participant_key);
     string_array_clear(bucket->supporting_cognates, bucket->supporting_cognate_count);
     memset(bucket, 0, sizeof(*bucket));
@@ -161,13 +224,16 @@ static rg_status bucket_append_support(class_bucket *bucket, const char *cognate
     return RG_OK;
 }
 
-static int bucket_equal(const class_bucket *bucket, char **lects, char **graphemes, size_t count) {
+static int bucket_equal(const class_bucket *bucket, char **lects, char **graphemes,
+                        seg_supra *supra, size_t count) {
     size_t i;
     if (bucket->segment_count != count) {
         return 0;
     }
     for (i = 0; i < count; i++) {
-        if (strcmp(bucket->lect_ids[i], lects[i]) != 0 || strcmp(bucket->graphemes[i], graphemes[i]) != 0) {
+        if (strcmp(bucket->lect_ids[i], lects[i]) != 0 ||
+            strcmp(bucket->graphemes[i], graphemes[i]) != 0 ||
+            !seg_supra_equal_internal(&bucket->supra[i], &supra[i])) {
             return 0;
         }
     }
@@ -180,6 +246,7 @@ static rg_status add_bucket_observation(
     size_t *bucket_cap,
     char **lects,
     char **graphemes,
+    seg_supra *supra,
     size_t count,
     double weight,
     const char *cognate_id,
@@ -187,13 +254,14 @@ static rg_status add_bucket_observation(
 ) {
     size_t i;
     for (i = 0; i < *bucket_count; i++) {
-        if (bucket_equal(&(*buckets)[i], lects, graphemes, count)) {
+        if (bucket_equal(&(*buckets)[i], lects, graphemes, supra, count)) {
             (*buckets)[i].count += weight;
             if (bucket_append_support(&(*buckets)[i], cognate_id) != RG_OK) {
                 return RG_ERR_OOM;
             }
             string_array_clear(lects, count);
             string_array_clear(graphemes, count);
+            seg_supra_free_array_internal(supra, count);
             *out_bucket_index = i;
             return RG_OK;
         }
@@ -211,6 +279,7 @@ static rg_status add_bucket_observation(
     memset(&(*buckets)[*bucket_count], 0, sizeof((*buckets)[*bucket_count]));
     (*buckets)[*bucket_count].lect_ids = lects;
     (*buckets)[*bucket_count].graphemes = graphemes;
+    (*buckets)[*bucket_count].supra = supra;
     (*buckets)[*bucket_count].segment_count = count;
     (*buckets)[*bucket_count].count = weight;
     if (participant_key_from_lects(lects, count, &(*buckets)[*bucket_count].participant_key) != RG_OK) {
@@ -238,6 +307,22 @@ static int bucket_cmp(const void *a, const void *b) {
             return c;
         }
         c = strcmp(ba->graphemes[i], bb->graphemes[i]);
+        if (c != 0) {
+            return c;
+        }
+        /* Suprasegmentals are part of the outcome identity, so two classes of
+         * the same graphemes under a different tone must order deterministically
+         * -- otherwise class ids depend on qsort's whim and diverge between the
+         * native and WebAssembly builds. */
+        c = strcmp(ba->supra[i].tone, bb->supra[i].tone);
+        if (c != 0) {
+            return c;
+        }
+        c = strcmp(ba->supra[i].length, bb->supra[i].length);
+        if (c != 0) {
+            return c;
+        }
+        c = strcmp(ba->supra[i].stress, bb->supra[i].stress);
         if (c != 0) {
             return c;
         }
@@ -588,9 +673,10 @@ rg_status aggregate_position_classes(
             memset(&obs, 0, sizeof(obs));
             obs.lects = (char **)calloc(order_count, sizeof(*obs.lects));
             obs.graphemes = (char **)calloc(order_count, sizeof(*obs.graphemes));
+            obs.supra = (seg_supra *)calloc(order_count, sizeof(*obs.supra));
             obs.positions = (size_t *)calloc(order_count, sizeof(*obs.positions));
             obs.lect_indices = (size_t *)calloc(order_count, sizeof(*obs.lect_indices));
-            if (obs.lects == 0 || obs.graphemes == 0 || obs.positions == 0 || obs.lect_indices == 0) {
+            if (obs.lects == 0 || obs.graphemes == 0 || obs.supra == 0 || obs.positions == 0 || obs.lect_indices == 0) {
                 obs.segment_count = 0;
                 reconciled_observation_clear(&obs);
                 status = RG_ERR_OOM;
@@ -667,6 +753,7 @@ rg_status aggregate_position_classes(
                         (next_node >= node_count || gap_lects[next_gap] < real_lect)) {
                         obs.lects[item_count] = rg_strdup_internal(model->lect_ids[gap_lects[next_gap]]);
                         obs.graphemes[item_count] = rg_strdup_internal(RG_GAP_GRAPHEME);
+                        (void)seg_supra_set_internal(&obs.supra[item_count], 0);
                         obs.positions[item_count] = (size_t)-1;
                         obs.lect_indices[item_count] = gap_lects[next_gap];
                         next_gap++;
@@ -677,13 +764,16 @@ rg_status aggregate_position_classes(
                         }
                         obs.lects[item_count] = rg_strdup_internal(model->lect_ids[real_lect]);
                         obs.graphemes[item_count] = rg_strdup_internal(forms[real_lect]->segments[node_positions[next_node]].grapheme);
+                        (void)seg_supra_set_internal(&obs.supra[item_count],
+                                                     &forms[real_lect]->segments[node_positions[next_node]]);
                         obs.positions[item_count] = node_positions[next_node];
                         obs.lect_indices[item_count] = real_lect;
                         next_node++;
                     } else {
                         break;
                     }
-                    if (obs.lects[item_count] == 0 || obs.graphemes[item_count] == 0) {
+                    if (obs.lects[item_count] == 0 || obs.graphemes[item_count] == 0 ||
+                        obs.supra[item_count].tone == 0) {
                         obs.segment_count = item_count + 1;
                         reconciled_observation_clear(&obs);
                         status = RG_ERR_OOM;
@@ -708,10 +798,12 @@ rg_status aggregate_position_classes(
             {
                 char **lects_copy = (char **)calloc(item_count, sizeof(*lects_copy));
                 char **graphemes_copy = (char **)calloc(item_count, sizeof(*graphemes_copy));
+                seg_supra *supra_copy = seg_supra_dup_array_internal(obs.supra, item_count);
                 size_t k;
-                if (lects_copy == 0 || graphemes_copy == 0) {
+                if (lects_copy == 0 || graphemes_copy == 0 || supra_copy == 0) {
                     free(lects_copy);
                     free(graphemes_copy);
+                    seg_supra_free_array_internal(supra_copy, item_count);
                     reconciled_observation_clear(&obs);
                     status = RG_ERR_OOM;
                     break;
@@ -728,6 +820,7 @@ rg_status aggregate_position_classes(
                     }
                 }
                 if (lects_copy == 0) {
+                    seg_supra_free_array_internal(supra_copy, item_count);
                     reconciled_observation_clear(&obs);
                     status = RG_ERR_OOM;
                     break;
@@ -738,6 +831,7 @@ rg_status aggregate_position_classes(
                     &bucket_cap,
                     lects_copy,
                     graphemes_copy,
+                    supra_copy,
                     item_count,
                     weight,
                     cognates[c].cognate_id,
@@ -823,6 +917,9 @@ rg_status aggregate_position_classes(
         model->unconditioned_classes[c].class_id = (int)c;
         model->unconditioned_classes[c].lect_ids = (const char *const *)buckets[c].lect_ids;
         model->unconditioned_classes[c].graphemes = (const char *const *)buckets[c].graphemes;
+        /* Layout-compatible with rg_suprasegmentals; the row takes ownership and
+         * multi_class_clear frees it. */
+        model->unconditioned_classes[c].suprasegmentals = (const rg_suprasegmentals *)buckets[c].supra;
         model->unconditioned_classes[c].segment_count = buckets[c].segment_count;
         model->unconditioned_classes[c].count = buckets[c].count;
         model->unconditioned_classes[c].confidence = 1.0;
@@ -835,6 +932,7 @@ rg_status aggregate_position_classes(
         model->unconditioned_classes[c].uncertainty = rg_wilson_default_internal(buckets[c].count, participant_total);
         buckets[c].lect_ids = 0;
         buckets[c].graphemes = 0;
+        buckets[c].supra = 0;
         buckets[c].supporting_cognates = 0;
         buckets[c].supporting_cognate_count = 0;
     }

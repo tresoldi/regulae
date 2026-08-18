@@ -42,8 +42,21 @@ function isIdentity(entry) { // eslint-disable-line no-unused-vars
   return new Set(entry.segments.map((s) => s.grapheme)).size === 1;
 }
 
+/* The suprasegmentals a segment carries, bracketed as the CLI renders them --
+ * `a[⁵⁵]` -- and empty when it carries none. A tone correspondence is part of
+ * the outcome, so it reads on the row. */
+function suprasegmentals(segment) { // eslint-disable-line no-unused-vars
+  const bits = [];
+  if (segment.tone) bits.push(segment.tone);
+  if (segment.length) bits.push(`len:${segment.length}`);
+  if (segment.stress) bits.push(`str:${segment.stress}`);
+  return bits.length ? `[${bits.join(",")}]` : "";
+}
+
 function correspondence(entry) { // eslint-disable-line no-unused-vars
-  return entry.segments.map((s) => `${s.lect}:${s.grapheme}`).join("  ~  ");
+  return entry.segments
+    .map((s) => `${s.lect}:${s.grapheme}${suprasegmentals(s)}`)
+    .join("  ~  ");
 }
 
 /* An environment the way the guide reads it: a filter on where the

@@ -72,6 +72,28 @@ rg_status present_lects_sorted(
     size_t *out_count
 );
 
+/* The suprasegmentals one reconciled segment carries, owned. Laid out to match
+ * the public rg_suprasegmentals (three string pointers, in the same order) so a
+ * published class row can borrow an array of these by cast rather than copying.
+ * Each string is owned and never NULL: "" where the segment carries none. */
+typedef struct seg_supra {
+    char *tone;
+    char *length;
+    char *stress;
+} seg_supra;
+
+/* Builds one entry from a segment (any of tone/length/stress may be NULL on the
+ * segment, and becomes "" here) or, with segment NULL, an all-"" entry for a
+ * gap. Returns RG_ERR_OOM leaving *out zeroed. */
+rg_status seg_supra_set_internal(seg_supra *out, const rg_segment *segment);
+/* Deep-copies `count` entries. On OOM frees what it made and returns 0. */
+seg_supra *seg_supra_dup_array_internal(const seg_supra *items, size_t count);
+void seg_supra_free_array_internal(seg_supra *items, size_t count);
+/* Whether two entries carry the same tone, length and stress. */
+int seg_supra_equal_internal(const seg_supra *a, const seg_supra *b);
+/* Non-empty when the entry carries any suprasegmental, for building keys. */
+int seg_supra_is_bare_internal(const seg_supra *s);
+
 /* One reconciled position tuple: which lects, which graphemes, which
  * environments. Produced by multilect_reconcile.c, consumed by class
  * discovery, released by the model's teardown. */
@@ -79,6 +101,8 @@ typedef struct reconciled_observation {
     size_t cognate_index;
     char **lects;
     char **graphemes;
+    /* Parallel to graphemes; part of the outcome identity. */
+    seg_supra *supra;
     size_t *positions;
     size_t *lect_indices;
     size_t segment_count;

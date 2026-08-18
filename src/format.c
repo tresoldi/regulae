@@ -528,6 +528,27 @@ static void append_class_segments(string_builder *builder, const rg_multi_class_
     size_t i;
     for (i = 0; i < row->segment_count; i++) {
         builder_appendf(builder, "%s%s:%s", i > 0 ? " ~ " : "", row->lect_ids[i], row->graphemes[i]);
+        /* The suprasegmentals are part of the outcome, so a tone correspondence
+         * reads on the row: `north:a[⁵⁵]`. Bracketed only when carried. */
+        if (row->suprasegmentals != 0) {
+            const rg_suprasegmentals *s = &row->suprasegmentals[i];
+            if (s->tone[0] != '\0' || s->length[0] != '\0' || s->stress[0] != '\0') {
+                int first = 1;
+                builder_appendf(builder, "[");
+                if (s->tone[0] != '\0') {
+                    builder_appendf(builder, "%s", s->tone);
+                    first = 0;
+                }
+                if (s->length[0] != '\0') {
+                    builder_appendf(builder, "%slen:%s", first ? "" : ",", s->length);
+                    first = 0;
+                }
+                if (s->stress[0] != '\0') {
+                    builder_appendf(builder, "%sstr:%s", first ? "" : ",", s->stress);
+                }
+                builder_appendf(builder, "]");
+            }
+        }
     }
 }
 

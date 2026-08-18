@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 38. The public surface has moved since this
+`RG_ABI_VERSION` is 39. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -345,6 +345,16 @@ per-lect `.context` on conditioned classes); `.graphemes` is the
 `lect -> grapheme` mapping. A `Segment` whose grapheme is
 `GAP_GRAPHEME` marks a lect that deleted the segment the others
 keep (§6), so a class can carry a `∅`.
+
+An unconditioned class also carries `suprasegmentals`
+(`rg_multi_class_row.suprasegmentals`), a per-segment `tone` /
+`length` / `stress` parallel to `graphemes` and part of the class's
+outcome identity: the same graphemes under a different tone are two
+classes, so a Sinitic or Hmong-Mien tone correspondence set gets its
+own row (from ABI 39). Each field is `""` where the segment carries
+none, and the JSON omits it there. Conditioned classes leave it unset
+— a suprasegmental predicted by an environment is a cross-dimensional
+rule (§6), not a class.
 
 **Read `len(supporting_cognates)`, not `count`, for how many
 cognate sets a class rests on.** `count` is aligned positions
@@ -1002,6 +1012,19 @@ What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **39** — `rg_multi_class_row` gained `suprasegmentals`, an array parallel to
+  `graphemes` of `rg_suprasegmentals` (`tone`, `length`, `stress`). A tone
+  correspondence set is a correspondence set, and now gets a class row: the same
+  graphemes under a different tone are two classes. Carried on an unconditioned
+  class; NULL on a conditioned one, whose outcome is the segmental split (a
+  suprasegmental under an environment is a cross-dimensional rule, §6). The JSON
+  segment gains `tone`/`length`/`stress` only where non-empty, so a segmental
+  corpus's model is byte-for-byte unchanged. Additive.
+- **38** — `rg_bic_config` gained `class_outcome_mode`: how a multi-lect class
+  split is charged for its outcome parameters. `PER_SISTER_LECT` (the default)
+  prices the split per sister lect, so the charge is bounded by each lect's
+  inventory rather than growing with the number of lects; `SISTER_TUPLE`
+  reproduces the pre-M11 joint-tuple charge. Affects the multi-lect layer only.
 - **36** — `rg_multi_class_row` gained `environment_alternatives`: the same
   identifiability flag, now on a conditioned segment class (§4.3). 0 when the
   environment is pinned, >0 when a different neighbour's feature carves the split

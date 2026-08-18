@@ -58,17 +58,17 @@ Trained through the wide loader with default options.
 | latin_italian | italian, latin | 96 | 11 |
 | latin_spanish | latin, spanish | 96 | 9 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
-| mandarin_historical | mandarin, middle_chinese | 65 | 2 |
+| mandarin_historical | mandarin, middle_chinese | 84 | 2 |
 | navajo_chipewyan | chipewyan, navajo | 64 | 0 |
 | oe_english | modern_english, old_english | 81 | 7 |
 | ppn_hawaiian | hawaiian, ppn | 41 | 2 |
 | swahili_zulu | swahili, zulu | 57 | 0 |
-| tone_3way_synthetic | daughter_a, daughter_b, proto | 9 | 0 |
-| tone_chinese_like | cantonese, mandarin | 69 | 5 |
-| tone_chinese_like_clean | cantonese, mandarin | 9 | 0 |
-| tone_synthetic | src, tgt | 8 | 0 |
-| tone_vietnamese_like | hanoi, saigon | 19 | 0 |
-| tone_yoruba_like | ekiti, standard | 21 | 0 |
+| tone_3way_synthetic | daughter_a, daughter_b, proto | 44 | 0 |
+| tone_chinese_like | cantonese, mandarin | 110 | 5 |
+| tone_chinese_like_clean | cantonese, mandarin | 44 | 0 |
+| tone_synthetic | src, tgt | 11 | 0 |
+| tone_vietnamese_like | hanoi, saigon | 39 | 0 |
+| tone_yoruba_like | ekiti, standard | 31 | 0 |
 | turkish_azerbaijani | azerbaijani, turkish | 38 | 3 |
 | umlaut_synthetic | derived, proto | 14 | 1 |
 

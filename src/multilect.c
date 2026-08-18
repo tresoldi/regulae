@@ -29,6 +29,7 @@ void reconciled_observation_clear(reconciled_observation *obs) {
     }
     string_array_clear(obs->lects, obs->segment_count);
     string_array_clear(obs->graphemes, obs->segment_count);
+    seg_supra_free_array_internal(obs->supra, obs->segment_count);
     free(obs->positions);
     free(obs->lect_indices);
     memset(obs, 0, sizeof(*obs));
@@ -165,6 +166,8 @@ static void multi_class_clear(rg_multi_class_row *klass) {
     }
     string_array_clear(rg_owned_internal(klass->lect_ids), klass->segment_count);
     string_array_clear(rg_owned_internal(klass->graphemes), klass->segment_count);
+    seg_supra_free_array_internal((seg_supra *)rg_owned_internal(klass->suprasegmentals),
+                                  klass->segment_count);
     if (klass->contexts != 0) {
         for (i = 0; i < klass->segment_count; i++) {
             rg_context_spec_clear_internal(rg_owned_internal(&klass->contexts[i]));
