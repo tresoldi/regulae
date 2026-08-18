@@ -190,6 +190,17 @@ fi
 step "learned models"
 python3 scripts/model_hashes.py || fail "the learned models moved; see above"
 
+# A model can stay byte-identical and still be published worse, and a model
+# that moves for a good reason can carry a bad change alongside it: the hash
+# says something moved, never whether what came out is readable. Four ratios
+# say that -- how many committed rules state that nothing happened, how much
+# evidence reaches a class binding every lect, how many cross-dimensional rows
+# have a segmental environment, how many predicates a committed environment
+# carries. Regenerate with --write in the same commit that moves them, so the
+# diff is the claim.
+step "report quality"
+python3 scripts/quality.py --check || fail "report quality moved; see above"
+
 step "generated artifacts were already current"
 # Tracked files only. The fixture directories joined this list when their
 # generators did, and they hold files a person writes by hand as well as files
