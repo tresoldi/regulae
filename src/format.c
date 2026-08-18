@@ -482,6 +482,48 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     return builder_finish(&builder);
 }
 
+/* Whether every lect in the class shows the same grapheme: a retention rather
+ * than a change. */
+static int class_is_identity(const rg_multi_class_row *row) {
+    size_t i;
+    if (row->segment_count == 0) {
+        return 0;
+    }
+    for (i = 1; i < row->segment_count; i++) {
+        if (strcmp(row->graphemes[i], row->graphemes[0]) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/* The class a contrast id names. Conditioned first, because a split's
+ * complement is usually itself a committed row, and the tables are small
+ * enough that a scan is cheaper than an index nothing else needs. */
+static const rg_multi_class_row *class_by_id(
+    const rg_multi_class_row *uncond,
+    size_t uncond_total,
+    const rg_multi_class_row *cond,
+    size_t cond_total,
+    int id
+) {
+    size_t i;
+    if (id < 0) {
+        return 0;
+    }
+    for (i = 0; i < cond_total; i++) {
+        if (cond[i].class_id == id) {
+            return &cond[i];
+        }
+    }
+    for (i = 0; i < uncond_total; i++) {
+        if (uncond[i].class_id == id) {
+            return &uncond[i];
+        }
+    }
+    return 0;
+}
+
 static void append_class_segments(string_builder *builder, const rg_multi_class_row *row) {
     size_t i;
     for (i = 0; i < row->segment_count; i++) {
@@ -731,6 +773,19 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             builder_appendf(&builder, "  [environment not identifiable: %d other%s carve it the same]",
                             row->environment_alternatives,
                             row->environment_alternatives == 1 ? "" : "s");
+        }
+        /* Two in five committed rules are X ~ X. Most are the retention side
+         * of a real split, with the change sitting in the contrast class, and
+         * "p ~ p before a vowel" is a null statement to read: a reader has to
+         * notice the graphemes are the same and then chase an id to find the
+         * event. Name which half of the pair is the event instead. */
+        if (class_is_identity(row)) {
+            const rg_multi_class_row *contrast = class_by_id(
+                uncond_rows, uncond_total, cond_rows, cond_total, row->contrast_class_id);
+            if (contrast != 0 && !class_is_identity(contrast)) {
+                builder_append(&builder, "  [unchanged here; the change is #");
+                builder_appendf(&builder, "%d]", contrast->class_id);
+            }
         }
         builder_append(&builder, "\n");
     }

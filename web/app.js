@@ -141,6 +141,12 @@ function correspondence(entry) {
   return entry.segments.map((s) => `${s.lect}:${s.grapheme}`).join("  ~  ");
 }
 
+/* Whether every lect in the class shows the same grapheme -- a retention
+   rather than a change. */
+function isIdentity(entry) {
+  return new Set(entry.segments.map((s) => s.grapheme)).size === 1;
+}
+
 /* A class by its id, across both tables. -1 (no contrast) returns null. */
 function classById(id) {
   if (id === undefined || id < 0) {
@@ -183,8 +189,17 @@ function renderClasses() {
   const body = $("classes").querySelector("tbody");
   body.innerHTML = "";
 
+  /* Conditioned classes are a decision list: each was committed against what
+     the earlier ones left unexplained, so a later one refines an earlier one
+     and the order carries that. The JSON publishes every table sorted by id,
+     which is why each row also carries decision_index -- iterating the array
+     as it arrives renders the list scrambled, and the CLI and this page then
+     report the same model in two different orders. */
+  const decided = [...model.classes.conditioned].sort(
+    (a, b) => (a.decision_index - b.decision_index) || (a.id - b.id),
+  );
   const all = [
-    ...model.classes.conditioned.map((c) => ({ entry: c, conditioned: true })),
+    ...decided.map((c) => ({ entry: c, conditioned: true })),
     ...model.classes.unconditioned.map((c) => ({ entry: c, conditioned: false })),
   ];
   if (!all.length) {
@@ -208,7 +223,14 @@ function renderClasses() {
          inline so the comparison is not a separate hunt through the table. */
       const contrast = classById(entry.contrast_class_id);
       if (contrast) {
-        env.textContent += ` · else ${correspondence(contrast)}`;
+        /* Two in five committed rules are X ~ X, and most of those are the
+           retention side of a real split: the change is sitting in the
+           contrast. "p ~ p before a vowel" is a null statement to read, so say
+           which half of the pair is the event rather than leaving the reader
+           to notice that the two graphemes are the same. */
+        env.textContent += isIdentity(entry) && !isIdentity(contrast)
+          ? ` · unchanged here; the change is ${correspondence(contrast)}`
+          : ` · else ${correspondence(contrast)}`;
       }
       corr.appendChild(env);
     }
