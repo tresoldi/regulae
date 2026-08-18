@@ -134,6 +134,8 @@ struct rg_multi_model {
     size_t conditioned_class_count;
     rg_multi_cross_dimensional_row *cross_dimensional_rows;
     size_t cross_dimensional_count;
+    rg_proposed_event_row *proposed_events;
+    size_t proposed_event_count;
     size_t unpaired_set_count;
     rg_corpus_fit fit;
 };

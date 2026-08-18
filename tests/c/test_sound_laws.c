@@ -1731,6 +1731,82 @@ static void test_fragmenting_a_change_over_a_class_costs_its_standing(rg_context
     rg_corpus_free(spread_corpus);
 }
 
+/* Four rows that are one change, grouped and named.
+ *
+ * The grouping condition is deliberately strict: same lects, same environment
+ * on each, differing graphemes. That is what a change split per segment looks
+ * like, and it is checkable without deciding anything about whether the pooled
+ * description is better -- which this does not decide, and the members stay
+ * published either way.
+ *
+ * The control is the same change on one segment. There is nothing to group and
+ * it proposes nothing, which is the half of the commitment that can fail
+ * quietly: a grouper that fires on a single correspondence would find events
+ * everywhere. */
+static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ctx) {
+    rg_corpus *spread_corpus = load("natural_class");
+    rg_corpus *control_corpus = load("natural_class_control");
+    rg_multi_model *spread = train(ctx, spread_corpus);
+    rg_multi_model *control = train(ctx, control_corpus);
+    size_t count = 0;
+    const rg_proposed_event_row *events = rg_multi_model_proposed_events(spread, &count);
+    size_t control_count = 1;
+    const rg_proposed_event_row *voicing = 0;
+    size_t i;
+
+    /* The change and the retention, one event each. */
+    assert(count == 2);
+    rg_multi_model_proposed_events(control, &control_count);
+    assert(control_count == 0);
+
+    for (i = 0; i < count; i++) {
+        size_t m;
+        for (m = 0; m < events[i].member_count; m++) {
+            size_t g;
+            for (g = 0; g < events[i].members[m].grapheme_count; g++) {
+                if (strcmp(events[i].members[m].graphemes[g], "v") == 0) {
+                    voicing = &events[i];
+                }
+            }
+        }
+    }
+    assert(voicing != 0);
+
+    /* Four member classes, every observation of all four, and the distinct
+     * sets behind them -- the pooled evidence no single member row carries. */
+    assert(voicing->class_id_count == 4);
+    assert(voicing->member_count == 2);
+    assert(voicing->count == 32.0);
+    assert(voicing->supporting_cognate_count == 32);
+
+    /* Both sides name their set, which is what makes it a class and not a
+     * list. The corpus was built so they can; most cannot. */
+    assert(voicing->featurally_definable);
+    for (i = 0; i < voicing->member_count; i++) {
+        assert(voicing->members[i].grapheme_count == 4);
+        assert(voicing->members[i].class_feature_count > 0);
+    }
+
+    /* The members are still published in their own right. Nothing was
+     * replaced, so a consumer that rejects the grouping loses nothing. */
+    for (i = 0; i < voicing->class_id_count; i++) {
+        size_t j;
+        int found = 0;
+        for (j = 0; j < rg_multi_model_conditioned_class_count(spread); j++) {
+            if (rg_multi_model_conditioned_class_at(spread, j)->class_id ==
+                voicing->class_ids[i]) {
+                found = 1;
+            }
+        }
+        assert(found);
+    }
+
+    rg_multi_model_free(spread);
+    rg_multi_model_free(control);
+    rg_corpus_free(spread_corpus);
+    rg_corpus_free(control_corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -1763,6 +1839,7 @@ int main(void) {
     test_conditioning_is_found_from_both_sides(ctx);
     test_a_confounded_environment_is_flagged(ctx);
     test_fragmenting_a_change_over_a_class_costs_its_standing(ctx);
+    test_one_change_over_a_class_is_proposed_as_one_event(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);
     test_class_counts_are_not_evidence_but_the_fit_is(ctx);

@@ -229,6 +229,69 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     return out;
 }
 
+/* Conditioned classes that look like one change. A proposal: every member is
+ * published in its own right under `classes.conditioned`, and `class_ids`
+ * points at them rather than replacing them. */
+static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
+    cJSON *out = cJSON_CreateObject();
+    cJSON *ids;
+    cJSON *members;
+    cJSON *support;
+    size_t i;
+    size_t j;
+    if (out == 0) {
+        return 0;
+    }
+    ids = cJSON_CreateArray();
+    members = cJSON_CreateArray();
+    support = cJSON_CreateArray();
+    if (ids == 0 || members == 0 || support == 0) {
+        cJSON_Delete(out);
+        cJSON_Delete(ids);
+        cJSON_Delete(members);
+        cJSON_Delete(support);
+        return 0;
+    }
+    for (i = 0; i < row->class_id_count; i++) {
+        cJSON_AddItemToArray(ids, cJSON_CreateNumber(row->class_ids[i]));
+    }
+    cJSON_AddItemToObject(out, "class_ids", ids);
+    for (i = 0; i < row->member_count; i++) {
+        const rg_event_member *member = &row->members[i];
+        cJSON *entry = cJSON_CreateObject();
+        cJSON *graphemes = cJSON_CreateArray();
+        cJSON *features = cJSON_CreateArray();
+        if (entry == 0 || graphemes == 0 || features == 0) {
+            cJSON_Delete(entry);
+            cJSON_Delete(graphemes);
+            cJSON_Delete(features);
+            cJSON_Delete(out);
+            cJSON_Delete(support);
+            return 0;
+        }
+        cJSON_AddStringToObject(entry, "lect", member->lect_id);
+        for (j = 0; j < member->grapheme_count; j++) {
+            cJSON_AddItemToArray(graphemes, cJSON_CreateString(member->graphemes[j]));
+        }
+        cJSON_AddItemToObject(entry, "graphemes", graphemes);
+        for (j = 0; j < member->class_feature_count; j++) {
+            cJSON_AddItemToArray(features, cJSON_CreateString(member->class_features[j]));
+        }
+        cJSON_AddItemToObject(entry, "class_features", features);
+        cJSON_AddItemToArray(members, entry);
+    }
+    cJSON_AddItemToObject(out, "members", members);
+    for (i = 0; i < row->supporting_cognate_count; i++) {
+        cJSON_AddItemToArray(support, cJSON_CreateString(row->supporting_cognates[i]));
+    }
+    cJSON_AddItemToObject(out, "supporting_cognates", support);
+    cJSON_AddNumberToObject(out, "count", row->count);
+    cJSON_AddBoolToObject(out, "featurally_definable", row->featurally_definable);
+    cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
+    cJSON_AddNumberToObject(out, "delta_score", row->delta_score);
+    return out;
+}
+
 static cJSON *json_segments(const rg_segment *segments, size_t count) {
     cJSON *array = cJSON_CreateArray();
     size_t i;
@@ -702,6 +765,24 @@ char *rg_json_from_multi_model_internal(
     class_rows = rg_multi_model_conditioned_classes(model, &table_count);
     for (i = 0; i < table_count; i++) {
         cJSON_AddItemToArray(array, json_class(&class_rows[i], 1));
+    }
+
+    array = cJSON_CreateArray();
+    if (array == 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    cJSON_AddItemToObject(root, "proposed_events", array);
+    {
+        const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &table_count);
+        for (i = 0; i < table_count; i++) {
+            cJSON *entry = json_proposed_event(&events[i]);
+            if (entry == 0) {
+                cJSON_Delete(root);
+                return 0;
+            }
+            cJSON_AddItemToArray(array, entry);
+        }
     }
 
     array = cJSON_CreateArray();

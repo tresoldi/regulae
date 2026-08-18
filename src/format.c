@@ -797,6 +797,53 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     decision_order = 0;
 
     total = xdim_total;
+    {
+        size_t event_total = 0;
+        const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &event_total);
+        size_t e;
+        builder_append(&builder, "\n--- Conditioned classes that look like one change ---\n");
+        if (event_total == 0) {
+            builder_append(&builder, "  (none - every committed environment names one correspondence)\n");
+        }
+        for (e = 0; e < event_total; e++) {
+            const rg_proposed_event_row *event = &events[e];
+            size_t m;
+            builder_append(&builder, "  count=");
+            append_count(&builder, event->count);
+            builder_appendf(&builder, " sets=%lu over %lu classes  margin=%.2f  ",
+                            (unsigned long)event->supporting_cognate_count,
+                            (unsigned long)event->class_id_count,
+                            event->search_margin);
+            for (m = 0; m < event->member_count; m++) {
+                const rg_event_member *member = &event->members[m];
+                size_t g;
+                builder_appendf(&builder, "%s%s:{", m == 0 ? "" : " ~ ", member->lect_id);
+                for (g = 0; g < member->grapheme_count; g++) {
+                    builder_appendf(&builder, "%s%s", g == 0 ? "" : ",", member->graphemes[g]);
+                }
+                builder_append(&builder, "}");
+                for (g = 0; g < member->class_feature_count; g++) {
+                    builder_appendf(&builder, "%s%s", g == 0 ? "=[" : " & ",
+                                    member->class_features[g]);
+                }
+                if (member->class_feature_count > 0) {
+                    builder_append(&builder, "]");
+                }
+            }
+            /* A set no feature picks out may still be the set a change applied
+             * to; saying so is not the same as doubting the grouping. */
+            if (!event->featurally_definable) {
+                builder_append(&builder, "  [no feature names this set in this corpus]");
+            }
+            builder_append(&builder, "\n");
+        }
+        if (event_total > 0) {
+            builder_append(&builder,
+                "  Each member class is published above and stays there. Whether one\n"
+                "  pooled rule beats the several is not decided here.\n");
+        }
+    }
+
     builder_append(&builder, "\n--- Cross-dimensional rules, in the order they were decided ---\n");
     if (total == 0) {
         builder_append(&builder, "  (none)\n");

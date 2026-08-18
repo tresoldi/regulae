@@ -114,6 +114,7 @@ add_library(regulae
     src/model_chunks.c
     src/model_tables.c
     src/model_context.c
+    src/events.c
     src/model_crossdim.c
     src/multilect.c
     src/multilect_classes.c

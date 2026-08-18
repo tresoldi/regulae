@@ -133,6 +133,16 @@ rg_status train_pair_models(
 );
 rg_status lift_cross_dimensional_rows(rg_multi_model *model);
 
+/* events.c: conditioned classes that look like one change, grouped. Runs after
+ * class discovery and changes nothing it reads. */
+rg_status rg_propose_events_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_multi_model *model
+);
+void rg_proposed_events_free_internal(rg_proposed_event_row *rows, size_t count);
+
 /* predictive.c: selection-nested validation over dependency components. */
 rg_status rg_predictive_evaluate_internal(
     const rg_context *ctx,

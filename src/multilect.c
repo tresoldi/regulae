@@ -196,6 +196,7 @@ void rg_multi_model_free(rg_multi_model *model) {
     }
     free(model->conditioned_classes);
     free(model->cross_dimensional_rows);
+    rg_proposed_events_free_internal(model->proposed_events, model->proposed_event_count);
     for (i = 0; i < model->class_position_count; i++) {
         free(model->class_positions[i].lect_indices);
         free(model->class_positions[i].positions);
@@ -473,6 +474,9 @@ rg_status rg_train_model(
         status = compute_corpus_fit(ctx, cognates, cognate_count, options, &baseline, model);
     }
     if (status == RG_OK) {
+        status = rg_propose_events_internal(ctx, cognates, cognate_count, model);
+    }
+    if (status == RG_OK) {
         status = rg_predictive_evaluate_internal(ctx, cognates, cognate_count, options, model);
     }
     if (status != RG_OK) {
@@ -504,6 +508,7 @@ size_t rg_multi_model_unpaired_set_count(const rg_multi_model *model) {
 RG_MULTI_TABLE(rg_multi_model_unconditioned_classes, rg_multi_class_row, unconditioned_classes, unconditioned_class_count)
 RG_MULTI_TABLE(rg_multi_model_conditioned_classes, rg_multi_class_row, conditioned_classes, conditioned_class_count)
 RG_MULTI_TABLE(rg_multi_model_cross_dimensional_rows, rg_multi_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)
+RG_MULTI_TABLE(rg_multi_model_proposed_events, rg_proposed_event_row, proposed_events, proposed_event_count)
 
 #undef RG_MULTI_TABLE
 

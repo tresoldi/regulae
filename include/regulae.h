@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 36
+#define RG_ABI_VERSION 37
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -776,6 +776,63 @@ typedef struct rg_multi_cross_dimensional_row {
     rg_cross_dimensional_row rule;
 } rg_multi_cross_dimensional_row;
 
+/* One lect's part in a proposed event: the graphemes it contributes across the
+ * member classes, and the features that name them as a class if any do. */
+typedef struct rg_event_member {
+    const char *lect_id;
+    const char *const *graphemes;
+    size_t grapheme_count;
+    /* Features carried by every grapheme above and by no other grapheme this
+     * lect shows in the corpus -- what makes the set a class rather than a
+     * list. Empty when no feature separates it, which is the common case
+     * rather than a failure: no feature theory tested against attested active
+     * classes expressed more than 71% of them (Mielke 2008), so a set that
+     * cannot be named may still be a real class. `featurally_definable` on the
+     * event says whether every lect managed it. */
+    const char *const *class_features;
+    size_t class_feature_count;
+} rg_event_member;
+
+/* Several conditioned classes that look like one change.
+ *
+ * A change applying to more than one segment is published as one class per
+ * segment: on the natural-class fixture, voicing four continuants between
+ * vowels comes out as four rows differing only in their graphemes, carrying
+ * the same environment and the same score to three decimal places. They are
+ * one event and no field said so, and the cost is not only readability --
+ * the same evidence states the change at a search margin over ten as one rule
+ * and under four as four rules.
+ *
+ * This groups them and stops. It does **not** decide that the pooled
+ * description is the better one: scoring a pooled hypothesis against the
+ * fragmented alternative is a model-selection question this does not answer,
+ * and `testdata/soundlaws/natural_class.tsv` with its control is what any
+ * answer has to be scored on. Every member class stays published exactly as
+ * it was, so a consumer that disagrees ignores this table and loses nothing.
+ *
+ * A proposal, and the field name says so. */
+typedef struct rg_proposed_event_row {
+    const rg_event_member *members;
+    size_t member_count;
+    /* The classes this event proposes to join, in ascending order. Each is
+     * published in its own right; nothing here replaces them. */
+    const int *class_ids;
+    size_t class_id_count;
+    /* Aligned positions across every member class, and the distinct cognate
+     * sets behind them. The pooled evidence, which is the number a reader
+     * wants and the one no single member row carries. */
+    double count;
+    const char *const *supporting_cognates;
+    size_t supporting_cognate_count;
+    /* Whether every lect named its grapheme set with a feature. */
+    bool featurally_definable;
+    /* Shared by the members, and the reason they group: identical scores on
+     * identical environments are what a single change looks like once it has
+     * been split per segment. */
+    double search_margin;
+    double delta_score;
+} rg_proposed_event_row;
+
 /* How one lect writes a sound that another lect in the same corpus writes as a
  * sequence -- see rg_find_transcription_drift. */
 typedef enum rg_drift_kind {
@@ -1480,6 +1537,14 @@ RG_API const rg_multi_class_row *rg_multi_model_conditioned_classes(
     const rg_multi_model *model,
     size_t *count
 );
+/* Conditioned classes that look like one change, grouped. Borrowed, valid
+ * while the model lives. See rg_proposed_event_row: a proposal, not a verdict,
+ * and the member classes remain published. */
+RG_API const rg_proposed_event_row *rg_multi_model_proposed_events(
+    const rg_multi_model *model,
+    size_t *count
+);
+
 RG_API const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_rows(
     const rg_multi_model *model,
     size_t *count
