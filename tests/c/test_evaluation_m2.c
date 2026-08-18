@@ -41,6 +41,23 @@ static double taxon_rule_margin(const rg_multi_model *model) {
     return -1.0;
 }
 
+/* The same conditioned rule, on 2, 3 and 4 taxa sampled from one history.
+ *
+ * Adding a taxon that also attests the rule is more evidence for it, never
+ * less, so the rule's search margin must not fall as the sample grows. Under
+ * the joint-tuple outcome model it was exactly constant here (2 and 3 lects
+ * both 29.5), which read as invariance but was an artifact: the joint tuple
+ * priced every added taxon as new outcomes, and on a corpus where that exactly
+ * cancelled the added likelihood the margin happened not to move -- the same
+ * mechanism that made `restraint/arity_5` lose the rule outright.
+ *
+ * Under `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default since M11) each sister
+ * lect that attests the rule adds to the score, so the margin holds through the
+ * third taxon and doubles at the fourth (two innovators attest it): 29.5, 29.5,
+ * 59.0. The property taxon sampling preserves is the rule and its strength, not
+ * a fixed number; exact-margin equality was never the invariant. Metadata
+ * invariance -- renaming, orientation, row order, duplicate lects -- is M5's,
+ * and adding a real taxon is not a metadata operation. */
 static void test_taxon_sampling_preserves_the_observed_rule(rg_context *ctx) {
     static const char *paths[] = {
         REGULAE_SOURCE_DIR "/testdata/linguistic/taxon_sampling_2lect.tsv",
@@ -57,7 +74,8 @@ static void test_taxon_sampling_preserves_the_observed_rule(rg_context *ctx) {
         if (i == 0) {
             first = margin;
         } else {
-            assert(fabs(margin - first) < 1e-12);
+            /* Never weakened by adding a taxon that attests it. */
+            assert(margin >= first - 1e-9);
         }
         rg_multi_model_free(model);
         rg_corpus_free(corpus);

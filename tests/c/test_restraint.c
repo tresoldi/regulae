@@ -514,31 +514,27 @@ static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_con
  * of words showing it, attested by one more language each time.
  *
  * So the right answer is the same at every rung and the evidence for it only
- * grows. What regulae does instead is the finding: the correspondence is
- * stated across more and thinner rows at each rung -- two rows at two lects,
- * six at three, seven at four -- and at five lects the conditioning search
- * commits nothing at all.
+ * grows. Until the outcome model was fixed in M11, what regulae did instead was
+ * the finding: a class-level split was priced by the number of distinct *sister
+ * tuples* in the pivot bucket, and a sister tuple is the full list of (lect,
+ * grapheme) pairs -- so it counted which lects a cognate set happened to cover,
+ * and any one-off reflex in any one sister, alongside the correspondence
+ * itself. Corrected BIC charged `K−1` parameters, `K` grew with the sample
+ * rather than the structure, and adding a language subtracted evidence until at
+ * five lects the conditioning search committed nothing at all.
  *
- * The cause is in `multilect_classes.c`. A class-level split is priced by the
- * number of distinct *sister tuples* in the pivot bucket, and a sister tuple
- * is the full list of (lect, grapheme) pairs -- so it counts which lects a
- * cognate set happened to cover, and any one-off reflex in any one sister,
- * alongside the correspondence itself. Corrected BIC charges `K−1` parameters
- * for a split, and `K` therefore grows with the sample rather than with the
- * structure, while a binary environment can only ever buy about one bit per
- * observation. Adding a language subtracts evidence.
- *
- * The assertions are written to the behaviour rather than to the intention,
- * like `merger_gap` above: a fixture that cannot fail tests nothing. When the
- * outcome alphabet stops counting the sampling, `arity_5` publishes the rule
- * and the row counts stop falling. */
-static void test_adding_a_lect_costs_the_conditioned_rule(rg_context *ctx) {
+ * `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default since M11) scores the split as
+ * a sum over sister lects instead of over the joint tuple, so `K` is bounded by
+ * each lect's inventory rather than by arity. The rule is now recovered at every
+ * rung -- five lects included -- and its row count no longer collapses. That is
+ * what the pairwise stage always did, and why it worked at every arity. */
+static void test_adding_a_lect_recovers_the_conditioned_rule(rg_context *ctx) {
     static const char *const rungs[] = {"arity_2", "arity_3", "arity_4", "arity_5"};
     /* Rows the change is stated across, and the evidence the largest carries.
-     * Both are wrong, and they are wrong in the same direction: the rule is
-     * one rule at every rung and its support is being divided, not lost. */
-    static const size_t expected_rows[] = {2, 3, 2, 0};
-    static const double expected_largest[] = {54.0, 7.0, 6.0, 0.0};
+     * The change is one rule attested by more languages each rung; the search
+     * recovers it at all four, five lects no longer silent. */
+    static const size_t expected_rows[] = {2, 3, 2, 2};
+    static const double expected_largest[] = {54.0, 7.0, 6.0, 4.0};
     size_t rung;
 
     for (rung = 0; rung < sizeof(rungs) / sizeof(rungs[0]); rung++) {
@@ -547,10 +543,10 @@ static void test_adding_a_lect_costs_the_conditioned_rule(rg_context *ctx) {
         double largest = 0.0;
         size_t rows = conditioned_rows_naming(model, "k", "q", &largest);
 
-        /* The change is in the corpus at every rung, whatever the conditioning
-         * search does with it, so the silence at five lects cannot be read as
-         * the corpus not carrying it. */
+        /* The change is in the corpus at every rung, and the conditioning
+         * search states it at every rung -- the arity cliff is gone. */
         assert(has_correspondence(model, "k", "q"));
+        assert(rows > 0);
         assert(rows == expected_rows[rung]);
         assert(largest == expected_largest[rung]);
 
@@ -668,7 +664,7 @@ int main(void) {
     test_the_split_statistic_says_two_populations_and_not_why(ctx);
     test_sixteen_sets_recover_the_conditioned_surface_contrast(ctx);
     test_a_neutralisation_keeps_stable_surface_correlates_explicit(ctx);
-    test_adding_a_lect_costs_the_conditioned_rule(ctx);
+    test_adding_a_lect_recovers_the_conditioned_rule(ctx);
     test_a_trigger_a_syllable_away_needs_five_a_side(ctx);
     test_an_unconditioned_relationship_commits_but_nothing_stands(ctx);
     rg_context_free(ctx);

@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 37
+#define RG_ABI_VERSION 38
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -86,6 +86,35 @@ typedef enum rg_split_scorer {
 
 RG_API const char *rg_split_scorer_string(rg_split_scorer scorer);
 
+/* How a multi-lect class split is charged for its added outcome parameters.
+ *
+ * `SISTER_TUPLE` scores one categorical over the sister tuples on the other
+ * side of the correspondence -- the full list of `(lect, grapheme)` pairs --
+ * and charges corrected BIC `(K-1)` where `K` counts those distinct tuples. A
+ * tuple is an outcome crossed with which languages a set happened to cover and
+ * any one-off reflex in any one sister, so `K` grows with the sample rather
+ * than the structure and a conditioned correspondence recovered at two lects is
+ * lost at three, four and five. This was the default and the defect through
+ * M10; it is retained to reproduce the pre-M11 model.
+ *
+ * `PER_SISTER_LECT` (the default since M11) scores the split as a sum over
+ * sister lects instead: for each sister lect present on both sides of the
+ * split, the outcome is that lect's grapheme and the charge is `(K_q-1)*ln n_q`
+ * with `K_q` bounded by the lect's inventory, not by arity. Coverage falls out
+ * -- an observation that lacks a lect does not enter that lect's sub-count, and
+ * a lect sitting entirely on one side contributes no contrast and is not
+ * charged -- so a real conditioned correspondence is recovered at every arity.
+ * This is what the pairwise stage already does, and why it works at every
+ * arity. See docs/multilect_hardening_plan.md (M11) for the alternatives
+ * measured and rejected. Only the multi-lect class search reads this; the
+ * pairwise stages score real target graphemes and are unaffected. */
+typedef enum rg_class_outcome_mode {
+    RG_CLASS_OUTCOME_SISTER_TUPLE = 0,
+    RG_CLASS_OUTCOME_PER_SISTER_LECT = 1
+} rg_class_outcome_mode;
+
+RG_API const char *rg_class_outcome_mode_string(rg_class_outcome_mode mode);
+
 typedef struct rg_bic_config {
     /* The criterion used to compare one pooled categorical distribution with
      * the two distributions induced by an environment. The struct keeps its
@@ -132,6 +161,9 @@ typedef struct rg_bic_config {
      * `tune_search_penalty` replaces it with a value measured from the corpus
      * itself. */
     double search_penalty_gamma;
+    /* How a multi-lect class split is charged for its added outcome
+     * parameters -- see rg_class_outcome_mode. */
+    rg_class_outcome_mode class_outcome_mode;
 } rg_bic_config;
 
 typedef enum rg_observation_unit {

@@ -35,6 +35,17 @@ const char *rg_split_scorer_string(rg_split_scorer scorer) {
     }
 }
 
+const char *rg_class_outcome_mode_string(rg_class_outcome_mode mode) {
+    switch (mode) {
+    case RG_CLASS_OUTCOME_SISTER_TUPLE:
+        return "sister_tuple";
+    case RG_CLASS_OUTCOME_PER_SISTER_LECT:
+        return "per_sister_lect";
+    default:
+        return "unknown";
+    }
+}
+
 const char *rg_observation_unit_string(rg_observation_unit unit) {
     switch (unit) {
     case RG_OBSERVATION_UNIT_AUTO:

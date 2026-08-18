@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 37);
+    assert(rg_abi_version() == 38);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -35,6 +35,9 @@ int main(void) {
     assert(fabs(bic.search_penalty_gamma - 1.0) < 1e-12);
     assert(bic.multi_lect_bic_small_sample_correction == 0);
     assert(fabs(bic.multi_lect_min_commit_scale - 0.5) < 1e-12);
+    assert(bic.class_outcome_mode == RG_CLASS_OUTCOME_PER_SISTER_LECT);
+    assert(strcmp(rg_class_outcome_mode_string(bic.class_outcome_mode),
+                  "per_sister_lect") == 0);
 
     rg_train_options_init_defaults(&options);
     assert(options.max_chunk_size == RG_DEFAULT_MAX_CHUNK_SIZE);

@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 36. The public surface has moved since this
+`RG_ABI_VERSION` is 38. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a

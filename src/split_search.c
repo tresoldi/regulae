@@ -399,8 +399,18 @@ rg_status rg_split_find_best(
         free(yes_items);
         free(no_items);
         candidate_config.candidate_count = partition_count;
-        status = rg_categorical_split_score_internal(pooled_mass, yes_mass, no_mass,
-                                                     outcome_count, &candidate_config, &scored);
+        if (score_config->outcome_mode == RG_CLASS_OUTCOME_PER_SISTER_LECT &&
+            score_config->group_scorer != 0) {
+            /* The per-sister-lect sum decomposes over sisters, which the caller
+             * reads from each observation's owner -- the generic pooled-mass
+             * categorical cannot express it. */
+            status = score_config->group_scorer(search->yes, yes_count, search->no, no_count,
+                                                &candidate_config, score_config->group_scorer_user,
+                                                &scored);
+        } else {
+            status = rg_categorical_split_score_internal(pooled_mass, yes_mass, no_mass,
+                                                         outcome_count, &candidate_config, &scored);
+        }
         if (status != RG_OK) {
             break;
         }

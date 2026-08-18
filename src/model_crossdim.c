@@ -894,6 +894,9 @@ static rg_status discover_cross_dimensional_orientation(
     score_config.candidate_count = 0;
     score_config.search_gamma = options == 0
         ? RG_SEARCH_PENALTY_GAMMA : options->bic.search_penalty_gamma;
+    score_config.outcome_mode = RG_CLASS_OUTCOME_SISTER_TUPLE;
+    score_config.group_scorer = 0;
+    score_config.group_scorer_user = 0;
 
     /* One pass per target dimension. The scorer has handled length and stress
      * as targets since the port; this stage only ever proposed tone. */

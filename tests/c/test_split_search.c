@@ -19,7 +19,8 @@ static double find_delta(
     const rg_split_candidate candidate = {"position", "initial", 0};
     const rg_split_gate gate = {0.0, -1.0, 0.0};
     const rg_split_score_config score = {
-        RG_SPLIT_SCORER_CORRECTED_BIC, 1.0, log_sample_size, 0.0, 1, 0.0
+        RG_SPLIT_SCORER_CORRECTED_BIC, 1.0, log_sample_size, 0.0, 1, 0.0,
+        RG_CLASS_OUTCOME_SISTER_TUPLE, 0, 0
     };
     rg_split_search search;
     rg_split_result result;
@@ -104,7 +105,8 @@ static void test_equivalent_split_encodings_do_not_increase_search_charge(void) 
         {0.0, -1.0, 0.0}, {0.0, -1.0, 0.0}, {0.0, -1.0, 0.0}
     };
     const rg_split_score_config score = {
-        RG_SPLIT_SCORER_CORRECTED_BIC, 1.0, log(8.0), 0.0, 0, 1.0
+        RG_SPLIT_SCORER_CORRECTED_BIC, 1.0, log(8.0), 0.0, 0, 1.0,
+        RG_CLASS_OUTCOME_SISTER_TUPLE, 0, 0
     };
     rg_split_search search;
     rg_split_result a;

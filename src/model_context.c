@@ -1044,7 +1044,10 @@ static rg_status discover_context_counts(
                 log(n_total),
                 0.0,
                 0,
-                options->bic.search_penalty_gamma
+                options->bic.search_penalty_gamma,
+                RG_CLASS_OUTCOME_SISTER_TUPLE,
+                0,
+                0
             },
             target_side
         );

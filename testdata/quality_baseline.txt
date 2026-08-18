@@ -21,7 +21,7 @@ testdata/soundlaws/metathesis_distant.tsv              0    n/a   1.00     0    
 testdata/soundlaws/morphological_rhotacism.tsv         4   0.75   1.00     0    n/a   1.50
 testdata/soundlaws/natural_class.tsv                   8   0.50   1.00     0    n/a   1.00
 testdata/soundlaws/natural_class_control.tsv           2   0.50   1.00     0    n/a   1.00
-testdata/soundlaws/opaque_umlaut.tsv                   3   0.67   1.00     0    n/a   1.67
+testdata/soundlaws/opaque_umlaut.tsv                   2   0.50   1.00     0    n/a   1.50
 testdata/soundlaws/place_assimilation.tsv              2   0.50   1.00     0    n/a   1.00
 testdata/soundlaws/place_dissimilation.tsv             2   0.50   1.00     0    n/a   1.50
 testdata/soundlaws/rhotacism.tsv                       3   0.67   1.00     0    n/a   1.67
@@ -29,9 +29,9 @@ testdata/soundlaws/rhotacism_reordered.tsv             3   0.67   1.00     0    
 testdata/soundlaws/rounding_harmony.tsv                1   0.00   1.00     0    n/a   1.00
 testdata/soundlaws/verner.tsv                          4   0.50   1.00     0    n/a   1.25
 testdata/restraint/arity_2.tsv                         3   0.33   1.00     0    n/a   1.33
-testdata/restraint/arity_3.tsv                         7   0.57   0.63     0    n/a   1.43
-testdata/restraint/arity_4.tsv                         7   0.71   0.46     0    n/a   1.29
-testdata/restraint/arity_5.tsv                         0    n/a   0.34     0    n/a    n/a
+testdata/restraint/arity_3.tsv                         9   0.67   0.63     0    n/a   1.33
+testdata/restraint/arity_4.tsv                        10   0.80   0.46     0    n/a   1.20
+testdata/restraint/arity_5.tsv                        16   0.88   0.34     0    n/a   1.19
 testdata/restraint/chance.tsv                          0    n/a   1.00     0    n/a    n/a
 testdata/restraint/contact.tsv                         0    n/a   1.00     0    n/a    n/a
 testdata/restraint/diffusion.tsv                       0    n/a   1.00     0    n/a    n/a
@@ -67,7 +67,7 @@ testdata/corpora/partial_coverage.tsv                  0    n/a   0.23     0    
 testdata/corpora/real_contaminated.tsv                 0    n/a   1.00     0    n/a    n/a
 testdata/corpora/real_latin_spanish.tsv                9   0.22   1.00     0    n/a   1.00
 testdata/corpora/real_ppn_hawaiian.tsv                 2   0.50   1.00     0    n/a   1.00
-testdata/corpora/real_romance_4lect.tsv               13   0.46   0.98     0    n/a   1.08
+testdata/corpora/real_romance_4lect.tsv                8   0.12   0.98     0    n/a   1.50
 testdata/corpora/real_tone_chinese.tsv                 0    n/a   1.00     0    n/a    n/a
 testdata/corpora/stress_dimension_target.tsv           0    n/a   1.00     4   1.00    n/a
 testdata/corpora/syllable_breaks_column.tsv            0    n/a   1.00     0    n/a    n/a
@@ -76,7 +76,7 @@ testdata/corpora/tonal_multilect.tsv                   0    n/a   1.00     0    
 testdata/corpora/tonogenesis_cldf.tsv                  0    n/a   1.00     2   1.00    n/a
 testdata/corpora/tonogenesis_internal.tsv              0    n/a   1.00     4   1.00    n/a
 
-TOTAL identity            51.0 / 129.0    = 0.3953
+TOTAL identity            64.0 / 144.0    = 0.4444
 TOTAL fragmentation    15839.0 / 16886.0  = 0.9380
 TOTAL density             18.0 / 25.0     = 0.7200
-TOTAL conjuncts          156.0 / 129.0    = 1.2093
+TOTAL conjuncts          176.0 / 144.0    = 1.2222

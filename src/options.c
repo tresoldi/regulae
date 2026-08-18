@@ -38,6 +38,7 @@ void rg_bic_config_init_defaults(rg_bic_config *config) {
     config->multi_lect_bic_small_sample_correction = 0;
     config->multi_lect_min_commit_scale = 0.5;
     config->search_penalty_gamma = RG_SEARCH_PENALTY_GAMMA;
+    config->class_outcome_mode = RG_CLASS_OUTCOME_PER_SISTER_LECT;
 }
 
 void rg_train_options_init_defaults(rg_train_options *options) {

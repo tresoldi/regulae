@@ -324,39 +324,42 @@ that a lect is missing from a set gives the ragged coverage every real wordlist
 has.
 
 The right answer is the same at every rung, and the evidence for it only grows.
-What comes out instead:
+Since M11 that is what comes out:
 
 | rung | sets | classes | conditioned | rows stating /k ~ q/ | largest such row |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `arity_2` | 126 | 55 | 3 | 2 | 54 |
-| `arity_3` | 146 | 142 | 7 | 3 | 7 |
-| `arity_4` | 157 | 235 | 7 | 2 | 6 |
-| `arity_5` | 158 | 293 | **0** | 0 | — |
+| `arity_3` | 146 | 142 | 9 | 3 | 7 |
+| `arity_4` | 157 | 235 | 10 | 2 | 6 |
+| `arity_5` | 158 | 293 | 16 | 2 | 4 |
 
-**Adding a language subtracts evidence.** The same rule, attested by one more
-lect each time, is stated across thinner and thinner rows until the search stops
-committing anything.
+**Adding a language no longer subtracts evidence.** The rule is recovered at
+every rung, five lects included, and its row count stops collapsing.
 
-The cause is in `multilect_classes.c`, and it is one mechanism with two
-symptoms. A class-level split is priced by the number of distinct *sister
-tuples* in the pivot bucket, and a sister tuple is the full list of
-(lect, grapheme) pairs — so it counts which lects a cognate set happened to
+Through M10 it did not. A class-level split was priced by the number of distinct
+*sister tuples* in the pivot bucket, and a sister tuple is the full list of
+(lect, grapheme) pairs — so it counted which lects a cognate set happened to
 cover, and any one-off reflex in any one sister, alongside the correspondence
-itself. Corrected BIC charges `K−1` parameters for a split. `K` therefore grows
-with the sample rather than with the structure, while a binary environment can
-only ever buy about one bit per observation, so the charge outruns anything the
-evidence can pay. The same tuple identity is what publishes one correspondence
-across several rows.
+itself. Corrected BIC charges `K−1` parameters for a split, so `K` grew with the
+sample rather than with the structure, while a binary environment can only ever
+buy about one bit per observation; the charge outran anything the evidence could
+pay, and at five lects the search committed nothing at all.
 
-This is not the fragmentation hypothesis the roadmap tested and refuted. That
+The fix is not the fragmentation hypothesis the roadmap tested and refuted. That
 one aliased each partial tuple to its *unique widest compatible parent*, which
 cannot reach the tail: on a four-lect Turkic pivot with nineteen sister keys,
 two have a unique widest parent, ten are compatible with several and seven with
 none, so the alias moves `K` from 19 to 17. The keys that dominate the charge
-are exactly the ones no parent can absorb.
+are exactly the ones no parent can absorb. `RG_CLASS_OUTCOME_PER_SISTER_LECT`
+(the default since M11) instead scores the split as a sum over sister lects: for
+each sister lect present on both sides, one categorical over that lect's
+graphemes, charged `(K_q−1)·ln n_q` with `K_q` bounded by the lect's inventory,
+not by arity. Coverage falls out — an observation lacking a lect does not enter
+that lect's sub-count — and the arity cliff with it. Two other outcome models
+were prototyped and rejected; `docs/multilect_hardening_plan.md` records the
+measurement.
 
-`test_adding_a_lect_costs_the_conditioned_rule` asserts the counts that are
-published rather than the counts that are right, and says which is which.
+`test_adding_a_lect_recovers_the_conditioned_rule` pins the recovered counts.
 
 ## `distant_003` … `distant_008` — the floor for a trigger one syllable away
 

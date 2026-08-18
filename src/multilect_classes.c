@@ -587,6 +587,207 @@ static const pivot_obs *pivot_of(const rg_split_observation *row) {
     return (const pivot_obs *)row->owner;
 }
 
+/* Per-sister-lect split scoring (RG_CLASS_OUTCOME_PER_SISTER_LECT).
+ *
+ * The joint sister tuple prices a split by how many distinct tuples the pivot
+ * bucket carries, which grows with arity and with one-off coverage; this scores
+ * the split as a sum over sister lects instead. For each sister lect present on
+ * both sides of the split, its graphemes are one categorical with `K_q` bounded
+ * by the lect's inventory, its likelihood gain is the pooled-minus-split
+ * negative log-likelihood, and its charge is `(K_q-1)*ln n_q`. A lect that
+ * lacks coverage on one side offers no contrast and is left out -- so the score
+ * tracks the conditioning rather than the sample. This is the pairwise stage's
+ * behaviour, summed over sisters. */
+typedef struct pl_outcome {
+    const char *grapheme;
+    double inside;
+    double outside;
+} pl_outcome;
+
+typedef struct pl_lect {
+    const char *lect;
+    pl_outcome *outcomes;
+    size_t count;
+    size_t cap;
+} pl_lect;
+
+static rg_status pl_accumulate(
+    pl_lect **lects,
+    size_t *lect_count,
+    size_t *lect_cap,
+    const char *lect,
+    const char *grapheme,
+    double weight,
+    int is_inside
+) {
+    pl_lect *entry = 0;
+    size_t i;
+    for (i = 0; i < *lect_count; i++) {
+        if (strcmp((*lects)[i].lect, lect) == 0) {
+            entry = &(*lects)[i];
+            break;
+        }
+    }
+    if (entry == 0) {
+        if (*lect_count == *lect_cap) {
+            size_t next_cap = *lect_cap == 0 ? 8 : *lect_cap * 2;
+            pl_lect *next = (pl_lect *)realloc(*lects, next_cap * sizeof(*next));
+            if (next == 0) {
+                return RG_ERR_OOM;
+            }
+            *lects = next;
+            *lect_cap = next_cap;
+        }
+        entry = &(*lects)[(*lect_count)++];
+        entry->lect = lect;
+        entry->outcomes = 0;
+        entry->count = 0;
+        entry->cap = 0;
+    }
+    for (i = 0; i < entry->count; i++) {
+        if (strcmp(entry->outcomes[i].grapheme, grapheme) == 0) {
+            if (is_inside) {
+                entry->outcomes[i].inside += weight;
+            } else {
+                entry->outcomes[i].outside += weight;
+            }
+            return RG_OK;
+        }
+    }
+    if (entry->count == entry->cap) {
+        size_t next_cap = entry->cap == 0 ? 4 : entry->cap * 2;
+        pl_outcome *next = (pl_outcome *)realloc(entry->outcomes, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        entry->outcomes = next;
+        entry->cap = next_cap;
+    }
+    entry->outcomes[entry->count].grapheme = grapheme;
+    entry->outcomes[entry->count].inside = is_inside ? weight : 0.0;
+    entry->outcomes[entry->count].outside = is_inside ? 0.0 : weight;
+    entry->count++;
+    return RG_OK;
+}
+
+static rg_status pl_accumulate_side(
+    const discovery_state *state,
+    const rg_split_observation *rows,
+    size_t count,
+    int is_inside,
+    pl_lect **lects,
+    size_t *lect_count,
+    size_t *lect_cap
+) {
+    size_t s;
+    size_t j;
+    for (s = 0; s < count; s++) {
+        const pivot_obs *obs = (const pivot_obs *)rows[s].owner;
+        const sister_tuple *tuple = &state->sisters[obs->sister_index];
+        for (j = 0; j < tuple->count; j++) {
+            rg_status status = pl_accumulate(lects, lect_count, lect_cap,
+                                             tuple->lects[j], tuple->graphemes[j],
+                                             obs->weight, is_inside);
+            if (status != RG_OK) {
+                return status;
+            }
+        }
+    }
+    return RG_OK;
+}
+
+static rg_status per_sister_lect_split_score(
+    const rg_split_observation *yes,
+    size_t yes_count,
+    const rg_split_observation *no,
+    size_t no_count,
+    const rg_split_score_config *config,
+    void *user,
+    rg_split_score_result *out
+) {
+    const discovery_state *state = (const discovery_state *)user;
+    pl_lect *lects = 0;
+    size_t lect_count = 0;
+    size_t lect_cap = 0;
+    double split_sum = 0.0;
+    double pooled_sum = 0.0;
+    double complexity = 0.0;
+    double search_charge;
+    rg_status status;
+    size_t i;
+    size_t k;
+
+    memset(out, 0, sizeof(*out));
+    status = pl_accumulate_side(state, yes, yes_count, 1, &lects, &lect_count, &lect_cap);
+    if (status == RG_OK) {
+        status = pl_accumulate_side(state, no, no_count, 0, &lects, &lect_count, &lect_cap);
+    }
+    if (status == RG_OK) {
+        for (i = 0; i < lect_count; i++) {
+            const pl_lect *entry = &lects[i];
+            double n_in = 0.0;
+            double n_out = 0.0;
+            double n_q;
+            double ln_q;
+            size_t distinct = 0;
+            double pooled_nll = 0.0;
+            double in_nll = 0.0;
+            double out_nll = 0.0;
+            for (k = 0; k < entry->count; k++) {
+                n_in += entry->outcomes[k].inside;
+                n_out += entry->outcomes[k].outside;
+            }
+            /* A lect covered on only one side of the split offers no contrast:
+             * the environment separates its coverage, not its outcomes. */
+            if (n_in <= 0.0 || n_out <= 0.0) {
+                continue;
+            }
+            for (k = 0; k < entry->count; k++) {
+                if (entry->outcomes[k].inside + entry->outcomes[k].outside > 0.0) {
+                    distinct++;
+                }
+            }
+            if (distinct < 2) {
+                continue;
+            }
+            n_q = n_in + n_out;
+            for (k = 0; k < entry->count; k++) {
+                double pooled = entry->outcomes[k].inside + entry->outcomes[k].outside;
+                if (pooled > 0.0) {
+                    pooled_nll += -pooled * log(pooled / n_q);
+                }
+                if (entry->outcomes[k].inside > 0.0) {
+                    in_nll += -entry->outcomes[k].inside * log(entry->outcomes[k].inside / n_in);
+                }
+                if (entry->outcomes[k].outside > 0.0) {
+                    out_nll += -entry->outcomes[k].outside * log(entry->outcomes[k].outside / n_out);
+                }
+            }
+            ln_q = log(n_q);
+            if (ln_q < 0.0) {
+                ln_q = 0.0;
+            }
+            pooled_sum += pooled_nll;
+            split_sum += in_nll + out_nll;
+            complexity += (double)(distinct - 1) * (ln_q + config->bic_extra_penalty);
+        }
+    }
+    for (i = 0; i < lect_count; i++) {
+        free(lects[i].outcomes);
+    }
+    free(lects);
+    if (status != RG_OK) {
+        return status;
+    }
+    search_charge = config->candidate_count > 1
+        ? config->search_gamma * 2.0 * log((double)config->candidate_count)
+        : 0.0;
+    out->search_charge = search_charge;
+    out->complexity_charge = complexity;
+    out->delta = 2.0 * (split_sum - pooled_sum) + complexity + search_charge;
+    return RG_OK;
+}
+
 static int multi_lect_min_commit_count(double n_total, double scale) {
     double v;
     if (scale <= 0.0) {
@@ -1759,6 +1960,15 @@ rg_status multi_lect_context_discovery(
             : 0.0;
         immediate_score.candidate_count = 0;
         immediate_score.search_gamma = options->bic.search_penalty_gamma;
+        immediate_score.outcome_mode = options->bic.class_outcome_mode;
+        /* The per-sister-lect sum is a corrected-BIC decomposition; the
+         * experimental scorers keep the joint-tuple categorical. */
+        immediate_score.group_scorer =
+            (options->bic.class_outcome_mode == RG_CLASS_OUTCOME_PER_SISTER_LECT &&
+             options->bic.split_scorer == RG_SPLIT_SCORER_CORRECTED_BIC)
+                ? per_sister_lect_split_score
+                : 0;
+        immediate_score.group_scorer_user = &state;
         long_score = immediate_score;
         long_score.bic_extra_penalty = 0.0;
         min_commit = (double)multi_lect_min_commit_count(n_total, options->bic.multi_lect_min_commit_scale);

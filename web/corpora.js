@@ -115,7 +115,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "4 lects · 96 cognate sets · 164 classes · 13 conditioned · cost/segment −1.65"
+    "stats": "4 lects · 96 cognate sets · 164 classes · 8 conditioned · cost/segment −1.65"
   },
   {
     "path": "testdata/restraint/chance.tsv",
@@ -322,7 +322,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "3 lects · 48 cognate sets · 24 classes · 3 conditioned · cost/segment −1.85"
+    "stats": "3 lects · 48 cognate sets · 24 classes · 2 conditioned · cost/segment −1.85"
   },
   {
     "path": "testdata/soundlaws/place_assimilation.tsv",
