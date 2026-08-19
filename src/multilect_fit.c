@@ -9,6 +9,7 @@ typedef struct outlier_work_row {
     int pair_count;
     double cost_per_segment;
     double z_score;
+    double confidence;
 } outlier_work_row;
 
 static int outlier_cmp(const void *a, const void *b) {
@@ -945,6 +946,7 @@ rg_status rg_find_cognate_outliers(
             }
             work[work_count].pair_count = pair_count;
             work[work_count].cost_per_segment = cost;
+            work[work_count].confidence = cognates[c].confidence;
             mean += cost;
             work_count++;
         }
@@ -986,6 +988,7 @@ rg_status rg_find_cognate_outliers(
         rows[c].pair_count = work[c].pair_count;
         rows[c].cost_per_segment = work[c].cost_per_segment;
         rows[c].z_score = work[c].z_score;
+        rows[c].confidence = work[c].confidence;
         work[c].cognate_id = 0;
     }
     for (c = 0; c < work_count; c++) {

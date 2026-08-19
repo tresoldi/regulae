@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 39
+#define RG_ABI_VERSION 40
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -925,6 +925,10 @@ typedef struct rg_cognate_outlier_row {
     int pair_count;
     double cost_per_segment;
     double z_score;
+    /* The caller-supplied confidence of the cognate set, carried through so a
+     * reader of the residue can weigh a bad alignment against how sure the
+     * judgement behind it was. 1.0 when the input stated none. */
+    double confidence;
 } rg_cognate_outlier_row;
 
 /* How well the model fits the corpus it was trained on, and what the same

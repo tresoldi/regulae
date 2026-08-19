@@ -659,10 +659,16 @@ function renderResidue() {
   const rows = model.outliers || [];
   if (!rows.length) {
     $("residue-hint").textContent = "";
-    body.innerHTML = '<tr><td colspan="3" class="empty">No sets were scored.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">No sets were scored.</td></tr>';
     return;
   }
   $("residue-hint").textContent = residueReading(model.fit);
+
+  /* The confidence column is worth a reader's attention only where it varies:
+     on an unweighted corpus every set is 1.0 and the column is noise, so it is
+     hidden unless some set was supplied at a lower confidence. */
+  const showConfidence = rows.some((r) => typeof r.confidence === "number" && r.confidence < 1);
+  $("residue").classList.toggle("hide-conf", !showConfidence);
 
   for (const row of rows) {
     const tr = document.createElement("tr");
@@ -685,7 +691,13 @@ function renderResidue() {
     cost.className = "cost";
     cost.textContent = row.cost_per_segment.toFixed(3);
 
-    tr.append(id, z, cost);
+    /* A low-confidence set that also aligns badly is doubly suspect; a
+       high-confidence one that does is the real puzzle. */
+    const conf = document.createElement("td");
+    conf.className = "conf conf-col";
+    conf.textContent = typeof row.confidence === "number" ? `${Math.round(row.confidence * 100)}%` : "";
+
+    tr.append(id, z, cost, conf);
     tr.addEventListener("click", () => selectSet(row.cognate_id));
     body.appendChild(tr);
   }

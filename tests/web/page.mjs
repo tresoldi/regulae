@@ -644,6 +644,24 @@ check('the gaps pane reads losses as x ~ ∅, and hides when there are none', ()
   assert.ok(byId.get('gaps-panel').hidden, 'the gaps pane showed with no gaps');
 });
 
+/* The residue carries each set's confidence, but the column is worth showing
+   only where it varies -- on an unweighted corpus every set is 1.0. */
+check('the residue confidence column shows only when confidence varies', () => {
+  const uniform = JSON.parse(JSON.stringify(model));
+  uniform.outliers.forEach((o) => { o.confidence = 1; });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(uniform), elapsedMs: 1 } });
+  assert.ok(byId.get('residue').classList.contains('hide-conf'),
+    'the confidence column showed on an unweighted corpus');
+
+  const varied = JSON.parse(JSON.stringify(model));
+  varied.outliers.forEach((o, i) => { o.confidence = i === 0 ? 0.4 : 1; });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(varied), elapsedMs: 1 } });
+  assert.ok(!byId.get('residue').classList.contains('hide-conf'),
+    'the confidence column hid despite variation');
+  const first = byId.get('residue').querySelectorAll('tr[data-cognate]')[0];
+  assert.match(first.querySelectorAll('td.conf')[0].textContent, /%/, 'no confidence percent shown');
+});
+
 /* The paper-ready export carries the evidence columns the summary download
    drops, in a table a write-up can paste. */
 check('the CSV and Markdown exports carry the evidence columns', () => {

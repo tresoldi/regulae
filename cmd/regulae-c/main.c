@@ -773,8 +773,9 @@ static int command_outliers(const char *path, const char *format, int top_k) {
         return 1;
     }
     for (i = 0; i < row_count; i++) {
-        printf("OUTLIER\t%s\t%d\t%.6f\t%.6f\n",
-               rows[i].cognate_id, rows[i].pair_count, rows[i].cost_per_segment, rows[i].z_score);
+        printf("OUTLIER\t%s\t%d\t%.6f\t%.6f\t%.6f\n",
+               rows[i].cognate_id, rows[i].pair_count, rows[i].cost_per_segment,
+               rows[i].z_score, rows[i].confidence);
     }
     rg_cognate_outlier_rows_free(rows, row_count);
     rg_multi_model_free(model);

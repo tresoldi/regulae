@@ -468,12 +468,21 @@ int main(void) {
     assert(rg_multi_model_unconditioned_class_at(model, 1000) == 0);
     assert(rg_multi_model_cross_dimensional_row_count(model) == 0);
     assert(rg_multi_model_cross_dimensional_row_at(model, 0) == 0);
+    /* The residue carries each set's caller-supplied confidence. Perturbed
+     * after training -- the outlier path only reads it -- so the model above is
+     * unchanged and the two rows still carry distinct, matched weights. */
+    cognates[0].confidence = 0.7;
+    cognates[1].confidence = 0.4;
     assert(rg_find_cognate_outliers(ctx, cognates, 2, model, &options, 0, 0, &outliers, &outlier_count) == RG_OK);
     assert(outlier_count == 2);
     assert(outliers != 0);
     assert(outliers[0].pair_count == 3);
     assert(outliers[1].pair_count == 3);
     assert(outliers[0].z_score >= outliers[1].z_score);
+    for (i = 0; i < outlier_count; i++) {
+        double expected = strcmp(outliers[i].cognate_id, "one") == 0 ? 0.7 : 0.4;
+        assert(outliers[i].confidence == expected);
+    }
     rg_cognate_outlier_rows_free(outliers, outlier_count);
     outliers = 0;
     outlier_count = 0;

@@ -1032,6 +1032,7 @@ char *rg_json_from_multi_model_internal(
                 cJSON_AddNumberToObject(entry, "pair_count", rows[i].pair_count);
                 cJSON_AddNumberToObject(entry, "cost_per_segment", rows[i].cost_per_segment);
                 cJSON_AddNumberToObject(entry, "z_score", rows[i].z_score);
+                cJSON_AddNumberToObject(entry, "confidence", rows[i].confidence);
                 cJSON_AddItemToArray(array, entry);
             }
             rg_cognate_outlier_rows_free(rows, row_count);

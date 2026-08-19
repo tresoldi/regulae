@@ -314,9 +314,13 @@ textarea {
 .panel.residue { margin-top: 22px; }
 .panel.residue .scroll { max-height: 34vh; }
 .panel.residue tr.apart td { color: var(--warn); }
-.panel.residue td.z, .panel.residue td.cost {
+.panel.residue td.z, .panel.residue td.cost, .panel.residue td.conf {
   text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+.panel.residue td.conf { color: var(--muted); }
+/* The confidence column is hidden on an unweighted corpus, where every set is
+   at 1.0 and the column carries nothing. */
+table.classes.hide-conf .conf-col { display: none; }
 
 /* The filter and chips above the classes table. Quiet by default; a chip lights
    with the accent when it is narrowing the table. */
