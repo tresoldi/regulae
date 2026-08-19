@@ -1157,6 +1157,11 @@ rg_status rg_json_read_train_options_internal(
         NUMBER_FIELD("chunk_min_transparency", chunk_min_transparency, double)
         NUMBER_FIELD("bootstrap_n", bootstrap_n, int)
         NUMBER_FIELD("bootstrap_seed", bootstrap_seed, int)
+        /* Calibrating against the shuffle sets both the corpus baseline and the
+         * per-rule standing null; the provenance block already round-trips these
+         * two, so a caller reading them back could not set them until here. */
+        NUMBER_FIELD("permutation_count", permutation_count, int)
+        NUMBER_FIELD("permutation_seed", permutation_seed, int)
         NUMBER_FIELD("predictive_folds", predictive_folds, int)
         NUMBER_FIELD("predictive_seed", predictive_seed, int)
         NUMBER_FIELD("predictive_min_groups", predictive_min_groups, int)
@@ -1200,6 +1205,21 @@ rg_status rg_json_read_train_options_internal(
             if (status != RG_OK) {
                 break;
             }
+            continue;
+        }
+
+        /* Whether the shuffle also tunes the search penalty rather than leaving
+         * it at its fixed default; only meaningful with permutation_count > 0. */
+        if (strcmp(key, "tune_search_penalty") == 0) {
+            if (!cJSON_IsBool(item)) {
+                status = RG_ERR_PARSE;
+                if (error_detail != 0 && error_detail_size > 0) {
+                    snprintf(error_detail, error_detail_size,
+                             "option \"tune_search_penalty\" must be true or false");
+                }
+                break;
+            }
+            out->tune_search_penalty = cJSON_IsTrue(item) ? true : false;
             continue;
         }
 

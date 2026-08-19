@@ -139,6 +139,21 @@ static void test_options_reader(void) {
     /* Untouched fields keep their defaults. */
     assert(options.concentration == 5.0);
 
+    /* The shuffle knobs the provenance block round-trips: a caller that reads
+     * permutation_count back out must be able to set it, and the browser page
+     * does. tune_search_penalty is the one boolean among them. */
+    assert(rg_json_read_train_options_internal(
+                                               "{\"permutation_count\":32,"
+                                               "\"permutation_seed\":99,"
+                                               "\"tune_search_penalty\":true}",
+                                               &options, detail, sizeof(detail)) == RG_OK);
+    assert(options.permutation_count == 32);
+    assert(options.permutation_seed == 99);
+    assert(options.tune_search_penalty == true);
+    /* A boolean knob rejects a number rather than coercing it. */
+    assert(rg_json_read_train_options_internal("{\"tune_search_penalty\":1}",
+                                               &options, detail, sizeof(detail)) == RG_ERR_PARSE);
+
     /* Nested BIC knobs are flattened into the same object. */
     assert(rg_json_read_train_options_internal("{\"min_split_observations\":4}",
                                                &options, detail, sizeof(detail)) == RG_OK);
