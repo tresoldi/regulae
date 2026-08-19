@@ -91,6 +91,42 @@ static void test_repeated_cells_name_two_histories(rg_context *ctx) {
     assert(fit->etymon_group_count == 2);
     assert(fit->bootstrap_unit == RG_OBSERVATION_UNIT_ETYMON_GROUP);
     assert(fit->bootstrap_effective_unit_count == 2);
+
+    /* Discovery scores the rule on distinct histories, not paradigm cells. The
+     * sixteen cells are two etyma, and before etymon weighting eight cells of
+     * the /p ~ f/ etymon -- all with /p/ before /i/, one environment and one
+     * outcome, so the permutation null cannot break them -- committed and stood
+     * a conditioned `p ~ f [before close]` on paradigm repetition alone. Now the
+     * cells of an etymon share one etymon's worth of weight, that count falls
+     * under the commit floor, and no conditioned class is manufactured from the
+     * paradigm. The /p ~ f/ correspondence itself remains, as an unconditioned
+     * class. */
+    assert(fit->conditioned_class_count == 0);
+    {
+        size_t n = 0;
+        const rg_multi_class_row *rows = rg_multi_model_unconditioned_classes(model, &n);
+        size_t i;
+        int saw_pf = 0;
+        for (i = 0; i < n; i++) {
+            size_t j;
+            int sp = 0;
+            int sf = 0;
+            for (j = 0; j < rows[i].segment_count; j++) {
+                if (strcmp(rows[i].graphemes[j], "p") == 0) {
+                    sp = 1;
+                }
+                if (strcmp(rows[i].graphemes[j], "f") == 0) {
+                    sf = 1;
+                }
+            }
+            if (sp && sf) {
+                saw_pf = 1;
+                /* Eight cells of one etymon, counted as about one. */
+                assert(rows[i].count < 2.0);
+            }
+        }
+        assert(saw_pf);
+    }
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
 }

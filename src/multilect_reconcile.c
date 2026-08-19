@@ -538,6 +538,33 @@ static rg_status append_reconciled_observation(
     return RG_OK;
 }
 
+/* An etymon's paradigm cells are not independent observations: eight cells of
+ * one etymon are one history sampled eight times, and counting them as eight
+ * inflates every count and every dBIC a conditioned split is scored on -- which
+ * neither the search charge nor the per-pivot permutation null catches, since
+ * the cells share one environment and one outcome and so survive being
+ * shuffled. Down-weight a cognate set by the number of sets sharing its etymon
+ * group, so an etymon contributes about one set's worth of weight however many
+ * cells it has, and a rule is scored on distinct histories rather than on
+ * paradigm size. An empty etymon group is its own etymon and keeps full weight;
+ * the interval and the predictive folds already resample and split on the group
+ * (see rg_corpus_fit), this makes discovery count it too. */
+static double etymon_weight_factor(const rg_cognate_set *cognates, size_t count, size_t index) {
+    const char *group = cognates[index].etymon_group;
+    size_t members = 0;
+    size_t i;
+    if (group == 0 || group[0] == '\0') {
+        return 1.0;
+    }
+    for (i = 0; i < count; i++) {
+        const char *other = cognates[i].etymon_group;
+        if (other != 0 && strcmp(other, group) == 0) {
+            members++;
+        }
+    }
+    return members > 0 ? 1.0 / (double)members : 1.0;
+}
+
 rg_status aggregate_position_classes(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
@@ -572,7 +599,8 @@ rg_status aggregate_position_classes(
         gap_edge *gap_edges = 0;
         size_t gap_edge_count = 0;
         size_t gap_edge_cap = 0;
-        double weight = cognate_weight(&cognates[c]);
+        double weight = cognate_weight(&cognates[c]) *
+                        etymon_weight_factor(cognates, cognate_count, c);
         size_t i;
         rg_status status = RG_OK;
         if (weight <= 0.0) {
