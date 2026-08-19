@@ -66,7 +66,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/finnish_estonian/cognates.tsv",
     "label": "Finnish and Estonian",
-    "description": "Two closely related lects. The simplest thing regulae returns -- which segment answers to which, and how often -- so it is the place to see what a correspondence class is.",
+    "description": "Two closely related lects. The simplest thing regulae returns: which segment answers to which, and how often. Start here to see what a correspondence class is.",
     "group": "Start here",
     "format": "wide",
     "readable": true,
@@ -75,7 +75,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/latin_spanish/cognates.tsv",
     "label": "Latin and Spanish",
-    "description": "Real data, and the environments are discovered rather than declared: no rule list is supplied anywhere, and nothing below -- the palatalisations, the voicing between vowels -- was named in advance.",
+    "description": "Real data, and the environments are discovered, not declared. No rule list is supplied anywhere; nothing below, the palatalisations or the voicing between vowels, was named in advance.",
     "group": "Start here",
     "format": "wide",
     "readable": true,
@@ -84,7 +84,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/ppn_hawaiian/cognates.tsv",
     "label": "Proto-Polynesian and Hawaiian",
-    "description": "A reconstruction pair with sweeping regular mergers: *t answers to Hawaiian k, *k to a glottal stop, *f to h and *r to l -- all recovered from the wordlist with no correspondence supplied.",
+    "description": "A reconstruction pair with sweeping, regular mergers: *t answers to Hawaiian k, *k to a glottal stop, *f to h, *r to l. All recovered from the wordlist, with no correspondence supplied.",
     "group": "Start here",
     "format": "wide",
     "readable": true,
@@ -93,7 +93,7 @@ const CORPUS_LIST = [
   {
     "path": "testdata/soundlaws/grimm.tsv",
     "label": "Grimm's Law",
-    "description": "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once -- p to f, t to θ, k to x -- and not one conditioned. A single correspondence proves little; the claim is the chain shift whole, every rung of it flat.",
+    "description": "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once (p to f, t to θ, k to x), and not one conditioned. A single correspondence proves little; the claim is the chain shift whole, every rung of it flat.",
     "group": "Start here",
     "format": "tsv",
     "readable": true,
@@ -111,7 +111,7 @@ const CORPUS_LIST = [
   {
     "path": "testdata/soundlaws/verner.tsv",
     "label": "Verner's Law",
-    "description": "The residue Grimm's Law leaves over. Where Proto-Germanic looks irregular the split turns on where the Proto-Indo-European accent fell -- and regulae recovers the stress environment with no accent rule supplied.",
+    "description": "The residue Grimm's Law leaves over. Where Proto-Germanic looks irregular, the split turns on where the Proto-Indo-European accent fell, and regulae recovers the stress environment with no accent rule supplied.",
     "group": "Start here",
     "format": "tsv",
     "readable": true,
@@ -120,7 +120,7 @@ const CORPUS_LIST = [
   {
     "path": "testdata/soundlaws/grassmann.tsv",
     "label": "Grassmann's Law",
-    "description": "Of two aspirates in a word, the first loses its aspiration. The trigger is neither adjacent nor at a fixed distance, so the environment is existential -- an aspirate somewhere ahead -- which regulae states rather than the adjacency it cannot.",
+    "description": "Of two aspirates in a word, the first loses its aspiration. The trigger is neither adjacent nor at a fixed distance, so the environment is existential (an aspirate somewhere ahead), which regulae states rather than the fixed adjacency it cannot.",
     "group": "Start here",
     "format": "tsv",
     "readable": true,
@@ -147,7 +147,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/tone_chinese_like/cognates.tsv",
     "label": "Tone from an environment",
-    "description": "Mandarin- and Cantonese-like. Where a segmental environment predicts a tone the rule is cross-dimensional -- the shape tonogenesis leaves -- and lands in a pane of its own, not among the segment correspondences.",
+    "description": "Mandarin- and Cantonese-like. Where a segmental environment predicts a tone, the rule is cross-dimensional (the shape tonogenesis leaves) and lands in a pane of its own, not among the segment correspondences.",
     "group": "Start here",
     "format": "wide",
     "readable": true,
@@ -176,7 +176,7 @@ const CORPUS_LIST = [
   {
     "path": "testdata/diagnostics/drift.tsv",
     "label": "One language, two transcriptions",
-    "description": "The same forty words segmented two ways. Reads as deaffrication, loss of aspiration and loss of length -- none of which happened, and nothing catches it.",
+    "description": "The same forty words segmented two ways. Reads as deaffrication, loss of aspiration and loss of length, none of which happened, and nothing catches it.",
     "group": "Start here",
     "format": "tsv",
     "readable": true,
@@ -401,7 +401,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/arabic_hebrew/cognates.tsv",
     "label": "arabic hebrew",
-    "description": "Arabic and Hebrew -- Semitic consonant correspondences, a few of them conditioned by their environment.",
+    "description": "Arabic and Hebrew. Semitic consonant correspondences, a few conditioned by their environment.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -410,7 +410,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/georgian_svan/cognates.tsv",
     "label": "georgian svan",
-    "description": "Georgian and Svan -- Kartvelian, and the richest conditioning in the set.",
+    "description": "Georgian and Svan. Kartvelian, and the richest conditioning in the set.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -419,7 +419,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/latin_french/cognates.tsv",
     "label": "latin french",
-    "description": "Latin and French -- a Romance daughter carried much further from the parent than Spanish.",
+    "description": "Latin and French. A Romance daughter carried much further from the parent than Spanish.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -428,7 +428,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/latin_italian/cognates.tsv",
     "label": "latin italian",
-    "description": "Latin and Italian -- the most conservative of the three Romance daughters here.",
+    "description": "Latin and Italian, the most conservative of the three Romance daughters here.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -437,7 +437,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/mandarin_historical/cognates.tsv",
     "label": "mandarin historical",
-    "description": "Middle Chinese and Mandarin -- tone carried in its own column beside the segments.",
+    "description": "Middle Chinese and Mandarin, with tone carried in its own column beside the segments.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -446,7 +446,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/navajo_chipewyan/cognates.tsv",
     "label": "navajo chipewyan",
-    "description": "Navajo and Chipewyan -- Athabaskan, consonant-rich.",
+    "description": "Navajo and Chipewyan. Athabaskan, consonant-rich.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -455,7 +455,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/oe_english/cognates.tsv",
     "label": "oe english",
-    "description": "Old English against the modern language -- a thousand years of change across everyday words.",
+    "description": "Old English against the modern language: a thousand years of change across everyday words.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -464,7 +464,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/swahili_zulu/cognates.tsv",
     "label": "swahili zulu",
-    "description": "Swahili and Zulu -- Bantu, regular and, here, unconditioned.",
+    "description": "Swahili and Zulu. Bantu, regular and, here, unconditioned.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -473,7 +473,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/turkish_azerbaijani/cognates.tsv",
     "label": "turkish azerbaijani",
-    "description": "Turkish and Azerbaijani -- Turkic, closely related.",
+    "description": "Turkish and Azerbaijani. Turkic, closely related.",
     "group": "Real languages",
     "format": "wide",
     "readable": true,
@@ -509,7 +509,7 @@ const CORPUS_LIST = [
   {
     "path": "experiments/tone_chinese_like_clean/cognates.tsv",
     "label": "tone chinese like clean",
-    "description": "A tone system with no segmental conditioning -- the control for the tonogenesis example (synthetic).",
+    "description": "A tone system with no segmental conditioning, the control for the tonogenesis example (synthetic).",
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,

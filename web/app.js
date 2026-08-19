@@ -187,7 +187,7 @@ function setBaselineAvailability(supported) {
     box.checked = false;
     if (note) {
       note.hidden = false;
-      note.textContent = "not in this engine build — runs in the CLI with --permutations";
+      note.textContent = "not in this engine build; runs in the CLI with --permutations";
     }
   } else if (note) {
     note.hidden = true;
@@ -403,7 +403,7 @@ function buildEvidenceRow(entry, conditioned) {
   }
 
   if (typeof entry.confidence === "number") {
-    line(`confidence ${Math.round(entry.confidence * 100)}% — the weight this rule rests on`,
+    line(`confidence ${Math.round(entry.confidence * 100)}%, the weight this rule rests on`,
       "ev-confidence");
   }
 
@@ -444,9 +444,9 @@ function renderClasses() {
   const method = classRows.length && classRows[0].entry.uncertainty
     && classRows[0].entry.uncertainty.method;
   $("classes-hint").textContent =
-    "Rate is how often, where a class applies, its correspondence is the one taken; "
-    + `the bar is the 95% ${method === "bootstrap" ? "bootstrap" : "Wilson"} interval. `
-    + "Select a row to see the alignments it rests on.";
+    "Rate is how often the correspondence is the one taken where the class applies; "
+    + `the bar is its 95% ${method === "bootstrap" ? "bootstrap" : "Wilson"} interval. `
+    + "Select a row for its alignments.";
 
   applyClassView();
 }
@@ -537,8 +537,8 @@ function renderEvents() {
   body.innerHTML = "";
   const events = model.proposed_events || [];
   $("events-hint").textContent = events.length
-    ? "Rows differing only in their graphemes, under the same environment and the same "
-      + "score. Whether one pooled rule beats the several is not decided here."
+    ? "Rows that differ only in their graphemes, under one environment and one score. "
+      + "Whether a single pooled rule beats them isn't decided here."
     : "";
   if (!events.length) {
     body.innerHTML = '<tr><td colspan="3" class="empty">'
@@ -656,9 +656,8 @@ function renderGaps() {
   }
   rows.sort((a, b) => b.gap.count - a.gap.count);
   $("gaps-hint").textContent =
-    "A segment answering to nothing across a lect pair, written x ~ ∅. Not a claim "
-    + "that anything was lost: the rate is how often, of the times the segment is present, "
-    + "it aligns to a gap.";
+    "A segment that answers to nothing, written x ~ ∅. The rate is how often it aligns to "
+    + "a gap when it's present, not a claim that anything was lost.";
 
   for (const { pair, gap } of rows) {
     const tr = document.createElement("tr");
@@ -1448,7 +1447,7 @@ $("file").addEventListener("change", (event) => {
        extension only seeds the guess and the format select is left to correct. */
     setFormat(file.name.endsWith(".csv") ? "arcaverborum" : "wide");
     $("example-note").textContent =
-      `Loaded ${file.name}, read as ${currentFormat} format — change “read as” if that is wrong.`;
+      `Loaded ${file.name}, read as ${currentFormat} format. Change "read as" if that's wrong.`;
     $("example-note").classList.remove("blocked");
   });
 });

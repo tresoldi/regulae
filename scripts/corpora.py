@@ -41,26 +41,26 @@ LADDER = [
     # then discovered conditioning, then a reconstruction with sweeping mergers.
     ("experiments/finnish_estonian/cognates.tsv",
      "Finnish and Estonian",
-     "Two closely related lects. The simplest thing regulae returns -- which "
-     "segment answers to which, and how often -- so it is the place to see what "
-     "a correspondence class is."),
+     "Two closely related lects. The simplest thing regulae returns: which "
+     "segment answers to which, and how often. Start here to see what a "
+     "correspondence class is."),
     ("experiments/latin_spanish/cognates.tsv",
      "Latin and Spanish",
-     "Real data, and the environments are discovered rather than declared: no "
-     "rule list is supplied anywhere, and nothing below -- the palatalisations, "
-     "the voicing between vowels -- was named in advance."),
+     "Real data, and the environments are discovered, not declared. No rule "
+     "list is supplied anywhere; nothing below, the palatalisations or the "
+     "voicing between vowels, was named in advance."),
     ("experiments/ppn_hawaiian/cognates.tsv",
      "Proto-Polynesian and Hawaiian",
-     "A reconstruction pair with sweeping regular mergers: *t answers to "
-     "Hawaiian k, *k to a glottal stop, *f to h and *r to l -- all recovered "
-     "from the wordlist with no correspondence supplied."),
+     "A reconstruction pair with sweeping, regular mergers: *t answers to "
+     "Hawaiian k, *k to a glottal stop, *f to h, *r to l. All recovered from "
+     "the wordlist, with no correspondence supplied."),
     # Then the famous named laws: a flat chain shift, its accent-conditioned
     # residue, and a dissimilation whose trigger is not adjacent. The synthetic
     # one-trigger rung sits between them as the isolated form of the idea.
     ("testdata/soundlaws/grimm.tsv",
      "Grimm's Law",
-     "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once -- "
-     "p to f, t to θ, k to x -- and not one conditioned. A single correspondence "
+     "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once "
+     "(p to f, t to θ, k to x), and not one conditioned. A single correspondence "
      "proves little; the claim is the chain shift whole, every rung of it flat."),
     ("testdata/soundlaws/graded_1_adjacent.tsv",
      "One change, one adjacent trigger",
@@ -69,15 +69,15 @@ LADDER = [
      "than declined."),
     ("testdata/soundlaws/verner.tsv",
      "Verner's Law",
-     "The residue Grimm's Law leaves over. Where Proto-Germanic looks irregular "
-     "the split turns on where the Proto-Indo-European accent fell -- and "
-     "regulae recovers the stress environment with no accent rule supplied."),
+     "The residue Grimm's Law leaves over. Where Proto-Germanic looks irregular, "
+     "the split turns on where the Proto-Indo-European accent fell, and regulae "
+     "recovers the stress environment with no accent rule supplied."),
     ("testdata/soundlaws/grassmann.tsv",
      "Grassmann's Law",
      "Of two aspirates in a word, the first loses its aspiration. The trigger is "
-     "neither adjacent nor at a fixed distance, so the environment is "
-     "existential -- an aspirate somewhere ahead -- which regulae states rather "
-     "than the adjacency it cannot."),
+     "neither adjacent nor at a fixed distance, so the environment is existential "
+     "(an aspirate somewhere ahead), which regulae states rather than the fixed "
+     "adjacency it cannot."),
     # Then the machinery: noise and ranking, several lects at once, and a rule
     # that crosses from a segment to a tone.
     ("experiments/contaminated_cognates_synthetic/cognates.tsv",
@@ -95,7 +95,7 @@ LADDER = [
     ("experiments/tone_chinese_like/cognates.tsv",
      "Tone from an environment",
      "Mandarin- and Cantonese-like. Where a segmental environment predicts a "
-     "tone the rule is cross-dimensional -- the shape tonogenesis leaves -- and "
+     "tone, the rule is cross-dimensional (the shape tonogenesis leaves) and "
      "lands in a pane of its own, not among the segment correspondences."),
     # The last three are what the tool looks like when it is right to find
     # nothing, and they belong on the ladder for the same reason the contrast
@@ -112,7 +112,7 @@ LADDER = [
     ("testdata/diagnostics/drift.tsv",
      "One language, two transcriptions",
      "The same forty words segmented two ways. Reads as deaffrication, loss of "
-     "aspiration and loss of length -- none of which happened, and nothing catches it."),
+     "aspiration and loss of length, none of which happened, and nothing catches it."),
 ]
 
 # Examples whose point only lands against the shuffle: the unrelated wordlists
@@ -136,27 +136,27 @@ REAL_LANGUAGES = {
 }
 
 DESCRIPTIONS = {
-    "arabic_hebrew": "Arabic and Hebrew -- Semitic consonant correspondences, "
-                     "a few of them conditioned by their environment.",
-    "georgian_svan": "Georgian and Svan -- Kartvelian, and the richest "
+    "arabic_hebrew": "Arabic and Hebrew. Semitic consonant correspondences, a "
+                     "few conditioned by their environment.",
+    "georgian_svan": "Georgian and Svan. Kartvelian, and the richest "
                      "conditioning in the set.",
-    "latin_french": "Latin and French -- a Romance daughter carried much "
-                    "further from the parent than Spanish.",
-    "latin_italian": "Latin and Italian -- the most conservative of the three "
+    "latin_french": "Latin and French. A Romance daughter carried much further "
+                    "from the parent than Spanish.",
+    "latin_italian": "Latin and Italian, the most conservative of the three "
                      "Romance daughters here.",
-    "oe_english": "Old English against the modern language -- a thousand years "
-                  "of change across everyday words.",
-    "swahili_zulu": "Swahili and Zulu -- Bantu, regular and, here, unconditioned.",
-    "turkish_azerbaijani": "Turkish and Azerbaijani -- Turkic, closely related.",
-    "navajo_chipewyan": "Navajo and Chipewyan -- Athabaskan, consonant-rich.",
-    "mandarin_historical": "Middle Chinese and Mandarin -- tone carried in its "
-                           "own column beside the segments.",
+    "oe_english": "Old English against the modern language: a thousand years of "
+                  "change across everyday words.",
+    "swahili_zulu": "Swahili and Zulu. Bantu, regular and, here, unconditioned.",
+    "turkish_azerbaijani": "Turkish and Azerbaijani. Turkic, closely related.",
+    "navajo_chipewyan": "Navajo and Chipewyan. Athabaskan, consonant-rich.",
+    "mandarin_historical": "Middle Chinese and Mandarin, with tone carried in "
+                           "its own column beside the segments.",
     "harmony_synthetic": "Vowel harmony spreading across a word (synthetic).",
     "umlaut_synthetic": "Umlaut: a following vowel fronts the one before it (synthetic).",
     "length_conditioned_synthetic": "A change conditioned by vowel length (synthetic).",
     "tone_synthetic": "Tone as a correspondence in its own right (synthetic).",
     "tone_3way_synthetic": "A three-way tone split across three lects (synthetic).",
-    "tone_chinese_like_clean": "A tone system with no segmental conditioning -- "
+    "tone_chinese_like_clean": "A tone system with no segmental conditioning, "
                                "the control for the tonogenesis example (synthetic).",
     "tone_vietnamese_like": "A denser tone inventory (synthetic).",
     "tone_yoruba_like": "A three-tone system (synthetic).",

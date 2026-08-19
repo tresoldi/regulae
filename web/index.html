@@ -23,12 +23,11 @@
 
   <p class="status-banner">
     <strong>Early release.</strong>
-    The engine is exercised against thirteen corpora, including real
-    Latin/Spanish and Proto-Polynesian/Hawaiian data. One diagnostic, anomaly
-    detection, is not available yet, and two synthetic corpora use input
-    notations the loaders do not read. Its resampling checks — bootstrap
-    intervals, held-out cross-validation and the shuffled baseline — are
-    available but off by default, since each retrains the model many times — see
+    Tested on thirteen corpora, including real Latin/Spanish and
+    Proto-Polynesian/Hawaiian. Anomaly detection isn't ported yet, and two
+    synthetic corpora use notations the loaders can't read. The resampling
+    checks (bootstrap, cross-validation, shuffled baseline) stay off by default
+    because they retrain the model many times; see
     <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
   </p>
 
@@ -48,7 +47,7 @@
     <section class="is-not">
       <h2>What this does not do</h2>
       <ul>
-        <li>Decide which words are cognate — that is your input</li>
+        <li>Decide which words are cognate (that's your input)</li>
         <li>Reconstruct proto-forms</li>
         <li>Claim a direction of change: correspondences are written
             <code>a&nbsp;~&nbsp;b</code>, never <code>a&nbsp;→&nbsp;b</code></li>
@@ -260,9 +259,8 @@
       <span class="version" id="timing"></span>
     </div>
     <p class="example-note">
-      The download is an inspection snapshot, not an interchange format: it
-      carries one best answer rather than the ensembles and uncertainty a
-      historical claim would need.
+      A snapshot for inspection, not an interchange format. It holds one best
+      answer, without the uncertainty a historical claim needs.
     </p>
 
     <!-- What a citation of this run needs: the feature system and its version,
@@ -270,7 +268,7 @@
          under. Emitted on every run and, until this block, only ever in the
          JSON download. -->
     <details class="provenance" id="provenance">
-      <summary>Provenance — how to cite and reproduce this run</summary>
+      <summary>Provenance, to cite and reproduce this run</summary>
       <dl id="provenance-body"></dl>
     </details>
   </div>

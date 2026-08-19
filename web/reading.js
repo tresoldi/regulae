@@ -162,7 +162,7 @@ function baselineReading(fit) { // eslint-disable-line no-unused-vars
   const measured = fit.rules_measured || 0;
   const stood = fit.rules_above_noise || 0;
   const rules = measured === 0
-    ? "No conditioned rule was committed to measure against the shuffle."
+    ? "No conditioned rule to measure against the shuffle."
     : `${stood} of ${measured} conditioned rule${measured === 1 ? "" : "s"} `
       + `clear${stood === 1 ? "s" : ""} what the same search reaches on the shuffle.`;
   /* z is how many baseline standard deviations the real fit sits below its
@@ -172,7 +172,7 @@ function baselineReading(fit) { // eslint-disable-line no-unused-vars
   return `Trained cost/segment ${fmtCost(fit.cost_per_segment)} sits ${strength} the shuffled `
     + `baseline (mean ${fmtCost(fit.null_cost_per_segment_mean)} over ${fit.permutation_count} `
     + `shuffles, z = ${z.toFixed(1)}). ${rules}`
-    + (z > -3 ? " On this evidence the pairings carry no cross-lect structure a shuffle does not." : "");
+    + (z > -3 ? " There is no structure here a shuffle would not also find." : "");
 }
 
 /* What the two split statistics say together, which is the only way either is
@@ -192,18 +192,18 @@ function residueReading(fit) { // eslint-disable-line no-unused-vars
   const separation = fit.cost_split_separation;
   const fraction = fit.cost_split_fraction;
   if (!(separation >= 4)) {
-    return "The sets fit the correspondences evenly — no group of them stands apart. "
-      + "Rows are still ranked, and the worst is still the one to read first.";
+    return "The sets fit evenly; no group stands apart. Rows are still ranked worst first, "
+      + "so start at the top.";
   }
   if (fraction <= 0.25) {
-    return `A tail of about ${Math.round(fraction * 100)}% of sets aligns much worse than `
-      + "the rest. That is the shape a handful of mistaken cognate judgements makes — start "
-      + "at the top and check whether those sets are cognate at all.";
+    return `About ${Math.round(fraction * 100)}% of sets align much worse than the rest: a tail, `
+      + "the shape a few mistaken cognate judgements make. Check whether the ones at the top are "
+      + "cognate at all.";
   }
   return `About ${Math.round(fraction * 100)}% of the corpus aligns differently from the rest: `
-    + "two populations rather than a tail. That is a shape and not a cause — a borrowed "
-    + "stratum, a change spread over the lexicon and unrelated contact all make it, and this "
-    + "number cannot tell them apart.";
+    + "two populations, not a tail. The number gives the shape, not the cause. Borrowing, a change "
+    + "that spread through part of the lexicon, or contact could each produce it, and this won't "
+    + "separate them.";
 }
 
 /* A segment answering to nothing across a lect pair, written as a correspondence
@@ -242,12 +242,12 @@ function ruleScore(entry) { // eslint-disable-line no-unused-vars
 function ruleStanding(entry) { // eslint-disable-line no-unused-vars
   const s = entry.standing;
   if (!s || s === "unmeasured") {
-    return "standing not measured — turn on the shuffled baseline to test it";
+    return "standing not measured; turn on the shuffled baseline to test it";
   }
   if (s === "above noise") {
-    return "STANDS — its search margin clears a shuffle of the corpus (rank p ≤ 0.05)";
+    return "STANDS: its search margin clears a shuffle of the corpus (rank p ≤ 0.05)";
   }
-  return "within noise — a shuffle reaches this margin as often, so the environment is not distinguished";
+  return "within noise: a shuffle reaches this margin as often, so the environment isn't distinguished";
 }
 
 /* The identifiability confound on a conditioned class: >0 means a different
@@ -283,16 +283,16 @@ function predictiveReading(p) { // eslint-disable-line no-unused-vars
     p.identity.top1_coverage, p.feature_distance.top1_coverage, p.inventory_frequency.top1_coverage);
   const generalises =
     `Trained on part of the corpus and asked for reflexes held out of the rest, the `
-    + `correspondences recover ${pct(best.top1_coverage)} at the first guess, against `
-    + `${pct(naive)} for the best of the three naive baselines below.`;
+    + `correspondences get ${pct(best.top1_coverage)} right on the first guess, against `
+    + `${pct(naive)} for the best naive baseline below.`;
   let conditioning;
   if (p.status === "confirmed") {
     conditioning = ` Conditioning earns its place out of sample: held-out log loss falls by `
       + `${p.log_loss_gain.toFixed(3)} when the environments are used.`;
   } else if (p.status === "not_confirmed") {
-    conditioning = ` Conditioning does not improve held-out prediction here `
+    conditioning = ` Conditioning does not help out of sample here `
       + `(log-loss change ${p.log_loss_gain.toFixed(3)}): the environments fit the corpus they were `
-      + `found on without generalising beyond it.`;
+      + `found on and no further.`;
   } else {
     conditioning = ` Too few groups to test whether conditioning generalises; the coverage is `
       + `descriptive only.`;
