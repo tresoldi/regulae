@@ -39,12 +39,36 @@ createRegulae({
 self.onmessage = (event) => {
   const { type } = event.data;
 
-  if (type !== "train") {
+  if (type !== "train" && type !== "segment") {
     post("fatal", { message: "unknown request: " + type });
     return;
   }
   if (engine === null) {
     post("fatal", { message: "the engine is not ready yet" });
+    return;
+  }
+
+  /* Segmenting one form so the page can show how it will be read. The token
+     lets the page ignore a stale answer when the visitor has typed on. This is
+     the same synchronous call training is, but over a single word, so it
+     returns before the next keystroke matters. */
+  if (type === "segment") {
+    const { word, token } = event.data;
+    let pointer = 0;
+    try {
+      pointer = engine.ccall("regulae_segment_json", "number", ["string"], [word]);
+      post("segment_result", { token, json: engine.UTF8ToString(pointer) });
+    } catch (error) {
+      post("segment_result", {
+        token,
+        json: JSON.stringify({ ok: false, status: "the word could not be segmented",
+          detail: (error && error.message) || String(error) }),
+      });
+    } finally {
+      if (pointer !== 0) {
+        engine.ccall("regulae_free", null, ["number"], [pointer]);
+      }
+    }
     return;
   }
 

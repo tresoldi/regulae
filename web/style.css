@@ -116,6 +116,56 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button:disabled { opacity: 0.45; cursor: default; }
 .controls .spacer { flex: 1; }
 
+/* ---- options and the segment preview --------------------------------- */
+
+/* The knobs that change a claim the tables make. Quieter than the run
+   controls: a visitor should find them when looking, not be steered to them. */
+.options {
+  display: flex;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 4px 0 0;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--muted);
+}
+.options label { color: var(--muted); }
+.options select { max-width: 220px; }
+.options .check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.options .check input { cursor: pointer; }
+.options .slow { font-size: 12px; color: var(--warn); font-family: var(--mono); }
+.options .hint-inline { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+
+.segment-tool {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 0;
+  flex-wrap: wrap;
+}
+.segment-tool label { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.segment-tool input {
+  font: 13px/1.5 var(--mono);
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  min-width: 220px;
+}
+/* The graphemes the form breaks into, dotted apart the way a class row writes a
+   segment, so the preview and the results read in one alphabet. */
+.segment-preview { display: flex; gap: 4px; flex-wrap: wrap; align-items: center;
+  font-family: var(--mono); font-size: 13px; min-height: 1.6em; }
+.segment-preview.bad { color: var(--warn); }
+.segment-preview .grapheme {
+  padding: 1px 6px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--panel);
+}
+.segment-preview .grapheme + .grapheme { margin-left: 0; }
+
 textarea {
   width: 100%;
   min-height: 200px;
@@ -189,6 +239,22 @@ textarea {
 .summary b { font-family: var(--mono); font-weight: 600; }
 .summary span { color: var(--muted); }
 
+/* The shuffled-baseline verdict, when it was run. Bordered like the status
+   banner because it is the same kind of statement -- a caveat on how far to
+   trust the tables -- rather than a table itself. */
+.baseline {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--panel);
+}
+.baseline[hidden] { display: none; }
+.baseline h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em;
+  color: var(--muted); margin: 0 0 6px; }
+.baseline p { margin: 0; font-size: 14px; }
+
 .panels { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); gap: 22px; margin-top: 20px; }
 .panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--muted); margin: 0 0 10px; }
@@ -200,6 +266,13 @@ textarea {
 .panel.events { margin-top: 22px; }
 .panel.events .scroll { max-height: 30vh; }
 .panel.events .unnamed { color: var(--muted); }
+
+/* Cross-dimensional rules, hidden entirely on the corpora that have none so the
+   pane is never an empty promise. */
+.panel.crossdim { margin-top: 22px; }
+.panel.crossdim[hidden] { display: none; }
+.panel.crossdim .scroll { max-height: 34vh; }
+.panel.crossdim .unnamed { color: var(--warn); }
 
 /* The sets the correspondences do not explain. Shorter than the panels above
    it because it is read from the top: the ranking is the point, not the tail. */
@@ -227,6 +300,21 @@ td.count, td.sets { font-family: var(--mono); text-align: right; width: 1%; }
 td.sets { color: var(--muted); }
 .env { display: block; font-size: 12px; color: var(--muted); font-family: var(--mono);
   white-space: normal; margin-top: 3px; }
+
+/* The rate a class applies at and the interval around it. The bar sits on a
+   0-1 track so intervals compare down the column; it goes muted for the Wilson
+   default and takes the accent once bootstrap has resampled it, which is the
+   one visible sign the option did anything. */
+td.rate { width: 128px; }
+td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
+  font-size: 12px; color: var(--muted); }
+.ci { position: relative; display: block; height: 4px; margin-top: 5px;
+  background: var(--line); border-radius: 2px; }
+.ci-bar { position: absolute; top: 0; bottom: 0; background: var(--muted);
+  border-radius: 2px; opacity: 0.5; }
+.ci.boot .ci-bar { background: var(--accent); opacity: 0.75; }
+.ci-tick { position: absolute; top: -2px; width: 2px; height: 8px;
+  background: var(--ink); transform: translateX(-1px); }
 
 .alignments { padding: 4px 0; }
 .alignment { padding: 8px 12px; border-bottom: 1px solid var(--line); }

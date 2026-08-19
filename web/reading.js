@@ -59,32 +59,120 @@ function correspondence(entry) { // eslint-disable-line no-unused-vars
     .join("  ~  ");
 }
 
+/* The constraints in one context object, as a readable list. A conditioned
+ * class carries one of these per segment; a cross-dimensional rule carries a
+ * single one for its environment. The two rendered the same slot two ways until
+ * this was shared, so it lives here once. */
+function describeContext(context) { // eslint-disable-line no-unused-vars
+  const bits = [];
+  for (const [slot, value] of Object.entries(context || {})) {
+    if (typeof value === "string") {
+      bits.push(`${slot}: ${value}`);
+    } else if (Array.isArray(value)) {
+      bits.push(`${slot}: ` + value
+        .map((c) => (c.offset === undefined
+          ? `${c.feature}:${c.value}`
+          : `${c.feature}:${c.value}@${c.offset}`))
+        .join(", "));
+    }
+  }
+  return bits.join("; ");
+}
+
 /* An environment the way the guide reads it: a filter on where the
  * correspondence applies, not a rewrite rule. */
 function environment(entry) { // eslint-disable-line no-unused-vars
   const parts = [];
   for (const segment of entry.segments) {
-    const context = segment.context;
-    if (!context || Object.keys(context).length === 0) {
-      continue;
-    }
-    const bits = [];
-    for (const [slot, value] of Object.entries(context)) {
-      if (typeof value === "string") {
-        bits.push(`${slot}: ${value}`);
-      } else if (Array.isArray(value)) {
-        bits.push(`${slot}: ` + value
-          .map((c) => (c.offset === undefined
-            ? `${c.feature}:${c.value}`
-            : `${c.feature}:${c.value}@${c.offset}`))
-          .join(", "));
-      }
-    }
-    if (bits.length) {
-      parts.push(`${segment.lect} — ${bits.join("; ")}`);
+    const bits = describeContext(segment.context);
+    if (bits) {
+      parts.push(`${segment.lect} — ${bits}`);
     }
   }
   return parts.join(" · ");
+}
+
+/* A cross-dimensional rule: a segmental feature on one lect predicting a
+ * suprasegmental value on another (tonogenesis is the type case). Written as a
+ * correspondence, never a rewrite -- the conditioned lect *carries* the value
+ * where the environment holds, it is not derived from it. The value is a Chao
+ * tone letter or a length/stress name, printed the way a segment's
+ * suprasegmental is so the two read alike. */
+function crossDimCorrespondence(row) { // eslint-disable-line no-unused-vars
+  return `${row.conditioned_lect} ${row.dimension}:${row.value}`;
+}
+
+function crossDimEnvironment(row) { // eslint-disable-line no-unused-vars
+  const bits = describeContext(row.environment);
+  /* environment_lect is where the trigger is read; conditioned_lect is where
+   * the value lands. When they differ the rule is cross-lect, the case the
+   * type example is about, so the lect is always named rather than assumed. */
+  return bits ? `where ${row.environment_lect} — ${bits}` : `across ${row.environment_lect}`;
+}
+
+/* Whether a rule's environment is the only feature that carves its
+ * observations this way; anything above zero is a confound the corpus cannot
+ * resolve, and the row has to say so rather than assert one reading. */
+function crossDimConfound(row) { // eslint-disable-line no-unused-vars
+  const n = row.environment_alternatives || 0;
+  return n > 0 ? `${n} other environment${n === 1 ? "" : "s"} fit the same observations` : "";
+}
+
+/* Costs are negative; the CLI writes the minus as a real minus sign and the
+ * stats line does too, so the page matches rather than showing a hyphen. */
+function fmtCost(value) { // eslint-disable-line no-unused-vars
+  return value.toFixed(2).replace("-", "−");
+}
+
+/* A class's rate and the interval around it, as a percentage a reader can say
+ * out loud. The estimate is the conditional probability the count represents --
+ * how often, where this class applies, the correspondence is the one taken --
+ * and lower/upper bound it at 95%. The method is Wilson on a plain run and
+ * bootstrap once resampling is on, which is the difference the interval is here
+ * to show; post_selection marks a rate measured on the same data that chose the
+ * environment, so it says how pinned the rate is, not whether the split is real. */
+function uncertaintyLabel(u) { // eslint-disable-line no-unused-vars
+  if (!u) {
+    return "";
+  }
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const unit = u.method === "bootstrap"
+    ? `bootstrap, ${Math.round(u.effective_n)} units`
+    : "Wilson";
+  return `${pct(u.estimate)} of the time · 95% CI ${pct(u.lower)}–${pct(u.upper)} · ${unit}`
+    + (u.post_selection ? " · rate given the chosen environment" : "");
+}
+
+/* The interval as three positions on a 0-100 track, so a row can draw it. Always
+ * on [0, 1], so bars are comparable down the column: a wide one is a rate the
+ * corpus barely pins, a narrow one is a rate it is sure of, and bootstrap
+ * narrowing a bar is the resampling doing its work in view. */
+function ciBar(u) { // eslint-disable-line no-unused-vars
+  const clamp = (x) => Math.max(0, Math.min(100, x * 100));
+  return { left: clamp(u.lower), right: clamp(u.upper), tick: clamp(u.estimate) };
+}
+
+/* What the shuffled-baseline comparison says, read as a whole rather than as a
+ * z-score a visitor has to interpret. Only meaningful once permutations have
+ * run, which the caller checks with fit.permutation_count. cost_per_segment is
+ * the mean alignment cost; lower is a tighter fit, so a model far below its
+ * shuffled baseline has found structure the shuffle destroys. */
+function baselineReading(fit) { // eslint-disable-line no-unused-vars
+  const z = fit.cost_per_segment_z;
+  const measured = fit.rules_measured || 0;
+  const stood = fit.rules_above_noise || 0;
+  const rules = measured === 0
+    ? "No conditioned rule was committed to measure against the shuffle."
+    : `${stood} of ${measured} conditioned rule${measured === 1 ? "" : "s"} `
+      + `clear${stood === 1 ? "s" : ""} what the same search reaches on the shuffle.`;
+  /* z is how many baseline standard deviations the real fit sits below its
+   * shuffles. A regular relationship runs tens of SDs out; near zero means the
+   * pairings carry no more structure than their shuffled alternative. */
+  const strength = z <= -8 ? "far below" : z <= -3 ? "below" : "no better than";
+  return `Trained cost/segment ${fmtCost(fit.cost_per_segment)} sits ${strength} the shuffled `
+    + `baseline (mean ${fmtCost(fit.null_cost_per_segment_mean)} over ${fit.permutation_count} `
+    + `shuffles, z = ${z.toFixed(1)}). ${rules}`
+    + (z > -3 ? " On this evidence the pairings carry no cross-lect structure a shuffle does not." : "");
 }
 
 /* What the two split statistics say together, which is the only way either is

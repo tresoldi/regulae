@@ -23,11 +23,13 @@
 
   <p class="status-banner">
     <strong>Early release.</strong>
-    The model this page produces is byte-identical to the reference
-    implementation across thirteen corpora, including real Latin/Spanish and
-    Proto-Polynesian/Hawaiian data. Bootstrap resampling, anomaly detection and
-    chunk-transparency screening are not implemented yet, and several input
-    conventions cannot be read — see
+    The engine reproduced its Go reference byte-for-byte on thirteen corpora —
+    including real Latin/Spanish and Proto-Polynesian/Hawaiian data — before
+    that reference was retired; it now stands on its own tests. One diagnostic,
+    anomaly detection, is not ported yet, and two synthetic corpora use input
+    notations the loaders do not read. The shuffled baseline and other resampling
+    checks are available but off by default, since each retrains the model many
+    times — see
     <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
   </p>
 
@@ -64,10 +66,45 @@
     <button id="cancel" hidden>Cancel</button>
   </div>
 
+  <!-- The engine can run several ways the default run does not. These stay
+       here rather than in a settings panel because each one changes a claim the
+       tables below make, so a visitor should see the knob next to the answer it
+       moves. The baseline is opt-in and slow: it retrains on the shuffled
+       corpus once per shuffle. -->
+  <div class="options">
+    <label for="scorer">Split scorer</label>
+    <select id="scorer" aria-label="Split scorer">
+      <option value="corrected_bic">corrected BIC (default)</option>
+      <option value="multinomial_nml">exact NML</option>
+      <option value="dirichlet_marginal">Dirichlet marginal</option>
+    </select>
+    <label class="check">
+      <input type="checkbox" id="bootstrap">
+      Bootstrap the intervals
+      <span class="hint-inline">resamples cognate sets; replaces the Wilson interval</span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="baseline">
+      Compare against a shuffled baseline
+      <span class="slow">slow: retrains on 20 shuffles</span>
+    </label>
+  </div>
+
   <p class="example-note" id="example-note"></p>
   <p class="example-stats" id="example-stats"></p>
 
   <textarea id="editor" spellcheck="false" aria-label="Corpus"></textarea>
+
+  <!-- How a written form reads before a full run commits to it. merkmal's
+       segmentation is where non-ASCII IPA can surprise, and an unknown grapheme
+       is the most common reason a corpus fails to load; typing a form here
+       names the offending sound without waiting for the run to refuse it. -->
+  <div class="segment-tool">
+    <label for="segment-input">Segment a form</label>
+    <input id="segment-input" type="text" spellcheck="false"
+           placeholder="type a form, e.g. kʷéntos" aria-label="Segment a form">
+    <div class="segment-preview" id="segment-preview"></div>
+  </div>
 
   <div class="progress" id="progress">
     <div class="bar"><div class="fill" id="progress-fill"></div></div>
@@ -79,12 +116,20 @@
   <div class="results" id="results">
     <div class="summary" id="summary"></div>
 
+    <!-- Whether the pairings carry more cross-lect structure than a shuffle of
+         them does. Present only when the shuffled baseline was run, since the
+         default run does not measure it. -->
+    <div class="baseline" id="baseline-panel" hidden>
+      <h2>Against a shuffled baseline</h2>
+      <p id="baseline-body"></p>
+    </div>
+
     <div class="panels">
       <div class="panel">
         <h2>Correspondence classes</h2>
-        <p class="hint">Select one to see the alignments it rests on.</p>
+        <p class="hint" id="classes-hint">Select one to see the alignments it rests on.</p>
         <div class="scroll"><table class="classes" id="classes">
-          <thead><tr><th>correspondence</th><th>count</th><th>sets</th></tr></thead>
+          <thead><tr><th>correspondence</th><th>count</th><th>sets</th><th>rate · 95% CI</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </div>
@@ -101,6 +146,15 @@
       <p class="hint" id="events-hint"></p>
       <div class="scroll"><table class="classes" id="events">
         <thead><tr><th>event</th><th>count</th><th>sets</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <div class="panel crossdim" id="crossdim-panel">
+      <h2>Cross-dimensional rules</h2>
+      <p class="hint" id="crossdim-hint"></p>
+      <div class="scroll"><table class="classes" id="crossdim">
+        <thead><tr><th>rule</th><th>count</th><th>vs.</th></tr></thead>
         <tbody></tbody>
       </table></div>
     </div>

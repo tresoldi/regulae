@@ -85,15 +85,18 @@ for (const id of [
   'example-note', 'example-stats', 'version', 'timing', 'guide', 'guide-open',
   'guide-close', 'guide-title', 'guide-body', 'guide-steps', 'guide-load', 'file',
   'download-json', 'download-summary', 'residue', 'residue-hint',
-  'events', 'events-hint',
+  'events', 'events-hint', 'crossdim', 'crossdim-panel', 'crossdim-hint',
+  'baseline-panel', 'baseline-body', 'scorer', 'baseline', 'bootstrap',
+  'classes-hint', 'segment-input', 'segment-preview',
 ]) {
-  byId.set(id, new Element(['classes', 'residue', 'events'].includes(id) ? 'table' : 'div'));
+  byId.set(id, new Element(['classes', 'residue', 'events', 'crossdim'].includes(id) ? 'table' : 'div'));
 }
 // The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
 byId.get('classes').appendChild(tbody);
 byId.get('residue').appendChild(new Element('tbody'));
 byId.get('events').appendChild(new Element('tbody'));
+byId.get('crossdim').appendChild(new Element('tbody'));
 
 const posted = [];
 class FakeWorker {
@@ -329,6 +332,90 @@ check('the events pane names a grouped class', () => {
     rendered.map((c) => c.textContent).join(' | ')}`);
   assert.match(voicing.textContent, /\[[^\]]* & [^\]]*\]/,
     'the grapheme set is not named by its features');
+});
+
+/* Cross-dimensional rules -- a segmental environment predicting a tone -- have
+   a pane of their own, hidden on the corpora that produce none so it is never
+   an empty promise. Latin/Spanish has none; the tone fixture has them, which is
+   why it earned a place on the ladder. */
+check('the cross-dimensional pane renders its rules, and hides when there are none', () => {
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  assert.equal(model.cross_dimensional.length, 0, 'latin/spanish unexpectedly has cross-dim rules');
+  assert.ok(byId.get('crossdim-panel').hidden, 'the empty cross-dim pane was not hidden');
+
+  const tone = JSON.parse(execFileSync(
+    cli, ['train', '--json', '--format', 'wide',
+      join(repo, 'experiments/tone_chinese_like/cognates.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.ok(tone.cross_dimensional.length > 0, 'tone fixture stopped producing cross-dim rules');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(tone), elapsedMs: 1 } });
+
+  const rendered = byId.get('crossdim').querySelectorAll('td.corr');
+  assert.equal(rendered.length, tone.cross_dimensional.length);
+  assert.ok(!byId.get('crossdim-panel').hidden, 'the cross-dim pane hid despite having rows');
+  for (let i = 0; i < tone.cross_dimensional.length; i += 1) {
+    const row = tone.cross_dimensional[i];
+    assert.ok(rendered[i].textContent.includes(row.conditioned_lect),
+      `cross-dim row omits the conditioned lect ${row.conditioned_lect}`);
+    assert.ok(rendered[i].textContent.includes(row.dimension),
+      `cross-dim row omits the dimension ${row.dimension}`);
+  }
+});
+
+/* The shuffled-baseline verdict shows only when the shuffle was run, since the
+   default run does not measure it. The fields are injected here rather than
+   spending twenty retrainings in a unit test; that the shuffle produces them is
+   checked in C. */
+check('the baseline pane appears only when the shuffle was run', () => {
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  assert.ok(byId.get('baseline-panel').hidden, 'the baseline pane showed without a shuffle');
+
+  const shuffled = JSON.parse(JSON.stringify(model));
+  Object.assign(shuffled.fit, {
+    permutation_count: 20,
+    null_cost_per_segment_mean: -0.6,
+    null_cost_per_segment_sd: 0.05,
+    cost_per_segment_z: -24.8,
+    rules_measured: 3,
+    rules_above_noise: 3,
+  });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(shuffled), elapsedMs: 1 } });
+  assert.ok(!byId.get('baseline-panel').hidden, 'the baseline pane hid despite a shuffle');
+  assert.ok(byId.get('baseline-body').textContent.includes('shuffled baseline'),
+    'the baseline pane did not read the verdict');
+});
+
+/* Every class carries an interval on the rate it applies at -- Wilson on a
+   plain run, bootstrap once resampling is on. The bar is drawn from lower/upper
+   and takes the accent class only when the method is bootstrap, which is the
+   one visible sign the option did anything. */
+check('every class shows its rate interval, marked when bootstrapped', () => {
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  const first = model.classes.unconditioned[0];
+  const rows = byId.get('classes').querySelectorAll('tr[data-class-id]');
+  const row = rows.find((r) => r.dataset.classId === String(first.id));
+  const point = row.querySelectorAll('.point')[0];
+  assert.ok(point, 'no rate point rendered');
+  assert.equal(point.textContent, first.uncertainty.estimate.toFixed(2));
+  const track = row.querySelectorAll('.ci')[0];
+  assert.ok(track && !track.classList.contains('boot'),
+    'the Wilson interval was marked as bootstrap');
+  assert.ok(byId.get('classes-hint').textContent.includes('Wilson'),
+    'the hint did not name the Wilson interval');
+
+  const boot = JSON.parse(JSON.stringify(model));
+  /* Bootstrap is all-or-nothing: a real run marks every class, so the test
+     does too rather than flipping one and reading the hint off another. */
+  for (const c of [...boot.classes.unconditioned, ...boot.classes.conditioned]) {
+    c.uncertainty.method = 'bootstrap';
+  }
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(boot), elapsedMs: 1 } });
+  const brow = byId.get('classes').querySelectorAll('tr[data-class-id]')
+    .find((r) => r.dataset.classId === String(first.id));
+  assert.ok(brow.querySelectorAll('.ci')[0].classList.contains('boot'),
+    'the bootstrap interval was not marked');
+  assert.ok(byId.get('classes-hint').textContent.includes('bootstrap'),
+    'the hint did not switch to bootstrap');
 });
 
 check('a failed run reports the status rather than rendering', () => {

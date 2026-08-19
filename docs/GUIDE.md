@@ -424,9 +424,11 @@ carry a source-wide convention. Optional `etymon_group` and `source_group`
 columns name those dependencies. regulae never guesses them from a shared id
 prefix or similar forms.
 
-With bootstrap intervals enabled through the API, `AUTO` resamples etymon
-groups when supplied and otherwise treats cognate sets as independent. The fit
-report prints that unit and its effective count. Source-publication resampling
+Every class already carries a Wilson interval on the rate it applies at. With
+bootstrap intervals enabled — through the API, or the page's *Bootstrap the
+intervals* box — `AUTO` resamples etymon groups when supplied and otherwise
+treats cognate sets as independent. The fit report prints that unit and its
+effective count. Source-publication resampling
 is explicit because one publication often contains the entire corpus; treating
 it as one automatic draw would erase rather than quantify the evidence.
 

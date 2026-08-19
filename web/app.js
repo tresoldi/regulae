@@ -43,6 +43,8 @@ function startWorker() {
       showProgress(message);
     } else if (message.type === "result") {
       finish(message);
+    } else if (message.type === "segment_result") {
+      showSegmentation(message);
     } else if (message.type === "fatal") {
       stopRunning();
       showError("The engine failed", message.message);
@@ -116,7 +118,37 @@ function run() {
   runButton.hidden = true;
   cancelButton.hidden = false;
   showProgress({ stage: "starting", completed: 0, total: 1 });
-  worker.postMessage({ type: "train", corpus, format: currentFormat });
+  const options = buildOptions();
+  /* The shuffle retrains once per shuffle, so a run that asks for it needs a
+     longer leash than the default one; the worker turns this into a deadline
+     the progress callback checks, since a synchronous WebAssembly call cannot
+     be interrupted any other way. */
+  const timeoutMs = options && options.includes("permutation_count") ? 180000 : 60000;
+  worker.postMessage({ type: "train", corpus, format: currentFormat, options, timeoutMs });
+}
+
+/* The options the run departs from the default with. Only non-default keys are
+   sent, so the payload says exactly what was changed and the provenance block
+   in the download records it. */
+function buildOptions() {
+  const options = {};
+  const scorer = $("scorer").value;
+  if (scorer && scorer !== "corrected_bic") {
+    options.split_scorer = scorer;
+  }
+  if ($("bootstrap").checked) {
+    /* Bootstrap only re-tallies class counts over resampled cognate sets -- it
+       does not retrain -- so a high draw count costs almost nothing and buys a
+       smoother interval. */
+    options.bootstrap_n = 300;
+  }
+  if ($("baseline").checked) {
+    /* Enough shuffles to place the fit against the baseline without making the
+       browser wait a minute per corpus; the CLI default is higher and the
+       guide says so. */
+    options.permutation_count = 20;
+  }
+  return Object.keys(options).length ? JSON.stringify(options) : null;
 }
 
 function finish({ json, elapsedMs }) {
@@ -153,6 +185,38 @@ function classById(id) {
 }
 
 
+/* The rate a class applies at, with its interval drawn as a bar on a 0-1 track.
+   Present on every class in the model -- Wilson by default, bootstrap once the
+   option is on -- so the column never empties; the numbers ride in the title so
+   the cell stays a glance rather than a paragraph. */
+function rateCell(u) {
+  const cell = document.createElement("td");
+  cell.className = "rate";
+  if (!u) {
+    return cell;
+  }
+  cell.title = uncertaintyLabel(u);
+
+  const point = document.createElement("span");
+  point.className = "point";
+  point.textContent = u.estimate.toFixed(2);
+
+  const track = document.createElement("span");
+  track.className = u.method === "bootstrap" ? "ci boot" : "ci";
+  const { left, right, tick } = ciBar(u);
+  const bar = document.createElement("span");
+  bar.className = "ci-bar";
+  bar.style.left = left + "%";
+  bar.style.right = (100 - right) + "%";
+  const mark = document.createElement("span");
+  mark.className = "ci-tick";
+  mark.style.left = tick + "%";
+  track.append(bar, mark);
+
+  cell.append(point, track);
+  return cell;
+}
+
 function renderClasses() {
   const body = $("classes").querySelector("tbody");
   body.innerHTML = "";
@@ -162,9 +226,17 @@ function renderClasses() {
     ...model.classes.unconditioned.map((c) => ({ entry: c, conditioned: false })),
   ];
   if (!all.length) {
-    body.innerHTML = '<tr><td colspan="2" class="empty">No classes were found.</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">No classes were found.</td></tr>';
     return;
   }
+
+  /* The interval column is Wilson until resampling is on, then bootstrap; the
+     hint says which so the bar is not read as one when it is the other. */
+  const method = all[0].entry.uncertainty && all[0].entry.uncertainty.method;
+  $("classes-hint").textContent =
+    "Rate is how often, where a class applies, its correspondence is the one taken; "
+    + `the bar is the 95% ${method === "bootstrap" ? "bootstrap" : "Wilson"} interval. `
+    + "Select a row to see the alignments it rests on.";
 
   for (const { entry, conditioned } of all) {
     const row = document.createElement("tr");
@@ -206,7 +278,7 @@ function renderClasses() {
     sets.textContent = (entry.supporting_cognates || []).length || "";
     sets.title = "distinct cognate sets behind this row";
 
-    row.append(corr, count, sets);
+    row.append(corr, count, sets, rateCell(entry.uncertainty));
     row.addEventListener("click", () => select(entry.id));
     body.appendChild(row);
   }
@@ -250,6 +322,70 @@ function renderEvents() {
     row.append(corr, count, sets);
     body.appendChild(row);
   }
+}
+
+/* Rules where a segmental feature on one lect predicts a suprasegmental value
+   on another -- tonogenesis and its kin. Computed on every run and, until this
+   pane, only ever counted in the summary. Written a ~ b like every other
+   correspondence: the value is carried where the environment holds, not derived
+   from it. */
+function renderCrossDimensional() {
+  const body = $("crossdim").querySelector("tbody");
+  body.innerHTML = "";
+  const rows = model.cross_dimensional || [];
+  $("crossdim-panel").hidden = rows.length === 0;
+  $("crossdim-hint").textContent = rows.length
+    ? "A feature on one lect predicting a suprasegmental value on another. The "
+      + "conditioned lect carries the value where the environment holds."
+    : "";
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="3" class="empty">'
+      + "No suprasegmental value was predicted by a segmental environment.</td></tr>";
+    return;
+  }
+  for (const row of rows) {
+    const tr = document.createElement("tr");
+
+    const corr = document.createElement("td");
+    corr.className = "corr";
+    corr.textContent = crossDimCorrespondence(row);
+    const env = document.createElement("span");
+    env.className = "env";
+    env.textContent = crossDimEnvironment(row);
+    const confound = crossDimConfound(row);
+    if (confound) {
+      env.textContent += ` · ${confound}`;
+      env.classList.add("unnamed");
+    }
+    corr.appendChild(env);
+
+    const count = document.createElement("td");
+    count.className = "count";
+    count.textContent = row.count % 1 === 0 ? row.count : row.count.toFixed(1);
+
+    /* The other reflex: how often the same lect does something else in this
+       environment. A rule with no contrast is exceptionless in the corpus. */
+    const contrast = document.createElement("td");
+    contrast.className = "sets";
+    contrast.textContent = row.contrast_count ? `else ${row.contrast_count}` : "";
+    contrast.title = "observations of the contrasting value in the same environment";
+
+    tr.append(corr, count, contrast);
+    body.appendChild(tr);
+  }
+}
+
+/* The corpus-level verdict, shown only when the shuffled baseline was run. Read
+   as prose rather than as a z-score: reading.js turns the fit fields into the
+   one sentence a visitor can act on. */
+function renderBaseline() {
+  const panel = $("baseline-panel");
+  if (!model.fit || !model.fit.permutation_count) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  $("baseline-body").textContent = baselineReading(model.fit);
 }
 
 /* Cognate sets ranked by how badly they align under the trained model. The
@@ -433,12 +569,71 @@ function renderSummary() {
 function render() {
   selectedClass = null;
   renderSummary();
+  renderBaseline();
   renderEvents();
+  renderCrossDimensional();
   renderResidue();
   renderClasses();
   renderAlignments();
   select(null);
   selectedClass = null;
+}
+
+/* ---- segmentation preview ---------------------------------------------- */
+
+/* A token per request, so a slow answer that arrives after the visitor has
+   typed on is dropped rather than shown against the wrong word. */
+let segmentToken = 0;
+let segmentTimer = null;
+
+function requestSegmentation() {
+  const word = $("segment-input").value.trim();
+  const preview = $("segment-preview");
+  if (!word) {
+    preview.innerHTML = "";
+    return;
+  }
+  if (!ready) {
+    preview.textContent = "The engine is still loading.";
+    return;
+  }
+  segmentToken += 1;
+  worker.postMessage({ type: "segment", word, token: segmentToken });
+}
+
+/* Debounced so a request goes out when typing pauses, not on every keystroke. */
+function scheduleSegmentation() {
+  clearTimeout(segmentTimer);
+  segmentTimer = setTimeout(requestSegmentation, 180);
+}
+
+function showSegmentation({ token, json }) {
+  if (token !== segmentToken) {
+    return;
+  }
+  const preview = $("segment-preview");
+  preview.innerHTML = "";
+  let payload;
+  try {
+    payload = JSON.parse(json);
+  } catch {
+    return;
+  }
+  if (!payload.ok) {
+    /* The most useful thing a bad form can say is which grapheme stopped it,
+       which is exactly the detail the loader would refuse the whole corpus
+       with. Named here, it is fixed before a run is spent on it. */
+    preview.classList.add("bad");
+    preview.textContent = payload.detail || payload.status;
+    return;
+  }
+  preview.classList.remove("bad");
+  for (const grapheme of payload.segments) {
+    const chip = document.createElement("span");
+    chip.className = "grapheme";
+    chip.textContent = grapheme;
+    preview.appendChild(chip);
+  }
 }
 
 /* ---- examples ---------------------------------------------------------- */
@@ -485,6 +680,10 @@ function buildExampleList() {
    and is generated from the trained model so it cannot contradict the run. */
 function showExample(entry) {
   loadCorpus(entry.path, entry.format);
+  /* An example that only makes its point against the shuffle -- the unrelated
+     wordlists, the neutralisation -- pre-arms the baseline so the next Run
+     delivers what the note promises. Others leave it off, since it is slow. */
+  $("baseline").checked = !!entry.baseline;
   const note = $("example-note");
   note.classList.toggle("blocked", !entry.readable);
   note.textContent = entry.readable
@@ -508,11 +707,21 @@ function download(name, text) {
 function summaryText() {
   const lines = ["LECTS\t" + model.lects.join(" ")];
   const sets = (entry) => (entry.supporting_cognates || []).length;
+  const rate = (entry) => {
+    const u = entry.uncertainty;
+    return u ? `\t${u.estimate.toFixed(3)}\t${u.lower.toFixed(3)}\t${u.upper.toFixed(3)}\t${u.method}` : "";
+  };
   for (const entry of model.classes.unconditioned) {
-    lines.push(`UNCOND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}`);
+    lines.push(`UNCOND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}${rate(entry)}`);
   }
   for (const entry of model.classes.conditioned) {
-    lines.push(`COND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}\t${environment(entry)}`);
+    lines.push(`COND\t${entry.id}\t${correspondence(entry)}\t${entry.count}\t${sets(entry)}\t${environment(entry)}${rate(entry)}`);
+  }
+  for (const row of model.cross_dimensional || []) {
+    lines.push(`XDIM\t${crossDimCorrespondence(row)}\t${row.count}\t${crossDimEnvironment(row)}`);
+  }
+  if (model.fit && model.fit.permutation_count) {
+    lines.push(`BASELINE\t${baselineReading(model.fit)}`);
   }
   return lines.join("\n") + "\n";
 }
@@ -559,6 +768,7 @@ startWorker();
 
 runButton.addEventListener("click", run);
 cancelButton.addEventListener("click", cancelRun);
+$("segment-input").addEventListener("input", scheduleSegmentation);
 $("guide-open").addEventListener("click", () => $("guide").classList.add("open"));
 $("guide-close").addEventListener("click", () => $("guide").classList.remove("open"));
 $("download-json").addEventListener("click", () => download("regulae-model.json", JSON.stringify(model, null, 2)));

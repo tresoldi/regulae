@@ -59,6 +59,14 @@ LADDER = [
     ("testdata/corpora/real_romance_4lect.tsv",
      "Romance, four lects",
      "Latin, Spanish, French and Italian reconciled into classes binding all four."),
+    # The first entry whose point is not a segment correspondence. Tone
+    # predicted by a segmental environment is a cross-dimensional rule, and it
+    # has a pane of its own; the ladder needs one corpus that fills it.
+    ("experiments/tone_chinese_like/cognates.tsv",
+     "Tone from an environment",
+     "Mandarin and Cantonese. Where a segmental environment predicts a tone the "
+     "rule is cross-dimensional -- the shape tonogenesis leaves -- and lands in "
+     "its own pane rather than among the segment correspondences."),
     # The last three are what the tool looks like when it is right to find
     # nothing, and they belong on the ladder for the same reason the contrast
     # environments belong in a fixture. A reader who has only seen it succeed
@@ -76,6 +84,16 @@ LADDER = [
      "The same forty words segmented two ways. Reads as deaffrication, loss of "
      "aspiration and loss of length -- none of which happened, and nothing catches it."),
 ]
+
+# Examples whose point only lands against the shuffle: the unrelated wordlists
+# whose correspondences are accidental, and the neutralisation whose every
+# environment is a correlate. Selecting one pre-arms the page's baseline
+# checkbox so the next run measures what the description promises. The baseline
+# is off elsewhere because it retrains once per shuffle.
+BASELINE_EXAMPLES = {
+    "testdata/restraint/chance.tsv",
+    "testdata/soundlaws/final_devoicing.tsv",
+}
 
 DESCRIPTIONS = {
     "arabic_hebrew": "Semitic, with conditioned classes.",
@@ -233,6 +251,8 @@ def main():
             entry["stats"] = probed["stats"]
         elif probed["blockedBy"]:
             entry["blockedBy"] = probed["blockedBy"]
+        if key in BASELINE_EXAMPLES:
+            entry["baseline"] = True
         entries.append(entry)
 
     # Ladder first, then the settled changes, then the rest, then blocked;
