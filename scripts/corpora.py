@@ -37,36 +37,66 @@ OUTPUT = REPO / "web" / "corpora.js"
 # The ladder, in order. Each earns its place by showing a capability the
 # previous entries cannot.
 LADDER = [
+    # First, real data at increasing depth of structure: a near-identical pair,
+    # then discovered conditioning, then a reconstruction with sweeping mergers.
     ("experiments/finnish_estonian/cognates.tsv",
      "Finnish and Estonian",
-     "Two closely related lects. A first look at what a correspondence class is."),
+     "Two closely related lects. The simplest thing regulae returns -- which "
+     "segment answers to which, and how often -- so it is the place to see what "
+     "a correspondence class is."),
     ("experiments/latin_spanish/cognates.tsv",
      "Latin and Spanish",
-     "The environments are discovered, not declared: no rule list is supplied "
-     "anywhere, and none of the conditioning below was named in advance."),
+     "Real data, and the environments are discovered rather than declared: no "
+     "rule list is supplied anywhere, and nothing below -- the palatalisations, "
+     "the voicing between vowels -- was named in advance."),
+    ("experiments/ppn_hawaiian/cognates.tsv",
+     "Proto-Polynesian and Hawaiian",
+     "A reconstruction pair with sweeping regular mergers: *t answers to "
+     "Hawaiian k, *k to a glottal stop, *f to h and *r to l -- all recovered "
+     "from the wordlist with no correspondence supplied."),
+    # Then the famous named laws: a flat chain shift, its accent-conditioned
+    # residue, and a dissimilation whose trigger is not adjacent. The synthetic
+    # one-trigger rung sits between them as the isolated form of the idea.
     ("testdata/soundlaws/grimm.tsv",
      "Grimm's Law",
-     "Three shifts running at once and not one of them conditioned. Finding a "
-     "single correspondence proves little; the claim is the chain shift whole, "
-     "and every rung of it flat."),
+     "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once -- "
+     "p to f, t to θ, k to x -- and not one conditioned. A single correspondence "
+     "proves little; the claim is the chain shift whole, every rung of it flat."),
     ("testdata/soundlaws/graded_1_adjacent.tsv",
      "One change, one adjacent trigger",
-     "The same shape with conditioning that is really there, so the environment "
-     "has to be recovered rather than declined."),
+     "The simplest conditioning, isolated in a synthetic corpus: one change "
+     "firing beside one trigger, so the environment has to be recovered rather "
+     "than declined."),
+    ("testdata/soundlaws/verner.tsv",
+     "Verner's Law",
+     "The residue Grimm's Law leaves over. Where Proto-Germanic looks irregular "
+     "the split turns on where the Proto-Indo-European accent fell -- and "
+     "regulae recovers the stress environment with no accent rule supplied."),
+    ("testdata/soundlaws/grassmann.tsv",
+     "Grassmann's Law",
+     "Of two aspirates in a word, the first loses its aspiration. The trigger is "
+     "neither adjacent nor at a fixed distance, so the environment is "
+     "existential -- an aspirate somewhere ahead -- which regulae states rather "
+     "than the adjacency it cannot."),
+    # Then the machinery: noise and ranking, several lects at once, and a rule
+    # that crosses from a segment to a tone.
     ("experiments/contaminated_cognates_synthetic/cognates.tsv",
      "Contaminated cognates",
-     "Confidence weighting and outlier ranking on deliberately noisy data."),
+     "A wordlist salted with false cognates. Confidence weighting and the "
+     "residue rank the planted sets to the top, where a comparativist would "
+     "check them first."),
     ("testdata/corpora/real_romance_4lect.tsv",
      "Romance, four lects",
-     "Latin, Spanish, French and Italian reconciled into classes binding all four."),
+     "Latin, Spanish, French and Italian reconciled into classes that bind all "
+     "four; the lect-pair selector narrows the alignments to one pair at a time."),
     # The first entry whose point is not a segment correspondence. Tone
     # predicted by a segmental environment is a cross-dimensional rule, and it
     # has a pane of its own; the ladder needs one corpus that fills it.
     ("experiments/tone_chinese_like/cognates.tsv",
      "Tone from an environment",
-     "Mandarin and Cantonese. Where a segmental environment predicts a tone the "
-     "rule is cross-dimensional -- the shape tonogenesis leaves -- and lands in "
-     "its own pane rather than among the segment correspondences."),
+     "Mandarin- and Cantonese-like. Where a segmental environment predicts a "
+     "tone the rule is cross-dimensional -- the shape tonogenesis leaves -- and "
+     "lands in a pane of its own, not among the segment correspondences."),
     # The last three are what the tool looks like when it is right to find
     # nothing, and they belong on the ladder for the same reason the contrast
     # environments belong in a fixture. A reader who has only seen it succeed
@@ -95,19 +125,41 @@ BASELINE_EXAMPLES = {
     "testdata/soundlaws/final_devoicing.tsv",
 }
 
+# Real language pairs that are not on the ladder. They make the point that the
+# engine is not tuned to Indo-European: the same search finds correspondences
+# across Semitic, Bantu, Kartvelian, Turkic and Athabaskan wordlists. Grouped
+# apart from the synthetic phenomena so the cross-family breadth reads as such.
+REAL_LANGUAGES = {
+    "arabic_hebrew", "georgian_svan", "latin_french", "latin_italian",
+    "oe_english", "swahili_zulu", "turkish_azerbaijani", "mandarin_historical",
+    "navajo_chipewyan",
+}
+
 DESCRIPTIONS = {
-    "arabic_hebrew": "Semitic, with conditioned classes.",
-    "georgian_svan": "Kartvelian. The richest conditioning in the set.",
-    "latin_french": "Romance, a second daughter for comparison.",
-    "latin_italian": "Romance, a third daughter.",
-    "oe_english": "Old English against the modern language.",
-    "swahili_zulu": "Bantu.",
-    "turkish_azerbaijani": "Turkic, closely related.",
-    "ppn_hawaiian": "Proto-Polynesian and Hawaiian.",
-    "mandarin_historical": "Middle Chinese and Mandarin, tone held in separate columns.",
-    "harmony_synthetic": "Vowel harmony, synthetic.",
-    "umlaut_synthetic": "Umlaut, synthetic.",
-    "length_conditioned_synthetic": "Length conditioning, synthetic.",
+    "arabic_hebrew": "Arabic and Hebrew -- Semitic consonant correspondences, "
+                     "a few of them conditioned by their environment.",
+    "georgian_svan": "Georgian and Svan -- Kartvelian, and the richest "
+                     "conditioning in the set.",
+    "latin_french": "Latin and French -- a Romance daughter carried much "
+                    "further from the parent than Spanish.",
+    "latin_italian": "Latin and Italian -- the most conservative of the three "
+                     "Romance daughters here.",
+    "oe_english": "Old English against the modern language -- a thousand years "
+                  "of change across everyday words.",
+    "swahili_zulu": "Swahili and Zulu -- Bantu, regular and, here, unconditioned.",
+    "turkish_azerbaijani": "Turkish and Azerbaijani -- Turkic, closely related.",
+    "navajo_chipewyan": "Navajo and Chipewyan -- Athabaskan, consonant-rich.",
+    "mandarin_historical": "Middle Chinese and Mandarin -- tone carried in its "
+                           "own column beside the segments.",
+    "harmony_synthetic": "Vowel harmony spreading across a word (synthetic).",
+    "umlaut_synthetic": "Umlaut: a following vowel fronts the one before it (synthetic).",
+    "length_conditioned_synthetic": "A change conditioned by vowel length (synthetic).",
+    "tone_synthetic": "Tone as a correspondence in its own right (synthetic).",
+    "tone_3way_synthetic": "A three-way tone split across three lects (synthetic).",
+    "tone_chinese_like_clean": "A tone system with no segmental conditioning -- "
+                               "the control for the tonogenesis example (synthetic).",
+    "tone_vietnamese_like": "A denser tone inventory (synthetic).",
+    "tone_yoruba_like": "A three-tone system (synthetic).",
 }
 
 # One per change the field settled long ago, built so that exactly one answer
@@ -237,7 +289,12 @@ def main():
             name = path.parent.name
             label = name.replace("_", " ")
             description = DESCRIPTIONS.get(name, "")
-            group = "More corpora" if probed["readable"] else "Not readable in this format yet"
+            if not probed["readable"]:
+                group = "Not readable in this format yet"
+            elif name in REAL_LANGUAGES:
+                group = "Real languages"
+            else:
+                group = "Synthetic phenomena"
 
         entry = {
             "path": key,
@@ -255,10 +312,11 @@ def main():
             entry["baseline"] = True
         entries.append(entry)
 
-    # Ladder first, then the settled changes, then the rest, then blocked;
-    # stable within each group.
-    order = {"Start here": 0, "Sound laws": 1, "More corpora": 2,
-             "Not readable in this format yet": 3}
+    # Ladder first, then the settled named changes, then real languages across
+    # the families, then the synthetic phenomena, then blocked; stable within
+    # each group.
+    order = {"Start here": 0, "Sound laws": 1, "Real languages": 2,
+             "Synthetic phenomena": 3, "Not readable in this format yet": 4}
     entries.sort(key=lambda e: order[e["group"]])
 
     text = (
