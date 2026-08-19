@@ -597,6 +597,25 @@ static void test_a_trigger_a_syllable_away_needs_five_a_side(rg_context *ctx) {
         rg_multi_model_free(model);
         rg_corpus_free(corpus);
     }
+
+    /* The five-a-side minimum is a gate, not the search charge in disguise:
+     * lowering it to three commits the same environment at three a side, on the
+     * rung the default declines. So the extra evidence the charge asks for does
+     * not by itself account for the step, and the constant is documented rather
+     * than derived -- see docs/GUIDE.md and multilect_hardening_plan.md (M13a). */
+    {
+        rg_corpus *corpus = load("restraint", "distant_003");
+        rg_multi_model *model = 0;
+        rg_train_options options;
+        rg_train_options_init_defaults(&options);
+        options.bic.long_range_min_split_observations = 3;
+        assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                              rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+        assert(rg_multi_model_conditioned_class_count(model) == 1);
+        assert(names_next_syllable_feature(model, "close"));
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
 }
 
 /* A strong, wholly unconditioned relationship with a little transcription

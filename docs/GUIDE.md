@@ -297,7 +297,16 @@ sound law. The frozen protocol and real negative panel are in
 
 ## How much data do I need?
 
-About **eight examples of a change and eight counterexamples**, measured.
+About **eight examples of a change and eight counterexamples**, measured — for a
+trigger in the immediate neighbour.
+
+A trigger a syllable away needs five examples a side, not three, and it is a gate
+rather than a floor the evidence climbs: the `distant_003`…`distant_008` ladder
+commits nothing at three or four a side and recovers the rule at five, and
+lowering the long-range minimum to three lets a three-a-side split commit, so the
+extra evidence the search charge asks for does not by itself account for the
+step. The eight-and-eight figure does not transfer to a distance-conditioned
+change; that ladder pins the one that does.
 
 `testdata/restraint/sparse_008` … `sparse_128` is one conditioned change — /p/ answering /f/
 before a front vowel — at 8, 16, 32, 64 and 128 cognate sets, each corpus a

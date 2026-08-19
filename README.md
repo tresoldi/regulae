@@ -147,6 +147,8 @@ because a spurious conditioned rule is formatted exactly like a real one.
 over the lexicon rather than over an environment, a borrowed stratum, and a
 ladder that measures the evidence floor — about eight examples of a change and
 eight counterexamples, below which the search stays quiet rather than guessing.
+That figure is for a trigger in the immediate neighbour; a trigger a syllable
+away needs five examples a side, not three, and the `distant_*` ladder pins it.
 
 ## Command line
 
