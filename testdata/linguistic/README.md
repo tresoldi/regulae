@@ -48,7 +48,7 @@ histories.
 When the column is absent, the fit report says that cognate sets are being
 treated as independent. It never guesses grouping from a shared prefix. The
 probe and the taxon-sampling trio are mandatory regressions in
-`tests/c/test_evaluation_m2.c`.
+`tests/c/test_linguistic_evaluation.c`.
 
 ## A winning feature is not necessarily an identified cause
 

@@ -391,6 +391,6 @@ int main(void) {
     test_symmetric_association_is_stated_over_both_lects(ctx);
     test_duplicate_lect_adds_pairs_and_no_evidence(ctx);
     rg_context_free(ctx);
-    printf("test_evaluation_m5: ok\n");
+    printf("metadata_invariance: ok\n");
     return 0;
 }

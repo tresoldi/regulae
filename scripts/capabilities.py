@@ -100,13 +100,13 @@ CAPABILITIES = [
         "observation-group metadata",
         "supported",
         "TSV and wide (`etymon_group`, `source_group`)",
-        "`tests/c/test_evaluation_m2.c`",
+        "`tests/c/test_linguistic_evaluation.c`",
     ),
     (
         "group-held-out predictive evidence",
         "supported; opt-in because it retrains per fold and orientation",
         "`predictive_folds`, JSON options, or `--predictive-folds`",
-        "`tests/c/test_evaluation_m4.c`",
+        "`tests/c/test_predictive_evaluation.c`",
     ),
     (
         "bootstrap uncertainty",
