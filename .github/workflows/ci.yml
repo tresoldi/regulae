@@ -32,13 +32,13 @@ jobs:
       matrix:
         compiler: [gcc, clang]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: regulae
 
       # merkmal is a sibling checkout, which is where CMakeLists.txt looks when
       # find_package does not turn one up. It is public, so no token.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: tresoldi/merkmal
           path: merkmal
@@ -75,11 +75,11 @@ jobs:
       matrix:
         sanitizer: [address, undefined]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: regulae
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: tresoldi/merkmal
           path: merkmal
@@ -107,11 +107,11 @@ jobs:
     name: clang-tidy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: regulae
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: tresoldi/merkmal
           path: merkmal
