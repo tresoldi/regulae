@@ -119,7 +119,7 @@ else.
 
 A conditioning claim is a comparison. "Latin `r` answers old Latin `s` between
 vowels, count 14" is not a claim until you know what `s` does when it is *not*
-between vowels — so every conditioned class reports that too:
+between vowels. So every conditioned class reports that too:
 
 ```
 count=14 elsewhere=0  cov=0.74 dBIC=-11.5   latin:r ~ old_latin:s  [between vowels]
@@ -133,7 +133,7 @@ conditioning: the same correspondence occurs twenty-six times outside. Both
 were committed by the same split gate, and before `elsewhere` was printed they
 differed only in a count you had nothing to weigh against.
 
-`dBIC` is the default scorer's value — how much better the model got, charged
+`dBIC` is the default scorer's value: how much better the model got, charged
 for the `K−1` outcome parameters and the distinct candidate partitions searched.
 More negative is a stronger split. Alternative runs label this `dNML` or
 `dDir`; machine output publishes `score_kind` and `delta_score`. None is a
@@ -166,7 +166,7 @@ Ask this before reading a single correspondence, because the model will produce
 some either way.
 
 A trained model reports `cost/segment`: how well, on average, the corpus aligns
-under the model it produced. On its own the number means little — its scale
+under the model it produced. On its own the number means little; its scale
 depends on the corpus. So compare it against the same corpus with the answer
 taken out. `--permutations 20` retrains twenty times on a version of your data
 where every wordlist is intact and every cognate set is the same size, but
@@ -181,7 +181,7 @@ shuffled baseline:   -0.5791 +/- 0.0837 over 10 shuffles, z = -14.8
 
 Two things to read here. The corpus aligns about fifteen standard deviations
 better than its own noise: there is a relationship, and it is not close. And
-the shuffled data produced **more** classes than the real data — 58 against 20,
+the shuffled data produced **more** classes than the real data: 58 against 20,
 12 against 3.
 
 That second line is the one to take to heart. **The number of classes is not
@@ -202,14 +202,14 @@ real are different questions, and they need different nulls. The pairing shuffle
 above answers the first: it breaks the correspondences, so what its search
 reaches is what the method finds in a corpus with no cross-lect structure at
 all. That is the wrong bar for a single rule, whose correspondences are not in
-doubt — the question is only whether its *environment* is.
+doubt; the question is only whether its *environment* is.
 
 So each conditioned class is judged against a second null, printed on the same
 run: its own pivot's **context-permuted** search. The bucket that produced the
 rule is re-searched many times with its environments shuffled against their
 outcomes and the correspondences left exactly as they are. A rule stands when
-its margin beats that shuffled environment on 95% of draws — a permutation
-p-value — so a lone overfit draw cannot sink a real rule, and a well-attested
+its margin beats that shuffled environment on 95% of draws (a permutation
+p-value), so a lone overfit draw cannot sink a real rule, and a well-attested
 environment the shuffled search reaches just as often cannot pass.
 
 ```
@@ -230,8 +230,8 @@ Beneath the p-value sits an **eight-example floor**, the same one the
 `sparse_016`…`sparse_128` ladder measures: a class on fewer than eight
 observations is `within-noise` whatever its margin. Below the floor a clean real
 change and a thin accident both leave the permutation rarely reaching their
-margin — the first because its signal is destroyed, the second because there is
-too little to resample — so no distribution separates them, and the honest
+margin: the first because its signal is destroyed, the second because there is
+too little to resample. No distribution separates them, and the honest
 verdict is that the corpus is too small to say. That is why a fragmented law
 often reads `within-noise` on every one of its pieces even when the change is
 not in doubt: each fragment is below the floor. It is the predictive check
@@ -239,21 +239,21 @@ below, not the standing verdict, that tells a real thin rule from an accident.
 
 `STANDS` means the margin cleared the rule's own pivot null and the floor;
 `within-noise` means it did not. **Without `--permutations` there is no verdict
-at all** — every rule reads `unmeasured`, which is not a pass. It says the
+at all**: every rule reads `unmeasured`, which is not a pass. It says the
 comparison was never made. Small corpora produce a lot of `within-noise`, and
 the answer is usually more data rather than a different reading.
 
 Two verdicts are printed because regulae works at two levels, and they are
-counted differently — and, for now, against different nulls. The first counts
-the multi-lect rules — the classes reconciled across every lect — each against
+counted differently, and, for now, against different nulls. The first counts
+the multi-lect rules, the classes reconciled across every lect, each against
 its pivot's context-permuted null. The second counts the conditioned
 correspondences each *pair* of lects carries in its own model, still against the
 pairing shuffle, and those are counted per pair, so a rule visible in every pair
 of a four-lect corpus is six there and one above. They are not added together
 for that reason.
 
-**Read both.** On the Grassmann fixture the two multi-lect classes —
-`greek:t ~ pie:tʰ` and `greek:k ~ pie:kʰ` — rest on six and five observations,
+**Read both.** On the Grassmann fixture the two multi-lect classes
+(`greek:t ~ pie:tʰ` and `greek:k ~ pie:kʰ`) rest on six and five observations,
 below the floor, so the multi-lect view is silent; the per-pair view, judged
 against the shuffle, still shows the aspirate-dissimilation correspondences. A
 corpus's strongest surface association can be in either view, and a small
@@ -296,8 +296,8 @@ sound law.
 
 ## How much data do I need?
 
-About **eight examples of a change and eight counterexamples**, measured — for a
-trigger in the immediate neighbour.
+About **eight examples of a change and eight counterexamples**, for a trigger
+in the immediate neighbour.
 
 A trigger a syllable away needs five examples a side, not three, and it is a gate
 rather than a floor the evidence climbs: the `distant_003`…`distant_008` ladder
@@ -307,12 +307,12 @@ extra evidence the search charge asks for does not by itself account for the
 step. The eight-and-eight figure does not transfer to a distance-conditioned
 change; that ladder pins the one that does.
 
-`testdata/restraint/sparse_008` … `sparse_128` is one conditioned change — /p/ answering /f/
-before a front vowel — at 8, 16, 32, 64 and 128 cognate sets, each corpus a
+`testdata/restraint/sparse_008` … `sparse_128` is one conditioned change (/p/ answering /f/
+before a front vowel) at 8, 16, 32, 64 and 128 cognate sets, each corpus a
 prefix of the next so that the only thing that varies is size. At 8 sets
 nothing at all is committed. At 16 the two sides of the intended contrast are
-the only committed classes, and the intended change — /p/ answering /f/ before a
-front vowel — clears its pivot's null while the retention side committed beside
+the only committed classes, and the intended change (/p/ answering /f/ before a
+front vowel) clears its pivot's null while the retention side committed beside
 it does not. From 32 upward both the change and its recovery are stable.
 
 Two readings, and the second is the one people miss.
@@ -323,7 +323,7 @@ it means a run that reports nothing on thirty cognates has told you about your
 corpus and not about your languages.
 
 **Discovery at the floor still needs a baseline.** Rules are listed in the
-order they were decided and that order carries meaning — a later rule refines
+order they were decided and that order carries meaning: a later rule refines
 what an earlier one left. At 16 sets the corrected model is already stable on
 this clean fixture, but a real corpus may contain stronger correlated
 predicates, and `--permutations` is what measures the search they create.
@@ -331,7 +331,7 @@ predicates, and `--permutations` is what measures the search they create.
 One more thing changes the arithmetic, and it catches people out. **A change
 that applies to a whole class of segments is divided by the size of that class
 before the search sees it.** Germanic i-umlaut is one change, and it arrives as
-four correspondences — `a ~ e`, `uː ~ yː`, `u ~ y`, `oː ~ øː` — each of which
+four correspondences (`a ~ e`, `uː ~ yː`, `u ~ y`, `oː ~ øː`), each of which
 has to carry its own evidence. In `testdata/soundlaws/opaque_umlaut.tsv` only
 the first crosses the floor, so only the first gets its environment, and the
 other three are published as bare splits with the trigger standing right next
@@ -358,7 +358,7 @@ least four different things it can mean:
 - **Lexical diffusion, or a change still in progress.** No environment because
   there is none: which words changed is a fact about the words.
 - **An environment regulae cannot state.** Syllable weight is the clearest
-  case — see `docs/capabilities.md` for the standing list of these.
+  case; see `docs/capabilities.md` for the standing list of these.
 
 Distinguishing them is your job, and the distributions will not do it. A
 selected environment explains a surface distribution; it does not decide
@@ -383,7 +383,7 @@ There is a signature, and the report names it when it is strong:
 ```
 
 Read the percentage with the separation. A high separation with a *small*
-share — a tenth of the corpus — is a tail of sets that do not belong, which is
+share (a tenth of the corpus) is a tail of sets that do not belong, which is
 what a handful of bad cognate judgements looks like. A high separation at about
 half is a corpus that is two populations. Which of the two it is, and why, the
 distributions cannot say: a borrowed layer, a block of bad judgements, two
@@ -391,14 +391,14 @@ sources, and half a lexicon that underwent a change the other half did not all
 produce it. It is a reason to ask a different question, not an answer.
 
 **Transcription drift.** Two sources for one language that disagree about
-where a segment ends — `tʃ` against `t ʃ`, `tʰ` against `t h`, `aː` against
-`a a` — produce a family of clean correspondences that read as deaffrication,
+where a segment ends (`tʃ` against `t ʃ`, `tʰ` against `t h`, `aː` against
+`a a`) produce a family of clean correspondences that read as deaffrication,
 loss of aspiration and loss of length. Nothing in the *model* catches it: every
 grapheme is valid, the fit is excellent, and the shuffled baseline cannot help,
 because a systematic difference is exactly what a sound law is.
 
-`regulae check` asks the other question — about the writing rather than the
-sounds — and prints a `DRIFT` line per suspect grapheme with the evidence
+`regulae check` asks the other question, about the writing rather than the
+sounds, and prints a `DRIFT` line per suspect grapheme with the evidence
 beside it:
 
 ```
@@ -424,8 +424,8 @@ columns name those dependencies. regulae never guesses them from a shared id
 prefix or similar forms.
 
 Every class already carries a Wilson interval on the rate it applies at. With
-bootstrap intervals enabled — through the API, or the page's *Bootstrap the
-intervals* box — `AUTO` resamples etymon groups when supplied and otherwise
+bootstrap intervals enabled (through the API, or the page's *Bootstrap the
+intervals* box), `AUTO` resamples etymon groups when supplied and otherwise
 treats cognate sets as independent. The fit report prints that unit and its
 effective count. Source-publication resampling
 is explicit because one publication often contains the entire corpus; treating
