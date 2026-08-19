@@ -114,6 +114,41 @@ carrying:
 - **Determinism.** Same input, same output across runs and
   processes.
 
+## Where this sits against lingrex CoPaR
+
+The field's tool for cross-lect correspondence is lingrex's **CoPaR**
+(correspondence-pattern recognition): it clusters the columns of aligned
+cognate sets into correspondence patterns and imputes a missing reflex from
+them. regulae overlaps with it — both take expert cognate sets, both align
+across lects, and both can predict a held-out reflex — and stating the overlap
+is the point of this note. What regulae adds is the part a historical linguist
+reads a correspondence for: the **environment** each one is conditioned on, the
+**decision list** that orders the conditioned rules, and a **standing verdict**
+for each against a per-pivot null. A pattern table says which sounds correspond;
+regulae says where, in what order the conditions were found, and whether the
+conditioning survives its own shuffle.
+
+The multi-lect half of that is recent. Before M11 (see
+`docs/multilect_hardening_plan.md`) regulae's conditioned-class discovery
+decayed as lects were added: the outcome charge grew with the number of
+languages, so a rule recovered at two lects was lost at five, and only the
+pairwise stage held at every arity. Since M11 the split is scored per sister
+lect, and a conditioned correspondence is recovered at every arity
+(`testdata/restraint/arity_2 … arity_5`); the multi-lect class table is a
+first-class output rather than a lossy lift of the pairs.
+
+`scripts/benchmark_cloze.py` runs a leave-one-reflex-out cloze — hold out one
+lect's reflex in a cognate set, predict it from the rest — for both tools on
+shared Lexibank families. It is a reproducible harness, not a leaderboard: the
+two predict different units (regulae scores a held-out reflex position by
+position, CoPaR imputes an alignment site) and an exact whole-reflex match is a
+harsh metric, so the numbers indicate rather than rank. On a Tukanoan-area
+Arawakan sample regulae recovers about two-thirds of held-out reflex positions;
+run the script for the CoPaR side and other families. The comparison is there
+for the boundary above — regulae is not a better pattern recogniser, it is a
+correspondence model that also states where each correspondence holds and
+whether it stands.
+
 ## Dependencies
 
 `regulae` is built on [merkmal](../merkmal) for phonological
