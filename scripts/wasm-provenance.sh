@@ -28,7 +28,7 @@ sources_hash() {
     cd "$repo_dir"
     git ls-files --cached --others --exclude-standard -z -- \
             src include web/regulae_wasm.c \
-        | sort -z \
+        | LC_ALL=C sort -z \
         | while IFS= read -r -d '' path; do
               # Name in the hash too, so a rename is a change.
               [ -f "$path" ] && printf '%s  %s\n' \
