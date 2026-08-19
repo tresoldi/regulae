@@ -367,7 +367,7 @@ if(REGULAE_BUILD_TESTS)
         add_test(NAME cli_train_json
             COMMAND regulae_cli train --json "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/three_lect_basic.tsv")
         set_tests_properties(cli_train_json PROPERTIES
-            PASS_REGULAR_EXPRESSION "\"export_kind\":\"debug_map_snapshot\"")
+            PASS_REGULAR_EXPRESSION "\"export_kind\":\"surface_relationship_model\"")
 
         add_test(NAME cli_wide
             COMMAND regulae_cli train --format wide "${CMAKE_CURRENT_SOURCE_DIR}/experiments/latin_spanish/cognates.tsv")

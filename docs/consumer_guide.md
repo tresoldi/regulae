@@ -1006,7 +1006,23 @@ public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
 signature or ownership change, and the reason is recorded in
-`docs/c_conversion_roadmap.md`. It is at **36**.
+`docs/c_conversion_roadmap.md`. It is at **39**.
+
+**The JSON export is named and versioned.** `export_kind` is
+`"surface_relationship_model"` — the maximum-a-posteriori surface
+relationship model, the supported machine-readable output for the
+downstream layer. It is a single correspondence system, not the
+ensemble the historia interchange schema (M8) requires, so a reader
+must not treat it as claim-capable. `format_version` (currently **2**)
+moves only on a breaking change to that schema; adding a field does
+not move it, since unknown keys are ignored. Every export carries a
+`provenance` block — the `feature_system` and its `merkmal_version`
+(the conditioning vocabulary is whatever that system reports, and its
+inventory can change between versions), a `corpus_checksum` of the
+exact cognate sets (`fnv1a64:` and 16 hex digits), and the
+fully-resolved `options` including every seed — so a run can be
+reproduced and cited. Two runs on one corpus produce byte-identical
+provenance.
 
 What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile

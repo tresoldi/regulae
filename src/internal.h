@@ -414,6 +414,9 @@ rg_status rg_score_link_with_context_model_internal(
  * constant that cannot be unsupported. */
 rg_uncertainty_estimate rg_wilson_default_internal(double count, double total);
 
+/* The merkmal library version, through the single merkmal bridge in context.c. */
+const char *rg_merkmal_version_internal(void);
+
 /* Sets a rule's standing from its search margin against the level the same
  * search reached on the shuffled corpus. Written out four times in
  * multilect_fit.c before this, which is three more places for the comparison

@@ -32,10 +32,19 @@ static void test_model_json_shape(rg_context *ctx) {
     assert(text != 0);
 
     assert(strstr(text, "\"ok\":true") != 0);
-    assert(strstr(text, "\"format_version\":1") != 0);
-    /* Labelled so nothing downstream reads a single MAP system as
-     * claim-capable interchange data. */
-    assert(strstr(text, "\"export_kind\":\"debug_map_snapshot\"") != 0);
+    assert(strstr(text, "\"format_version\":2") != 0);
+    /* A named, versioned export -- still a single MAP system, not the
+     * claim-capable interchange schema (§7). */
+    assert(strstr(text, "\"export_kind\":\"surface_relationship_model\"") != 0);
+    /* Provenance names the feature system and its version, a checksum of the
+     * exact input, and the fully-resolved options, so the export can be
+     * reproduced and cited. */
+    assert(strstr(text, "\"provenance\":{") != 0);
+    assert(strstr(text, "\"feature_system\":\"distinctive\"") != 0);
+    assert(strstr(text, "\"merkmal_version\":\"") != 0);
+    assert(strstr(text, "\"corpus_checksum\":\"fnv1a64:") != 0);
+    assert(strstr(text, "\"class_outcome_mode\":\"per_sister_lect\"") != 0);
+    assert(strstr(text, "\"permutation_seed\":") != 0);
     assert(strstr(text, "\"lects\":[\"alpha\",\"beta\",\"gamma\"]") != 0);
     assert(strstr(text, "\"unconditioned\"") != 0);
     assert(strstr(text, "\"conditioned\"") != 0);

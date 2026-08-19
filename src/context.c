@@ -345,6 +345,13 @@ rg_status rg_context_system_name(const rg_context *ctx, const char **out) {
     return map_merkmal_status(status);
 }
 
+/* The merkmal version, through the single bridge so nothing else calls merkmal.
+ * Provenance records it because a feature system's inventory can change between
+ * versions. */
+const char *rg_merkmal_version_internal(void) {
+    return mk_version();
+}
+
 /* Memoised: the scoring path asks this for both graphemes of every link it
  * considers, and resolving a grapheme in merkmal is not cheap. */
 rg_status rg_context_is_segment(const rg_context *ctx, const char *grapheme, bool *out) {

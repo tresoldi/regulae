@@ -3,6 +3,7 @@
 
 #include "cJSON.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,7 +16,7 @@
  * correspondence system is explicitly not claim-capable data. Nothing here
  * should be mistaken for that format, which M8 designs. */
 
-#define RG_JSON_FORMAT_VERSION 1
+#define RG_JSON_FORMAT_VERSION 2
 
 static cJSON *json_uncertainty(rg_uncertainty_estimate value) {
     cJSON *out = cJSON_CreateObject();
@@ -540,6 +541,132 @@ char *rg_segments_to_json(const rg_segment *segments, size_t count) {
     return text;
 }
 
+/* FNV-1a over a canonical serialisation of the cognate sets, so the export
+ * names the exact input it was trained on. Fields are unit-separated so no two
+ * distinct corpora collide by concatenation, and the double's bytes hash
+ * directly -- both the native and WebAssembly targets are little-endian, so the
+ * checksum agrees, which the wasm parity test requires. */
+static void checksum_bytes(uint64_t *h, const void *data, size_t n) {
+    const unsigned char *p = (const unsigned char *)data;
+    size_t i;
+    for (i = 0; i < n; i++) {
+        *h ^= p[i];
+        *h *= UINT64_C(1099511628211);
+    }
+}
+
+static void checksum_field(uint64_t *h, const char *value) {
+    checksum_bytes(h, value != 0 ? value : "", value != 0 ? strlen(value) : 0);
+    checksum_bytes(h, "\x1f", 1);
+}
+
+static void corpus_checksum(const rg_cognate_set *cognates, size_t count, char out[32]) {
+    uint64_t h = UINT64_C(1469598103934665603);
+    size_t c;
+    size_t f;
+    size_t s;
+    for (c = 0; c < count; c++) {
+        checksum_field(&h, cognates[c].cognate_id);
+        checksum_field(&h, cognates[c].etymon_group);
+        checksum_field(&h, cognates[c].source_group);
+        checksum_bytes(&h, &cognates[c].confidence, sizeof(double));
+        for (f = 0; f < cognates[c].form_count; f++) {
+            const rg_form *form = &cognates[c].forms[f].form;
+            checksum_field(&h, cognates[c].forms[f].lect_id);
+            for (s = 0; s < form->segment_count; s++) {
+                checksum_field(&h, form->segments[s].grapheme);
+                checksum_field(&h, form->segments[s].tone);
+                checksum_field(&h, form->segments[s].length);
+                checksum_field(&h, form->segments[s].stress);
+            }
+        }
+    }
+    snprintf(out, 32, "fnv1a64:%016llx", (unsigned long long)h);
+}
+
+/* What the export was produced from: the feature system and its version (the
+ * conditioning vocabulary is whatever it reports), a checksum of the exact
+ * cognate sets, and the fully-resolved training options including every seed.
+ * Enough to reproduce the run and to cite it. */
+static cJSON *json_provenance(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options
+) {
+    cJSON *out = cJSON_CreateObject();
+    cJSON *opts;
+    cJSON *bic;
+    rg_train_options resolved;
+    const char *system_name = 0;
+    char checksum[32];
+    if (out == 0) {
+        return 0;
+    }
+    if (options == 0) {
+        rg_train_options_init_defaults(&resolved);
+    } else {
+        resolved = *options;
+    }
+    if (ctx == 0 || rg_context_system_name(ctx, &system_name) != RG_OK) {
+        system_name = "";
+    }
+    corpus_checksum(cognates, cognate_count, checksum);
+    cJSON_AddStringToObject(out, "feature_system", system_name);
+    cJSON_AddStringToObject(out, "merkmal_version", rg_merkmal_version_internal());
+    cJSON_AddStringToObject(out, "corpus_checksum", checksum);
+
+    opts = cJSON_CreateObject();
+    bic = cJSON_CreateObject();
+    if (opts == 0 || bic == 0) {
+        cJSON_Delete(opts);
+        cJSON_Delete(bic);
+        cJSON_Delete(out);
+        return 0;
+    }
+    cJSON_AddNumberToObject(opts, "max_chunk_size", resolved.max_chunk_size);
+    cJSON_AddNumberToObject(opts, "temperature", resolved.temperature);
+    cJSON_AddNumberToObject(opts, "concentration", resolved.concentration);
+    cJSON_AddNumberToObject(opts, "max_iter", resolved.max_iter);
+    cJSON_AddNumberToObject(opts, "convergence_eps", resolved.convergence_eps);
+    cJSON_AddNumberToObject(opts, "segment_weight", resolved.segment_weight);
+    cJSON_AddNumberToObject(opts, "displacement_weight", resolved.displacement_weight);
+    cJSON_AddNumberToObject(opts, "tone_weight", resolved.tone_weight);
+    cJSON_AddNumberToObject(opts, "chunk_min_transparency", resolved.chunk_min_transparency);
+    cJSON_AddNumberToObject(opts, "bootstrap_n", resolved.bootstrap_n);
+    cJSON_AddNumberToObject(opts, "bootstrap_seed", resolved.bootstrap_seed);
+    cJSON_AddStringToObject(opts, "bootstrap_unit", rg_observation_unit_string(resolved.bootstrap_unit));
+    cJSON_AddNumberToObject(opts, "permutation_count", resolved.permutation_count);
+    cJSON_AddNumberToObject(opts, "permutation_seed", resolved.permutation_seed);
+    cJSON_AddBoolToObject(opts, "tune_search_penalty", resolved.tune_search_penalty);
+    cJSON_AddNumberToObject(opts, "predictive_folds", resolved.predictive_folds);
+    cJSON_AddNumberToObject(opts, "predictive_seed", resolved.predictive_seed);
+    cJSON_AddNumberToObject(opts, "predictive_min_groups", resolved.predictive_min_groups);
+    cJSON_AddNumberToObject(opts, "predictive_abstention_threshold", resolved.predictive_abstention_threshold);
+    cJSON_AddNumberToObject(opts, "predictive_top_k", resolved.predictive_top_k);
+
+    cJSON_AddStringToObject(bic, "split_scorer", rg_split_scorer_string(resolved.bic.split_scorer));
+    cJSON_AddStringToObject(bic, "class_outcome_mode", rg_class_outcome_mode_string(resolved.bic.class_outcome_mode));
+    cJSON_AddNumberToObject(bic, "split_prior_concentration", resolved.bic.split_prior_concentration);
+    cJSON_AddNumberToObject(bic, "delta_bic_threshold", resolved.bic.delta_bic_threshold);
+    cJSON_AddNumberToObject(bic, "min_split_observations", resolved.bic.min_split_observations);
+    cJSON_AddNumberToObject(bic, "max_split_depth", resolved.bic.max_split_depth);
+    cJSON_AddNumberToObject(bic, "min_chunk_observations", resolved.bic.min_chunk_observations);
+    cJSON_AddNumberToObject(bic, "long_range_delta_bic_threshold", resolved.bic.long_range_delta_bic_threshold);
+    cJSON_AddNumberToObject(bic, "long_range_min_split_observations", resolved.bic.long_range_min_split_observations);
+    cJSON_AddNumberToObject(bic, "long_range_min_dominant_fraction", resolved.bic.long_range_min_dominant_fraction);
+    cJSON_AddNumberToObject(bic, "cross_dim_max_iterations", resolved.bic.cross_dim_max_iterations);
+    cJSON_AddNumberToObject(bic, "cross_dim_min_rule_count", resolved.bic.cross_dim_min_rule_count);
+    cJSON_AddNumberToObject(bic, "cross_dim_min_rule_confidence", resolved.bic.cross_dim_min_rule_confidence);
+    cJSON_AddNumberToObject(bic, "cross_dim_delta_bic_threshold", resolved.bic.cross_dim_delta_bic_threshold);
+    cJSON_AddBoolToObject(bic, "multi_lect_bic_small_sample_correction", resolved.bic.multi_lect_bic_small_sample_correction);
+    cJSON_AddNumberToObject(bic, "multi_lect_min_commit_scale", resolved.bic.multi_lect_min_commit_scale);
+    cJSON_AddNumberToObject(bic, "search_penalty_gamma", resolved.bic.search_penalty_gamma);
+    cJSON_AddItemToObject(opts, "bic", bic);
+    cJSON_AddItemToObject(out, "options", opts);
+    return out;
+}
+
 char *rg_model_to_json(
     const rg_context *ctx,
     const rg_multi_model *model,
@@ -584,8 +711,20 @@ char *rg_json_from_multi_model_internal(
     cJSON_AddBoolToObject(root, "ok", 1);
     cJSON_AddNumberToObject(root, "format_version", RG_JSON_FORMAT_VERSION);
     cJSON_AddStringToObject(root, "regulae_version", rg_version_string());
-    /* Labelled so nothing downstream mistakes this for claim-capable egress. */
-    cJSON_AddStringToObject(root, "export_kind", "debug_map_snapshot");
+    /* A named, versioned export: the maximum-a-posteriori surface relationship
+     * model, with the provenance below to reproduce and cite it. Still a single
+     * correspondence system, not the ensemble the historia layer's interchange
+     * schema (M8) requires -- a reader must not treat it as claim-capable. The
+     * format is `format_version` and its stability rule is in consumer_guide §7. */
+    cJSON_AddStringToObject(root, "export_kind", "surface_relationship_model");
+    {
+        cJSON *provenance = json_provenance(ctx, cognates, cognate_count, options);
+        if (provenance == 0) {
+            cJSON_Delete(root);
+            return 0;
+        }
+        cJSON_AddItemToObject(root, "provenance", provenance);
+    }
 
     lects = cJSON_CreateArray();
     if (lects == 0) {
