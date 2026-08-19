@@ -206,6 +206,90 @@ function residueReading(fit) { // eslint-disable-line no-unused-vars
     + "number cannot tell them apart.";
 }
 
+/* The score the search committed a class on: the improvement in the chosen
+ * scorer and the margin over the runner-up. Costs are negative, so a more
+ * negative delta is a larger improvement. Present on every decided class. */
+function ruleScore(entry) { // eslint-disable-line no-unused-vars
+  const bits = [];
+  if (typeof entry.delta_bic === "number") {
+    bits.push(`ΔBIC ${fmtCost(entry.delta_bic)}`);
+  }
+  if (entry.score_kind && entry.score_kind !== "corrected_bic"
+      && typeof entry.delta_score === "number") {
+    bits.push(`Δ${entry.score_kind} ${fmtCost(entry.delta_score)}`);
+  }
+  if (typeof entry.search_margin === "number") {
+    bits.push(`margin ${entry.search_margin.toFixed(2)}`);
+  }
+  return bits.join(" · ");
+}
+
+/* Whether a conditioned class clears its shuffled null. Measured only when the
+ * shuffled baseline was run; the "not measured" wording says so rather than
+ * implying the rule failed. "Above noise" is the STANDS verdict the CLI prints;
+ * "within noise" means a shuffle of the corpus reaches this search margin as
+ * often, so the environment is not distinguished from chance. */
+function ruleStanding(entry) { // eslint-disable-line no-unused-vars
+  const s = entry.standing;
+  if (!s || s === "unmeasured") {
+    return "standing not measured — turn on the shuffled baseline to test it";
+  }
+  if (s === "above noise") {
+    return "STANDS — its search margin clears a shuffle of the corpus (rank p ≤ 0.05)";
+  }
+  return "within noise — a shuffle reaches this margin as often, so the environment is not distinguished";
+}
+
+/* The identifiability confound on a conditioned class: >0 means a different
+ * neighbour's feature carves the same split and the corpus cannot say which
+ * conditions it. The same flag the cross-dimensional row already reads, here
+ * for a segment split. Empty when the environment is uniquely identifiable. */
+function ruleConfound(entry) { // eslint-disable-line no-unused-vars
+  const n = entry.environment_alternatives || 0;
+  return n > 0
+    ? `${n} other environment${n === 1 ? "" : "s"} carve this split the same way; `
+      + "the corpus cannot say which conditions it"
+    : "";
+}
+
+/* What the held-out prediction says, read as prose rather than as a table of
+ * scores. Present only once cross-validation has run, which the caller checks
+ * with predictive.status. Two claims are separable and both matter: whether the
+ * learned correspondences generalise at all (their top-1 coverage against the
+ * best naive baseline), and whether *conditioning* earns its place out of
+ * sample (the log-loss gain and the confirmed/not-confirmed verdict). The
+ * second is the harder bar, and on the multi-lect layer it is often not
+ * cleared even when the first is -- so the two are said separately rather than
+ * collapsed into one verdict. */
+function predictiveReading(p) { // eslint-disable-line no-unused-vars
+  if (!p || p.status === "unmeasured") {
+    return "";
+  }
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  const cond = p.conditioned;
+  const uncond = p.unconditioned;
+  const best = cond.top1_coverage >= uncond.top1_coverage ? cond : uncond;
+  const naive = Math.max(
+    p.identity.top1_coverage, p.feature_distance.top1_coverage, p.inventory_frequency.top1_coverage);
+  const generalises =
+    `Trained on part of the corpus and asked for reflexes held out of the rest, the `
+    + `correspondences recover ${pct(best.top1_coverage)} at the first guess, against `
+    + `${pct(naive)} for the best of the three naive baselines below.`;
+  let conditioning;
+  if (p.status === "confirmed") {
+    conditioning = ` Conditioning earns its place out of sample: held-out log loss falls by `
+      + `${p.log_loss_gain.toFixed(3)} when the environments are used.`;
+  } else if (p.status === "not_confirmed") {
+    conditioning = ` Conditioning does not improve held-out prediction here `
+      + `(log-loss change ${p.log_loss_gain.toFixed(3)}): the environments fit the corpus they were `
+      + `found on without generalising beyond it.`;
+  } else {
+    conditioning = ` Too few groups to test whether conditioning generalises; the coverage is `
+      + `descriptive only.`;
+  }
+  return generalises + conditioning;
+}
+
 /* An event's correspondence, with each lect's grapheme set named by the
    features that pick it out when any do. A set no feature names is still an
    event -- see rg_proposed_event_row on why that is ordinary. */

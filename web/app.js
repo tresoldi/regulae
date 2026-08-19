@@ -28,6 +28,16 @@ let model = null;
 let currentFormat = "wide";
 let selectedClass = null;
 let selectedSet = null;
+let baselineSupported = true;
+
+/* The classes table is a view over one array, so filtering and sorting are
+   state the view reads rather than a rebuild of the model. classRows is built
+   once per run; classView says which subset to show and in what order. */
+let classRows = [];
+const classView = { query: "", chip: "all", recurring: false, changes: false, stands: false, sort: "default", desc: true };
+/* Which classes have their evidence drawer open. Kept as ids so the open state
+   survives a filter or sort re-render rather than being tied to a DOM row. */
+const expandedClasses = new Set();
 
 /* ---- worker lifecycle -------------------------------------------------- */
 
@@ -39,6 +49,7 @@ function startWorker() {
       ready = true;
       runButton.disabled = false;
       $("version").textContent = "v" + message.version;
+      setBaselineAvailability(message.baselineSupported !== false);
     } else if (message.type === "progress") {
       showProgress(message);
     } else if (message.type === "result") {
@@ -119,11 +130,12 @@ function run() {
   cancelButton.hidden = false;
   showProgress({ stage: "starting", completed: 0, total: 1 });
   const options = buildOptions();
-  /* The shuffle retrains once per shuffle, so a run that asks for it needs a
-     longer leash than the default one; the worker turns this into a deadline
-     the progress callback checks, since a synchronous WebAssembly call cannot
-     be interrupted any other way. */
-  const timeoutMs = options && options.includes("permutation_count") ? 180000 : 60000;
+  /* The shuffle and the cross-validation both retrain many times over, so a run
+     that asks for either needs a longer leash than the default one; the worker
+     turns this into a deadline the progress callback checks, since a synchronous
+     WebAssembly call cannot be interrupted any other way. */
+  const slow = options && (options.includes("permutation_count") || options.includes("predictive_folds"));
+  const timeoutMs = slow ? 180000 : 60000;
   worker.postMessage({ type: "train", corpus, format: currentFormat, options, timeoutMs });
 }
 
@@ -142,13 +154,43 @@ function buildOptions() {
        smoother interval. */
     options.bootstrap_n = 300;
   }
-  if ($("baseline").checked) {
+  if ($("predictive").checked) {
+    /* Few enough folds to keep an interactive run bearable; each one retrains,
+       so this is the knob that makes cross-validation the slow option it is. */
+    options.predictive_folds = 4;
+  }
+  if (baselineSupported && $("baseline").checked) {
     /* Enough shuffles to place the fit against the baseline without making the
        browser wait a minute per corpus; the CLI default is higher and the
-       guide says so. */
+       guide says so. Sent only when the engine accepts it -- an older committed
+       build does not, and the box is disabled there rather than failing here. */
     options.permutation_count = 20;
   }
   return Object.keys(options).length ? JSON.stringify(options) : null;
+}
+
+/* Gate the shuffled-baseline box on whether the engine accepts the option. The
+   feature is real -- the CLI runs it -- but a committed WebAssembly build that
+   predates its JSON surface would reject the option and fail the run, so the
+   box is disabled with a note rather than left as a trap. */
+function setBaselineAvailability(supported) {
+  baselineSupported = supported;
+  const box = $("baseline");
+  const label = $("baseline-check");
+  const note = $("baseline-unavailable");
+  box.disabled = !supported;
+  if (label && label.classList) {
+    label.classList.toggle("disabled", !supported);
+  }
+  if (!supported) {
+    box.checked = false;
+    if (note) {
+      note.hidden = false;
+      note.textContent = "not in this engine build — runs in the CLI with --permutations";
+    }
+  } else if (note) {
+    note.hidden = true;
+  }
 }
 
 function finish({ json, elapsedMs }) {
@@ -217,70 +259,239 @@ function rateCell(u) {
   return cell;
 }
 
-function renderClasses() {
-  const body = $("classes").querySelector("tbody");
-  body.innerHTML = "";
+/* The distinct cognate sets behind a row -- the count that answers whether a
+   correspondence recurs, which is the question the table is usually asked. */
+function setCount(entry) {
+  return (entry.supporting_cognates || []).length;
+}
 
-  const all = [
+/* One class row's DOM. Pulled out of the render loop so the filtered/sorted
+   view can rebuild the tbody from the same builder the first render used. */
+function buildClassRow(entry, conditioned) {
+  const row = document.createElement("tr");
+  row.dataset.classId = String(entry.id);
+
+  const corr = document.createElement("td");
+  corr.className = "corr";
+
+  /* The caret opens the evidence drawer without selecting the row -- selection
+     filters the alignments, evidence is a different question -- so its click is
+     stopped from reaching the row. */
+  const caret = document.createElement("button");
+  caret.className = "caret";
+  caret.textContent = expandedClasses.has(entry.id) ? "▾" : "▸";
+  caret.title = "show the evidence behind this rule";
+  caret.setAttribute("aria-expanded", expandedClasses.has(entry.id) ? "true" : "false");
+  caret.addEventListener("click", (event) => {
+    event.stopPropagation();
+    if (expandedClasses.has(entry.id)) {
+      expandedClasses.delete(entry.id);
+    } else {
+      expandedClasses.add(entry.id);
+    }
+    applyClassView();
+  });
+  corr.appendChild(caret);
+  corr.append(correspondence(entry));
+  if (conditioned) {
+    const env = document.createElement("span");
+    env.className = "env";
+    env.textContent = environment(entry) || "conditioned";
+    /* The pivot's other reflex out of the environment: the contrast that
+       makes it a split, and the row a visitor needs to believe it. Shown
+       inline so the comparison is not a separate hunt through the table. */
+    const contrast = classById(entry.contrast_class_id);
+    if (contrast) {
+      /* Two in five committed rules are X ~ X, and most of those are the
+         retention side of a real split: the change is sitting in the
+         contrast. "p ~ p before a vowel" is a null statement to read, so say
+         which half of the pair is the event rather than leaving the reader
+         to notice that the two graphemes are the same. */
+      env.textContent += isIdentity(entry) && !isIdentity(contrast)
+        ? ` · unchanged here; the change is ${correspondence(contrast)}`
+        : ` · else ${correspondence(contrast)}`;
+    }
+    corr.appendChild(env);
+  }
+
+  const count = document.createElement("td");
+  count.className = "count";
+  count.textContent = entry.count % 1 === 0 ? entry.count : entry.count.toFixed(1);
+
+  const sets = document.createElement("td");
+  sets.className = "sets";
+  sets.textContent = setCount(entry) || "";
+  sets.title = "distinct cognate sets behind this row";
+
+  row.append(corr, count, sets, rateCell(entry.uncertainty));
+  row.addEventListener("click", () => select(entry.id));
+  return row;
+}
+
+/* The evidence drawer beneath an expanded class: what the search committed the
+   rule on, whether it stands, the confounds the corpus cannot resolve, and the
+   cognate sets behind it. Everything here is on the class row already -- the
+   drawer only reads it -- so it answers "why this rule, and can I trust it?"
+   without a trip through the JSON download. */
+function buildEvidenceRow(entry, conditioned) {
+  const tr = document.createElement("tr");
+  tr.className = "evidence-row";
+  tr.dataset.evidenceFor = String(entry.id);
+  const cell = document.createElement("td");
+  cell.colSpan = 4;
+  const box = document.createElement("div");
+  box.className = "evidence";
+
+  const line = (text, className) => {
+    if (!text) {
+      return;
+    }
+    const div = document.createElement("div");
+    div.className = "ev-line" + (className ? " " + className : "");
+    div.textContent = text;
+    box.appendChild(div);
+  };
+
+  line(ruleScore(entry), "ev-score");
+
+  if (conditioned) {
+    const standing = entry.standing;
+    const cls = standing === "above noise" ? "ev-stands"
+      : standing === "within noise" ? "ev-within" : "ev-unmeasured";
+    line(ruleStanding(entry), cls);
+    line(ruleConfound(entry), "ev-confound");
+
+    /* The elsewhere case the split was scored against, named and sized: the
+       contrast that makes the environment a finding rather than a description. */
+    const contrast = classById(entry.contrast_class_id);
+    if (contrast) {
+      const mass = entry.contrast_alternative_count;
+      const size = typeof mass === "number" && mass > 0
+        ? ` (${mass % 1 === 0 ? mass : mass.toFixed(1)} observations)` : "";
+      line(`elsewhere: ${correspondence(contrast)}${size}`, "ev-contrast");
+    }
+  }
+
+  if (typeof entry.confidence === "number") {
+    line(`confidence ${Math.round(entry.confidence * 100)}% — the weight this rule rests on`,
+      "ev-confidence");
+  }
+
+  const cognates = entry.supporting_cognates || [];
+  if (cognates.length) {
+    const sets = document.createElement("div");
+    sets.className = "ev-line ev-sets";
+    const label = document.createElement("span");
+    label.textContent = `sets (${cognates.length}): ${cognates.join(", ")}`;
+    const copy = document.createElement("button");
+    copy.className = "ev-copy";
+    copy.textContent = "copy";
+    copy.title = "copy the supporting cognate sets";
+    copy.addEventListener("click", (event) => {
+      event.stopPropagation();
+      copyText(cognates.join(", "), copy);
+    });
+    sets.append(label, copy);
+    box.appendChild(sets);
+  }
+
+  cell.appendChild(box);
+  tr.appendChild(cell);
+  return tr;
+}
+
+function renderClasses() {
+  /* Default order is the decision list for the conditioned rows -- a finding,
+     not a key -- then the unconditioned ones. Filtering and sorting are applied
+     over this array without touching the model. */
+  classRows = [
     ...decisionOrder(model.classes.conditioned).map((c) => ({ entry: c, conditioned: true })),
     ...model.classes.unconditioned.map((c) => ({ entry: c, conditioned: false })),
   ];
-  if (!all.length) {
-    body.innerHTML = '<tr><td colspan="4" class="empty">No classes were found.</td></tr>';
-    return;
-  }
 
   /* The interval column is Wilson until resampling is on, then bootstrap; the
      hint says which so the bar is not read as one when it is the other. */
-  const method = all[0].entry.uncertainty && all[0].entry.uncertainty.method;
+  const method = classRows.length && classRows[0].entry.uncertainty
+    && classRows[0].entry.uncertainty.method;
   $("classes-hint").textContent =
     "Rate is how often, where a class applies, its correspondence is the one taken; "
     + `the bar is the 95% ${method === "bootstrap" ? "bootstrap" : "Wilson"} interval. `
     + "Select a row to see the alignments it rests on.";
 
-  for (const { entry, conditioned } of all) {
-    const row = document.createElement("tr");
-    row.dataset.classId = String(entry.id);
+  applyClassView();
+}
 
-    const corr = document.createElement("td");
-    corr.className = "corr";
-    corr.textContent = correspondence(entry);
-    if (conditioned) {
-      const env = document.createElement("span");
-      env.className = "env";
-      env.textContent = environment(entry) || "conditioned";
-      /* The pivot's other reflex out of the environment: the contrast that
-         makes it a split, and the row a visitor needs to believe it. Shown
-         inline so the comparison is not a separate hunt through the table. */
-      const contrast = classById(entry.contrast_class_id);
-      if (contrast) {
-        /* Two in five committed rules are X ~ X, and most of those are the
-           retention side of a real split: the change is sitting in the
-           contrast. "p ~ p before a vowel" is a null statement to read, so say
-           which half of the pair is the event rather than leaving the reader
-           to notice that the two graphemes are the same. */
-        env.textContent += isIdentity(entry) && !isIdentity(contrast)
-          ? ` · unchanged here; the change is ${correspondence(contrast)}`
-          : ` · else ${correspondence(contrast)}`;
-      }
-      corr.appendChild(env);
+/* Whether a row passes the current filter: the chips narrow by kind, recurrence
+   and whether anything changed, and the query matches the written
+   correspondence and its environment together, so "p ~ f" and "before a vowel"
+   both find their rows. */
+function classMatches({ entry, conditioned }) {
+  if (classView.chip === "conditioned" && !conditioned) return false;
+  if (classView.chip === "unconditioned" && conditioned) return false;
+  if (classView.recurring && setCount(entry) < 2) return false;
+  if (classView.changes && isIdentity(entry)) return false;
+  if (classView.stands && entry.standing !== "above noise") return false;
+  const query = classView.query.trim().toLowerCase();
+  if (query) {
+    const hay = `${correspondence(entry)} ${conditioned ? environment(entry) : ""}`.toLowerCase();
+    if (!hay.includes(query)) return false;
+  }
+  return true;
+}
+
+/* The value a sortable column reads. Rate sorts on the point estimate; the
+   correspondence column has no key -- it is the decision order, restored by the
+   "default" sort. */
+function sortValue(entry, key) {
+  if (key === "count") return entry.count;
+  if (key === "sets") return setCount(entry);
+  if (key === "rate") return entry.uncertainty ? entry.uncertainty.estimate : -1;
+  return 0;
+}
+
+function applyClassView() {
+  const body = $("classes").querySelector("tbody");
+  body.innerHTML = "";
+
+  if (!classRows.length) {
+    body.innerHTML = '<tr><td colspan="4" class="empty">No classes were found.</td></tr>';
+    $("class-count").textContent = "";
+    return;
+  }
+
+  let rows = classRows.filter(classMatches);
+  if (classView.sort !== "default") {
+    const dir = classView.desc ? -1 : 1;
+    rows = [...rows].sort((a, b) =>
+      dir * (sortValue(a.entry, classView.sort) - sortValue(b.entry, classView.sort)));
+  }
+
+  for (const { entry, conditioned } of rows) {
+    const row = buildClassRow(entry, conditioned);
+    if (entry.id === selectedClass) {
+      row.classList.add("selected");
+    } else if (selectedClass !== null) {
+      row.classList.add("dimmed");
     }
-
-    const count = document.createElement("td");
-    count.className = "count";
-    count.textContent = entry.count % 1 === 0 ? entry.count : entry.count.toFixed(1);
-
-    /* count is aligned positions, so one word with a doubled segment reads 2.
-       Whether a correspondence recurs is the question a visitor is actually
-       asking of this table, and only this column answers it. */
-    const sets = document.createElement("td");
-    sets.className = "sets";
-    sets.textContent = (entry.supporting_cognates || []).length || "";
-    sets.title = "distinct cognate sets behind this row";
-
-    row.append(corr, count, sets, rateCell(entry.uncertainty));
-    row.addEventListener("click", () => select(entry.id));
     body.appendChild(row);
+    if (expandedClasses.has(entry.id)) {
+      body.appendChild(buildEvidenceRow(entry, conditioned));
+    }
+  }
+
+  if (!rows.length) {
+    body.innerHTML = '<tr><td colspan="4" class="no-match">'
+      + "No class matches the filter. Clear it to see the rest.</td></tr>";
+  }
+
+  $("class-count").textContent = rows.length === classRows.length
+    ? `${classRows.length} classes`
+    : `${rows.length} of ${classRows.length}`;
+
+  for (const th of $("classes").querySelectorAll("th[data-sort]")) {
+    const on = th.dataset.sort === classView.sort && classView.sort !== "default";
+    th.classList.toggle("sorted", on);
+    th.classList.toggle("desc", on && classView.desc);
   }
 }
 
@@ -472,9 +683,13 @@ function renderAlignments() {
     const gloss = document.createElement("div");
     gloss.className = "gloss";
     gloss.textContent = alignment.cognate_id;
+    /* The two forms reassembled from the columns, so the alignment reads as the
+       words it aligns rather than as a grid a visitor has to sound out. */
+    const src = alignment.links.map((l) => l.source.join("")).join("");
+    const tgt = alignment.links.map((l) => l.target.join("")).join("");
     const pair = document.createElement("span");
     pair.className = "pair";
-    pair.textContent = `  ${alignment.lect_a} ~ ${alignment.lect_b}`;
+    pair.textContent = `  ${alignment.lect_a} ${src} ~ ${alignment.lect_b} ${tgt}`;
     gloss.appendChild(pair);
 
     const cols = document.createElement("div");
@@ -561,6 +776,13 @@ function renderSummary() {
     item.innerHTML = `<b>${value}</b> <span>${label}</span>`;
     $("summary").appendChild(item);
   }
+  /* The trained fit as one number, so the headline count of classes sits next
+     to how tightly the corpus aligns under them. Lower is a closer fit. */
+  if (model.fit && typeof model.fit.cost_per_segment === "number") {
+    const fit = document.createElement("div");
+    fit.innerHTML = `<b>${fmtCost(model.fit.cost_per_segment)}</b> <span>cost/segment</span>`;
+    $("summary").appendChild(fit);
+  }
   const lects = document.createElement("div");
   lects.innerHTML = `<span>${model.lects.join(", ")}</span>`;
   $("summary").appendChild(lects);
@@ -568,8 +790,11 @@ function renderSummary() {
 
 function render() {
   selectedClass = null;
+  resetClassView();
   renderSummary();
+  renderProvenance();
   renderBaseline();
+  renderPredictive();
   renderEvents();
   renderCrossDimensional();
   renderResidue();
@@ -577,6 +802,105 @@ function render() {
   renderAlignments();
   select(null);
   selectedClass = null;
+}
+
+/* A fresh corpus starts with a clean table: an old filter left over from the
+   last run would silently hide rows the new run found. */
+function resetClassView() {
+  classView.query = "";
+  classView.chip = "all";
+  classView.recurring = false;
+  classView.changes = false;
+  classView.stands = false;
+  classView.sort = "default";
+  classView.desc = true;
+  expandedClasses.clear();
+  const filter = $("class-filter");
+  if (filter) {
+    filter.value = "";
+  }
+  for (const chip of $("class-chips").querySelectorAll("button")) {
+    chip.classList.toggle("on", chip.dataset.chip === "all");
+  }
+}
+
+/* Held-out prediction, shown only when cross-validation ran. The prose reads
+   the verdict; the table gives the trained models and the three baselines the
+   verdict rests on, so a reader can weigh the numbers rather than take them. */
+function renderPredictive() {
+  const panel = $("predictive-panel");
+  const p = model.fit && model.fit.predictive;
+  if (!p || p.status === "unmeasured") {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  $("predictive-body").textContent = predictiveReading(p);
+
+  const body = $("predictive-table").querySelector("tbody");
+  body.innerHTML = "";
+  const rows = [
+    { label: "trained · conditioned", score: p.conditioned, trained: true },
+    { label: "trained · unconditioned", score: p.unconditioned, trained: true },
+    { label: "baseline · identity (a ↦ a)", score: p.identity },
+    { label: "baseline · inventory frequency", score: p.inventory_frequency },
+    { label: "baseline · feature distance", score: p.feature_distance },
+  ];
+  const pct = (x) => `${Math.round(x * 100)}%`;
+  for (const { label, score, trained } of rows) {
+    if (!score) {
+      continue;
+    }
+    const tr = document.createElement("tr");
+    if (trained) {
+      tr.className = "trained";
+    }
+    const name = document.createElement("td");
+    name.className = "corr";
+    name.textContent = label;
+    const top1 = document.createElement("td");
+    top1.className = "num";
+    top1.textContent = pct(score.top1_coverage);
+    const topk = document.createElement("td");
+    topk.className = "num";
+    topk.textContent = pct(score.top_k_coverage);
+    const loss = document.createElement("td");
+    loss.className = "num";
+    loss.textContent = score.log_loss.toFixed(3);
+    tr.append(name, top1, topk, loss);
+    body.appendChild(tr);
+  }
+}
+
+/* The provenance a citation of this run needs, read straight off the model.
+   Reference rather than result, so it stays in a closed disclosure. */
+function renderProvenance() {
+  const dl = $("provenance-body");
+  dl.innerHTML = "";
+  const prov = model.provenance || {};
+  const opts = prov.options || {};
+  const rows = [
+    ["regulae version", model.regulae_version],
+    ["export kind", model.export_kind],
+    ["feature system", prov.feature_system],
+    ["merkmal version", prov.merkmal_version],
+    ["corpus checksum", prov.corpus_checksum],
+    ["split scorer", opts.bic && opts.bic.split_scorer],
+    ["bootstrap draws", opts.bootstrap_n],
+    ["cross-validation folds", opts.predictive_folds],
+    ["shuffles", opts.permutation_count],
+    ["max chunk size", opts.max_chunk_size],
+  ];
+  for (const [label, value] of rows) {
+    if (value === undefined || value === null || value === "") {
+      continue;
+    }
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = String(value);
+    dl.append(dt, dd);
+  }
 }
 
 /* ---- segmentation preview ---------------------------------------------- */
@@ -640,9 +964,20 @@ function showSegmentation({ token, json }) {
 
 function loadCorpus(path, format) {
   editor.value = CORPORA[path] || "";
-  currentFormat = format || "wide";
+  setFormat(format || "wide");
   results.classList.remove("active");
   $("error").innerHTML = "";
+}
+
+/* The input format is the select's value; loading an example or a file sets it,
+   and a visitor pasting their own data sets it by hand. Kept in one place so
+   the select and currentFormat never disagree. */
+function setFormat(format) {
+  currentFormat = format || "wide";
+  const select = $("format");
+  if (select) {
+    select.value = currentFormat;
+  }
 }
 
 function buildExampleList() {
@@ -682,8 +1017,9 @@ function showExample(entry) {
   loadCorpus(entry.path, entry.format);
   /* An example that only makes its point against the shuffle -- the unrelated
      wordlists, the neutralisation -- pre-arms the baseline so the next Run
-     delivers what the note promises. Others leave it off, since it is slow. */
-  $("baseline").checked = !!entry.baseline;
+     delivers what the note promises. Others leave it off, since it is slow, and
+     an engine build without the option leaves it off regardless. */
+  $("baseline").checked = !!entry.baseline && baselineSupported;
   const note = $("example-note");
   note.classList.toggle("blocked", !entry.readable);
   note.textContent = entry.readable
@@ -723,7 +1059,35 @@ function summaryText() {
   if (model.fit && model.fit.permutation_count) {
     lines.push(`BASELINE\t${baselineReading(model.fit)}`);
   }
+  if (model.fit && model.fit.predictive && model.fit.predictive.status !== "unmeasured") {
+    lines.push(`PREDICTIVE\t${predictiveReading(model.fit.predictive)}`);
+  }
+  if (model.provenance) {
+    lines.push(`PROVENANCE\t${model.provenance.feature_system}\t${model.provenance.corpus_checksum}`);
+  }
   return lines.join("\n") + "\n";
+}
+
+/* Copy text to the clipboard and flash the button that asked for it. Guarded
+   because the API is absent in the test's DOM shim and on an insecure origin;
+   the download button covers those. */
+function copyText(text, button) {
+  if (!navigator.clipboard) {
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    if (button) {
+      const was = button.textContent;
+      button.textContent = "copied";
+      setTimeout(() => { button.textContent = was; }, 1200);
+    }
+  }, () => {});
+}
+
+function copySummary() {
+  if (model) {
+    copyText(summaryText(), $("copy-summary"));
+  }
 }
 
 /* ---- guide ------------------------------------------------------------- */
@@ -773,6 +1137,66 @@ $("guide-open").addEventListener("click", () => $("guide").classList.add("open")
 $("guide-close").addEventListener("click", () => $("guide").classList.remove("open"));
 $("download-json").addEventListener("click", () => download("regulae-model.json", JSON.stringify(model, null, 2)));
 $("download-summary").addEventListener("click", () => download("regulae-summary.tsv", summaryText()));
+$("copy-summary").addEventListener("click", copySummary);
+
+$("format").addEventListener("change", (event) => setFormat(event.target.value));
+
+wireClassTools();
+
+/* The filter, chips and sortable headers over the classes table. Attached once;
+   they read and write classView, which applyClassView renders from. */
+function wireClassTools() {
+  $("class-filter").addEventListener("input", (event) => {
+    classView.query = event.target.value;
+    applyClassView();
+  });
+  for (const chip of $("class-chips").querySelectorAll("button")) {
+    chip.addEventListener("click", () => handleChip(chip.dataset.chip));
+  }
+  for (const th of $("classes").querySelectorAll("th[data-sort]")) {
+    th.addEventListener("click", () => handleSort(th.dataset.sort));
+  }
+}
+
+/* The kind chips (all/conditioned/unconditioned) are one choice; recurring and
+   changes are independent toggles laid over it. */
+function handleChip(name) {
+  if (name === "recurring") {
+    classView.recurring = !classView.recurring;
+  } else if (name === "changes") {
+    classView.changes = !classView.changes;
+  } else if (name === "stands") {
+    classView.stands = !classView.stands;
+  } else {
+    classView.chip = name;
+  }
+  for (const chip of $("class-chips").querySelectorAll("button")) {
+    const key = chip.dataset.chip;
+    const on = key === "recurring" ? classView.recurring
+      : key === "changes" ? classView.changes
+        : key === "stands" ? classView.stands
+          : classView.chip === key;
+    chip.classList.toggle("on", on);
+  }
+  applyClassView();
+}
+
+/* A first click sorts a column descending, a second ascending, a third returns
+   to the decision order the correspondence column carries. */
+function handleSort(key) {
+  if (key === "default") {
+    classView.sort = "default";
+  } else if (classView.sort === key && classView.desc) {
+    classView.desc = false;
+  } else if (classView.sort === key) {
+    classView.sort = "default";
+    classView.desc = true;
+  } else {
+    classView.sort = key;
+    classView.desc = true;
+  }
+  applyClassView();
+}
 
 $("file").addEventListener("change", (event) => {
   const file = event.target.files[0];
@@ -781,9 +1205,11 @@ $("file").addEventListener("change", (event) => {
   }
   file.text().then((text) => {
     editor.value = text;
-    currentFormat = file.name.endsWith(".csv") ? "arcaverborum" : "wide";
+    /* A .csv is Arca Verborum's long format; a .tsv can be either shape, so the
+       extension only seeds the guess and the format select is left to correct. */
+    setFormat(file.name.endsWith(".csv") ? "arcaverborum" : "wide");
     $("example-note").textContent =
-      `Loaded ${file.name}, read as ${currentFormat} format.`;
+      `Loaded ${file.name}, read as ${currentFormat} format — change “read as” if that is wrong.`;
     $("example-note").classList.remove("blocked");
   });
 });

@@ -20,6 +20,30 @@ function post(type, payload) {
   self.postMessage(Object.assign({ type }, payload));
 }
 
+/* Whether this engine accepts the shuffled baseline over the JSON options
+ * surface. The option parser runs before the corpus is read and rejects a key
+ * it does not know, so a one-line corpus is enough to ask the question; a build
+ * that predates JSON support for `permutation_count` answers "unsupported
+ * option" and the page disables the box rather than failing the visitor's run.
+ * The CLI reaches the same feature through a flag, so this is a surface gap in
+ * one build, not a missing capability. */
+function baselineSupported(instance) {
+  let pointer = 0;
+  try {
+    pointer = instance.ccall(
+      "regulae_train_json", "number", ["string", "string", "string"],
+      ["g\ta\tb\nx\tpa\tfa\n", "wide", '{"permutation_count":1}']);
+    const payload = JSON.parse(instance.UTF8ToString(pointer));
+    return !(payload.ok === false && payload.status === "unsupported option");
+  } catch {
+    return false;
+  } finally {
+    if (pointer !== 0) {
+      instance.ccall("regulae_free", null, ["number"], [pointer]);
+    }
+  }
+}
+
 createRegulae({
   onProgress(stage, completed, total) {
     post("progress", { stage, completed, total });
@@ -30,7 +54,10 @@ createRegulae({
 })
   .then((instance) => {
     engine = instance;
-    post("ready", { version: instance.ccall("regulae_version", "string", [], []) });
+    post("ready", {
+      version: instance.ccall("regulae_version", "string", [], []),
+      baselineSupported: baselineSupported(instance),
+    });
   })
   .catch((error) => {
     post("fatal", { message: "could not start the engine: " + (error && error.message) });

@@ -26,9 +26,9 @@
     The engine is exercised against thirteen corpora, including real
     Latin/Spanish and Proto-Polynesian/Hawaiian data. One diagnostic, anomaly
     detection, is not available yet, and two synthetic corpora use input
-    notations the loaders do not read. The shuffled baseline and other resampling
-    checks are available but off by default, since each retrains the model many
-    times — see
+    notations the loaders do not read. Its resampling checks — bootstrap
+    intervals, held-out cross-validation and the shuffled baseline — are
+    available but off by default, since each retrains the model many times — see
     <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
   </p>
 
@@ -60,6 +60,17 @@
   <div class="controls">
     <select id="examples" aria-label="Example corpus"></select>
     <input type="file" id="file" accept=".tsv,.csv,.txt" aria-label="Load a file">
+    <!-- The parser cannot guess long-vs-wide from the bytes: a two-column TSV is
+         a valid `wide` corpus of one lect pair and a valid `tsv` corpus with a
+         header it will reject. Loading an example or a named file sets this; a
+         visitor pasting their own data sets it here. -->
+    <label class="format" for="format">read as</label>
+    <select id="format" aria-label="Input format">
+      <option value="wide">wide — one row per cognate, one column per lect</option>
+      <option value="tsv">tsv — cognate_id, lect_id, segments</option>
+      <option value="gled">gled</option>
+      <option value="arcaverborum">arcaverborum (.csv)</option>
+    </select>
     <span class="spacer"></span>
     <button id="run" class="primary" disabled>Run</button>
     <button id="cancel" hidden>Cancel</button>
@@ -82,10 +93,23 @@
       Bootstrap the intervals
       <span class="hint-inline">resamples cognate sets; replaces the Wilson interval</span>
     </label>
+    <!-- Held-out prediction: the correspondences are trained on part of the
+         corpus and asked to recover reflexes masked out of the rest, then scored
+         against three naive baselines. It answers "do these generalise", which a
+         within-corpus fit cannot. Opt-in because it retrains once per fold. -->
     <label class="check">
+      <input type="checkbox" id="predictive">
+      Cross-validate the predictions
+      <span class="slow">slow: retrains once per fold</span>
+    </label>
+    <!-- The shuffled baseline retrains on a permuted corpus. It runs in the CLI
+         (`--permutations`); whether this committed engine accepts it over JSON is
+         probed at load, and the box is disabled with a note when it does not. -->
+    <label class="check" id="baseline-check">
       <input type="checkbox" id="baseline">
       Compare against a shuffled baseline
       <span class="slow">slow: retrains on 20 shuffles</span>
+      <span class="unavailable" id="baseline-unavailable" hidden></span>
     </label>
   </div>
 
@@ -123,12 +147,51 @@
       <p id="baseline-body"></p>
     </div>
 
+    <!-- Held-out prediction, present only when cross-validation was run. The
+         verdict is prose; the table below it is the coverage the trained system
+         reaches on masked reflexes against three baselines a linguist already
+         knows how to weigh. -->
+    <div class="baseline predictive" id="predictive-panel" hidden>
+      <h2>Held-out prediction</h2>
+      <p id="predictive-body"></p>
+      <div class="scroll"><table class="classes" id="predictive-table">
+        <thead><tr><th>model</th><th>top-1</th><th>top-k</th><th>log-loss</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
     <div class="panels">
       <div class="panel">
         <h2>Correspondence classes</h2>
         <p class="hint" id="classes-hint">Select one to see the alignments it rests on.</p>
+        <!-- A real corpus trains a hundred-odd classes; a comparativist arrives
+             looking for one segment. The filter matches the written
+             correspondence and its environment, and the chips narrow to the
+             cut a question is actually about — the changes, the recurring ones,
+             one side of the pair. -->
+        <div class="table-tools">
+          <input id="class-filter" type="text" spellcheck="false"
+                 placeholder="filter, e.g. p ~ f, or “before a vowel”"
+                 aria-label="Filter correspondence classes">
+          <div class="chips" id="class-chips">
+            <button class="chip on" data-chip="all">all</button>
+            <button class="chip" data-chip="conditioned">conditioned</button>
+            <button class="chip" data-chip="unconditioned">unconditioned</button>
+            <button class="chip" data-chip="recurring" title="two or more distinct cognate sets">recurring</button>
+            <button class="chip" data-chip="changes" title="hide the retention rows where every lect keeps the same segment">changes only</button>
+            <button class="chip" data-chip="stands" title="conditioned rules that clear the shuffled baseline — run it first">stands</button>
+          </div>
+          <span class="count" id="class-count"></span>
+        </div>
+        <!-- The count, sets and rate headers sort; the correspondence column is
+             left in decision order, which is a finding rather than a key. -->
         <div class="scroll"><table class="classes" id="classes">
-          <thead><tr><th>correspondence</th><th>count</th><th>sets</th><th>rate · 95% CI</th></tr></thead>
+          <thead><tr>
+            <th data-sort="default" class="sortable" title="return to decision order">correspondence</th>
+            <th data-sort="count" class="sortable num">count</th>
+            <th data-sort="sets" class="sortable num">sets</th>
+            <th data-sort="rate" class="sortable num">rate · 95% CI</th>
+          </tr></thead>
           <tbody></tbody>
         </table></div>
       </div>
@@ -170,6 +233,7 @@
     <div class="controls">
       <button id="download-json">Download JSON</button>
       <button id="download-summary">Download summary</button>
+      <button id="copy-summary">Copy summary</button>
       <span class="spacer"></span>
       <span class="version" id="timing"></span>
     </div>
@@ -178,6 +242,15 @@
       carries one best answer rather than the ensembles and uncertainty a
       historical claim would need.
     </p>
+
+    <!-- What a citation of this run needs: the feature system and its version,
+         a checksum of the exact corpus, and the settings the model was trained
+         under. Emitted on every run and, until this block, only ever in the
+         JSON download. -->
+    <details class="provenance" id="provenance">
+      <summary>Provenance — how to cite and reproduce this run</summary>
+      <dl id="provenance-body"></dl>
+    </details>
   </div>
 
 </div>

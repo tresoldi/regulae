@@ -135,6 +135,16 @@ button:disabled { opacity: 0.45; cursor: default; }
 .options .check input { cursor: pointer; }
 .options .slow { font-size: 12px; color: var(--warn); font-family: var(--mono); }
 .options .hint-inline { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+/* A gated option: the box is disabled and this says why, so an unavailable
+   diagnostic reads as a stated gap rather than a dead control. */
+.options .check.disabled { opacity: 0.55; cursor: default; }
+.options .check.disabled input { cursor: default; }
+.options .unavailable { font-size: 12px; color: var(--warn); font-family: var(--mono); }
+
+/* The input-format selector sits with the run controls, not the options, since
+   it changes how the corpus is read rather than a claim the tables make. */
+.controls .format { font-size: 13px; color: var(--muted); }
+#format { max-width: 280px; }
 
 .segment-tool {
   display: flex;
@@ -255,6 +265,26 @@ textarea {
   color: var(--muted); margin: 0 0 6px; }
 .baseline p { margin: 0; font-size: 14px; }
 
+/* Held-out prediction. Bordered like the baseline verdict — the same kind of
+   caveat on how far to trust the tables — with a short table under the prose. */
+.predictive[hidden] { display: none; }
+.predictive .scroll { max-height: 32vh; margin-top: 10px; }
+.predictive table.classes td.num, .predictive table.classes th:not(:first-child) {
+  text-align: right; font-variant-numeric: tabular-nums; font-family: var(--mono); white-space: nowrap;
+}
+.predictive tr.trained td { font-weight: 600; }
+.predictive tr.trained td:first-child { color: var(--accent); }
+
+/* The provenance block: closed by default, since it is reference rather than
+   result. Its rows are label/value pairs read straight off the model. */
+.provenance { margin-top: 16px; border: 1px solid var(--line); border-radius: 6px;
+  background: var(--panel); font-size: 13px; }
+.provenance > summary { padding: 10px 14px; cursor: pointer; color: var(--muted); }
+.provenance dl { margin: 0; padding: 0 14px 14px; display: grid;
+  grid-template-columns: auto 1fr; gap: 4px 16px; }
+.provenance dt { color: var(--muted); }
+.provenance dd { margin: 0; font-family: var(--mono); font-size: 12px; word-break: break-all; }
+
 .panels { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 4fr); gap: 22px; margin-top: 20px; }
 .panel h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 0.06em;
   color: var(--muted); margin: 0 0 10px; }
@@ -283,6 +313,36 @@ textarea {
   text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
+/* The filter and chips above the classes table. Quiet by default; a chip lights
+   with the accent when it is narrowing the table. */
+.table-tools {
+  display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap;
+  margin: -2px 0 10px;
+}
+.table-tools input {
+  font: 13px/1.5 var(--mono); padding: 5px 9px; border: 1px solid var(--line);
+  border-radius: 4px; background: var(--panel); color: var(--ink); min-width: 200px; flex: 1;
+}
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip {
+  font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line);
+  border-radius: 999px; background: var(--panel); color: var(--muted); cursor: pointer;
+}
+.chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.table-tools .count { font-size: 12px; color: var(--muted); font-family: var(--mono);
+  font-variant-numeric: tabular-nums; margin-left: auto; }
+
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+th.sortable.num { text-align: right; }
+/* The arrow the current sort draws, so the direction is not a guess. */
+th.sorted::after { content: " ▲"; font-size: 10px; color: var(--accent); }
+th.sorted.desc::after { content: " ▼"; }
+
+/* An empty row after filtering: not the same as a corpus that found nothing,
+   so it says the filter is what emptied the table. */
+tr.no-match td { color: var(--muted); text-align: center; padding: 18px; }
+
 table.classes { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.classes th {
   position: sticky; top: 0; background: var(--panel); text-align: left;
@@ -300,6 +360,35 @@ td.count, td.sets { font-family: var(--mono); text-align: right; width: 1%; }
 td.sets { color: var(--muted); }
 .env { display: block; font-size: 12px; color: var(--muted); font-family: var(--mono);
   white-space: normal; margin-top: 3px; }
+
+/* The caret that opens a row's evidence drawer. Sits before the correspondence,
+   quiet until hovered, and does not select the row. */
+.caret {
+  border: 0; background: none; color: var(--muted); cursor: pointer;
+  font-size: 11px; padding: 0 6px 0 0; line-height: 1;
+}
+.caret:hover { color: var(--accent); }
+
+/* The evidence drawer: a full-width row under the class it belongs to, set off
+   from the table by a left rule in the accent so it reads as attached to the
+   row above rather than as another class. */
+tr.evidence-row td { background: var(--accent-soft); padding: 0; border-bottom: 1px solid var(--line); }
+.evidence { padding: 10px 14px 12px 26px; border-left: 3px solid var(--accent);
+  font-size: 13px; display: grid; gap: 4px; }
+.ev-line { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.ev-score { color: var(--ink); }
+.ev-stands { color: var(--accent); font-weight: 600; }
+.ev-within { color: var(--muted); }
+.ev-unmeasured { color: var(--muted); font-style: italic; }
+.ev-confound { color: var(--warn); }
+.ev-sets { display: flex; gap: 8px; align-items: baseline; white-space: normal; }
+.ev-sets span { flex: 1; word-break: break-word; }
+.ev-copy {
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted);
+  font: inherit; font-size: 11px; padding: 1px 8px; border-radius: 3px; cursor: pointer;
+  white-space: nowrap;
+}
+.ev-copy:hover { border-color: var(--accent); color: var(--accent); }
 
 /* The rate a class applies at and the interval around it. The bar sits on a
    0-1 track so intervals compare down the column; it goes muted for the Wilson
