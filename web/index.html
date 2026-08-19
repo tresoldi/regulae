@@ -221,6 +221,17 @@
       </table></div>
     </div>
 
+    <!-- Segments that answer to nothing across a lect pair, read off the
+         per-pair tables and written as x ~ ∅. Hidden when a corpus has none. -->
+    <div class="panel gaps" id="gaps-panel">
+      <h2>Correspondences to ∅</h2>
+      <p class="hint" id="gaps-hint"></p>
+      <div class="scroll"><table class="classes" id="gaps">
+        <thead><tr><th>correspondence</th><th>count</th><th>rate · 95% CI</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
     <div class="panel residue">
       <h2>Residue</h2>
       <p class="hint" id="residue-hint"></p>
@@ -234,6 +245,10 @@
       <button id="download-json">Download JSON</button>
       <button id="download-summary">Download summary</button>
       <button id="copy-summary">Copy summary</button>
+      <!-- A correspondence table with the evidence columns, for a paste into a
+           paper rather than an inspection of the whole model. -->
+      <button id="copy-csv">Copy table (CSV)</button>
+      <button id="copy-markdown">Copy table (Markdown)</button>
       <span class="spacer"></span>
       <span class="version" id="timing"></span>
     </div>

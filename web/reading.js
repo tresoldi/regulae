@@ -206,6 +206,16 @@ function residueReading(fit) { // eslint-disable-line no-unused-vars
     + "number cannot tell them apart.";
 }
 
+/* A segment answering to nothing across a lect pair, written as a correspondence
+ * to ∅. `deletion` reads on the source→target direction, so its inverse is an
+ * epenthesis and the ∅ moves to the source side; the flag is bookkeeping, not a
+ * directional claim, so both are written with the tilde and never an arrow. */
+function gapCorrespondence(sourceLect, targetLect, gap) { // eslint-disable-line no-unused-vars
+  return gap.deletion
+    ? `${sourceLect}:${gap.grapheme}  ~  ${targetLect}:∅`
+    : `${sourceLect}:∅  ~  ${targetLect}:${gap.grapheme}`;
+}
+
 /* The score the search committed a class on: the improvement in the chosen
  * scorer and the margin over the runner-up. Costs are negative, so a more
  * negative delta is a larger improvement. Present on every decided class. */

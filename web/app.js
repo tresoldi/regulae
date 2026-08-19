@@ -599,6 +599,57 @@ function renderBaseline() {
   $("baseline-body").textContent = baselineReading(model.fit);
 }
 
+/* Segments that answer to nothing across a lect pair, read off the per-pair
+   tables and written x ~ ∅. Loss and epenthesis are first-class objects of
+   comparative work but were only ever visible as ∅ cells inside an alignment.
+   Framed as correspondences with rates, never as "deletions": the rate is how
+   often, of the times the segment is present, it aligns to a gap. */
+function renderGaps() {
+  const panel = $("gaps-panel");
+  const body = $("gaps").querySelector("tbody");
+  body.innerHTML = "";
+
+  const multiPair = (model.lects || []).length > 2;
+  const rows = [];
+  for (const pair of model.pairwise || []) {
+    for (const gap of pair.gaps || []) {
+      rows.push({ pair, gap });
+    }
+  }
+  panel.hidden = rows.length === 0;
+  if (!rows.length) {
+    $("gaps-hint").textContent = "";
+    return;
+  }
+  rows.sort((a, b) => b.gap.count - a.gap.count);
+  $("gaps-hint").textContent =
+    "A segment answering to nothing across a lect pair, written x ~ ∅. Not a claim "
+    + "that anything was lost: the rate is how often, of the times the segment is present, "
+    + "it aligns to a gap.";
+
+  for (const { pair, gap } of rows) {
+    const tr = document.createElement("tr");
+
+    const corr = document.createElement("td");
+    corr.className = "corr";
+    corr.textContent = gapCorrespondence(pair.source_lect, pair.target_lect, gap);
+    if (multiPair) {
+      const tag = document.createElement("span");
+      tag.className = "env";
+      tag.textContent = `${pair.source_lect} ~ ${pair.target_lect}`;
+      corr.appendChild(tag);
+    }
+
+    const count = document.createElement("td");
+    count.className = "count";
+    count.textContent = gap.count;
+    count.title = `of ${gap.present_total} times the segment is present`;
+
+    tr.append(corr, count, rateCell(gap.uncertainty));
+    body.appendChild(tr);
+  }
+}
+
 /* Cognate sets ranked by how badly they align under the trained model. The
    residue is not an error term: a set that will not align is either not
    cognate, or cognate through a correspondence the model has not got. */
@@ -797,6 +848,7 @@ function render() {
   renderPredictive();
   renderEvents();
   renderCrossDimensional();
+  renderGaps();
   renderResidue();
   renderClasses();
   renderAlignments();
@@ -1068,6 +1120,66 @@ function summaryText() {
   return lines.join("\n") + "\n";
 }
 
+/* The correspondence table as rows of the columns a write-up wants: the
+   correspondence and its environment, the counts, the rate and its interval,
+   and the evidence the summary download drops -- the committing score, the
+   standing verdict, the confound and the confidence. Conditioned rows first, in
+   decision order, then the unconditioned ones. */
+function correspondenceTableRows() {
+  const num = (x, d) => (typeof x === "number" ? x.toFixed(d) : "");
+  const all = [
+    ...decisionOrder(model.classes.conditioned).map((e) => ({ e, conditioned: true })),
+    ...model.classes.unconditioned.map((e) => ({ e, conditioned: false })),
+  ];
+  return all.map(({ e, conditioned }) => {
+    const u = e.uncertainty || {};
+    return {
+      kind: conditioned ? "conditioned" : "unconditioned",
+      correspondence: correspondence(e),
+      environment: conditioned ? environment(e) : "",
+      count: String(e.count),
+      sets: String(setCount(e)),
+      rate: num(u.estimate, 3),
+      ci_low: num(u.lower, 3),
+      ci_high: num(u.upper, 3),
+      delta_bic: num(e.delta_bic, 2),
+      margin: num(e.search_margin, 2),
+      standing: e.standing && e.standing !== "unmeasured" ? e.standing : "",
+      env_alternatives: String(e.environment_alternatives || 0),
+      confidence: num(e.confidence, 3),
+    };
+  });
+}
+
+const TABLE_COLUMNS = [
+  "kind", "correspondence", "environment", "count", "sets", "rate", "ci_low",
+  "ci_high", "delta_bic", "margin", "standing", "env_alternatives", "confidence",
+];
+
+/* CSV that survives a comma or a quote in an environment string. */
+function correspondenceCsv() {
+  const escape = (v) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
+  const lines = [TABLE_COLUMNS.join(",")];
+  for (const row of correspondenceTableRows()) {
+    lines.push(TABLE_COLUMNS.map((c) => escape(row[c])).join(","));
+  }
+  return lines.join("\n") + "\n";
+}
+
+/* A GitHub-flavoured Markdown table, pipes in a cell escaped so the columns do
+   not shift. */
+function correspondenceMarkdown() {
+  const escape = (v) => v.replace(/\|/g, "\\|");
+  const lines = [
+    `| ${TABLE_COLUMNS.join(" | ")} |`,
+    `| ${TABLE_COLUMNS.map(() => "---").join(" | ")} |`,
+  ];
+  for (const row of correspondenceTableRows()) {
+    lines.push(`| ${TABLE_COLUMNS.map((c) => escape(row[c])).join(" | ")} |`);
+  }
+  return lines.join("\n") + "\n";
+}
+
 /* Copy text to the clipboard and flash the button that asked for it. Guarded
    because the API is absent in the test's DOM shim and on an insecure origin;
    the download button covers those. */
@@ -1138,6 +1250,16 @@ $("guide-close").addEventListener("click", () => $("guide").classList.remove("op
 $("download-json").addEventListener("click", () => download("regulae-model.json", JSON.stringify(model, null, 2)));
 $("download-summary").addEventListener("click", () => download("regulae-summary.tsv", summaryText()));
 $("copy-summary").addEventListener("click", copySummary);
+$("copy-csv").addEventListener("click", () => {
+  if (model) {
+    copyText(correspondenceCsv(), $("copy-csv"));
+  }
+});
+$("copy-markdown").addEventListener("click", () => {
+  if (model) {
+    copyText(correspondenceMarkdown(), $("copy-markdown"));
+  }
+});
 
 $("format").addEventListener("change", (event) => setFormat(event.target.value));
 

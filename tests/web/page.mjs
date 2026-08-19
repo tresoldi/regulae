@@ -112,9 +112,10 @@ for (const id of [
   'format', 'class-filter', 'class-chips', 'class-count', 'copy-summary',
   'baseline-check', 'baseline-unavailable', 'predictive', 'predictive-panel',
   'predictive-body', 'predictive-table', 'provenance', 'provenance-body',
+  'gaps-panel', 'gaps', 'gaps-hint', 'copy-csv', 'copy-markdown',
 ]) {
   byId.set(id, new Element(
-    ['classes', 'residue', 'events', 'crossdim', 'predictive-table'].includes(id) ? 'table' : 'div'));
+    ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'gaps'].includes(id) ? 'table' : 'div'));
 }
 // The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
@@ -123,6 +124,7 @@ byId.get('residue').appendChild(new Element('tbody'));
 byId.get('events').appendChild(new Element('tbody'));
 byId.get('crossdim').appendChild(new Element('tbody'));
 byId.get('predictive-table').appendChild(new Element('tbody'));
+byId.get('gaps').appendChild(new Element('tbody'));
 
 // The classes table has sortable headers app.js wires and reads; the shim
 // carries them so a sort click has something to act on.
@@ -617,6 +619,48 @@ check('an alignment names the two forms it aligns', () => {
   const src = first.links.map((l) => l.source.join('')).join('');
   const gloss = byId.get('alignments').querySelectorAll('.pair')[0];
   assert.ok(gloss.textContent.includes(src), `the source form ${src} is not shown`);
+});
+
+/* Segment losses read as x ~ ∅. Latin/Spanish has few; the gaps_and_length
+   fixture exists to exercise the pane, and a copy with the gaps emptied checks
+   that the pane hides rather than standing open and blank. */
+check('the gaps pane reads losses as x ~ ∅, and hides when there are none', () => {
+  const gapModel = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/corpora/gaps_and_length.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  const gapCount = (gapModel.pairwise || []).reduce((n, p) => n + (p.gaps || []).length, 0);
+  assert.ok(gapCount > 0, 'fixture stopped producing gaps');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(gapModel), elapsedMs: 1 } });
+  assert.ok(!byId.get('gaps-panel').hidden, 'the gaps pane hid despite gaps');
+  const rows = byId.get('gaps').querySelectorAll('tr');
+  assert.equal(rows.length, gapCount, 'the gaps pane dropped rows');
+  for (const r of rows) {
+    assert.match(r.querySelectorAll('td.corr')[0].textContent, /∅/, 'a gap row is not written to ∅');
+  }
+
+  const noGaps = JSON.parse(JSON.stringify(gapModel));
+  noGaps.pairwise.forEach((p) => { p.gaps = []; });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(noGaps), elapsedMs: 1 } });
+  assert.ok(byId.get('gaps-panel').hidden, 'the gaps pane showed with no gaps');
+});
+
+/* The paper-ready export carries the evidence columns the summary download
+   drops, in a table a write-up can paste. */
+check('the CSV and Markdown exports carry the evidence columns', () => {
+  rerender();
+  const csv = vm.runInContext('correspondenceCsv()', context);
+  const header = csv.split('\n')[0];
+  for (const column of ['correspondence', 'environment', 'delta_bic', 'standing', 'confidence']) {
+    assert.ok(header.includes(column), `CSV header omits ${column}`);
+  }
+  assert.ok(csv.includes('conditioned'), 'CSV has no conditioned rows');
+  assert.match(csv, /-\d+\.\d{2}/, 'CSV carries no committing score');
+
+  const md = vm.runInContext('correspondenceMarkdown()', context);
+  const lines = md.split('\n');
+  assert.match(lines[0], /^\| kind \| correspondence \|/, 'Markdown has no header row');
+  assert.match(lines[1], /\| --- \|/, 'Markdown has no separator row');
+  assert.ok(lines[2].startsWith('|'), 'Markdown has no body rows');
 });
 
 check('a failed run reports the status rather than rendering', () => {

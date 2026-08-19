@@ -304,6 +304,11 @@ textarea {
 .panel.crossdim .scroll { max-height: 34vh; }
 .panel.crossdim .unnamed { color: var(--warn); }
 
+/* Correspondences to ∅ -- segment losses and insertions per lect pair. */
+.panel.gaps { margin-top: 22px; }
+.panel.gaps[hidden] { display: none; }
+.panel.gaps .scroll { max-height: 34vh; }
+
 /* The sets the correspondences do not explain. Shorter than the panels above
    it because it is read from the top: the ranking is the point, not the tail. */
 .panel.residue { margin-top: 22px; }
