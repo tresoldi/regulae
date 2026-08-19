@@ -28,6 +28,7 @@ let model = null;
 let currentFormat = "wide";
 let selectedClass = null;
 let selectedSet = null;
+let selectedPair = null;
 let baselineSupported = true;
 
 /* The classes table is a view over one array, so filtering and sorting are
@@ -216,6 +217,23 @@ function finish({ json, elapsedMs }) {
 
 
 
+/* Make a non-button element operable from the keyboard: focusable, activated by
+   Enter or Space, and announced with a role. The result surface is otherwise
+   mouse-only -- a comparativist working by keyboard or screen reader could
+   select nothing. */
+function makeActivatable(el, handler, role) {
+  el.setAttribute("tabindex", "0");
+  if (role) {
+    el.setAttribute("role", role);
+  }
+  el.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handler(event);
+    }
+  });
+}
+
 /* A class by its id, across both tables. -1 (no contrast) returns null. */
 function classById(id) {
   if (id === undefined || id < 0) {
@@ -239,8 +257,17 @@ function rateCell(u) {
   }
   cell.title = uncertaintyLabel(u);
 
+  /* The interval is drawn as a bar, so its numbers live only in the hover title
+     -- invisible to a screen reader. This says them in text, hidden from sight
+     but read aloud. */
+  const spoken = document.createElement("span");
+  spoken.className = "sr-only";
+  spoken.textContent = uncertaintyLabel(u);
+  cell.appendChild(spoken);
+
   const point = document.createElement("span");
   point.className = "point";
+  point.setAttribute("aria-hidden", "true");
   point.textContent = u.estimate.toFixed(2);
 
   const track = document.createElement("span");
@@ -281,6 +308,7 @@ function buildClassRow(entry, conditioned) {
   caret.className = "caret";
   caret.textContent = expandedClasses.has(entry.id) ? "▾" : "▸";
   caret.title = "show the evidence behind this rule";
+  caret.setAttribute("aria-label", `evidence for ${correspondence(entry)}`);
   caret.setAttribute("aria-expanded", expandedClasses.has(entry.id) ? "true" : "false");
   caret.addEventListener("click", (event) => {
     event.stopPropagation();
@@ -325,6 +353,8 @@ function buildClassRow(entry, conditioned) {
 
   row.append(corr, count, sets, rateCell(entry.uncertainty));
   row.addEventListener("click", () => select(entry.id));
+  makeActivatable(row, () => select(entry.id), "button");
+  row.setAttribute("aria-selected", entry.id === selectedClass ? "true" : "false");
   return row;
 }
 
@@ -492,6 +522,9 @@ function applyClassView() {
     const on = th.dataset.sort === classView.sort && classView.sort !== "default";
     th.classList.toggle("sorted", on);
     th.classList.toggle("desc", on && classView.desc);
+    if (th.dataset.sort !== "default") {
+      th.setAttribute("aria-sort", on ? (classView.desc ? "descending" : "ascending") : "none");
+    }
   }
 }
 
@@ -629,6 +662,7 @@ function renderGaps() {
 
   for (const { pair, gap } of rows) {
     const tr = document.createElement("tr");
+    tr.dataset.pair = `${pair.source_lect}~${pair.target_lect}`;
 
     const corr = document.createElement("td");
     corr.className = "corr";
@@ -699,7 +733,23 @@ function renderResidue() {
 
     tr.append(id, z, cost, conf);
     tr.addEventListener("click", () => selectSet(row.cognate_id));
+    makeActivatable(tr, () => selectSet(row.cognate_id), "button");
     body.appendChild(tr);
+  }
+}
+
+/* An alignment block is shown when it passes all three filters at once: the
+   selected class, the selected cognate set, and the selected lect pair. The
+   three used to each hide blocks on their own and stack into a blank panel, so
+   they are resolved here in one place. */
+function updateAlignmentVisibility() {
+  for (const block of $("alignments").querySelectorAll(".alignment")) {
+    const ids = JSON.parse(block.dataset.classes);
+    let hidden = false;
+    if (selectedClass !== null && !ids.includes(selectedClass)) hidden = true;
+    if (selectedSet !== null && block.dataset.cognate !== selectedSet) hidden = true;
+    if (selectedPair !== null && block.dataset.pair !== selectedPair) hidden = true;
+    block.classList.toggle("hidden", hidden);
   }
 }
 
@@ -714,10 +764,9 @@ function selectSet(cognateId) {
   }
   for (const row of $("classes").querySelectorAll("tr[data-class-id]")) {
     row.classList.remove("selected", "dimmed");
+    row.setAttribute("aria-selected", "false");
   }
-  for (const block of $("alignments").querySelectorAll(".alignment")) {
-    block.classList.toggle("hidden", selectedSet !== null && block.dataset.cognate !== selectedSet);
-  }
+  updateAlignmentVisibility();
   for (const col of $("alignments").querySelectorAll(".col")) {
     col.classList.remove("lit");
   }
@@ -725,6 +774,51 @@ function selectSet(cognateId) {
   hint.textContent = selectedSet === null
     ? "Select a column to see which class it belongs to."
     : `Showing ${selectedSet}. Select it again to show every set.`;
+}
+
+/* The lect-pair selector, shown only past two lects. A multi-lect corpus aligns
+   every pair, so its alignments panel is otherwise flooded; this narrows it to
+   one pair, and the gap pane with it. */
+function renderLectPair() {
+  const wrap = $("lect-pair-wrap");
+  const select = $("lect-pair");
+  selectedPair = null;
+
+  const pairs = [];
+  const seen = new Set();
+  for (const a of model.alignments || []) {
+    const key = `${a.lect_a}~${a.lect_b}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      pairs.push({ key, label: `${a.lect_a} ~ ${a.lect_b}` });
+    }
+  }
+
+  const multi = (model.lects || []).length > 2 && pairs.length > 1;
+  wrap.hidden = !multi;
+  select.innerHTML = "";
+  if (!multi) {
+    return;
+  }
+  const all = document.createElement("option");
+  all.value = "";
+  all.textContent = "all lect pairs";
+  select.appendChild(all);
+  for (const pair of pairs) {
+    const option = document.createElement("option");
+    option.value = pair.key;
+    option.textContent = pair.label;
+    select.appendChild(option);
+  }
+}
+
+/* Narrow the alignments and the gaps to the chosen lect pair, or restore all. */
+function applyPairFilter() {
+  selectedPair = $("lect-pair").value || null;
+  updateAlignmentVisibility();
+  for (const tr of $("gaps").querySelectorAll("tr[data-pair]")) {
+    tr.hidden = selectedPair !== null && tr.dataset.pair !== selectedPair;
+  }
 }
 
 function renderAlignments() {
@@ -742,6 +836,7 @@ function renderAlignments() {
     block.dataset.classes = JSON.stringify(
       [...new Set(alignment.links.flatMap((l) => l.classes || []))]);
     block.dataset.cognate = alignment.cognate_id;
+    block.dataset.pair = `${alignment.lect_a}~${alignment.lect_b}`;
 
     const gloss = document.createElement("div");
     gloss.className = "gloss";
@@ -776,10 +871,14 @@ function renderAlignments() {
       /* Selecting a column reveals the class it belongs to, which is the
        * reverse of selecting a class to see its columns. */
       if (ids.length) {
-        col.addEventListener("click", (event) => {
+        const activate = (event) => {
           event.stopPropagation();
           select(ids[0], true);
-        });
+        };
+        col.addEventListener("click", activate);
+        makeActivatable(col, activate, "button");
+        col.setAttribute("aria-label",
+          `${top.textContent} to ${bottom.textContent}; show its class`);
       }
       cols.appendChild(col);
     }
@@ -801,12 +900,10 @@ function select(classId, scrollToClass) {
     const id = Number(row.dataset.classId);
     row.classList.toggle("selected", id === selectedClass);
     row.classList.toggle("dimmed", selectedClass !== null && id !== selectedClass);
+    row.setAttribute("aria-selected", id === selectedClass ? "true" : "false");
   }
 
-  for (const block of $("alignments").querySelectorAll(".alignment")) {
-    const ids = JSON.parse(block.dataset.classes);
-    block.classList.toggle("hidden", selectedClass !== null && !ids.includes(selectedClass));
-  }
+  updateAlignmentVisibility();
   for (const col of $("alignments").querySelectorAll(".col")) {
     const ids = JSON.parse(col.dataset.classes);
     col.classList.toggle("lit", selectedClass !== null && ids.includes(selectedClass));
@@ -864,6 +961,7 @@ function render() {
   renderResidue();
   renderClasses();
   renderAlignments();
+  renderLectPair();
   select(null);
   selectedClass = null;
 }
@@ -1274,6 +1372,7 @@ $("copy-markdown").addEventListener("click", () => {
 });
 
 $("format").addEventListener("change", (event) => setFormat(event.target.value));
+$("lect-pair").addEventListener("change", applyPairFilter);
 
 wireClassTools();
 
@@ -1286,9 +1385,14 @@ function wireClassTools() {
   });
   for (const chip of $("class-chips").querySelectorAll("button")) {
     chip.addEventListener("click", () => handleChip(chip.dataset.chip));
+    chip.setAttribute("aria-pressed", chip.classList.contains("on") ? "true" : "false");
   }
   for (const th of $("classes").querySelectorAll("th[data-sort]")) {
     th.addEventListener("click", () => handleSort(th.dataset.sort));
+    if (th.dataset.sort !== "default") {
+      makeActivatable(th, () => handleSort(th.dataset.sort), null);
+      th.setAttribute("aria-sort", "none");
+    }
   }
 }
 
@@ -1311,6 +1415,7 @@ function handleChip(name) {
         : key === "stands" ? classView.stands
           : classView.chip === key;
     chip.classList.toggle("on", on);
+    chip.setAttribute("aria-pressed", on ? "true" : "false");
   }
   applyClassView();
 }

@@ -33,6 +33,18 @@
 
 * { box-sizing: border-box; }
 
+/* Text for a screen reader only: read aloud, off-screen. Used to voice the
+   numbers a bar draws and any control whose label is otherwise only visual. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* A visible focus ring for keyboard navigation. The result surface is a set of
+   activatable rows, columns and headers, and a keyboard user needs to see which
+   one holds focus. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 body {
   margin: 0;
   background: var(--bg);
@@ -363,7 +375,10 @@ table.classes td { padding: 7px 10px; border-bottom: 1px solid var(--line); vert
 table.classes tr { cursor: pointer; }
 table.classes tr:hover td { background: var(--accent-soft); }
 table.classes tr.selected td { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-table.classes tr.dimmed { opacity: 0.35; }
+/* Dimmed, not erased: 0.35 dropped the un-selected rows below a legible
+   contrast, so a reader scanning for the selection lost the rest of the table.
+   0.55 keeps them readable while the selection still stands out. */
+table.classes tr.dimmed { opacity: 0.55; }
 td.corr { font-family: var(--mono); white-space: nowrap; }
 td.count, td.sets { font-family: var(--mono); text-align: right; width: 1%; }
 td.sets { color: var(--muted); }
@@ -413,6 +428,12 @@ td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
 .ci.boot .ci-bar { background: var(--accent); opacity: 0.75; }
 .ci-tick { position: absolute; top: -2px; width: 2px; height: 8px;
   background: var(--ink); transform: translateX(-1px); }
+
+/* The lect-pair selector above the alignments, shown only past two lects. */
+.lect-pair-wrap { display: flex; align-items: center; gap: 8px; margin: -4px 0 8px; }
+.lect-pair-wrap[hidden] { display: none; }
+.lect-pair-wrap label { font-size: 13px; color: var(--muted); }
+#lect-pair { max-width: 220px; }
 
 .alignments { padding: 4px 0; }
 .alignment { padding: 8px 12px; border-bottom: 1px solid var(--line); }

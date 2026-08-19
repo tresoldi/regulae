@@ -113,6 +113,7 @@ for (const id of [
   'baseline-check', 'baseline-unavailable', 'predictive', 'predictive-panel',
   'predictive-body', 'predictive-table', 'provenance', 'provenance-body',
   'gaps-panel', 'gaps', 'gaps-hint', 'copy-csv', 'copy-markdown',
+  'lect-pair', 'lect-pair-wrap',
 ]) {
   byId.set(id, new Element(
     ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'gaps'].includes(id) ? 'table' : 'div'));
@@ -679,6 +680,60 @@ check('the CSV and Markdown exports carry the evidence columns', () => {
   assert.match(lines[0], /^\| kind \| correspondence \|/, 'Markdown has no header row');
   assert.match(lines[1], /\| --- \|/, 'Markdown has no separator row');
   assert.ok(lines[2].startsWith('|'), 'Markdown has no body rows');
+});
+
+/* On a multi-lect corpus the alignments are one block per lect pair; the
+   selector narrows them to one. Hidden on the two-lect corpora the other checks
+   use, so it takes a four-lect model of its own. */
+check('the lect-pair selector filters alignments on a multi-lect corpus', () => {
+  const multi = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/corpora/real_romance_4lect.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.ok(multi.lects.length > 2, 'fixture is not multi-lect');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(multi), elapsedMs: 1 } });
+  assert.ok(!byId.get('lect-pair-wrap').hidden, 'the selector is hidden on a multi-lect corpus');
+
+  const select = byId.get('lect-pair');
+  const options = select.querySelectorAll('option');
+  assert.ok(options.length > 2, 'no lect pairs offered');
+  const pair = options[1].value;
+  select.value = pair;
+  (select.listeners.change || []).forEach((h) => h({ target: select }));
+
+  const visible = byId.get('alignments').querySelectorAll('.alignment:not(.hidden)');
+  assert.ok(visible.length > 0, 'the pair filter hid every alignment');
+  for (const block of visible) {
+    assert.equal(block.dataset.pair, pair, 'an alignment outside the chosen pair stayed visible');
+  }
+
+  // Two-lect corpora keep the selector hidden.
+  rerender();
+  assert.ok(byId.get('lect-pair-wrap').hidden, 'the selector showed on a two-lect corpus');
+});
+
+/* The result surface is a set of activatable rows, columns and headers. It has
+   to be reachable and announced without a mouse. */
+check('the result surface is keyboard-operable and announced', () => {
+  rerender();
+  const row = byId.get('classes').querySelectorAll('tr[data-class-id]')[0];
+  assert.equal(row.getAttribute('tabindex'), '0', 'class rows are not focusable');
+  assert.equal(row.getAttribute('role'), 'button', 'class rows carry no button role');
+  assert.equal(row.getAttribute('aria-selected'), 'false', 'class row is not marked unselected');
+  (row.listeners.keydown || []).forEach((h) => h({ key: 'Enter', preventDefault() {} }));
+  assert.equal(row.getAttribute('aria-selected'), 'true', 'Enter did not select the row');
+
+  const chip = byId.get('class-chips').children.find((c) => c.dataset.chip === 'recurring');
+  assert.equal(chip.getAttribute('aria-pressed'), 'false', 'chip has no aria-pressed');
+  chip.click();
+  assert.equal(chip.getAttribute('aria-pressed'), 'true', 'chip aria-pressed did not update');
+  chip.click();
+
+  const th = byId.get('classes').querySelectorAll('th[data-sort]').find((t) => t.dataset.sort === 'count');
+  th.click();
+  assert.equal(th.getAttribute('aria-sort'), 'descending', 'sorted header carries no aria-sort');
+
+  const sr = row.querySelectorAll('.sr-only')[0];
+  assert.ok(sr && /CI/.test(sr.textContent), 'the interval numbers are not voiced for a screen reader');
 });
 
 check('a failed run reports the status rather than rendering', () => {

@@ -198,6 +198,13 @@
 
       <div class="panel">
         <h2>Alignments</h2>
+        <!-- Past two lects the alignments are one block per lect pair; this
+             narrows them (and the gap pane) to a single pair. Hidden on a
+             two-lect corpus, which has only one. -->
+        <div class="lect-pair-wrap" id="lect-pair-wrap" hidden>
+          <label for="lect-pair">lect pair</label>
+          <select id="lect-pair" aria-label="Filter alignments by lect pair"></select>
+        </div>
         <p class="hint" id="alignments-hint">Select a column to see which class it belongs to.</p>
         <div class="scroll"><div class="alignments" id="alignments"></div></div>
       </div>
