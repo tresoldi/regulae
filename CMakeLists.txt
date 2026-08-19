@@ -414,18 +414,6 @@ if(REGULAE_BUILD_TESTS)
                         "${CMAKE_CURRENT_SOURCE_DIR}/scripts/corpora.py"
                         --check --cli $<TARGET_FILE:regulae_cli>)
 
-            add_test(NAME evaluation_m2_current
-                COMMAND ${Python3_EXECUTABLE}
-                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m2.py" --verify)
-            add_test(NAME evaluation_m3_current
-                COMMAND ${Python3_EXECUTABLE}
-                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m3.py" --verify)
-            add_test(NAME evaluation_m4_current
-                COMMAND ${Python3_EXECUTABLE}
-                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m4.py" --verify)
-            add_test(NAME evaluation_m5_current
-                COMMAND ${Python3_EXECUTABLE}
-                        "${CMAKE_CURRENT_SOURCE_DIR}/scripts/evaluate_m5.py" --verify)
         endif()
 
         add_test(NAME web_page

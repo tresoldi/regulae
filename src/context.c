@@ -69,9 +69,9 @@ typedef struct displacement_cache_entry {
  * const *pointer* to a non-const cache, so a lookup writes what it memoises
  * with no cast at all, and the context proper stays genuinely immutable. */
 struct rg_context_cache {
-    /* The grapheme that last failed to resolve. The Go reference carries this
-     * on its error value; a C status code cannot, and "unknown grapheme" with
-     * no indication of which one is unactionable on a corpus of any size. */
+    /* The grapheme that last failed to resolve. A C status code cannot carry
+     * it, and "unknown grapheme" with no indication of which one is
+     * unactionable on a corpus of any size. */
     char *unknown_grapheme;
     rg_grapheme_diagnosis last_diagnosis;
     int has_diagnosis;

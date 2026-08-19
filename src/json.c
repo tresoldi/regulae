@@ -14,7 +14,8 @@
  * adapter, not the interchange schema. The framework requires historia-facing
  * egress to carry ensembles and soft partitions; a single maximum-a-posteriori
  * correspondence system is explicitly not claim-capable data. Nothing here
- * should be mistaken for that format, which M8 designs. */
+ * should be mistaken for that format, which a downstream interchange schema
+ * designs. */
 
 #define RG_JSON_FORMAT_VERSION 2
 
@@ -225,10 +226,10 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     cJSON_AddItemToObject(out, "segments", segments);
 
     {
-        /* Always, even when empty. Omitting the key made every conditioned
-         * class -- which carried no support at all until ABI 30 -- a KeyError
-         * in the consumer rather than a row with nothing behind it, so the
-         * gap read as a bug in whoever was reading the model. A field a
+        /* Always, even when empty. Omitting the key would make a conditioned
+         * class with no support behind it a KeyError in the consumer rather
+         * than a row with nothing behind it, so the gap would read as a bug in
+         * whoever was reading the model. A field a
          * consumer must guard for absence is a field that gets skipped. */
         cJSON *support = cJSON_CreateArray();
         if (support == 0) {
@@ -545,7 +546,7 @@ char *rg_segments_to_json(const rg_segment *segments, size_t count) {
  * names the exact input it was trained on. Fields are unit-separated so no two
  * distinct corpora collide by concatenation, and the double's bytes hash
  * directly -- both the native and WebAssembly targets are little-endian, so the
- * checksum agrees, which the wasm parity test requires. */
+ * checksum agrees across them. */
 static void checksum_bytes(uint64_t *h, const void *data, size_t n) {
     const unsigned char *p = (const unsigned char *)data;
     size_t i;
@@ -714,7 +715,7 @@ char *rg_json_from_multi_model_internal(
     /* A named, versioned export: the maximum-a-posteriori surface relationship
      * model, with the provenance below to reproduce and cite it. Still a single
      * correspondence system, not the ensemble the historia layer's interchange
-     * schema (M8) requires -- a reader must not treat it as claim-capable. The
+     * schema requires -- a reader must not treat it as claim-capable. The
      * format is `format_version` and its stability rule is in consumer_guide §7. */
     cJSON_AddStringToObject(root, "export_kind", "surface_relationship_model");
     {

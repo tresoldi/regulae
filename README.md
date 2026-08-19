@@ -3,12 +3,9 @@
 Pairwise and multi-lect phonological alignment for the new
 historical linguistics framework.
 
-The implementation is a C99 core library with a C ABI. It was
-ported from a Go implementation, which served as a frozen
-executable reference until merkmal 1.0 changed the feature
-system out from under it; the original Python is archived under
-`python/`. See `docs/c_conversion_roadmap.md` for the conversion
-state.
+The implementation is a C99 core library with a stable C ABI,
+built on the [merkmal](../merkmal) feature library. Python
+bindings are provided under `python/`.
 
 ## What this package does
 
@@ -38,7 +35,7 @@ carrying:
 - **Conditioned multi-lect classes** carrying per-lect
   phonological context environments, discovered via a shared
   categorical split criterion at the class level. Corrected BIC is
-  the M3-selected default; exact NML and a Dirichlet marginal
+  the default; exact NML and a Dirichlet marginal
   likelihood are available for controlled comparisons.
 - **Multi-lect cross-dimensional rules** where a segmental
   feature on one lect conditions a suprasegmental value on
@@ -128,14 +125,11 @@ for each against a per-pivot null. A pattern table says which sounds correspond;
 regulae says where, in what order the conditions were found, and whether the
 conditioning survives its own shuffle.
 
-The multi-lect half of that is recent. Before M11 (see
-`docs/multilect_hardening_plan.md`) regulae's conditioned-class discovery
-decayed as lects were added: the outcome charge grew with the number of
-languages, so a rule recovered at two lects was lost at five, and only the
-pairwise stage held at every arity. Since M11 the split is scored per sister
-lect, and a conditioned correspondence is recovered at every arity
-(`testdata/restraint/arity_2 … arity_5`); the multi-lect class table is a
-first-class output rather than a lossy lift of the pairs.
+The multi-lect half of that scores a conditioned split per sister lect, so a
+conditioned correspondence is recovered at every arity
+(`testdata/restraint/arity_2 … arity_5`) rather than decaying as lects are
+added and the outcome charge grows with the number of languages. The multi-lect
+class table is a first-class output rather than a lossy lift of the pairs.
 
 `scripts/benchmark_cloze.py` runs a leave-one-reflex-out cloze — hold out one
 lect's reflex in a cognate set, predict it from the rest — for both tools on
@@ -334,8 +328,8 @@ lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
 moves on any layout, signature or ownership change. It is at
-**28**. The most recent breaks, and `docs/consumer_guide.md` §7
-has the full list with reasons:
+**39**. `docs/consumer_guide.md` §7 has the full list of rules;
+a few of the design choices it reflects:
 
 - Each published table is handed out whole — the rows and a count
   — rather than through a count function and an index function.
@@ -351,11 +345,9 @@ has the full list with reasons:
 
 ## Documentation
 
-- **Scientific roadmap** at
-  [`docs/surface_relationship_roadmap.md`](docs/surface_relationship_roadmap.md)
-  — the product boundary, statistical correction, evaluation programme and
-  milestone gates for a calibrated surface relationship model. Its domain
-  terms are fixed in [`CONTEXT.md`](CONTEXT.md).
+- **Domain glossary** at [`CONTEXT.md`](CONTEXT.md) — the terms regulae uses
+  and the claims it is careful to keep apart, so a surface relationship model
+  is never read as a historical one.
 - **Guide** at [`docs/GUIDE.md`](docs/GUIDE.md) — what the output means and
   how to read a conditioned environment. Also the source for the in-page
   walkthrough.
@@ -368,28 +360,19 @@ has the full list with reasons:
   published wordlists, one or two per family, from Indo-European to Pama-Nyungan.
   Regenerate with `scripts/families.py` against your own Lexibank clone; nothing
   is vendored, so it is not checked by CI.
-- **Conversion state** at `docs/c_conversion_roadmap.md`
-  (milestones, intentional deviations, why parity ended) and
-  `docs/c_conversion_handoff.md`.
 - **Design documents** at `docs/training_pipeline.md`,
   `docs/correspondence_discovery.md`, and
   `docs/alignment_details.md` — rationale for the staged
-  training pipeline, discovery mechanisms, and data types
-  (language-agnostic; written against the original design).
+  training pipeline, discovery mechanisms, and data types.
 - **Consumer guide** at [`docs/consumer_guide.md`](docs/consumer_guide.md) —
   the external contract: what each published field means, what it does not
   mean, how to read a table, and the ABI stability rules. Start here if you
   are building on regulae rather than changing it.
-- **Why the modules are shaped this way** at
-  [`docs/architecture_plan.md`](docs/architecture_plan.md) — the structural
-  pass of 2026-08-15/16, what each phase was allowed to change, and the
-  decisions deliberately left open.
 - **Static analysis** at `docs/static_analysis.md` — the clang-tidy baseline
   and why each suppression exists.
-- The original Python implementation is archived under
-  `python/` for reference. It is not built, tested or supported, and the
-  tutorials under `docs/tutorials/` were written against it — see that
-  directory's README.
+- **Python bindings** under [`python/`](python/) — a thin wrapper that trains
+  through the C core and parses the JSON model it renders; see that directory's
+  README to build and use them.
 
 ## Licence
 

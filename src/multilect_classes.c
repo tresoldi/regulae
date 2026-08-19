@@ -1621,13 +1621,12 @@ static int cognate_index_cmp(const void *a, const void *b) {
 /* Names the cognate sets behind a committed split, so a conditioned class can
  * point at its own evidence.
  *
- * Every conditioned class published an empty support list until ABI 30. The
- * aggregated unconditioned rows named their sets and the committed rules -- the
- * decisions, the ones a reader has most reason to check, and the only ones that
- * claim a conditioning environment -- named nothing. The observations were
- * already carried this far to build the class-position table; only this last
- * step was missing. The Python reconciler declared a dict for the same purpose
- * and never wrote to it, so both implementations had the gap.
+ * The committed rules name their support here. The aggregated unconditioned
+ * rows name their sets, and the committed rules -- the decisions, the ones a
+ * reader has most reason to check, and the only ones that claim a conditioning
+ * environment -- must name their sets too. The observations are already carried
+ * this far to build the class-position table; this last step draws the support
+ * from them.
  *
  * Sorted by cognate index, which is corpus order, matching what the header
  * promises and what the unconditioned rows already do. */

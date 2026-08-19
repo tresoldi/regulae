@@ -13,9 +13,8 @@ segments, eight examples and eight counterexamples each.
 Same number of aligned positions, same environment, same contrast; the only
 difference is whether the evidence sits in one cell or four.
 
-The pair measures what AGENTS.md records as a limitation and nothing yet puts a
-number on: "one change fragments into one correspondence per segment it applies
-to". The control finds the rule with room to spare. The spread version has to
+The pair measures a known limitation nothing yet puts a number on: "one change
+fragments into one correspondence per segment it applies to". The control finds the rule with room to spare. The spread version has to
 find it four times over, from a quarter of the evidence each time, and whatever
 it does is what fragmentation costs. `linguistic_research_sources.md` asks for
 exactly this measurement -- evidence held constant while the same displacement

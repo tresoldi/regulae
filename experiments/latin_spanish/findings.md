@@ -289,7 +289,7 @@ immediate alignment priority should be context conditioning.
 * **Chunk promotion is more aggressive than expected.** 45 chunks
   from 97 pairs — roughly half a chunk per pair. Some are clear
   wins, some are bookkeeping artifacts. A tighter BIC threshold
-  might help, but the real fix is M4's rule abstraction so that
+  might help, but the real fix is rule abstraction so that
   related chunks don't accumulate as separate entries.
 
 * **The displacement layer earns its keep.** The fact that 46

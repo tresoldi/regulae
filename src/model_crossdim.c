@@ -378,8 +378,8 @@ static int xdim_partition_relation(
  * The position test is deliberate. Features of the SAME segment that co-vary
  * with the committed one -- voicing and its correlated laryngeal features on the
  * one onset -- are always confounded and a linguist collapses them into one
- * category; flagging them is noise. The confound worth a warning is the one the
- * M7.2 study caught: the conditioner could be a different segment entirely
+ * category; flagging them is noise. The confound worth a warning is when the
+ * conditioner could be a different segment entirely
  * (onset voicing versus the following vowel's frontness). Counts distinct
  * features, so the same feature at two other offsets is one alternative. */
 static size_t xdim_environment_alternatives(
@@ -673,7 +673,7 @@ static rg_status xdim_environment_context(
          * identically: on three Sinitic dialects, 113 of 156 cross-dimensional
          * rows read `tone:-`, and "not ³⁵" was indistinguishable from "not ⁵⁵"
          * unless the reader found the sibling row under the same
-         * decision_index and worked it out. The export M7 exists to provide was
+         * decision_index and worked it out. The export exists to provide was
          * lossy for exactly the rows its grouping contract was built to serve.
          *
          * Worse than lossy, on a valued dimension. The published environment is

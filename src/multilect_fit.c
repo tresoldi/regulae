@@ -771,7 +771,7 @@ rg_status compute_corpus_fit(
          * The pairwise *conditioned correspondences* are a different case: they
          * are not lifted anywhere, so they are genuinely outside the count.
          * Whether they belong in it is a question about what "how many rules
-         * stand" is counting, not a bug -- see docs/architecture_plan.md. */
+         * stand" is counting, not a bug. */
         for (i = 0; i < model->pair_model_count; i++) {
             rg_pairwise_model *pair = model->pair_models[i].model;
             for (j = 0; j < pair->conditioned_segment_count_count; j++) {

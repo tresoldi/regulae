@@ -186,7 +186,7 @@ rg_status distance_context_copy_two(
 
 /* Union of the context features over [start, end), optionally skipping one
  * index. Feature names are emitted in the fixed alphabetical order of
- * context_feature_names, which is what the Go reference produces by sorting. */
+ * context_feature_names. */
 rg_status context_feature_union_copy_excluding(
     const rg_feature_constraint *const *source_features,
     const size_t *source_feature_counts,

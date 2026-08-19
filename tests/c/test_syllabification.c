@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Expected break positions are the Go reference output, produced by
- * `go run ./tools/goref syllables`. */
+/* Expected break positions for these words. */
 
 typedef struct syllable_case {
     const char *graphemes[8];

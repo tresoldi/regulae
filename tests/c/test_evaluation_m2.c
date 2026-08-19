@@ -51,12 +51,12 @@ static double taxon_rule_margin(const rg_multi_model *model) {
  * cancelled the added likelihood the margin happened not to move -- the same
  * mechanism that made `restraint/arity_5` lose the rule outright.
  *
- * Under `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default since M11) each sister
+ * Under `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default) each sister
  * lect that attests the rule adds to the score, so the margin holds through the
  * third taxon and doubles at the fourth (two innovators attest it): 29.5, 29.5,
  * 59.0. The property taxon sampling preserves is the rule and its strength, not
  * a fixed number; exact-margin equality was never the invariant. Metadata
- * invariance -- renaming, orientation, row order, duplicate lects -- is M5's,
+ * invariance -- renaming, orientation, row order, duplicate lects -- is tested elsewhere,
  * and adding a real taxon is not a metadata operation. */
 static void test_taxon_sampling_preserves_the_observed_rule(rg_context *ctx) {
     static const char *paths[] = {
@@ -137,6 +137,6 @@ int main(void) {
     test_taxon_sampling_preserves_the_observed_rule(ctx);
     test_repeated_cells_name_two_histories(ctx);
     rg_context_free(ctx);
-    printf("M2 linguistic evaluation regressions passed\n");
+    printf("linguistic evaluation regressions passed\n");
     return 0;
 }

@@ -32,9 +32,8 @@ class row names its distinct supporting sets (§4.2) and links to
 the row that contrasts it (§4.3); a deletion has a row shape (§4.9,
 §6); a cross-dimensional rule can be lect-internal (§6); and a
 conditioned rule flags when its environment is not identifiable
-from the corpus (§4.3, §6). The Python wrapper replaced a full
-reimplementation on 2026-08-17 (§2) — the retired code is under
-`docs/legacy_python/`.
+from the corpus (§4.3, §6). The Python wrapper is a thin binding
+over the C core (§2).
 
 The reliability fields — `standing`, `search_margin`,
 `decision_index`, the contrast counts, `rg_corpus_fit` — are what
@@ -205,11 +204,10 @@ regulae.GAP_GRAPHEME             # the "∅" a deleting lect carries
 regulae.RegulaeError, regulae.SourceMarkerError
 ```
 
-The wrapper used to be a full reimplementation of the engine; it
-drifted behind the C and was retired to `docs/legacy_python/` on
-2026-08-17. The fine-grained primitives it exposed (`score_link`,
-`align_forms`, `find_cognate_outliers`, the EM internals) are gone
-— they existed only because Python had its own engine. What
+The wrapper is a thin binding, not a second engine. It exposes no
+fine-grained primitives (`score_link`, `align_forms`,
+`find_cognate_outliers`, the EM internals) — those would exist only
+if Python had its own engine, and it does not. What
 remains is the model and the loaders. Any field the dataclasses do
 not surface is on `MultiLectModel.raw`, the parsed JSON verbatim.
 
@@ -351,7 +349,7 @@ An unconditioned class also carries `suprasegmentals`
 `length` / `stress` parallel to `graphemes` and part of the class's
 outcome identity: the same graphemes under a different tone are two
 classes, so a Sinitic or Hmong-Mien tone correspondence set gets its
-own row (from ABI 39). Each field is `""` where the segment carries
+own row. Each field is `""` where the segment carries
 none, and the JSON omits it there. Conditioned classes leave it unset
 — a suprasegmental predicted by an environment is a cross-dimensional
 rule (§6), not a class.
@@ -360,7 +358,7 @@ rule (§6), not a class.
 cognate sets a class rests on.** `count` is aligned positions
 weighted by cognate confidence, so one word with a geminate or a
 repeated segment reaches 2 without the correspondence recurring
-anywhere. `supporting_cognates` lists each set once (from ABI 30);
+anywhere. `supporting_cognates` lists each set once;
 its length is the recurrence a reader wants, and an adjudication
 panel repeatedly mistook `count` for it. On the C side this is
 `rg_multi_class_row.supporting_cognates` /
@@ -413,14 +411,14 @@ and `contrast_class_id` is the number to read instead.** A real
 split exists because the pivot takes a *different* reflex out of
 the environment, so the same tuple barely recurs there;
 `contrast_count` measures that same tuple and is near zero exactly
-when the conditioning holds. `contrast_class_id` (from ABI 31) is
+when the conditioning holds. `contrast_class_id` is
 the id of the class holding the pivot's *other* reflex — on Verner,
 the conditioned `gothic:d ~ pgmc:θ` before a vowel points at
 `gothic:d ~ pgmc:d` — and `contrast_alternative_count` is that
 reflex's mass in the complement. `-1` where there is none. Look the
 id up in `model.classes` (unconditioned first, then conditioned).
 
-A conditioned class also carries **`environment_alternatives`** (ABI 36), the
+A conditioned class also carries **`environment_alternatives`**, the
 same identifiability flag the cross-dimensional row has (§6): the count of rival
 conditioners at another position the corpus cannot tell this environment from. 0
 when the environment is pinned, >0 when a different neighbour's feature carves
@@ -459,11 +457,10 @@ point at the evidence without matching graphemes back by hand.
 Its length is also the number to read when the question is whether
 a correspondence recurs. `count` cannot answer that — it is
 aligned positions weighted by cognate confidence, so one word with
-a geminate reaches 2 without recurring anywhere. M6's adjudicators
-made that mistake repeatedly, and a downstream tool ranking rows
-by `count` will make it silently. From ABI 30 each set is listed
-once; before it, an id appeared once per position, so the list's
-length agreed with `count` and answered nothing.
+a geminate reaches 2 without recurring anywhere. A reader who
+trusts `count` for recurrence will make that mistake silently.
+`supporting_cognates` lists each set once, so its length counts
+distinct sets and answers what `count` cannot.
 
 ### 4.5 `lects`
 
@@ -579,8 +576,7 @@ reports conditioned and unconditioned log loss, top-k coverage, Brier score,
 ten-bin calibration error and abstention; sibling fields report identity,
 inventory-frequency and feature-distance baselines. Pairwise scores include
 both orientations, and three-or-more-lect corpora additionally report
-leave-one-lect-out pooling. See `docs/m4_evaluation.md` for the frozen protocol
-and the real negative panel.
+leave-one-lect-out pooling.
 
 These four were separate fields on each row until 2026-08-16,
 copied into four row types. A C consumer reads
@@ -598,7 +594,7 @@ On a conditioned multi-lect class, `contrast_count` alone will not
 answer "is this real?" — it is the *same* reflex out of the
 environment, and that is ~0 exactly when the conditioning holds,
 because a real split means the pivot takes a *different* reflex
-elsewhere. From ABI 31 the row also carries `contrast_class_id`,
+elsewhere. The row also carries `contrast_class_id`,
 the id of the class holding that different reflex, and
 `contrast_alternative_count`, its mass in the complement. On
 Verner the conditioned `gothic:d ~ pgmc:θ` (before a vowel) points
@@ -725,7 +721,7 @@ The tables, and what each yields:
 Passing `NULL` for the count is allowed; passing a `NULL` model
 yields a `NULL` table and a zero count.
 
-`rg_pairwise_model_gap_counts` (ABI 32) is where a deletion or an
+`rg_pairwise_model_gap_counts` is where a deletion or an
 epenthesis has a row. The segment tables are one-to-one and cannot
 say "this answers to nothing"; the gap table does, keyed by the
 grapheme on the side that keeps it, with `deletion` for the
@@ -733,7 +729,7 @@ source-to-target loss direction and `count / present_total` the
 rate it is dropped. It is a post-EM aggregation, not the scoring
 model, so a consumer reads it exactly like the tonal table.
 
-The multi-lect class table states losses too, from ABI 33: a lect
+The multi-lect class table states losses too: a lect
 that dropped a segment the others keep appears in the class with
 the grapheme `RG_GAP_GRAPHEME` (`"∅"`), so `{french:∅, latin:u,
 …}` is French apocope and not a lect missing from the row. A
@@ -841,7 +837,7 @@ a **gap**, where a segment answers to nothing.
 class CrossDimensionalRule:            # C: rg_cross_dimensional_row
     environment:         dict          # a Context, not one feature at one position
     context_is_target:   bool          # which form the environment is read from
-    dimension_from_environment: bool   # ABI 34: tone read from the env's own form
+    dimension_from_environment: bool   # tone read from the env's own form
     environment_lect:    str
     conditioned_lect:    str           # == environment_lect when lect-internal
     dimension:           str           # "tone"|"length"|"stress"
@@ -852,7 +848,7 @@ class CrossDimensionalRule:            # C: rg_cross_dimensional_row
     confidence:          float         # count / source_count
     contrast_count:      float         # matches outside the environment
     contrast_confidence: float         # contrast_count / contrast_source_count
-    environment_alternatives: int      # ABI 35: rival conditioners the data cannot rule out
+    environment_alternatives: int      # rival conditioners the data cannot rule out
     uncertainty:         Uncertainty
     predictive:          PredictiveEvidence
 ```
@@ -874,7 +870,7 @@ published: a `"-"` constraint names the complementary
 environment, and a consumer that filters to `"+"` will read a
 merger as a one-way change.
 
-**`dimension_from_environment` (ABI 34) says whether the rule is
+**`dimension_from_environment` says whether the rule is
 lect-internal.** 0 is the cross-lect rule — one lect's material
 predicts the other lect's tone. 1 is tonogenesis proper: an onset
 and the tone it conditions in the same language, read from one
@@ -895,7 +891,7 @@ than a conditioning effect. The contrast fields are what make the
 row a claim; the search charge `search_margin` on the C row scores
 the environment as a whole and is what a rule must clear.
 
-**`environment_alternatives` (ABI 35) says whether the named
+**`environment_alternatives` says whether the named
 conditioner is pinned.** A rule can predict the outcome perfectly
 and still not identify its cause: if every voiced onset is also
 before a front vowel, "voiced onset → low tone" and "front vowel →
@@ -907,9 +903,8 @@ when it is confounded and the stated environment is one of several
 the data supports. It fires only on a perfect confound, never on a
 partial correlation, and it says nothing about whether the split is
 real (that is `search_margin` and the contrast fields) — only
-whether its cause is pinned. The M7.2 analyst study
-(`docs/m7_analyst_study.md`) found a confounded environment stated
-at full confidence is the report's most anchoring line; a consumer
+whether its cause is pinned. A confounded environment stated
+at full confidence is a report's most anchoring line; a consumer
 that surfaces `environment_alternatives > 0` beside `confidence` is
 warning the reader the report cannot warn them of otherwise.
 
@@ -971,13 +966,13 @@ class GapCorrespondence:               # C: rg_gap_count_row
 ```
 
 A 1-to-1 table cannot say "this answers to nothing", so a deletion
-— the commonest sound change — had no row shape until ABI 32. The
+— the commonest sound change — needs a row shape of its own. The
 gap table (`PairwiseModel.gaps`, `rg_pairwise_model_gap_counts`)
 gives it one, per pair, keyed by the grapheme on the side that
 kept it. On real Romance data it recovers French apocope as
 `- ~ e`, `- ~ a`, `- ~ o` where Italian keeps the vowel.
 
-At the multi-lect level (from ABI 33) a loss is a class row too: a
+At the multi-lect level a loss is a class row too: a
 lect that dropped a segment the others keep appears in the class
 with `GAP_GRAPHEME` (`"∅"`), so `{french:∅, latin:u, …}` is
 apocope and not a lect missing from the row. Compare a segment's
@@ -1005,14 +1000,13 @@ contract.
 public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
-signature or ownership change, and the reason is recorded in
-`docs/c_conversion_roadmap.md`. It is at **39**.
+signature or ownership change. It is at **39**.
 
 **The JSON export is named and versioned.** `export_kind` is
 `"surface_relationship_model"` — the maximum-a-posteriori surface
 relationship model, the supported machine-readable output for the
 downstream layer. It is a single correspondence system, not the
-ensemble the historia interchange schema (M8) requires, so a reader
+ensemble a downstream interchange schema requires, so a reader
 must not treat it as claim-capable. `format_version` (currently **2**)
 moves only on a breaking change to that schema; adding a field does
 not move it, since unknown keys are ignored. Every export carries a
@@ -1040,7 +1034,7 @@ time rather than silently, which is the intent.
   split is charged for its outcome parameters. `PER_SISTER_LECT` (the default)
   prices the split per sister lect, so the charge is bounded by each lect's
   inventory rather than growing with the number of lects; `SISTER_TUPLE`
-  reproduces the pre-M11 joint-tuple charge. Affects the multi-lect layer only.
+  reproduces the legacy joint-tuple charge. Affects the multi-lect layer only.
 - **36** — `rg_multi_class_row` gained `environment_alternatives`: the same
   identifiability flag, now on a conditioned segment class (§4.3). 0 when the
   environment is pinned, >0 when a different neighbour's feature carves the split
@@ -1424,6 +1418,3 @@ exactly that output can call it rather than parse the CLI.
 - `experiments/<name>/findings.md` — what each experiment found on
   real data. Written for framework developers, not downstream
   consumers, but they are the closest thing to worked results.
-- `docs/architecture_plan.md` — why the modules are shaped the way
-  they are, and which decisions were deliberately left open. Read
-  it before proposing a change to the published shape.

@@ -6,9 +6,8 @@
 #include <string.h>
 
 /* The regulae command-line front end. `train --summary` and `outliers` emit a
- * compact, deterministic line format meant to be diffed. It was shaped for the
- * parity harness and kept after it, because a format two implementations could
- * be compared through is also the one a user can grep and a test can pin. */
+ * compact, deterministic line format meant to be diffed. A format stable
+ * enough to diff cleanly is also the one a user can grep and a test can pin. */
 
 #define MAX_PARTS 64
 
@@ -194,8 +193,8 @@ static int fail(const char *what, rg_status status) {
  * having a choice of them. */
 #define RG_RESIDUE_MIN_ENTROPY 1.0
 
-/* The evidence floor AGENTS.md records, so a correspondence is not called
- * unexplained on the strength of a handful of words. */
+/* The evidence floor, so a correspondence is not called unexplained on the
+ * strength of a handful of words. */
 #define RG_RESIDUE_MIN_OBSERVATIONS 8.0
 
 /* How predictable one lect's segment is from the other's, in bits, and which

@@ -6,14 +6,14 @@ Status: accepted on 2026-08-16.
 
 Pairwise conditioned correspondences, multi-lect conditioned classes and
 cross-dimensional associations all compare one pooled categorical distribution
-with two distributions induced by an environment. Before M3, two copies of the
+with two distributions induced by an environment. Earlier, two copies of the
 operation used a corrected BIC-shaped score while cross-dimensional discovery
 implemented the likelihood comparison separately. The multi-lect immediate
 pass also added `2/(n-1)` to `ln(n)`, without a derivation for a BIC penalty.
 
-M3 placed the three discovery stages behind one categorical-scoring seam and
-compared corrected BIC, exact multinomial normalized maximum likelihood (NML)
-and a symmetric-Dirichlet marginal likelihood. NML follows the exact
+The three discovery stages were placed behind one categorical-scoring seam, and
+corrected BIC, exact multinomial normalized maximum likelihood (NML)
+and a symmetric-Dirichlet marginal likelihood were compared. NML follows the exact
 multinomial normalization and recurrence described by
 [Kontkanen et al. (2003)](https://proceedings.mlr.press/r4/kontkanen03a.html)
 and [Kontkanen and Myllymäki (2007)](https://doi.org/10.1016/j.ipl.2007.04.003).
@@ -107,5 +107,5 @@ a linguistic truth.
 - Permutation nulls remain validation gates rather than being folded into the
   within-sample score. The pairing shuffle still supports the production
   standing verdict.
-- M4 must replace the narrow fixed-position predictive panel with nested,
+- The narrow fixed-position predictive panel must be replaced with nested,
   group-held-out prediction over learned alignments and arbitrary environments.

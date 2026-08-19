@@ -4,7 +4,7 @@
 /* Shared between the pairwise pipeline's stages, and between them only.
  *
  * model.c ran to 4,800 lines and 101 static functions, and the stages inside
- * it are the ones AGENTS.md calls load-bearing: initial prior, segment EM,
+ * it are the load-bearing ones: initial prior, segment EM,
  * displacement aggregation, context discovery, chunk promotion, tonal
  * aggregation, cross-dimensional discovery, long-range discovery. They are now
  * one file each, and this header is what they had been sharing implicitly by

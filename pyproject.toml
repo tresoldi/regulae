@@ -1,8 +1,7 @@
 # The Python package is a thin wrapper over the C core, built by setup.py in
 # this directory: the extension compiles regulae, the vendored cJSON and the
 # sibling merkmal checkout straight in, so a built wheel needs neither an
-# installed libregulae nor the merkmal Python package. The retired pure-Python
-# implementation is under docs/legacy_python/.
+# installed libregulae nor the merkmal Python package.
 [build-system]
 requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"

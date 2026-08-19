@@ -22,11 +22,9 @@ Implementation, in the C core:
 - `src/vocabulary.c` — the searchable feature vocabulary, derived per
   corpus.
 
-The residual-MI anomaly engine described in places below was never
-ported; the same phenomena are reached by candidate enumeration plus a
-scored comparison against the complement. The paths given here until
-2026-08-16 pointed at the archived Python tree under `python/`, which is
-not built or supported.
+The residual-MI anomaly engine described in places below is not
+implemented; the same phenomena are reached by candidate enumeration plus a
+scored comparison against the complement.
 
 ## 1. Segment correspondences via Dirichlet update
 
@@ -201,7 +199,7 @@ Under the hand-written list this replaced, the three valued systems found
 
 #### Why it is not a fixed list
 
-It was one until 2026-08-15: 27 names, hand-picked, by someone writing about
+It was one once: 27 names, hand-picked, by someone writing about
 Latin. No rounding, no vowel nasalisation, no lateral, trill, tap or retroflex,
 no ejective, implosive or click, no breathy or creaky, no syllabicity, and no
 vowel height between close and open; affricates received no manner feature at
@@ -281,7 +279,7 @@ against `rg_corpus_fit.null_search_margin` is for. Two numbers
 answering two questions, each labelled.
 
 Intervals are published on every row that carries one. Six of the eight
-row types computed one and surfaced it nowhere until 2026-08-15.
+row types compute one and surface it.
 
 ### Cross-dimensional rules, and why one predicate is not enough
 
@@ -336,8 +334,8 @@ Three rules keep the output readable, each of which was a real failure first:
   determined its outcome is skipped too — but only inside a *determined* one,
   because refining an undetermined environment is the whole point.
 
-**The target dimension is not only tone.** The scorer has handled stress and
-length as targets since the port and this stage proposed neither, so
+**The target dimension is not only tone.** The scorer handles stress and
+length as targets, and this stage once proposed neither, so
 compensatory lengthening and stress shifts were unreachable however regular.
 All three are searched now, and all three are suppliable: `tone`, `stress` and
 `length` columns in the long format, `<lect>_tone`, `<lect>_stress` and
@@ -378,15 +376,15 @@ candidate list is built from the values actually observed, so the axis costs
 nothing where the data is silent, which is most corpora. Morphological analysis
 belongs to the package upstream of this one.
 
-Boundaries reach the model from the wide loader's `<lect>_breaks` column and,
-since 2026-08-15, the long loader's `breaks` column.
+Boundaries reach the model from the wide loader's `<lect>_breaks` column and
+the long loader's `breaks` column.
 
 ### Pricing the search, not only the parameter
 
 Under the default corrected-BIC scorer, splitting one pooled `K`-outcome
 multinomial into two adds `K−1` parameters, so pairwise, multi-lect and
-cross-dimensional discovery charge `(K−1) · ln(n)`. A fixed `ln(n)` charge,
-used until M1, under-priced every split with more than two outcomes.
+cross-dimensional discovery charge `(K−1) · ln(n)`. A fixed `ln(n)` charge
+under-prices every split with more than two outcomes.
 
 That parameter charge does not price the argmax. Widening the vocabulary means
 the surviving environment is the best of *m* candidates, and the maximum of a
@@ -394,7 +392,7 @@ hundred candidates clears its bar by chance far more often than one does.
 
 So every scorer carries `γ · 2 · ln(m)` alongside its within-sample comparison,
 where `m` is the number of distinct observed partitions, not the number of
-predicate names. The M3 bake-off selected `γ = 1` with corrected BIC: corrected
+predicate names. The bake-off selected `γ = 1` with corrected BIC: corrected
 BIC at half charge failed the pre-existing no-environment restraint fixtures,
 while every NML and Dirichlet candidate failed established restraint and most
 also exceeded the generated null envelope. ADR 0001 records the selection and
@@ -464,7 +462,7 @@ carries meaning: a later rule refines, or applies within, what an earlier one
 did not settle.
 
 Every published table is sorted by key so lookups can binary-search it, and
-that destroyed the order until 2026-08-15. So each row a greedy loop commits
+that destroys the commit order. So each row a greedy loop commits
 carries `decision_index`, and `train --human` renders the conditioned and
 cross-dimensional blocks in that order rather than by size. Rows committed by
 one decision share an index; `-1` marks a row not decided by a search at all,
@@ -515,8 +513,8 @@ Neither BIC nor an ordinary chi-square threshold prices selection of the best
 environment from the adaptive candidate search; the separate search charge and
 shuffled baseline address that problem.
 
-M3 compared it with exact NML and symmetric-Dirichlet marginal likelihoods
-under a recorded protocol. Corrected BIC with the full model-space charge was
+A recorded protocol compared it with exact NML and symmetric-Dirichlet marginal
+likelihoods. Corrected BIC with the full model-space charge was
 the only candidate to satisfy fractional-input coverage, generated null and
 power gates, and all three pre-existing no-environment restraint fixtures. The
 zero threshold and `γ = 1` are empirical defaults, not probability cutoffs or
@@ -724,33 +722,31 @@ anything here", which is the question that has to be answered first. It does
 not certify any individual environment, and a rule's own evidence — its count,
 its contrast, its interval — remains the reader's business.
 
-### What the original design had and this does not
+### What is deliberately not implemented
 
-The Python implementation ranked candidates by residual mutual information
+An alternative design ranks candidates by residual mutual information
 against a permutation null (shuffle the target assignments, recompute, 100×)
-before the BIC loop saw them, supported joint predictors (`src_feature_2`), and
-ran a post-commit pass to collapse dual positional framings of one rule. None
-of that is ported.
+before the BIC loop sees them, supports joint predictors (`src_feature_2`), and
+runs a post-commit pass to collapse dual positional framings of one rule. None
+of that is done here.
 
-The claim that "the permutation null and the BIC gate answer the same question
-by different means, and the loop above keeps the cheaper one" stood here until
-2026-08-15 and was wrong. They answer different questions. BIC prices
+The permutation null and the BIC gate answer different questions. BIC prices
 *parameters*: the `K−1` dimensions added by splitting a `K`-outcome
 distribution. The permutation null prices the *search* — and the search is
 large, since `find_best_split` takes the argmax over ~55 immediate or 135
 long-range candidates, greedily, recursively.
 
-Those observations exposed two distinct under-charges. The adaptive search
-charge addressed the candidate argmax; the later `K−1` correction addressed
+The search's size exposes two distinct under-charges. The adaptive search
+charge addresses the candidate argmax; the `K−1` correction addresses
 the categorical dimension. With both in place, the unrelated restraint corpus
 publishes no conditioned class under the default charge, while the deliberately
 unpriced shuffled runs continue to expose the search's null margins.
 
-The null is back, as a calibration layer rather than a candidate filter — see
+The null serves as a calibration layer rather than a candidate filter — see
 "Reading a model against its own noise" below. Dual-framing dedup is
 unnecessary here: the second framing of a committed rule has no unexplained
-evidence left to justify it. Joint predictors are a real gap, tracked in
-`c_conversion_roadmap.md` — `rg_cross_dimensional_row` cannot represent a rule
+evidence left to justify it. Joint predictors are a real gap:
+`rg_cross_dimensional_row` cannot represent a rule
 conditioned on two predicates, so a change like the full Middle Chinese
 register split, which needs voicing *and* source tone together, is out of reach.
 
@@ -780,18 +776,19 @@ with no tone has nothing to condition, so a corpus can carry an association in
 one orientation, in both, or in neither. The four fixtures under
 `testdata/evaluation/m5/generated/` are one of each.
 
-It searched one orientation until M5, and the cost was measurable.
+Searching only one orientation had a measurable cost.
 `experiments/tone_chinese_like_clean/` encodes a voicing-to-tone rule at
-confidence 1.00 by construction, and the stage committed nothing on it because
+confidence 1.00 by construction, and a single-orientation search committed
+nothing on it because
 `cantonese` sorts before `mandarin` and the rule runs the other way; renaming
 the lects so the conditioning lect sorted first recovered both rules exactly.
 `experiments/mandarin_historical/` lost the Middle Chinese voicing tonogenesis
 the same way. `src/multilect.c` sorts lects into ascending id order and explains
 why in a comment ending **"a name is metadata, and no analysis may turn on
-it"**, and this stage turned on it.
+it"**, and a single-orientation search turned on it.
 
-Both corpora now publish the association whichever lect sorts first, and
-`scripts/evaluate_m5.py` gates it: the same relationship is generated with the
+Both corpora publish the association whichever lect sorts first, and a gate
+enforces it: the same relationship is generated with the
 conditioning lect sorting first and second, and both have to produce it. An
 association true in both orientations is published once per lect, because which
 lect carries the environment is part of the claim and merging the two rows would
@@ -811,35 +808,28 @@ adjustment. Rules that explain a real correspondence produce negative
 adjustments (lower cost), making the alignment cheaper on matching
 data and more expensive on mismatching data.
 
-The overlay *is* inside the DP, as of 2026-08-16. It had not been:
-the search picked an alignment without knowing the rules would fire
-and the rules re-scored what it had already chosen, so the alignment
-returned was not the one that minimised the function reporting its
-cost. This note called that provisional, and integrating it more
-principled but a substantial refactor.
-
-It was neither substantial nor a refactor of the cost algebra. The
-adjustment is local to a DP transition: its source predicate reads the
+The overlay is inside the DP. The adjustment is local to a DP
+transition: its source predicate reads the
 source form at the link's start and its target value the target form
 at that position plus the rule's offset, and both forms are fixed
 input, so nothing in it depends on any other link. At a transition
-those two positions are exactly the DP's own indices. The whole-
-alignment walk existed because the function was called after the fact,
-not because the quantity was non-local.
+those two positions are exactly the DP's own indices, so the search
+minimises the same function that reports its cost rather than
+re-scoring an alignment it has already chosen.
 
-What it cost, measured over all 63 corpora in the tree: no detectable
+Pricing it in the DP costs no detectable
 time — the rule table is empty for every stage before cross-dimensional
-discovery commits, and the guard returns immediately — and two corpora
-changed, `mandarin_historical` and `tone_chinese_like`, the two with
-committed tonogenesis rules. Both improved: `cost_per_segment` went
-from −1.833 to −1.854 and from −1.926 to −1.980. Class counts and rule
+discovery commits, and the guard returns immediately — and only two corpora
+score differently, `mandarin_historical` and `tone_chinese_like`, the two with
+committed tonogenesis rules. Both improve: `cost_per_segment`
+−1.833 to −1.854 and −1.926 to −1.980. Class counts and rule
 counts are unchanged in both, so the rules found are the same rules;
-what moved is which alignments the search settled on. Every fixture in
-`testdata/soundlaws/` is bit-identical, so no sound law was lost.
+what moves is which alignments the search settles on. Every fixture in
+`testdata/soundlaws/` is bit-identical.
 
 One consequence is worth stating because it is easy to miss. Stage
 order is load-bearing, and the long-range context stage runs *after*
-cross-dimensional discovery and re-aligns. So from now on it sees
+cross-dimensional discovery and re-aligns. So it sees
 alignments that were chosen knowing the cross-dimensional rules, which
 is a change in what that stage is shown, not only in what the caller is
 told an alignment cost.
@@ -870,8 +860,7 @@ computed by a minimal sonority-based syllabifier: the max-onset
 principle under the sonority sequencing principle. Language-agnostic
 and simple by design — supply your own with a `syllables` column
 (long format) or `<lect>_syllables` (wide), and they are respected
-unchanged. Until 2026-08-15 the docs told users to do that and no
-loader could read the column.
+unchanged.
 
 The scale is stop < fricative < nasal < liquid < glide < vowel, and it
 reads three things that matter typologically:
@@ -982,8 +971,8 @@ filters (support floors, dual-framing dedup) from the per-pair pass.
 ## Threshold calibration summary
 
 Thresholds throughout the pipeline are empirical settings, not probability
-cutoffs. M3 compared the scorer, prior, threshold, search charge and legacy
-small-sample addition on development and held-back panels. Earlier values were
+cutoffs. The scorer, prior, threshold, search charge and small-sample
+addition were compared on development and held-back panels. Earlier values were
 calibrated on a combination of synthetic fixtures
 (tonogenesis, umlaut, harmony) and real-data experiments
 (Latin–Spanish, Latin–French, Proto-Polynesian–Hawaiian, Old English–

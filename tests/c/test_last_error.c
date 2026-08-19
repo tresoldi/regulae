@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <string.h>
 
-/* The Go reference's UnknownGraphemeError names the offending grapheme and the
+/* A rich error type could name the offending grapheme and the
  * feature system. A C status code cannot, so the context carries it: "unknown
  * grapheme" without saying which one is unactionable on a corpus of any size. */
 

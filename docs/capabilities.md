@@ -16,7 +16,7 @@ the engine changed to allow it.
 | --- | --- | --- | --- |
 | segment correspondences | supported | every loader | `testdata/corpora/*` (13 corpora) |
 | conditioned environments | supported | every loader | `testdata/corpora/conditioned_multilect.tsv` |
-| conditioned-split scorers | corrected BIC default; exact NML and Dirichlet marginal experimental | C options, JSON options, or `--scorer` | `tests/c/test_split_score.c`, `docs/m3_evaluation.md`, ADR 0001 |
+| conditioned-split scorers | corrected BIC default; exact NML and Dirichlet marginal experimental | C options, JSON options, or `--scorer` | `tests/c/test_split_score.c`, ADR 0001 |
 | long-range conditioning | supported | every loader | `testdata/corpora/long_range.tsv` |
 | multi-lect reconciliation | supported | every loader | `testdata/corpora/real_romance_4lect.tsv` (4 lects) |
 | confidence weighting and outliers | supported | TSV and wide (`confidence` column) | `testdata/corpora/real_contaminated.tsv` |
@@ -26,7 +26,7 @@ the engine changed to allow it.
 | stress conditioning | supported | every loader, from IPA marks or a `_stress` column | `testdata/soundlaws/verner.tsv`, `tests/c/test_sound_laws.c` |
 | manner conditioning | supported | every loader | `testdata/soundlaws/graded_5_distance_two.tsv` |
 | observation-group metadata | supported | TSV and wide (`etymon_group`, `source_group`) | `tests/c/test_evaluation_m2.c` |
-| group-held-out predictive evidence | supported; opt-in because it retrains per fold and orientation | `predictive_folds`, JSON options, or `--predictive-folds` | `tests/c/test_evaluation_m4.c`, `docs/m4_evaluation.md` |
+| group-held-out predictive evidence | supported; opt-in because it retrains per fold and orientation | `predictive_folds`, JSON options, or `--predictive-folds` | `tests/c/test_evaluation_m4.c` |
 | bootstrap uncertainty | supported | `bootstrap_n`; cognate, etymon, or source groups | `tests/c/test_uncertainty.c`: resamples named groups |
 | chunk transparency screening | supported | `chunk_min_transparency`; every chunk row carries its score | `testdata/soundlaws/metathesis_adjacent.tsv`, `tests/c/test_sound_laws.c` |
 | anomaly detection | **not ported** | n/a | never ported |

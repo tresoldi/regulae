@@ -5,10 +5,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* M5 asks whether the same supplied surface relationship is recovered when the
- * metadata changes. These are the probes that have to hold in every build, not
- * only when scripts/evaluate_m5.py is run: the panel measures the whole space,
- * and this file keeps the commitments that a refactor could quietly lose.
+/* This file asks whether the same supplied surface relationship is recovered when the
+ * metadata changes. These are the probes that have to hold in every build:
+ * they keep the commitments that a refactor could quietly lose.
  *
  * None of it is a claim about inheritance or about which lect is ancestral. */
 
@@ -216,9 +215,9 @@ static void test_row_order_is_not_evidence(rg_context *ctx) {
 
 /* The association is true of the pair, not of the lect that sorts first.
  *
- * Cross-dimensional discovery searched one orientation only until M5, so on
+ * Cross-dimensional discovery searches both orientations, so on
  * these two corpora -- the same relationship with the conditioning lect sorting
- * first and second -- one published the rule and the other published nothing.
+ * first and second -- both publish the rule.
  * The tone bearer merged the voicing contrast, so its own form predicts nothing
  * and the environment can only be stated over the other lect. */
 static void test_cross_dimensional_association_survives_lect_order(rg_context *ctx) {

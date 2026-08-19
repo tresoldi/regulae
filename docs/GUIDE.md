@@ -292,8 +292,7 @@ The predictive verdict is separate from `STANDS` and the split score:
 This is surface cloze prediction: the other lect's form and the surrounding
 surface context are observed while the reflex is predicted. It is not a
 proto-form reconstruction score and not a claim that regulae discovered a
-sound law. The frozen protocol and real negative panel are in
-`docs/m4_evaluation.md`.
+sound law.
 
 ## How much data do I need?
 

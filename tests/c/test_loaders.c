@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Loader behaviour, checked against the corpora the parity harness runs. */
+/* Loader behaviour, checked against the corpora suite. */
 
 static const rg_cognate_set *find_cognate(const rg_corpus *corpus, const char *cognate_id) {
     size_t i;
@@ -212,9 +212,9 @@ static void test_corpus_from_pairs(void) {
 }
 
 /* The wide loader segments through merkmal; the long fixture beside it was
- * produced by splitting the same words on characters. That fixture is
- * parity-verified against the Go reference, so agreeing with it here checks the
- * segmentation bridge against a known-good result rather than against my own
+ * produced by splitting the same words on characters. That fixture is a
+ * known-good corpus, so agreeing with it here checks the
+ * segmentation bridge rather than against my own
  * expectations. */
 static void test_wide_matches_the_parity_verified_corpus(rg_context *ctx) {
     rg_corpus *wide = 0;
@@ -400,7 +400,7 @@ static void test_segment_word(rg_context *ctx) {
     rg_segments_free(segments, count);
 
     /* A combining diacritic attaches to its base. This is exactly the case
-     * that had to be hand-corrected when the Romance parity corpus was built
+     * that had to be hand-corrected when the Romance corpus was built
      * by splitting on characters. */
     assert(rg_context_segment_word(ctx, "e\xcc\x83", &segments, &count) == RG_OK);
     assert(count == 1);

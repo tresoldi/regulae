@@ -167,8 +167,7 @@ residual-MI anomaly detection it was written around was never ported to
 the C core: cross-dimensional discovery reaches the same phenomena by
 enumerating candidate environments and gating each on a BIC comparison
 against its complement. `docs/correspondence_discovery.md` is the
-description of what runs. See `AGENTS.md` for the full list of designed
-but unported machinery.
+description of what runs.
 
 The full staging and its rationale live in `docs/training_pipeline.md`.
 The discovery mechanisms for each kind of correspondence

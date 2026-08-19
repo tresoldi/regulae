@@ -305,8 +305,8 @@ rg_status rg_context_constraints_internal(
 );
 
 /* JSON transport for the CLI's --json output and the WebAssembly adapter. Not
- * the interchange schema: that is M8's job, and a single MAP correspondence
- * system is explicitly not claim-capable data. */
+ * the interchange schema: that is a downstream interchange schema's job, and a
+ * single MAP correspondence system is explicitly not claim-capable data. */
 /* Threads one progress counter through a whole training run so a caller sees a
  * single monotonic fraction, rather than each lect pair restarting at zero. */
 typedef struct rg_progress_state {

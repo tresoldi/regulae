@@ -478,7 +478,7 @@ static void test_a_neutralisation_keeps_stable_surface_correlates_explicit(rg_co
  * row states P(target | source), and the two are published in one table in one
  * format. The test asserts what is published today rather than what should be,
  * because a fixture that cannot fail tests nothing and a test that hides a
- * difference is worse than no test. When M8's direction typing lands, the
+ * difference is worse than no test. When direction typing lands, the
  * count below goes to zero for changes and the row reappears as ancestry. */
 static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_context *ctx) {
     rg_corpus *corpus = load("restraint", "merger_gap");
@@ -514,7 +514,7 @@ static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_con
  * of words showing it, attested by one more language each time.
  *
  * So the right answer is the same at every rung and the evidence for it only
- * grows. Until the outcome model was fixed in M11, what regulae did instead was
+ * grows. A joint-tuple outcome model instead undercuts
  * the finding: a class-level split was priced by the number of distinct *sister
  * tuples* in the pivot bucket, and a sister tuple is the full list of (lect,
  * grapheme) pairs -- so it counted which lects a cognate set happened to cover,
@@ -523,7 +523,7 @@ static void test_a_lexical_gap_in_the_source_is_published_as_conditioning(rg_con
  * rather than the structure, and adding a language subtracted evidence until at
  * five lects the conditioning search committed nothing at all.
  *
- * `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default since M11) scores the split as
+ * `RG_CLASS_OUTCOME_PER_SISTER_LECT` (the default) scores the split as
  * a sum over sister lects instead of over the joint tuple, so `K` is bounded by
  * each lect's inventory rather than by arity. The rule is now recovered at every
  * rung -- five lects included -- and its row count no longer collapses. That is
@@ -602,7 +602,7 @@ static void test_a_trigger_a_syllable_away_needs_five_a_side(rg_context *ctx) {
      * lowering it to three commits the same environment at three a side, on the
      * rung the default declines. So the extra evidence the charge asks for does
      * not by itself account for the step, and the constant is documented rather
-     * than derived -- see docs/GUIDE.md and multilect_hardening_plan.md (M13a). */
+     * than derived -- see docs/GUIDE.md. */
     {
         rg_corpus *corpus = load("restraint", "distant_003");
         rg_multi_model *model = 0;
@@ -627,7 +627,7 @@ static void test_a_trigger_a_syllable_away_needs_five_a_side(rg_context *ctx) {
  * The search commits several, each resting on the three or four words where a
  * noise token lined up with a neighbour -- and one on seven, above the eight-
  * example floor's neighbourhood, which the pairing shuffle certified along with
- * the rest. This is the over-certification docs/m6_evaluation.md is about, and
+ * the rest. This is the over-certification the pairing shuffle invites, and
  * it grew with corpus size because the shuffle's bar does not. The per-pivot
  * context-permuted null and the evidence floor decline all of them.
  *

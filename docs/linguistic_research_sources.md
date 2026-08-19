@@ -7,12 +7,10 @@ primary or authoritative sources linked throughout. The product claim was
 subsequently clarified: regulae explains relationships among supplied surface
 forms; it does not discover sound laws. The evaluation below should be read at
 that descriptive level. Historical-event recovery is a downstream research
-question, not a core acceptance criterion. The resulting implementation plan
-is in `docs/surface_relationship_roadmap.md`.
+question, not a core acceptance criterion.
 
 The live measurements in this memo describe that reviewed snapshot, before the
-categorical `K−1` parameter-count correction. M1's implementation record and
-post-correction acceptance panel are in the roadmap.
+categorical `K−1` parameter-count correction.
 
 ## Executive judgment
 
@@ -58,7 +56,7 @@ generally it explains a supplied surface relationship. The distinction matters:
 this is a validation verdict, not a code-quality verdict.
 
 The commit history contains 117 commits from 2026-04-16 through the reviewed
-snapshot. The C port began on 2026-07-30, and most of the linguistic restraint,
+snapshot, and most of the linguistic restraint,
 search calibration and challenge fixtures landed on 2026-08-14--16. The same
 development process designed the algorithm, constructed the fixtures, chose the
 expected analyses and wrote the assertions. That work found real defects and is
@@ -123,7 +121,7 @@ Two documentation contradictions affect scientific interpretation. In
 multiple-comparison adjustment, while a later section correctly explains that
 BIC prices added parameters but not the adaptive search over roughly 55 or 135
 candidates. Those cannot both be true. In `docs/capabilities.md`, bootstrap is
-listed as unported and ignored, while `bootstrap_class_intervals`, the API,
+listed as unavailable and ignored, while `bootstrap_class_intervals`, the API,
 tests and commit `df68421` show that whole-cognate-set bootstrap is live. These
 are not cosmetic discrepancies: they change what a reader believes a rule's
 evidence and interval mean.
@@ -202,7 +200,7 @@ word lengths and semantic lists establish operating thresholds.
 
 ## What the repository already demonstrates
 
-The history since `b8ecf5c` is linguistically substantive, not merely a port:
+The history since `b8ecf5c` is linguistically substantive:
 fixtures were rebuilt so wrong analyses were available; conditioning became a
 comparison with an attested complement; searches were made bidirectional;
 place, stress, morphology, syllable weight, distant triggers and disjunctive
@@ -232,8 +230,8 @@ Four current CLI runs are especially informative:
   cause is borrowing, chronology, source mixture or diffusion.
 
 Scientific auditability also requires documentation consistency.
-`docs/capabilities.md` currently says bootstrap uncertainty was never ported,
-while the current API documentation, roadmap, history (`df68421`) and project
+`docs/capabilities.md` currently says bootstrap uncertainty is unavailable,
+while the current API documentation, history (`df68421`) and project
 instructions say whole-cognate-set bootstrap is implemented. A reader cannot
 evaluate an uncertainty claim while the capability ledger disagrees with the
 implementation record.

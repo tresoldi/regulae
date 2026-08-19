@@ -14,14 +14,13 @@
  * and it is advisory. `chunk_min_transparency` is what acts on it, and its
  * default of zero drops nothing.
  *
- * One deliberate departure from the Go reference this is ported from. There,
- * two of the process profiles are directional: nasal fusion requires the
- * *target* to have gained nasalization and a *source* segment to have gone,
- * and reading the same correspondence from the other lect it matches nothing,
- * so the same chunk scored 0.05 higher in one direction than the other. That
- * would have made a corpus's analysis depend on which lect its file names
- * first, which is an invariant this library enforces elsewhere and had to
- * repair in chunk promotion itself. Transparency is a property of the
+ * Two of the process profiles are inherently directional: nasal fusion
+ * requires the *target* to have gained nasalization and a *source* segment to
+ * have gone, and reading the same correspondence from the other lect it would
+ * match nothing, so the same chunk would score 0.05 higher in one direction
+ * than the other. That would make a corpus's analysis depend on which lect its
+ * file names first, which is an invariant this library enforces elsewhere and
+ * in chunk promotion itself. Transparency is a property of the
  * correspondence, not of a direction of change -- "a~ã before a nasal" is
  * exactly as interpretable read either way -- so each directional profile is
  * tested in both orientations and matches if either holds.

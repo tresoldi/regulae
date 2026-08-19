@@ -208,11 +208,11 @@ static void test_conditioned_palatalization(rg_context *ctx, const rg_train_opti
  * coincide. Every word realises p~f twice, so the class is worth twelve aligned
  * positions and rests on six cognate sets.
  *
- * M6's adjudication panel repeatedly read `count` as a count of words, and on
+ * `count` is easily misread as a count of words, and on
  * real corpora that reading inflates a row's support by however often a word
- * happens to repeat a segment. The distinct-set number is what they wanted, and
- * before ABI 30 it was not published: `supporting_cognates` listed an id once
- * per position, so its length agreed with `count` and answered nothing. */
+ * happens to repeat a segment. The distinct-set number is what is wanted, and
+ * `supporting_cognates` publishes each id once, so its length reports the
+ * distinct sets rather than agreeing with `count`. */
 static void test_supporting_sets_are_distinct(rg_context *ctx, const rg_train_options *options) {
     const char *source_words[6] = {"papa", "pipi", "pupu", "pepe", "popo", "papi"};
     const char *target_words[6] = {"fafa", "fifi", "fufu", "fefe", "fofo", "fafi"};
@@ -331,7 +331,7 @@ static void test_multi_lect_deletion_class(rg_context *ctx, const rg_train_optio
  * segment-only class table has only the trivial /a ~ a ~ a/ to publish and the
  * tone correspondence -- the whole point of a Sinitic or Hmong-Mien sample --
  * would be invisible. Because the suprasegmentals are part of the reconciled
- * outcome identity (ABI 39), the two tone patterns are two class rows, each
+ * outcome identity, the two tone patterns are two class rows, each
  * carrying its tone. */
 static void test_tone_correspondence_is_a_class(rg_context *ctx, const rg_train_options *options) {
     char path[512];

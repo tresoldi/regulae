@@ -46,7 +46,7 @@ CAPABILITIES = [
         "conditioned-split scorers",
         "corrected BIC default; exact NML and Dirichlet marginal experimental",
         "C options, JSON options, or `--scorer`",
-        "`tests/c/test_split_score.c`, `docs/m3_evaluation.md`, ADR 0001",
+        "`tests/c/test_split_score.c`, ADR 0001",
     ),
     (
         "long-range conditioning",
@@ -106,7 +106,7 @@ CAPABILITIES = [
         "group-held-out predictive evidence",
         "supported; opt-in because it retrains per fold and orientation",
         "`predictive_folds`, JSON options, or `--predictive-folds`",
-        "`tests/c/test_evaluation_m4.c`, `docs/m4_evaluation.md`",
+        "`tests/c/test_evaluation_m4.c`",
     ),
     (
         "bootstrap uncertainty",

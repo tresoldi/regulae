@@ -33,10 +33,10 @@ extern "C" {
  * rg_context_use_system takes any system the registry holds. */
 #define RG_DEFAULT_FEATURE_SYSTEM "distinctive"
 /* The grapheme a multi-lect class carries for a lect that deleted the segment
- * the others keep -- "∅", U+2205. Before ABI 33 a deletion was invisible in the
- * class table: the deleting lect was simply absent from the class, so a loss and
- * a lect that never had the word looked identical. A class row now names the
- * loss as `lect:∅`. It is only ever a class-table grapheme, never fed back to
+ * the others keep -- "∅", U+2205. A class row names the loss as `lect:∅`, so a
+ * loss is distinct from a lect that never had the word rather than the deleting
+ * lect being simply absent from the class.
+ * It is only ever a class-table grapheme, never fed back to
  * the feature system, and it appears only in the unconditioned table -- a gap
  * conditions nothing, so it is kept out of the conditioning search. */
 #define RG_GAP_GRAPHEME "\xe2\x88\x85"
@@ -94,10 +94,10 @@ RG_API const char *rg_split_scorer_string(rg_split_scorer scorer);
  * tuple is an outcome crossed with which languages a set happened to cover and
  * any one-off reflex in any one sister, so `K` grows with the sample rather
  * than the structure and a conditioned correspondence recovered at two lects is
- * lost at three, four and five. This was the default and the defect through
- * M10; it is retained to reproduce the pre-M11 model.
+ * lost at three, four and five. It is retained only for comparison and is not
+ * the default.
  *
- * `PER_SISTER_LECT` (the default since M11) scores the split as a sum over
+ * `PER_SISTER_LECT` (the default) scores the split as a sum over
  * sister lects instead: for each sister lect present on both sides of the
  * split, the outcome is that lect's grapheme and the charge is `(K_q-1)*ln n_q`
  * with `K_q` bounded by the lect's inventory, not by arity. Coverage falls out
@@ -105,8 +105,7 @@ RG_API const char *rg_split_scorer_string(rg_split_scorer scorer);
  * a lect sitting entirely on one side contributes no contrast and is not
  * charged -- so a real conditioned correspondence is recovered at every arity.
  * This is what the pairwise stage already does, and why it works at every
- * arity. See docs/multilect_hardening_plan.md (M11) for the alternatives
- * measured and rejected. Only the multi-lect class search reads this; the
+ * arity. Only the multi-lect class search reads this; the
  * pairwise stages score real target graphemes and are unaffected. */
 typedef enum rg_class_outcome_mode {
     RG_CLASS_OUTCOME_SISTER_TUPLE = 0,
@@ -145,7 +144,7 @@ typedef struct rg_bic_config {
      * Set this only to suppress weak rules in a report. */
     double cross_dim_min_rule_confidence;
     double cross_dim_delta_bic_threshold;
-    /* Legacy BIC-only `2/(n-1)` addition. Off by default after M3 because it
+    /* Legacy BIC-only `2/(n-1)` addition. Off by default because it
      * has no derivation in the selected criterion; retained only to reproduce
      * earlier experimental models. Ignored by the other scorers. */
     bool multi_lect_bic_small_sample_correction;
@@ -156,8 +155,9 @@ typedef struct rg_bic_config {
      * that survives is the best of many, while two predicate names that make
      * the same unordered two-way division are one search opportunity.
      *
-     * M3 selected 1.0 under its recorded restraint, null, power and predictive
-     * protocol; it remains an empirical setting, not a probability cutoff. Setting `permutation_count` and
+     * The default is 1.0, selected under a recorded restraint, null, power and
+     * predictive protocol; it remains an empirical setting, not a probability
+     * cutoff. Setting `permutation_count` and
      * `tune_search_penalty` replaces it with a value measured from the corpus
      * itself. */
     double search_penalty_gamma;
@@ -183,9 +183,7 @@ RG_API const char *rg_observation_unit_string(rg_observation_unit unit);
 
 /* The feature system is not here. It belongs to the context -- see
  * rg_context_use_system -- because it decides what a grapheme means before any
- * training option is consulted. This struct carried a `feature_system` field
- * until ABI 21 that nothing read: setting it selected nothing and reported
- * nothing. */
+ * training option is consulted. It is deliberately not a training option. */
 typedef struct rg_train_options {
     int max_chunk_size;
     double temperature;
@@ -666,8 +664,8 @@ typedef struct rg_cross_dimensional_row {
     /* Whether the conditioned dimension is read from the same form that states
      * the environment. 0 is the cross-lect rule -- one lect's material predicts
      * the other lect's tone. 1 is lect-internal: an onset and the tone it
-     * conditions in the same language, which is what tonogenesis leaves behind
-     * and what the row could not say before ABI 34. With `context_is_target`
+     * conditions in the same language, which is what tonogenesis leaves behind.
+     * With `context_is_target`
      * this names the single form both are read from: target when
      * `context_is_target`, source otherwise. */
     int dimension_from_environment;
@@ -691,12 +689,12 @@ typedef struct rg_cross_dimensional_row {
      * observations, so it fires only on a perfect confound, never on a partial
      * correlation.
      *
-     * The M7.2 analyst study found a confounded environment stated at full
-     * confidence is the report's most anchoring line: on a corpus where onset
-     * voicing and vowel frontness were perfectly confounded, every reader given
-     * the report adopted the one predicate it named and missed the ambiguity,
-     * while readers of the raw table caught it. This is the flag that was
-     * missing. It says nothing about whether the split is real -- that is
+     * A confounded environment stated at full confidence is a report's most
+     * anchoring line: on a corpus where onset voicing and vowel frontness are
+     * perfectly confounded, a reader given only the report adopts the one
+     * predicate it names and misses the ambiguity, while a reader of the raw
+     * table catches it. This flag exists to surface that. It says nothing about
+     * whether the split is real -- that is
      * `evidence` and the contrast fields -- only whether its cause is pinned. */
     int environment_alternatives;
     rg_rule_evidence evidence;
@@ -737,9 +735,9 @@ typedef struct rg_multi_pair_model_row {
  * under a different tone is a different class, so `north:a central:a south:a`
  * with tones `⁵⁵ ⁵⁵ ³³` and the same tuple with `¹¹ ³³ ¹¹` are two rows. For
  * Sinitic, Hmong-Mien, Tai-Kadai, Bantu register and much of Otomanguean the
- * tone correspondence set *is* the correspondence set, and before ABI 39 it had
- * no class row at any arity -- the tone reached per-pair count tables and
- * directed cross-dimensional rules but was dropped at reconciliation. */
+ * tone correspondence set *is* the correspondence set, and it earns a class row
+ * at every arity rather than reaching only the per-pair count tables and
+ * directed cross-dimensional rules and being dropped at reconciliation. */
 typedef struct rg_suprasegmentals {
     const char *tone;
     const char *length;
@@ -776,8 +774,8 @@ typedef struct rg_multi_class_row {
      * environment does not hold -- the comparison the split was scored on, and
      * the row a reader needs to judge it. On Verner the conditioned
      * `gothic:d ~ pgmc:θ` (before a vowel) points here at `gothic:d ~ pgmc:d`:
-     * the contrast that makes the conditioning real, which sat in an unrelated
-     * row with nothing linking it before ABI 31.
+     * the contrast that makes the conditioning real; `contrast_class_id` links
+     * the two, which an unrelated row would otherwise leave unconnected.
      *
      * -1 on an unconditioned class, and on a conditioned class whose complement
      * was empty or had no majority reflex. Indexes `class_id`, which is a
@@ -792,7 +790,7 @@ typedef struct rg_multi_class_row {
     double contrast_alternative_count;
     /* Rival conditioners at another position the corpus cannot tell this
      * conditioned class's environment from -- the same identifiability flag the
-     * cross-dimensional row carries (ABI 35), here for a segment split (ABI 36).
+     * cross-dimensional row carries, here for a segment split.
      * 0 on an unconditioned class and on a conditioned one whose environment is
      * uniquely identifiable; >0 when a different neighbour's feature carves the
      * split the same way and the corpus cannot say which conditions it. */
@@ -806,11 +804,10 @@ typedef struct rg_multi_class_row {
      * Read `supporting_cognate_count` wherever the question is whether a
      * correspondence recurs. `count` cannot answer it: it is aligned positions
      * weighted by cognate confidence, so a single word with a geminate or a
-     * repeated segment reaches 2, and one of M6's adjudication panels accepted
-     * such a row believing two words supported it. Before ABI 30 this list
-     * repeated an id once per position and its length equalled `count` on an
-     * unweighted corpus; a consumer that relied on that is now reading distinct
-     * sets, which is the number it almost certainly wanted. */
+     * repeated segment reaches 2, and such a row is easily misread as two words
+     * supporting it. This list gives each supporting set once, so its length is
+     * the count of distinct sets -- almost certainly the number a consumer
+     * wants. */
     const char *const *supporting_cognates;
     size_t supporting_cognate_count;
     rg_uncertainty_estimate uncertainty;
@@ -1396,11 +1393,10 @@ typedef struct rg_arcaverborum_load_options {
 
 /* Why a load failed, and where.
  *
- * The caller owns the storage, which is the whole point. A failed load returns
- * no corpus to hang a message on, and the answer until ABI 22 was a
- * process-wide buffer: not thread-safe, and stale between calls, because the
- * parse_* entry points never cleared it and a successful parse after a failed
- * load still reported the failure.
+ * The caller owns the storage, which is the whole point: a failed load returns
+ * no corpus to hang a message on, and a caller-owned diagnosis is thread-safe
+ * and never stale between calls -- the alternative, a process-wide buffer, is
+ * neither.
  *
  * Every load and parse entry point clears this on entry when one is supplied,
  * and passing null asks for no reporting. line is 1-based, and 0 when the

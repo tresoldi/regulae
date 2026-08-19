@@ -1,10 +1,8 @@
 """Native C-backed Python wrapper for regulae.
 
 The package trains through the C core and parses its JSON into dataclasses. It
-does no modelling of its own: it used to reimplement the engine in Python, which
-drifted behind the C every time the C gained a feature, and nothing checked the
-two agreed. The boundary is now the JSON the core renders, so the wrapper stays
-correct for free -- see docs/legacy_python/ for the retired implementation.
+does no modelling of its own: the boundary is the JSON the core renders, so the
+wrapper stays correct for free and inherits every C feature.
 """
 
 from __future__ import annotations

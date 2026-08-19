@@ -4,11 +4,8 @@ A thin Python wrapper over the regulae C core. It trains through the C library
 and parses the model it renders as JSON into dataclasses; it does no modelling
 of its own.
 
-The package used to reimplement the engine in Python. That copy drifted behind
-the C every time the C gained a feature, and nothing checked the two agreed, so
-it was retired to `docs/legacy_python/`. The boundary is now the JSON the core
-renders, which means the wrapper inherits every C feature for free and an ABI
-change never reaches it.
+The boundary is the JSON the core renders, which means the wrapper inherits
+every C feature for free and an ABI change never reaches it.
 
 ## Install
 

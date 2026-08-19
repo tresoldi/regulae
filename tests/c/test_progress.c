@@ -74,7 +74,7 @@ static void test_progress_is_monotonic_and_bounded(rg_context *ctx) {
         }
     }
     /* Three lects means three pairs, each running the nine pairwise stages
-     * (gap aggregation joined them at ABI 32), plus the three multi-lect
+     * (gap aggregation is one of them), plus the three multi-lect
      * stages. */
     assert(r.totals[0] == 3 * 9 + 3);
     assert(r.count == r.totals[0]);

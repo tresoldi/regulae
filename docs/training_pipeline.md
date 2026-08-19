@@ -10,8 +10,7 @@ The implementation is the C core: `src/model.c` drives the pairwise
 pipeline, `src/model_context.c`, `src/model_chunks.c` and
 `src/model_crossdim.c` are the discovery stages, `src/split_search.c` is
 the split search they share, and `src/multilect_*.c` is the multi-lect
-layer. The path given here until 2026-08-16 pointed at the archived
-Python tree under `python/`, which is not built or supported.
+layer.
 
 Conceptual overview in `framework/03_alignment.md`, technical detail in
 `docs/alignment_details.md`, discovery mechanisms in
@@ -156,11 +155,11 @@ search charge, so synonymous feature encodings cannot change selection.
 **Why corrected BIC remains the default.** BIC has the
 complexity penalty built in. Mutual information does not penalize
 splits by how many parameters they add, so it would over-commit on
-small data. M3 selected the full model-space charge, `γ = 1`, and a zero
-threshold after the earlier half charge admitted a conditioned class in the
-pre-existing unrelated-lect restraint fixture. Corrected BIC survived the
-recorded comparison with exact NML and Dirichlet marginal likelihoods; see ADR
-0001.
+small data. The full model-space charge, `γ = 1`, and a zero
+threshold were selected after the earlier half charge admitted a conditioned
+class in the pre-existing unrelated-lect restraint fixture. Corrected BIC
+survived the recorded comparison with exact NML and Dirichlet marginal
+likelihoods; see ADR 0001.
 
 **Why after chunk promotion.** See the design choice discussion
 at the top — chunks are a kind of compressed correspondence, and
@@ -215,8 +214,8 @@ a conditional probability without its baseline is not evidence of
 conditioning. See `docs/correspondence_discovery.md` for the criterion
 and for what the original Python design had that this does not.
 
-**Where it is charged, and why that is a stage-order fact.** As of
-2026-08-16 the DP charges for these rules while it searches, rather than
+**Where it is charged, and why that is a stage-order fact.** The DP
+charges for these rules while it searches, rather than
 the rules re-scoring an alignment already chosen. The adjustment is local
 to a DP transition — its source predicate reads the source form at the
 link's start and its target value the target form at that position plus
@@ -235,10 +234,10 @@ bit-identical.
 
 **Why the environment is tested against its complement rather than
 scored on its own.** The stage answers "does this feature condition this
-dimension", and conditioning is a comparison. Until 2026-08-14 it was
-answered with `P(value | environment) >= 0.5` and no comparison at all,
-which committed predicates true of the whole corpus, predicates that
-partitioned the corpus without moving anything, and — on a two-valued
+dimension", and conditioning is a comparison. Answering it instead with
+`P(value | environment) >= 0.5` and no comparison at all
+would commit predicates true of the whole corpus, predicates that
+partition the corpus without moving anything, and — on a two-valued
 dimension — both values for the same environment at once.
 
 **Why the greedy loop tests against the residue.** Correlated framings
@@ -343,7 +342,7 @@ Short version:
 3. **Class-level context discovery.** A multi-lect version of stage 4,
    iterating over pivot lects and committing splits at the class
    level. It uses the same categorical scorer and a sample-size-scaled
-   min-commit floor. M3 removed the un-derived AICc-shaped addition.
+   min-commit floor, with no un-derived AICc-shaped addition.
 4. **Cross-dimensional rule lifting.** Per-pair cross-dimensional
    commits are surfaced at the multi-lect level with explicit
    `src_lect`/`tgt_lect` labels. No new discovery runs at this
@@ -404,7 +403,7 @@ wordlist and set-membership pattern while breaking which forms answer one
 another, then retrains the whole pipeline. It supports the corpus-fit z-score
 and, today, the published per-rule standing threshold.
 
-M2's evaluation harness adds two conditioned-selection nulls without changing
+The evaluation harness adds two conditioned-selection nulls without changing
 that default. A **within-source-bucket outcome shuffle** retains the source
 segment, its environment and weights while permuting target outcomes inside
 the source bucket. A **parametric unconditioned null** samples those outcomes
@@ -415,8 +414,6 @@ is deliberately limited to clean equal-length synthetic forms; it is an
 evaluation instrument, not another production verdict hidden in the model.
 
 The null name appears in JSON for both corpus fit and conditioned standing.
-`docs/m2_evaluation.md` records the factorial snapshot and permutation-count
-convergence.
 
 ## What's not in the pipeline (and why)
 
@@ -427,13 +424,6 @@ Things a new reader might expect but won't find:
   badly get included and contribute noisy observations. The user is
   expected to run `find_cognate_outliers` post-hoc to triage outlier
   pairs manually.
-- **No iterated-DP pass after cross-dimensional commits.** The
-  cross-dimensional overlay is currently a post-hoc additive
-  correction at scoring time, not a factor inside the DP. This means
-  the DP picks alignments without knowing the rules will fire; the
-  rules re-score those alignments after the fact. The alternative
-  (bake the overlay into the DP cost function) is a substantial
-  refactor and has not been done.
 - **No joint training of displacement and segment tables.** Stage 2
   is a one-pass aggregation, not an EM loop. This is fine as long as
   segment-level EM has converged first — the displacement counts

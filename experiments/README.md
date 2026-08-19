@@ -16,8 +16,8 @@ not; nothing below those sections was rewritten to match the engine.
 
 | directory | status |
 |---|---|
-| `tone_chinese_like_clean/` | Claims two cross-dimensional rules at confidence 1.00; both are committed since M5. |
-| `mandarin_historical/` | Claims the Middle Chinese voicing tonogenesis; committed since M5, alongside tone-to-tone rows. |
+| `tone_chinese_like_clean/` | Claims two cross-dimensional rules at confidence 1.00; both are committed. |
+| `mandarin_historical/` | Claims the Middle Chinese voicing tonogenesis; committed, alongside tone-to-tone rows. |
 | `morph_boundary_synthetic/` | Corpus **does not load** -- inline `+` is refused as CLDF/CLTS markup. |
 | `stress_conditioned_synthetic/` | Corpus **does not load** -- inline `-` is not a grapheme any feature system covers. |
 | `gled_polynesian/`, `gled_romance/`, `arcaverborum_polynesian/` | No corpus in the repository; the data is not vendored. |
@@ -29,7 +29,7 @@ the derived lect first alphabetically -- `cantonese` before `mandarin`,
 `mandarin` before `middle_chinese` -- so the stage asked whether the daughter
 predicts the ancestor, which is the direction the rule is not in.
 
-M5 searches both orientations. `rg_cross_dimensional_row.context_is_target` says
+regulae searches both orientations. `rg_cross_dimensional_row.context_is_target` says
 which form the environment was read from, which is what
 `rg_conditioned_segment_count_row` had always carried for conditioned
 correspondences: a change is only visible from the side that has the split, and

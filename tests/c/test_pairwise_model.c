@@ -229,9 +229,9 @@ static void test_joint_cross_dimensional_rule(rg_context *ctx) {
 }
 
 /* Tonogenesis is lect-internal: an onset conditions the tone in the same
- * language. Until ABI 34 the row could only say "one lect's material predicts
- * the other's tone", never "this lect's own onset predicts its own tone", so
- * the daughter's own voicing-conditioned tone was unstatable. The fixture keeps
+ * language. The row can say "this lect's own onset predicts its own tone", not
+ * only "one lect's material predicts the other's tone", so
+ * the daughter's own voicing-conditioned tone is statable. The fixture keeps
  * voicing on the daughter and splits its tone by that voicing; both the
  * lect-internal rule and the cross-lect one must appear, and no gap must reach
  * the segment side. */

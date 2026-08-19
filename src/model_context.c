@@ -703,7 +703,7 @@ static rg_status commit_splits_for_source(
 /* Flattens the corpus alignments into (source, target, context, weight) rows.
  * When decompose_chunks is set, multi-segment links are broken down through a
  * one-segment sub-alignment and each resulting 1-to-1 pair inherits the outer
- * link's context, matching the Go reference. */
+ * link's context. */
 static rg_status flatten_context_observations(
     const rg_context *ctx,
     const rg_form_pair *pairs,

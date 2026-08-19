@@ -506,7 +506,7 @@ def noise_unconditioned():
 
     What the search does instead is commit a handful, each resting on the three
     or four words where a noise token happened to line up with a neighbour. This
-    is the shape `docs/m6_evaluation.md`'s finding is about: on data with a real
+    is the shape the finding is about: on data with a real
     relationship but no conditioning, the pairing shuffle -- which destroys the
     correspondences and so measures a low bar -- certified every one of these as
     STANDS, and did it more the larger the corpus got. The per-pivot

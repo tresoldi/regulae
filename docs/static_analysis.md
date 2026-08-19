@@ -41,7 +41,7 @@ Four were real and are fixed.
 `diagnosis->message[0]`, and every loader clears the struct on entry — but
 `load_corpus` returns `RG_ERR_UNSUPPORTED_OPTION` for an unrecognised format
 without reaching a loader, so the CLI read uninitialised stack. Introduced in
-the same session, at ABI 22, and reachable only by passing `--format` a value
+the same session, and reachable only by passing `--format` a value
 the CLI does not know.
 
 **An `ftell` that can return -1.** `tests/c/test_loaders.c` did
@@ -55,8 +55,8 @@ every implementation in existence ignores it. Guarded.
 Two more were real and were found in the same pass, in `loaders.c`:
 `parse_record` appends fields as it goes and can fail after some are built,
 leaving the partly-filled row to its caller; neither caller released it. That is
-a leak on the out-of-memory path, of the same shape as the one the fuzzer found
-in M14 — and one no fuzzer would have found, because fuzzing does not produce
+a leak on the out-of-memory path, of the same shape as one the fuzzer found
+earlier — and one no fuzzer would have found, because fuzzing does not produce
 allocation failures. `loader_row_clear` now exists and both callers use it.
 
 ## The six suppressions

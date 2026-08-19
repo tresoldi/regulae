@@ -23,8 +23,5 @@ The other three suites are elsewhere and ask different questions:
 a change that is not there can be declined, `../diagnostics/` whether a corpus
 that is wrong can be identified as wrong. Each has its own README.
 
-These were the parity corpora: until merkmal 1.0 they were run through both
-the C implementation and the frozen Go reference and diffed. That comparison
-ended with the reference — see the parity section of
-`docs/c_conversion_roadmap.md` — and the corpora outlived it because the
-coverage they were chosen for is still the coverage the C tests need.
+These corpora were chosen for the range of phenomena they cover, and the C
+tests still rely on exactly that coverage.

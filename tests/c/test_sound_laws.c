@@ -218,7 +218,7 @@ static void test_rhotacism(rg_context *ctx) {
  * alphabetically had those stages align each pair in the opposite direction
  * from the one its model was trained in. Reading a model of P(b|a) as P(a|b)
  * misses nearly every lookup and falls back to the untrained prior. */
-/* AGENTS.md states the invariant: "a rule published without the contrast it was
+/* The invariant: "a rule published without the contrast it was
  * measured against cannot be read". The cross-dimensional rows honoured it and
  * the conditioned classes did not, which is the block the human report leads
  * with. "s ~ r between vowels, count 14" says nothing until you know what /s/

@@ -138,7 +138,7 @@ class CorrespondenceClass:
 class CrossDimensionalRule:
     """A feature conditioning a suprasegmental dimension.
 
-    ``dimension_from_environment`` is the M7.1 addition: false is the cross-lect
+    ``dimension_from_environment`` names the rule shape: false is the cross-lect
     rule (one lect's onset predicts the other's tone), true is lect-internal
     tonogenesis (an onset and the tone it conditions in one lect). For a
     lect-internal rule ``conditioned_lect`` equals ``environment_lect``.

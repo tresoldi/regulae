@@ -218,8 +218,8 @@ environment to reduce, and a row conditioning that direction cannot be a change
 whatever it scores.
 
 `test_a_lexical_gap_in_the_source_is_published_as_conditioning` asserts the
-count that is published rather than the count that is right, and says so. M8's
-direction typing is what should change it.
+count that is published rather than the count that is right, and says so.
+Direction typing is what should change it.
 
 ## `noise_unconditioned` — a real relationship, and nothing to condition
 
@@ -238,8 +238,8 @@ one language pair. The right answer is still zero conditioned rules.
 
 What the search commits instead is a handful of rules, each resting on the three
 or four words where a noise token lined up with a neighbour — and one on seven,
-above the floor's neighbourhood. This is the shape `docs/m6_evaluation.md`'s
-finding is about: on data with a real relationship and no conditioning, the
+above the floor's neighbourhood. This is the shape the finding is about: on
+data with a real relationship and no conditioning, the
 **pairing shuffle certified every one of these as `STANDS`, and did it more the
 larger the corpus grew**, because the shuffle destroys the correspondences and
 so measures a bar that does not rise with the evidence.
@@ -324,7 +324,7 @@ that a lect is missing from a set gives the ragged coverage every real wordlist
 has.
 
 The right answer is the same at every rung, and the evidence for it only grows.
-Since M11 that is what comes out:
+That is what comes out:
 
 | rung | sets | classes | conditioned | rows stating /k ~ q/ | largest such row |
 | --- | ---: | ---: | ---: | ---: | ---: |
@@ -336,7 +336,7 @@ Since M11 that is what comes out:
 **Adding a language no longer subtracts evidence.** The rule is recovered at
 every rung, five lects included, and its row count stops collapsing.
 
-Through M10 it did not. A class-level split was priced by the number of distinct
+Earlier it did not. A class-level split was priced by the number of distinct
 *sister tuples* in the pivot bucket, and a sister tuple is the full list of
 (lect, grapheme) pairs — so it counted which lects a cognate set happened to
 cover, and any one-off reflex in any one sister, alongside the correspondence
@@ -345,19 +345,18 @@ sample rather than with the structure, while a binary environment can only ever
 buy about one bit per observation; the charge outran anything the evidence could
 pay, and at five lects the search committed nothing at all.
 
-The fix is not the fragmentation hypothesis the roadmap tested and refuted. That
+The fix is not the fragmentation hypothesis that was tested and refuted. That
 one aliased each partial tuple to its *unique widest compatible parent*, which
 cannot reach the tail: on a four-lect Turkic pivot with nineteen sister keys,
 two have a unique widest parent, ten are compatible with several and seven with
 none, so the alias moves `K` from 19 to 17. The keys that dominate the charge
 are exactly the ones no parent can absorb. `RG_CLASS_OUTCOME_PER_SISTER_LECT`
-(the default since M11) instead scores the split as a sum over sister lects: for
+(the default) instead scores the split as a sum over sister lects: for
 each sister lect present on both sides, one categorical over that lect's
 graphemes, charged `(K_q−1)·ln n_q` with `K_q` bounded by the lect's inventory,
 not by arity. Coverage falls out — an observation lacking a lect does not enter
 that lect's sub-count — and the arity cliff with it. Two other outcome models
-were prototyped and rejected; `docs/multilect_hardening_plan.md` records the
-measurement.
+were prototyped and rejected on the same measurement.
 
 `test_adding_a_lect_recovers_the_conditioned_rule` pins the recovered counts.
 
