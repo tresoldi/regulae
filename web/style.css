@@ -5,27 +5,30 @@
  * carries the selection across both. */
 
 :root {
-  --bg: #fbfaf8;
+  --bg: #f6f7f8;
   --panel: #ffffff;
-  --ink: #1c1a17;
-  --muted: #6b6660;
-  --line: #ddd8d0;
-  --accent: #8a4b2a;
-  --accent-soft: #f3e2d6;
-  --warn: #7a5c12;
+  --panel-tint: #eef3f1;
+  --ink: #1b1f23;
+  --muted: #57606a;
+  --line: #d8dee4;
+  --accent: #2a7d6f;
+  --accent-soft: #eef3f1;
+  --warn: #8a5b12;
   --warn-soft: #f7efd8;
-  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #161513;
-    --panel: #1e1d1a;
-    --ink: #ece8e1;
-    --muted: #9a938a;
-    --line: #34312c;
-    --accent: #d99a6c;
-    --accent-soft: #3a2b20;
+    --bg: #0f1113;
+    --panel: #16181b;
+    --panel-tint: #13201c;
+    --ink: #e7e9ec;
+    --muted: #9aa0a8;
+    --line: #2a2e33;
+    --accent: #5bbfae;
+    --accent-soft: #17231f;
     --warn: #d9bc72;
     --warn-soft: #352e18;
   }
@@ -49,7 +52,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.55 var(--sans);
 }
 
 a { color: var(--accent); }
@@ -58,15 +61,19 @@ a { color: var(--accent); }
 
 /* ---- header ---------------------------------------------------------- */
 
+/* The faint tinted bar is regulae's one nod to the sr.ht header; it spans the
+   content column and carries the wordmark, version and the two links. */
 .top {
   display: flex;
   align-items: baseline;
   gap: 16px;
-  padding: 18px 0;
+  margin: 0 -20px;
+  padding: 13px 20px;
+  background: var(--panel-tint);
   border-bottom: 1px solid var(--line);
   flex-wrap: wrap;
 }
-.top h1 { font-size: 21px; margin: 0; letter-spacing: -0.01em; }
+.top h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
 .top .version { color: var(--muted); font-size: 13px; font-family: var(--mono); }
 .top .spacer { flex: 1; }
 .top a, .top button { font-size: 14px; }
@@ -79,7 +86,7 @@ a { color: var(--accent); }
   border: 1px solid var(--line);
   border-left: 3px solid var(--warn);
   background: var(--warn-soft);
-  border-radius: 4px;
+  border-radius: 0;
   font-size: 14px;
 }
 .status-banner strong { color: var(--warn); }
@@ -92,7 +99,7 @@ a { color: var(--accent); }
   gap: 0;
   margin: 22px 0 0;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 0;
   overflow: hidden;
   background: var(--panel);
 }
@@ -118,7 +125,7 @@ select, button, input[type="file"]::file-selector-button {
   font-size: 14px;
   padding: 7px 12px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--panel);
   color: var(--ink);
   cursor: pointer;
@@ -170,7 +177,7 @@ button:disabled { opacity: 0.45; cursor: default; }
   font: 13px/1.5 var(--mono);
   padding: 6px 10px;
   border: 1px solid var(--line);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--panel);
   color: var(--ink);
   min-width: 220px;
@@ -183,7 +190,7 @@ button:disabled { opacity: 0.45; cursor: default; }
 .segment-preview .grapheme {
   padding: 1px 6px;
   border: 1px solid var(--line);
-  border-radius: 3px;
+  border-radius: 0;
   background: var(--panel);
 }
 .segment-preview .grapheme + .grapheme { margin-left: 0; }
@@ -195,7 +202,7 @@ textarea {
   font: 13px/1.5 var(--mono);
   padding: 12px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--panel);
   color: var(--ink);
   tab-size: 12;
@@ -227,7 +234,7 @@ textarea {
 .progress .bar {
   height: 4px;
   background: var(--line);
-  border-radius: 2px;
+  border-radius: 0;
   overflow: hidden;
 }
 .progress .fill { height: 100%; width: 0; background: var(--accent); transition: width 120ms linear; }
@@ -238,7 +245,7 @@ textarea {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--panel);
 }
 .error .what { font-weight: 600; }
@@ -269,7 +276,7 @@ textarea {
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  border-radius: 0;
   background: var(--panel);
 }
 .baseline[hidden] { display: none; }
@@ -289,7 +296,7 @@ textarea {
 
 /* The provenance block: closed by default, since it is reference rather than
    result. Its rows are label/value pairs read straight off the model. */
-.provenance { margin-top: 16px; border: 1px solid var(--line); border-radius: 6px;
+.provenance { margin-top: 16px; border: 1px solid var(--line); border-radius: 0;
   background: var(--panel); font-size: 13px; }
 .provenance > summary { padding: 10px 14px; cursor: pointer; color: var(--muted); }
 .provenance dl { margin: 0; padding: 0 14px 14px; display: grid;
@@ -303,7 +310,7 @@ textarea {
 .panel .hint { font-size: 13px; color: var(--muted); margin: -4px 0 10px; }
 
 .scroll { max-height: 62vh; overflow: auto; border: 1px solid var(--line);
-  border-radius: 6px; background: var(--panel); }
+  border-radius: 0; background: var(--panel); }
 
 .panel.events { margin-top: 22px; }
 .panel.events .scroll { max-height: 30vh; }
@@ -342,12 +349,12 @@ table.classes.hide-conf .conf-col { display: none; }
 }
 .table-tools input {
   font: 13px/1.5 var(--mono); padding: 5px 9px; border: 1px solid var(--line);
-  border-radius: 4px; background: var(--panel); color: var(--ink); min-width: 200px; flex: 1;
+  border-radius: 0; background: var(--panel); color: var(--ink); min-width: 200px; flex: 1;
 }
 .chips { display: flex; gap: 5px; flex-wrap: wrap; }
 .chip {
   font: inherit; font-size: 12px; padding: 3px 9px; border: 1px solid var(--line);
-  border-radius: 999px; background: var(--panel); color: var(--muted); cursor: pointer;
+  border-radius: 0; background: var(--panel); color: var(--muted); cursor: pointer;
 }
 .chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .table-tools .count { font-size: 12px; color: var(--muted); font-family: var(--mono);
@@ -409,7 +416,7 @@ tr.evidence-row td { background: var(--accent-soft); padding: 0; border-bottom: 
 .ev-sets span { flex: 1; word-break: break-word; }
 .ev-copy {
   border: 1px solid var(--line); background: var(--panel); color: var(--muted);
-  font: inherit; font-size: 11px; padding: 1px 8px; border-radius: 3px; cursor: pointer;
+  font: inherit; font-size: 11px; padding: 1px 8px; border-radius: 0; cursor: pointer;
   white-space: nowrap;
 }
 .ev-copy:hover { border-color: var(--accent); color: var(--accent); }
@@ -422,9 +429,9 @@ td.rate { width: 128px; }
 td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
   font-size: 12px; color: var(--muted); }
 .ci { position: relative; display: block; height: 4px; margin-top: 5px;
-  background: var(--line); border-radius: 2px; }
+  background: var(--line); border-radius: 0; }
 .ci-bar { position: absolute; top: 0; bottom: 0; background: var(--muted);
-  border-radius: 2px; opacity: 0.5; }
+  border-radius: 0; opacity: 0.5; }
 .ci.boot .ci-bar { background: var(--accent); opacity: 0.75; }
 .ci-tick { position: absolute; top: -2px; width: 2px; height: 8px;
   background: var(--ink); transform: translateX(-1px); }
@@ -446,7 +453,7 @@ td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
   grid-template-rows: auto auto;
   gap: 1px;
   padding: 2px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   font-family: var(--mono);
   font-size: 13px;
   border: 1px solid transparent;
@@ -475,7 +482,7 @@ td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
 .guide header h2 { font-size: 15px; margin: 0; flex: 1; }
 .guide .body { padding: 18px; overflow: auto; flex: 1; }
 .guide .body h3 { font-size: 15px; margin: 18px 0 6px; }
-.guide .body pre { background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+.guide .body pre { background: var(--bg); border: 1px solid var(--line); border-radius: 0;
   padding: 10px; overflow: auto; font-size: 12px; }
 .guide .body code { font-family: var(--mono); font-size: 0.92em; }
 .guide .steps { display: flex; gap: 6px; padding: 10px 18px; border-top: 1px solid var(--line);
