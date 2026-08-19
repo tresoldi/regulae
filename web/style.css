@@ -78,18 +78,20 @@ a { color: var(--accent); }
 .top .spacer { flex: 1; }
 .top a, .top button { font-size: 14px; }
 
-.tagline { margin: 18px 0 0; font-size: 19px; color: var(--muted); }
+.tagline { margin: 14px 0 0; font-size: 16px; color: var(--muted); }
 
+/* A plain note, not a warning: the tinted fill and a teal left edge tie it to
+   the palette rather than flagging caution. */
 .status-banner {
-  margin: 18px 0 0;
+  margin: 16px 0 0;
   padding: 10px 14px;
   border: 1px solid var(--line);
-  border-left: 3px solid var(--warn);
-  background: var(--warn-soft);
+  border-left: 3px solid var(--accent);
+  background: var(--panel-tint);
   border-radius: 0;
   font-size: 14px;
 }
-.status-banner strong { color: var(--warn); }
+.status-banner strong { color: var(--ink); }
 
 /* ---- the boundary block ---------------------------------------------- */
 
