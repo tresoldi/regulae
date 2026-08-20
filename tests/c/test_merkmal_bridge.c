@@ -17,8 +17,9 @@ static int feature_set_contains(const rg_feature_set *features, const char *need
 
 /* The tie bar is how a transcription says "one segment", and the default
  * reading honours it: "t͡ʃ" is one segment where untied "tʃ" is two. Longest
- * match against the inventory reads both as one, and on the same rule reads
- * the geminate "kk" as one, which is why it is not the default. */
+ * match merges explicit inventory entries and known complex segments
+ * (affricates, labio-velars, prenasalized stops) but not arbitrary clusters
+ * or geminates; "bukka" stays five segments in both modes. */
 static void test_segmentation_reads_the_tie_bar(rg_context *ctx) {
     rg_segment *segments = 0;
     size_t count = 0;
@@ -35,8 +36,7 @@ static void test_segmentation_reads_the_tie_bar(rg_context *ctx) {
 
     assert(rg_context_set_segmentation(ctx, RG_SEGMENT_SYSTEM_LONGEST_MATCH) == RG_OK);
     assert(rg_context_segment_word(ctx, "bukka", &segments, &count) == RG_OK);
-    assert(count == 4);
-    assert(strcmp(segments[2].grapheme, "kk") == 0);
+    assert(count == 5);
     rg_segments_free(segments, count);
     assert(rg_context_set_segmentation(ctx, RG_SEGMENT_ORTHOGRAPHIC) == RG_OK);
 
