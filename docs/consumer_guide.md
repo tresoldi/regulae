@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 39. The public surface has moved since this
+`RG_ABI_VERSION` is 40. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1000,7 +1000,7 @@ contract.
 public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
-signature or ownership change. It is at **39**.
+signature or ownership change. It is at **40**.
 
 **The JSON export is named and versioned.** `export_kind` is
 `"surface_relationship_model"` — the maximum-a-posteriori surface
@@ -1022,6 +1022,22 @@ What has landed, most recent first, as a guide to the kind of
 break to expect. Every one of them fails a consumer at compile
 time rather than silently, which is the intent.
 
+- **40** — `rg_train_options` gained `ibm1_prior` (0: run; default
+  negative: skip), and the public API gained the translation table surface:
+  `rg_train_translation_table`, `rg_translation_table_from_prior`,
+  `rg_translation_table_precompute`, `rg_translation_probability`,
+  `rg_translation_align`, `rg_translation_score`,
+  `rg_translation_table_free`, and the vocabulary accessors.
+  The translation table is an IBM Model 1 probability table P(t|s)
+  trained by EM from form pairs, with no positional constraint. Inside
+  the pipeline it seeds the Dirichlet prior before segment-level EM so
+  that the first alignment is informed by corpus-wide co-occurrence;
+  as a standalone API it gives downstream packages (cognate detection,
+  loanword identification) an unconstrained alignment score that
+  handles disjoint mappings — reduplication, infixation, long-range
+  metathesis — which the monotone DP cannot express. The pairwise
+  progress stage count is now dynamic (ten with IBM, nine without).
+  Struct layout change on `rg_train_options`.
 - **39** — `rg_multi_class_row` gained `suprasegmentals`, an array parallel to
   `graphemes` of `rg_suprasegmentals` (`tone`, `length`, `stress`). A tone
   correspondence set is a correspondence set, and now gets a class row: the same

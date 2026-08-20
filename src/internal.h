@@ -30,10 +30,13 @@
 #ifndef RG_SEARCH_PENALTY_GAMMA
 #define RG_SEARCH_PENALTY_GAMMA 1.0
 #endif
-/* Stages the pairwise pipeline reports: initial prior, segment EM, displacement
- * aggregation, gap aggregation, context discovery, chunk promotion, tonal
- * aggregation, cross-dimensional discovery, long-range discovery. */
-#define RG_PAIRWISE_STAGE_COUNT 9
+/* Base pairwise stages: initial prior, segment EM, displacement aggregation,
+ * gap aggregation, context discovery, chunk promotion, tonal aggregation,
+ * cross-dimensional discovery, long-range discovery. The IBM1 prior step adds
+ * one when opts->ibm1_prior >= 0. */
+#define RG_PAIRWISE_STAGE_COUNT_BASE 9
+#define RG_PAIRWISE_STAGE_COUNT(opts) \
+    ((size_t)RG_PAIRWISE_STAGE_COUNT_BASE + ((opts) && (opts)->ibm1_prior >= 0 ? (size_t)1 : (size_t)0))
 /* Multi-lect stages beyond the per-pair work: reconciliation, class discovery,
  * cross-dimensional lifting. */
 #define RG_MULTILECT_STAGE_COUNT 3
@@ -139,6 +142,16 @@ struct rg_multi_model {
     size_t unpaired_set_count;
     rg_corpus_fit fit;
 };
+
+/* Replaces the Dirichlet prior in a pairwise model with probabilities from a
+ * trained IBM Model 1 translation table. Each alpha(t|s) becomes
+ * concentration * P_ibm(t|s), and the log normaliser is set to 0 for all
+ * sources (since the IBM probabilities are already normalised). Pairs the
+ * table does not cover keep their existing alpha. */
+rg_status rg_seed_prior_from_ibm1_internal(
+    const rg_translation_table *table,
+    rg_pairwise_model *model
+);
 
 /* Class ids realised at a given position pair, for a link of an alignment
  * between two lects of one cognate set. Returns the number written to out,

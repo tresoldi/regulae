@@ -608,6 +608,24 @@ rg_status rg_train_pairwise_internal(
         rg_pairwise_model_free(model);
         return RG_ERR_CANCELLED;
     }
+    if (pair_count > 0 && opts->ibm1_prior >= 0) {
+        rg_translation_table *ibm_table = 0;
+        status = rg_train_translation_table(ctx, pairs, pair_count, 0, &ibm_table);
+        if (status != RG_OK) {
+            rg_pairwise_model_free(model);
+            return status;
+        }
+        status = rg_seed_prior_from_ibm1_internal(ibm_table, model);
+        rg_translation_table_free(ibm_table);
+        if (status != RG_OK) {
+            rg_pairwise_model_free(model);
+            return status;
+        }
+        if (rg_progress_step_internal(progress, "ibm1 prior")) {
+            rg_pairwise_model_free(model);
+            return RG_ERR_CANCELLED;
+        }
+    }
     for (iter = 0; iter < max_iter; iter++) {
         double cost = 0.0;
         status = corpus_cost_with_model(ctx, pairs, pair_count, opts, model, &cost);
@@ -685,7 +703,7 @@ rg_status rg_train_pairwise_segment_counts(
     rg_pairwise_model **out
 ) {
     rg_progress_state progress;
-    rg_progress_init_internal(&progress, options, RG_PAIRWISE_STAGE_COUNT);
+    rg_progress_init_internal(&progress, options, RG_PAIRWISE_STAGE_COUNT(options));
     return rg_train_pairwise_internal(ctx, pairs, pair_count, options, &progress, out);
 }
 

@@ -41,6 +41,7 @@ the engine changed to allow it.
 | several environments for one correspondence | supported | every loader | `tests/c/test_sound_laws.c`: rows merge on their observations, not on the tuple |
 | partial cognacy, per morpheme | **not expressible** | n/a | `testdata/diagnostics/partial.tsv`: visible in the ranking, not usable in training |
 | transcription drift between sources | reported, not refused | `regulae check`, or `rg_find_transcription_drift` | `testdata/diagnostics/drift.tsv`: 5 of 5 found, and no corpus in this repository reports a false one |
+| unconstrained translation table (IBM Model 1) | supported; opt-in in the pipeline, standalone API | `ibm1_prior`, or `rg_train_translation_table` | `tests/c/test_ibm1.c` |
 | telling borrowing from inheritance | **out of scope** | n/a | `testdata/restraint/contact.tsv`: the correspondences are real either way; the ranking shows the split |
 
 ## Corpora regulae reads (24 of 24)

@@ -924,7 +924,7 @@ extends through three additional stages.
 
 ### Per-pair pass
 
-The full seven-stage pairwise pipeline runs on every directed pair of
+The full eight-stage pairwise pipeline runs on every directed pair of
 lects that shares enough cognate data. The "canonical pair ordering"
 derives from `_collect_lect_ids`, which alphabetises lect IDs and
 iterates `combinations(lect_ids, 2)`.

@@ -426,7 +426,7 @@ rg_status rg_train_model(
     {
         size_t pairs = model->lect_count < 2 ? 0 : model->lect_count * (model->lect_count - 1) / 2;
         rg_progress_init_internal(&progress, options,
-                                  pairs * RG_PAIRWISE_STAGE_COUNT + RG_MULTILECT_STAGE_COUNT);
+                                  pairs * RG_PAIRWISE_STAGE_COUNT(options) + RG_MULTILECT_STAGE_COUNT);
     }
     status = train_pair_models(ctx, cognates, cognate_count, options, &progress, model);
     if (status == RG_OK && rg_progress_step_internal(&progress, "reconciliation")) {

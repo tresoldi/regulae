@@ -56,7 +56,41 @@ one-pass aggregation of residuals from the previous stages.
 All stages are private functions in `training.py`. Names used here
 match the code.
 
-### 1. Segment-level EM — `_segment_em`
+### 1. IBM Model 1 prior seeding
+
+**What it does.** Trains a pair of unconstrained translation tables
+P(t|s) and P(s|t) by EM over the corpus's form pairs, with no
+monotonicity or positional constraint. Each source position maps
+independently to any target position or to null. The learned
+probabilities then replace the merkmal-distance Dirichlet prior that
+stage 0 (the initial prior) installed: for each (source, target) in
+the prior table, `alpha` becomes `concentration * P_ibm(t|s)` under
+the geometric mean of the two directions, and the log-normalizer
+is zeroed.
+
+**Why it exists.** The merkmal prior is a good first guess — segments
+that are featurally close align cheaply — but it knows nothing about
+what actually corresponds in the corpus. On a language pair where a
+change crosses a large feature distance (a stop becoming a fricative
+at a different place, a vowel fronting and raising simultaneously),
+the merkmal prior underweights the link and the EM loop starts from a
+poor alignment. The IBM step observes the corpus and learns which
+mappings recur, including disjoint ones (reduplication, infixation,
+long-range metathesis) that a monotone DP cannot express. Seeding
+the Dirichlet with those probabilities gives segment-level EM a warm
+start: the first alignment is already informed by the data.
+
+**What it does not do.** The IBM table is not used as an alignment
+model. Its probabilities seed the prior; the DP alignment in stage 2
+remains monotone and positional. The IBM step also does not condition
+on phonological environment — that is what stages 5 and 8 are for.
+
+**Gating.** Controlled by `rg_train_options.ibm1_prior`: 0 runs
+the step; a negative value (the default) skips it. When the
+step is active, the progress counter reports ten pairwise stages
+rather than nine.
+
+### 2. Segment-level EM — `_segment_em`
 
 **What it does.** Iterative E/M loop: align every form pair under the
 current model, then re-estimate the segment correspondence table from
@@ -82,7 +116,7 @@ framework's load-bearing properties: the model does something sensible
 on small corpora and learns more from large ones without a phase
 transition.
 
-### 2. Displacement aggregation — `_displacement_aggregation`
+### 3. Displacement aggregation — `_displacement_aggregation`
 
 **What it does.** One-pass re-alignment of the corpus with the
 post-EM model, counting every 1-to-1 link's `FeatureDisplacement`
@@ -100,7 +134,7 @@ classic case: once the Dirichlet table has seen `p → f`, `t → θ`,
 has zero observations. Without displacement aggregation, the model
 can only memorize pairs it has seen.
 
-### 3. Chunk promotion — `_chunk_promotion`
+### 4. Chunk promotion — `_chunk_promotion`
 
 **What it does.** Walks the training alignments, collects candidate
 multi-segment chunks, and runs a greedy BIC loop: at each step, pick
@@ -127,7 +161,7 @@ corpora. An explicit `MIN_CHUNK_OBSERVATIONS = 2` floor rejects them.
 version: chunk costs stored in the phrase table must be offset for
 the DP, but the BIC comparison uses unoffset `−log P`.
 
-### 4. Context discovery — `_context_discovery`
+### 5. Context discovery — `_context_discovery`
 
 **What it does.** For each source grapheme with at least two observed
 targets, runs a greedy feature-based split search. Candidate splits
@@ -173,7 +207,7 @@ equivalents via a sub-alignment with `max_chunk_size=1`, so that
 patterns expressed as chunks by the main search (like `sk → ʃ`) still
 contribute to context discovery.
 
-### 5. Tonal aggregation — `_tonal_aggregation`
+### 6. Tonal aggregation — `_tonal_aggregation`
 
 **What it does.** One pass: re-align, then count each 1-to-1 link's
 tonal correspondence. A link where both segments are untoned
@@ -193,7 +227,7 @@ It also makes the next stage (cross-dimensional discovery) tractable:
 tonal outcome", and that correlation can only be tested when the two
 dimensions live in separate tables.
 
-### 6. Cross-dimensional discovery — `discover_cross_dimensional_rows`
+### 7. Cross-dimensional discovery — `discover_cross_dimensional_rows`
 
 **What it does.** Walks the 1-to-1 links once, recording for every toned
 target segment which of the candidate environments (source feature ×
@@ -269,7 +303,7 @@ tone jointly condition a target tone. Joint rules pay an extra BIC
 parameter penalty so they only win when a single-predictor rule
 genuinely cannot explain the data.
 
-### 7. Long-range context discovery — `_long_range_discovery`
+### 8. Long-range context discovery — `_long_range_discovery`
 
 **What it does.** A second pass of context discovery, but using a
 different candidate set: distance-bounded predicates (offsets
@@ -299,7 +333,7 @@ by definition. Without these, the larger candidate space surfaces
 chance partitions on small corpora.
 
 **Why 1-to-1 only.** Multi-segment link observations are not
-decomposed into 1-to-1 equivalents here (unlike stage 4): chunks
+decomposed into 1-to-1 equivalents here (unlike stage 5): chunks
 span multiple positions and the "same/next/previous syllable"
 predicates become ambiguous over a span. Chunks are silently
 skipped.
@@ -333,13 +367,13 @@ runs per-pair first, then reconciles. The detail lives in
 `docs/correspondence_discovery.md` under "Multi-lect training".
 Short version:
 
-1. **Per-pair pass.** Run the full seven-stage pipeline on every
+1. **Per-pair pass.** Run the full eight-stage pipeline on every
    directed pair of lects that shares enough cognate data.
 2. **Reconciliation.** Union-find over per-pair 1-to-1 link positions
    produces N-way correspondence classes. Each class is a tuple of
    one segment per participating lect at corresponding positions,
    with observation counts aggregated across the corpus.
-3. **Class-level context discovery.** A multi-lect version of stage 4,
+3. **Class-level context discovery.** A multi-lect version of stage 5,
    iterating over pivot lects and committing splits at the class
    level. It uses the same categorical scorer and a sample-size-scaled
    min-commit floor, with no un-derived AICc-shaped addition.
@@ -385,14 +419,14 @@ mixed the scales.
 
 ## Re-alignment between stages
 
-Stages 2, 4, 5, 6, 7 all re-run alignment on the corpus with the
+Stages 3, 5, 6, 7, 8 all re-run alignment on the corpus with the
 current model before doing their own work. This is correct: each
 stage's observations have to reflect the best alignment under the
 current model, not a stale alignment under the pre-previous-stage
 model. The alignments are cheap relative to the training work
 itself, and the `align_corpus` function is memoized over the batch.
 
-The only stage that re-aligns *during* its own work is stage 1
+The only stage that re-aligns *during* its own work is stage 2
 (segment-level EM) — that's what makes it EM rather than a one-pass
 count.
 
@@ -424,7 +458,7 @@ Things a new reader might expect but won't find:
   badly get included and contribute noisy observations. The user is
   expected to run `find_cognate_outliers` post-hoc to triage outlier
   pairs manually.
-- **No joint training of displacement and segment tables.** Stage 2
+- **No joint training of displacement and segment tables.** Stage 3
   is a one-pass aggregation, not an EM loop. This is fine as long as
   segment-level EM has converged first — the displacement counts
   are then just a feature-level view of the same data — but it does

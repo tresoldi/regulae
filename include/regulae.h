@@ -47,6 +47,7 @@ typedef struct rg_alignment rg_alignment;
 typedef struct rg_pairwise_model rg_pairwise_model;
 typedef struct rg_multi_model rg_multi_model;
 typedef struct rg_corpus rg_corpus;
+typedef struct rg_translation_table rg_translation_table;
 
 typedef enum rg_status {
     RG_OK = 0,
@@ -233,6 +234,10 @@ typedef struct rg_train_options {
      * top-1 coverage does not. */
     double predictive_abstention_threshold;
     int predictive_top_k;
+    /* Run an IBM Model 1 pass before the DP alignment EM and use the learned
+     * probabilities as the Dirichlet prior. 0 runs the step; negative
+     * (the default) skips it. */
+    int ibm1_prior;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -1688,6 +1693,125 @@ RG_API rg_status rg_find_transcription_drift(
     size_t *out_count
 );
 RG_API void rg_transcription_drift_rows_free(rg_transcription_drift_row *rows, size_t count);
+
+/* ---- Translation table (IBM Model 1) ----
+ *
+ * An unconstrained probability table P(t|s) learned by EM from a corpus of
+ * form pairs. Each source position independently maps to a target position or
+ * to null; there is no monotonicity constraint, so disjoint mappings (e.g.
+ * reduplication, infixation, long-range metathesis) fall out naturally.
+ *
+ * A table can also be built from merkmal priors alone (no corpus), in which
+ * case P(t|s) is the softmax of the feature distance. That table answers
+ * queries lazily unless precompute is called. */
+
+typedef enum rg_direction {
+    RG_DIR_FORWARD = 0,
+    RG_DIR_BACKWARD,
+    RG_DIR_SYMMETRIC
+} rg_direction;
+
+typedef struct rg_translation_table_options {
+    /* EM iteration cap. 0 = dynamic default (converge within threshold). */
+    int max_iterations;
+    /* Prior probability of mapping to null (deletion). Negative = derive from
+     * the gap cost (RG_DEFAULT_GAP_COST). */
+    double null_prior;
+    /* Relative change in corpus log-likelihood below which EM stops. */
+    double convergence_threshold;
+    /* Softmax temperature for the merkmal-distance prior. 0 = 1.0. */
+    double temperature;
+} rg_translation_table_options;
+
+RG_API void rg_translation_table_options_init_defaults(
+    rg_translation_table_options *options
+);
+
+typedef struct rg_translation_assignment {
+    size_t source_index;
+    size_t target_index;
+    double probability;
+} rg_translation_assignment;
+
+typedef struct rg_translation_alignment {
+    rg_translation_assignment *assignments;
+    size_t count;
+    double score;
+} rg_translation_alignment;
+
+/* Train on a corpus of form pairs. Both directions (forward and backward) are
+ * trained so that symmetric queries are available. */
+RG_API rg_status rg_train_translation_table(
+    const rg_context *ctx,
+    const rg_form_pair *pairs,
+    size_t pair_count,
+    const rg_translation_table_options *options,
+    rg_translation_table **out
+);
+
+/* Build from merkmal priors only (no corpus). Queries are lazy: each call to
+ * rg_translation_probability computes the softmax on the fly. Call
+ * rg_translation_table_precompute to materialise the full matrix. */
+RG_API rg_status rg_translation_table_from_prior(
+    const rg_context *ctx,
+    rg_translation_table **out
+);
+
+/* Materialise the full |V_s| x |V_t| probability matrix for a prior-only
+ * table, so repeated queries are O(1) lookups. */
+RG_API rg_status rg_translation_table_precompute(
+    rg_translation_table *table,
+    const char **source_inventory,
+    size_t source_count,
+    const char **target_inventory,
+    size_t target_count
+);
+
+/* Query a single-pair probability. direction selects P(t|s), P(s|t), or their
+ * geometric mean. Returns 0.0 for unknown graphemes. */
+RG_API double rg_translation_probability(
+    const rg_translation_table *table,
+    const char *source,
+    const char *target,
+    rg_direction direction
+);
+
+/* Per-position Viterbi assignment for a specific form pair. Each source
+ * position is assigned to the target position (or null) with highest
+ * posterior probability under the model. */
+RG_API rg_status rg_translation_align(
+    const rg_translation_table *table,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    rg_translation_alignment **out
+);
+
+/* Sum of symmetric log-probabilities over the Viterbi assignment, divided by
+ * the source length. Lower (more negative) means worse. */
+RG_API rg_status rg_translation_score(
+    const rg_translation_table *table,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count,
+    double *score
+);
+
+RG_API void rg_translation_table_free(rg_translation_table *table);
+RG_API void rg_translation_alignment_free(rg_translation_alignment *alignment);
+
+/* The source and target vocabularies the table was trained on (or precomputed
+ * for). Returns 0 for a lazy prior-only table that has not been precomputed. */
+RG_API const char *const *rg_translation_table_source_vocab(
+    const rg_translation_table *table,
+    size_t *count
+);
+RG_API const char *const *rg_translation_table_target_vocab(
+    const rg_translation_table *table,
+    size_t *count
+);
 
 #ifdef __cplusplus
 }

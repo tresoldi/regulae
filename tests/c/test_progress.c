@@ -74,8 +74,8 @@ static void test_progress_is_monotonic_and_bounded(rg_context *ctx) {
         }
     }
     /* Three lects means three pairs, each running the nine pairwise stages
-     * (gap aggregation is one of them), plus the three multi-lect
-     * stages. */
+     * (gap aggregation is one of them), plus the three multi-lect stages.
+     * IBM Model 1 is off by default and adds a tenth stage when enabled. */
     assert(r.totals[0] == 3 * 9 + 3);
     assert(r.count == r.totals[0]);
     assert(saw_pairwise_stage);

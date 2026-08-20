@@ -110,6 +110,7 @@ add_library(regulae
     src/loader_gled.c
     src/loader_arcaverborum.c
     src/chunk_diagnostics.c
+    src/ibm1.c
     src/model.c
     src/model_chunks.c
     src/model_tables.c
@@ -294,6 +295,10 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_scoring tests/c/test_scoring.c)
     target_link_libraries(test_scoring PRIVATE regulae::regulae)
     add_test(NAME scoring COMMAND test_scoring)
+
+    add_executable(test_ibm1 tests/c/test_ibm1.c)
+    target_link_libraries(test_ibm1 PRIVATE regulae::regulae)
+    add_test(NAME ibm1 COMMAND test_ibm1)
 
     add_executable(test_split_search tests/c/test_split_search.c)
     target_include_directories(test_split_search PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
