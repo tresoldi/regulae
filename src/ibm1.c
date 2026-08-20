@@ -677,6 +677,7 @@ rg_status rg_translation_align(
     size_t source_count,
     const rg_segment *target,
     size_t target_count,
+    rg_direction direction,
     rg_translation_alignment **out
 ) {
     rg_translation_alignment *alignment;
@@ -720,48 +721,16 @@ rg_status rg_translation_align(
             continue;
         }
 
-        if (table->has_matrices) {
-            size_t sv = vocab_find(table->source_vocab, table->source_count, sg);
-            if (sv < table->source_count) {
-                size_t stride = table->target_count + 1;
-                double null_p = table->forward[sv * stride + table->target_count];
-                for (j = 0; j < target_count; j++) {
-                    const char *tg = target[j].grapheme;
-                    size_t tv;
-                    if (tg == 0) {
-                        continue;
-                    }
-                    tv = vocab_find(table->target_vocab, table->target_count, tg);
-                    if (tv < table->target_count) {
-                        double p = table->forward[sv * stride + tv];
-                        if (p > best_p) {
-                            best_p = p;
-                            best_j = j;
-                        }
-                    }
-                }
-                if (null_p > best_p) {
-                    best_p = null_p;
-                    best_j = (size_t)-1;
-                }
+        for (j = 0; j < target_count; j++) {
+            const char *tg = target[j].grapheme;
+            double p;
+            if (tg == 0) {
+                continue;
             }
-        } else {
-            double null_p = exp(-RG_DEFAULT_GAP_COST);
-            for (j = 0; j < target_count; j++) {
-                const char *tg = target[j].grapheme;
-                double p;
-                if (tg == 0) {
-                    continue;
-                }
-                p = lazy_prior_probability(table->ctx, sg, tg, table->temperature);
-                if (p > best_p) {
-                    best_p = p;
-                    best_j = j;
-                }
-            }
-            if (null_p > best_p) {
-                best_p = null_p;
-                best_j = (size_t)-1;
+            p = rg_translation_probability(table, sg, tg, direction);
+            if (p > best_p) {
+                best_p = p;
+                best_j = j;
             }
         }
 
@@ -786,6 +755,7 @@ rg_status rg_translation_score(
     size_t source_count,
     const rg_segment *target,
     size_t target_count,
+    rg_direction direction,
     double *score
 ) {
     rg_translation_alignment *alignment = 0;
@@ -795,7 +765,7 @@ rg_status rg_translation_score(
         return RG_ERR_INVALID_ARGUMENT;
     }
     *score = 0.0;
-    status = rg_translation_align(table, source, source_count, target, target_count, &alignment);
+    status = rg_translation_align(table, source, source_count, target, target_count, direction, &alignment);
     if (status != RG_OK) {
         return status;
     }

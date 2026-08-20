@@ -1778,24 +1778,27 @@ RG_API double rg_translation_probability(
 
 /* Per-position Viterbi assignment for a specific form pair. Each source
  * position is assigned to the target position (or null) with highest
- * posterior probability under the model. */
+ * probability under the chosen direction. RG_DIR_SYMMETRIC (geometric
+ * mean of forward and backward) is the recommended default. */
 RG_API rg_status rg_translation_align(
     const rg_translation_table *table,
     const rg_segment *source,
     size_t source_count,
     const rg_segment *target,
     size_t target_count,
+    rg_direction direction,
     rg_translation_alignment **out
 );
 
-/* Sum of symmetric log-probabilities over the Viterbi assignment, divided by
- * the source length. Lower (more negative) means worse. */
+/* Sum of log-probabilities over the Viterbi assignment, divided by the
+ * source length. Lower (more negative) means worse. */
 RG_API rg_status rg_translation_score(
     const rg_translation_table *table,
     const rg_segment *source,
     size_t source_count,
     const rg_segment *target,
     size_t target_count,
+    rg_direction direction,
     double *score
 );
 

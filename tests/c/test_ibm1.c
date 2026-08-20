@@ -137,14 +137,18 @@ static void test_align(void) {
     assert(rg_context_new_builtin(&ctx) == RG_OK);
     assert(rg_train_translation_table(ctx, pairs, 2, 0, &table) == RG_OK);
 
-    assert(rg_translation_align(table, src1, 2, tgt1, 2, &alignment) == RG_OK);
+    assert(rg_translation_align(table, src1, 2, tgt1, 2, RG_DIR_SYMMETRIC, &alignment) == RG_OK);
     assert(alignment != 0);
     assert(alignment->count == 2);
     assert(alignment->assignments[0].target_index == 0);
     assert(alignment->assignments[1].target_index == 1);
     rg_translation_alignment_free(alignment);
 
-    assert(rg_translation_score(table, src1, 2, tgt1, 2, &score) == RG_OK);
+    assert(rg_translation_align(table, src1, 2, tgt1, 2, RG_DIR_FORWARD, &alignment) == RG_OK);
+    assert(alignment->count == 2);
+    rg_translation_alignment_free(alignment);
+
+    assert(rg_translation_score(table, src1, 2, tgt1, 2, RG_DIR_SYMMETRIC, &score) == RG_OK);
     assert(score < 0.0);
 
     rg_translation_table_free(table);
@@ -191,8 +195,8 @@ static void test_null_args(void) {
     assert(rg_train_translation_table(0, 0, 0, 0, 0) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_translation_table_from_prior(0, 0) == RG_ERR_INVALID_ARGUMENT);
     assert(rg_translation_probability(0, "p", "b", RG_DIR_FORWARD) == 0.0);
-    assert(rg_translation_align(0, 0, 0, 0, 0, 0) == RG_ERR_INVALID_ARGUMENT);
-    assert(rg_translation_score(0, 0, 0, 0, 0, 0) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_translation_align(0, 0, 0, 0, 0, RG_DIR_SYMMETRIC, 0) == RG_ERR_INVALID_ARGUMENT);
+    assert(rg_translation_score(0, 0, 0, 0, 0, RG_DIR_SYMMETRIC, 0) == RG_ERR_INVALID_ARGUMENT);
 
     rg_translation_table_free(0);
     rg_translation_alignment_free(0);
