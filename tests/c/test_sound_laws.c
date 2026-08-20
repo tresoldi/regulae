@@ -1833,6 +1833,20 @@ static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ct
         assert(voicing->members[i].class_feature_count > 0);
     }
 
+    /* The shared displacement states the rule: voiced is gained on one
+     * side, and that is the only feature the grouping has in common. */
+    assert(voicing->shared_displacement_count > 0);
+    {
+        size_t d;
+        int has_voiced = 0;
+        for (d = 0; d < voicing->shared_displacement_count; d++) {
+            if (strcmp(voicing->shared_displacement[d].feature, "voiced") == 0) {
+                has_voiced = 1;
+            }
+        }
+        assert(has_voiced);
+    }
+
     /* The members are still published in their own right. Nothing was
      * replaced, so a consumer that rejects the grouping loses nothing. */
     for (i = 0; i < voicing->class_id_count; i++) {

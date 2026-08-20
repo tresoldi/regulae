@@ -989,6 +989,25 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             if (!event->featurally_definable) {
                 builder_append(&builder, "  [no feature names this set in this corpus]");
             }
+            if (event->shared_displacement_count > 0) {
+                size_t d;
+                builder_append(&builder, "  \xce\x94:");
+                for (d = 0; d < event->shared_displacement_count; d++) {
+                    const rg_feature_displacement *fd = &event->shared_displacement[d];
+                    if (strcmp(fd->from_value, "absent") == 0 &&
+                        strcmp(fd->to_value, "present") == 0) {
+                        builder_appendf(&builder, " +%s(%s)",
+                                        fd->feature, event->members[1].lect_id);
+                    } else if (strcmp(fd->from_value, "present") == 0 &&
+                               strcmp(fd->to_value, "absent") == 0) {
+                        builder_appendf(&builder, " +%s(%s)",
+                                        fd->feature, event->members[0].lect_id);
+                    } else {
+                        builder_appendf(&builder, " %s:%s\xe2\x86\x92%s",
+                                        fd->feature, fd->from_value, fd->to_value);
+                    }
+                }
+            }
             builder_append(&builder, "\n");
         }
         if (event_total > 0) {

@@ -308,6 +308,7 @@ textarea:focus { border-color: var(--ink); outline: none; }
 .panel.events { margin-top: 22px; }
 .panel.events .scroll { max-height: 30vh; }
 .panel.events .unnamed { color: var(--muted); }
+.panel.events .displacement { color: var(--accent); }
 
 /* Cross-dimensional rules, hidden entirely on the corpora that have none so the
    pane is never an empty promise. */

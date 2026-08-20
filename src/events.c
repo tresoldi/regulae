@@ -352,6 +352,9 @@ static void event_row_clear(rg_proposed_event_row *row) {
     free(rg_owned_internal(row->class_ids));
     string_array_free((char **)rg_owned_internal(row->supporting_cognates),
                       row->supporting_cognate_count);
+    rg_feature_displacement_free(
+        rg_owned_internal(row->shared_displacement),
+        row->shared_displacement_count);
     memset(row, 0, sizeof(*row));
 }
 
@@ -364,6 +367,105 @@ void rg_proposed_events_free_internal(rg_proposed_event_row *rows, size_t count)
         event_row_clear(&rows[i]);
     }
     free(rows);
+}
+
+/* The displacement shared by every member class between two slots.
+ *
+ * The displacement is what changed -- the rule the grouping implies.
+ * `classes_share_displacement` already verified every member agrees on
+ * it; this function reads the same data and keeps a copy, so the event
+ * can say what it found rather than only that it found something.
+ *
+ * For environment-grouped events the displacement is computed the same
+ * way but may come back empty when the members change different
+ * features. That is fine: `shared_displacement_count == 0` says the
+ * rule is not statable as a single feature change. */
+static rg_status compute_shared_displacement(
+    const rg_context *ctx,
+    const rg_multi_class_row *classes,
+    const size_t *indices,
+    size_t index_count,
+    size_t slot_a,
+    size_t slot_b,
+    rg_feature_displacement **out,
+    size_t *out_count
+) {
+    const rg_feature_displacement *first = 0;
+    size_t first_count = 0;
+    rg_feature_displacement *kept = 0;
+    size_t kept_count = 0;
+    size_t i;
+    size_t k;
+    rg_status status;
+
+    *out = 0;
+    *out_count = 0;
+    if (index_count == 0) {
+        return RG_OK;
+    }
+    status = rg_context_displacement_internal(
+        ctx, classes[indices[0]].graphemes[slot_a],
+        classes[indices[0]].graphemes[slot_b], &first, &first_count);
+    if (status != RG_OK || first_count == 0) {
+        return status;
+    }
+    /* Deep-copy the first displacement as the running intersection. */
+    kept = (rg_feature_displacement *)calloc(first_count, sizeof(*kept));
+    if (kept == 0) {
+        return RG_ERR_OOM;
+    }
+    for (k = 0; k < first_count; k++) {
+        kept[k].feature = rg_strdup_internal(first[k].feature);
+        kept[k].from_value = rg_strdup_internal(first[k].from_value);
+        kept[k].to_value = rg_strdup_internal(first[k].to_value);
+        if (kept[k].feature == 0 || kept[k].from_value == 0 || kept[k].to_value == 0) {
+            rg_feature_displacement_free(kept, k + 1);
+            return RG_ERR_OOM;
+        }
+    }
+    kept_count = first_count;
+
+    /* Intersect with every subsequent member. */
+    for (i = 1; i < index_count && kept_count > 0; i++) {
+        const rg_feature_displacement *other = 0;
+        size_t other_count = 0;
+        status = rg_context_displacement_internal(
+            ctx, classes[indices[i]].graphemes[slot_a],
+            classes[indices[i]].graphemes[slot_b], &other, &other_count);
+        if (status != RG_OK) {
+            rg_feature_displacement_free(kept, kept_count);
+            return status;
+        }
+        /* Remove items from `kept` that are not in `other`. */
+        for (k = 0; k < kept_count; ) {
+            size_t j;
+            int found = 0;
+            for (j = 0; j < other_count; j++) {
+                if (strcmp(kept[k].feature, other[j].feature) == 0 &&
+                    strcmp(kept[k].from_value, other[j].from_value) == 0 &&
+                    strcmp(kept[k].to_value, other[j].to_value) == 0) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (found) {
+                k++;
+            } else {
+                rg_free_owned_internal(kept[k].feature);
+                rg_free_owned_internal(kept[k].from_value);
+                rg_free_owned_internal(kept[k].to_value);
+                kept[k] = kept[kept_count - 1];
+                kept_count--;
+            }
+        }
+    }
+    if (kept_count == 0) {
+        free(kept);
+        kept = 0;
+    }
+    *out = kept;
+    *out_count = kept_count;
+    return RG_OK;
 }
 
 /* One event out of the classes at `indices`. */
@@ -462,6 +564,20 @@ static rg_status build_event(
     }
     out->supporting_cognates = (const char *const *)cognate_ids;
     out->supporting_cognate_count = cognate_id_count;
+
+    /* The feature displacement shared by every member class between the
+     * first two lect slots -- the rule the grouping implies. */
+    if (status == RG_OK && first->segment_count >= 2) {
+        rg_feature_displacement *disp = 0;
+        size_t disp_count = 0;
+        status = compute_shared_displacement(
+            ctx, classes, indices, index_count, 0, 1, &disp, &disp_count);
+        if (status == RG_OK) {
+            out->shared_displacement = disp;
+            out->shared_displacement_count = disp_count;
+        }
+    }
+
     if (status != RG_OK) {
         event_row_clear(out);
     }

@@ -403,6 +403,8 @@ check('the events pane names a grouped class', () => {
     rendered.map((c) => c.textContent).join(' | ')}`);
   assert.match(voicing.textContent, /\[[^\]]* & [^\]]*\]/,
     'the grapheme set is not named by its features');
+  assert.match(voicing.textContent, /Δ:.*voiced/,
+    'the event row should show the shared displacement');
 
   /* Clicking an event row selects its member classes and filters alignments to
      those realising them; clicking a member class highlights the event back.

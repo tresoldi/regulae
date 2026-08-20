@@ -305,6 +305,24 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
     cJSON_AddBoolToObject(out, "featurally_definable", row->featurally_definable);
     cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
     cJSON_AddNumberToObject(out, "delta_score", row->delta_score);
+    if (row->shared_displacement_count > 0) {
+        cJSON *disp = cJSON_CreateArray();
+        if (disp != 0) {
+            for (i = 0; i < row->shared_displacement_count; i++) {
+                cJSON *item = cJSON_CreateObject();
+                if (item != 0) {
+                    cJSON_AddStringToObject(item, "feature",
+                                            row->shared_displacement[i].feature);
+                    cJSON_AddStringToObject(item, "from",
+                                            row->shared_displacement[i].from_value);
+                    cJSON_AddStringToObject(item, "to",
+                                            row->shared_displacement[i].to_value);
+                    cJSON_AddItemToArray(disp, item);
+                }
+            }
+            cJSON_AddItemToObject(out, "shared_displacement", disp);
+        }
+    }
     return out;
 }
 

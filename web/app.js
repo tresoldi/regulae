@@ -10,8 +10,8 @@
  */
 
 /* global CORPORA, CORPUS_LIST, GUIDE_STEPS,
-   correspondence, decisionOrder, environment, eventCorrespondence, isIdentity,
-   residueReading */
+   correspondence, decisionOrder, environment, eventCorrespondence,
+   eventDisplacement, isIdentity, residueReading */
 
 const $ = (id) => document.getElementById(id);
 
@@ -597,6 +597,13 @@ function renderEvents() {
       note.className = "env unnamed";
       note.textContent = "no feature names this set in this corpus";
       corr.appendChild(note);
+    }
+    const disp = eventDisplacement(event);
+    if (disp) {
+      const rule = document.createElement("span");
+      rule.className = "env displacement";
+      rule.textContent = `Δ: ${disp}`;
+      corr.appendChild(rule);
     }
     const count = document.createElement("td");
     count.className = "count";

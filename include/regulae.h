@@ -885,6 +885,14 @@ typedef struct rg_proposed_event_row {
      * been split per segment. */
     double search_margin;
     double delta_score;
+    /* The feature displacement shared by every member class, measured
+     * between the first two member slots. What changed is the rule the
+     * grouping implies, and this states it: `+long` means the first slot
+     * carries `long` where the second does not; `close-mid: present→absent`
+     * with `close: absent→present` means a height step. Empty when fewer
+     * than two slots exist or the members disagree. Owned. */
+    const rg_feature_displacement *shared_displacement;
+    size_t shared_displacement_count;
 } rg_proposed_event_row;
 
 /* How one lect writes a sound that another lect in the same corpus writes as a

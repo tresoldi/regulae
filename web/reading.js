@@ -311,3 +311,27 @@ function eventCorrespondence(event) { // eslint-disable-line no-unused-vars
     })
     .join("  ~  ");
 }
+
+/* The shared feature displacement, rendered as a compact rule annotation.
+ * Each item says which feature differs and in which direction, relative
+ * to the first two member slots (member[0] and member[1]):
+ *   from=present, to=absent  => member[0] has it   => "+feature (lect0)"
+ *   from=absent,  to=present => member[1] has it   => "+feature (lect1)"
+ *   otherwise (valued features)                     => "feature: from->to"
+ */
+function eventDisplacement(event) { // eslint-disable-line no-unused-vars
+  const disp = event.shared_displacement;
+  if (!disp || !disp.length) return "";
+  const members = event.members || [];
+  return disp
+    .map((d) => {
+      if (d.from === "absent" && d.to === "present") {
+        return `+${d.feature}(${members[1] ? members[1].lect : "?"})`;
+      }
+      if (d.from === "present" && d.to === "absent") {
+        return `+${d.feature}(${members[0] ? members[0].lect : "?"})`;
+      }
+      return `${d.feature}: ${d.from}→${d.to}`;
+    })
+    .join(", ");
+}
