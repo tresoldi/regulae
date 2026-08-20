@@ -30,12 +30,14 @@ let selectedClass = null;
 let selectedSet = null;
 let selectedPair = null;
 let baselineSupported = true;
+let modelChunks = null;
+let modelDrift = null;
 
 /* The classes table is a view over one array, so filtering and sorting are
    state the view reads rather than a rebuild of the model. classRows is built
    once per run; classView says which subset to show and in what order. */
 let classRows = [];
-const classView = { query: "", chip: "all", recurring: false, changes: false, stands: false, sort: "default", desc: true };
+const classView = { query: "", chip: "all", recurring: false, changes: true, weak: false, stands: false, sort: "default", desc: true };
 /* Which classes have their evidence drawer open. Kept as ids so the open state
    survives a filter or sort re-render rather than being tied to a DOM row. */
 const expandedClasses = new Set();
@@ -194,7 +196,7 @@ function setBaselineAvailability(supported) {
   }
 }
 
-function finish({ json, elapsedMs }) {
+function finish({ json, chunks, drift, elapsedMs }) {
   stopRunning();
   let payload;
   try {
@@ -208,9 +210,26 @@ function finish({ json, elapsedMs }) {
     return;
   }
   model = payload;
+  /* Chunks and drift ride beside the model, off separate worker calls, so the
+     documented model JSON stays byte-stable. Either may be null on an old
+     engine build; the panes then stay hidden. */
+  modelChunks = parseExtras(chunks, "pairs");
+  modelDrift = parseExtras(drift, "drift");
   $("timing").textContent = (elapsedMs / 1000).toFixed(2) + "s";
   render();
   results.classList.add("active");
+}
+
+/* Parses a worker extra and returns the named array, or null when the run
+   did not produce it. A malformed extra is not a failed run. */
+function parseExtras(text, key) {
+  if (!text) return null;
+  try {
+    const payload = JSON.parse(text);
+    return payload.ok && Array.isArray(payload[key]) ? payload[key] : null;
+  } catch {
+    return null;
+  }
 }
 
 /* ---- rendering --------------------------------------------------------- */
@@ -321,6 +340,16 @@ function buildClassRow(entry, conditioned) {
   });
   corr.appendChild(caret);
   corr.append(correspondence(entry));
+  if (conditioned && (entry.environment_alternatives || 0) > 0) {
+    /* The environment on this row is one of several that carve the split the
+       same way; the cell says so, not only the hint, so the row cannot be
+       quoted as *the* environment. */
+    const tied = document.createElement("span");
+    tied.className = "env";
+    tied.textContent = "tied";
+    tied.title = `${entry.environment_alternatives} other environment(s) carve this split the same way`;
+    corr.appendChild(tied);
+  }
   if (conditioned) {
     const env = document.createElement("span");
     env.className = "env";
@@ -454,13 +483,19 @@ function renderClasses() {
 /* Whether a row passes the current filter: the chips narrow by kind, recurrence
    and whether anything changed, and the query matches the written
    correspondence and its environment together, so "p ~ f" and "before a vowel"
-   both find their rows. */
+   both find their rows. Retentions are hidden unless "changes only" is off, and
+   conditioned rows that are thin or unmeasured sit behind the "weak" chip: the
+   table leads with what the corpus actually carries. */
 function classMatches({ entry, conditioned }) {
   if (classView.chip === "conditioned" && !conditioned) return false;
   if (classView.chip === "unconditioned" && conditioned) return false;
   if (classView.recurring && setCount(entry) < 2) return false;
   if (classView.changes && isIdentity(entry)) return false;
   if (classView.stands && entry.standing !== "above noise") return false;
+  if (!classView.weak && conditioned
+      && (entry.count < 8 || entry.standing === "unmeasured" || entry.standing === "within noise")) {
+    return false;
+  }
   const query = classView.query.trim().toLowerCase();
   if (query) {
     const hay = `${correspondence(entry)} ${conditioned ? environment(entry) : ""}`.toLowerCase();
@@ -537,12 +572,11 @@ function renderEvents() {
   body.innerHTML = "";
   const events = model.proposed_events || [];
   $("events-hint").textContent = events.length
-    ? "Rows that differ only in their graphemes, under one environment and one score. "
-      + "Whether a single pooled rule beats them isn't decided here."
+    ? "Classes that differ only in their graphemes and share an environment or "
+      + "a feature displacement. Whether a single pooled rule beats them isn't decided here."
     : "";
   if (!events.length) {
-    body.innerHTML = '<tr><td colspan="3" class="empty">'
-      + "Every committed environment names one correspondence.</td></tr>";
+    body.innerHTML = '<tr><td colspan="3" class="empty">(none)</td></tr>';
     return;
   }
   for (const event of events) {
@@ -952,10 +986,12 @@ function render() {
   resetClassView();
   renderSummary();
   renderProvenance();
+  renderDrift();
   renderBaseline();
   renderPredictive();
   renderEvents();
   renderCrossDimensional();
+  renderChunks();
   renderGaps();
   renderResidue();
   renderClasses();
@@ -965,13 +1001,69 @@ function render() {
   selectedClass = null;
 }
 
+/* Transcription drift reads as a conditioned change once trained, so it is
+   said above the model, not left for a separate tool. Hidden when the corpus
+   carries none. */
+function renderDrift() {
+  const panel = $("drift-panel");
+  if (!modelDrift || !modelDrift.length) {
+    panel.hidden = true;
+    return;
+  }
+  panel.hidden = false;
+  const list = $("drift-list");
+  list.innerHTML = "";
+  for (const row of modelDrift) {
+    const li = document.createElement("li");
+    li.textContent = `${row.lect} writes ${row.grapheme} where ${row.other_lect} writes "${row.written_as}"`
+      + ` (${row.corroborated}/${row.forms} forms)`;
+    list.appendChild(li);
+  }
+}
+
+/* Spans of more than one segment, read off the pair models: kt answering
+   tʃ, or two segments trading places ([reordering]) is one fact, not several
+   segment correspondences. Hidden when nothing promoted. */
+function renderChunks() {
+  const panel = $("chunks-panel");
+  const body = $("chunks").querySelector("tbody");
+  body.innerHTML = "";
+  let shown = 0;
+  for (const pair of modelChunks || []) {
+    for (const chunk of pair.chunks || []) {
+      const row = document.createElement("tr");
+      const pairCell = document.createElement("td");
+      pairCell.textContent = `${pair.source_lect} › ${pair.target_lect}`;
+      const corr = document.createElement("td");
+      corr.textContent = `${chunk.source} ~ ${chunk.target}`;
+      if (chunk.reordering) {
+        const tag = document.createElement("span");
+        tag.className = "env";
+        tag.textContent = "reordering";
+        tag.title = "the same segments in another order, not a set of substitutions";
+        corr.append(" ", tag);
+      }
+      const count = document.createElement("td");
+      count.className = "count";
+      count.textContent = chunk.count % 1 === 0 ? chunk.count : chunk.count.toFixed(1);
+      row.append(pairCell, corr, count);
+      body.appendChild(row);
+      shown++;
+    }
+  }
+  panel.hidden = shown === 0;
+  $("chunks-hint").textContent = shown === 0 ? ""
+    : "A chunk is one span answering to one span; a reordering is the same segments in another order.";
+}
+
 /* A fresh corpus starts with a clean table: an old filter left over from the
    last run would silently hide rows the new run found. */
 function resetClassView() {
   classView.query = "";
   classView.chip = "all";
   classView.recurring = false;
-  classView.changes = false;
+  classView.changes = true;
+  classView.weak = false;
   classView.stands = false;
   classView.sort = "default";
   classView.desc = true;
@@ -981,7 +1073,9 @@ function resetClassView() {
     filter.value = "";
   }
   for (const chip of $("class-chips").querySelectorAll("button")) {
-    chip.classList.toggle("on", chip.dataset.chip === "all");
+    chip.classList.toggle("on", chip.dataset.chip === "all" || chip.dataset.chip === "changes");
+    chip.setAttribute("aria-pressed",
+      chip.dataset.chip === "all" || chip.dataset.chip === "changes" ? "true" : "false");
   }
 }
 
@@ -1402,6 +1496,8 @@ function handleChip(name) {
     classView.recurring = !classView.recurring;
   } else if (name === "changes") {
     classView.changes = !classView.changes;
+  } else if (name === "weak") {
+    classView.weak = !classView.weak;
   } else if (name === "stands") {
     classView.stands = !classView.stands;
   } else {
@@ -1411,8 +1507,9 @@ function handleChip(name) {
     const key = chip.dataset.chip;
     const on = key === "recurring" ? classView.recurring
       : key === "changes" ? classView.changes
-        : key === "stands" ? classView.stands
-          : classView.chip === key;
+        : key === "weak" ? classView.weak
+          : key === "stands" ? classView.stands
+            : classView.chip === key;
     chip.classList.toggle("on", on);
     chip.setAttribute("aria-pressed", on ? "true" : "false");
   }

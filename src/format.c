@@ -343,6 +343,7 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     size_t conditioned_total = 0;
     size_t chunk_total = 0;
     size_t xdim_total = 0;
+    size_t xdim_published = 0;
     size_t tonal_total = 0;
     size_t gap_total = 0;
 
@@ -357,14 +358,22 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     segment_rows = rg_pairwise_model_segment_counts(model, &segment_total);
     conditioned_rows = rg_pairwise_model_conditioned_segment_counts(model, &conditioned_total);
     chunk_rows = rg_pairwise_model_chunks(model, &chunk_total);
-    rg_pairwise_model_cross_dimensional_rows(model, &xdim_total);
+    {
+        const rg_cross_dimensional_row *xdim =
+            rg_pairwise_model_cross_dimensional_rows(model, &xdim_total);
+        for (i = 0; i < xdim_total; i++) {
+            if (rg_cross_dim_row_publishable_internal(&xdim[i])) {
+                xdim_published++;
+            }
+        }
+    }
     rg_pairwise_model_tonal_counts(model, &tonal_total);
     rg_pairwise_model_gap_counts(model, &gap_total);
     builder_appendf(&builder, "segment correspondences: %lu\n", (unsigned long)segment_total);
     builder_appendf(&builder, "gap correspondences:     %lu\n", (unsigned long)gap_total);
     builder_appendf(&builder, "conditioned entries:     %lu\n", (unsigned long)conditioned_total);
     builder_appendf(&builder, "promoted chunks:         %lu\n", (unsigned long)chunk_total);
-    builder_appendf(&builder, "cross-dimensional rules: %lu\n", (unsigned long)xdim_total);
+    builder_appendf(&builder, "cross-dimensional rules: %lu\n", (unsigned long)xdim_published);
     builder_appendf(&builder, "tonal correspondences:   %lu\n\n", (unsigned long)tonal_total);
 
     builder_appendf(&builder, "--- Top %d segment correspondences ---\n", opts.top_segments);
@@ -567,6 +576,90 @@ static void append_class_contexts(string_builder *builder, const rg_multi_class_
     }
 }
 
+/* A committed split whose elsewhere count exceeds its in-environment count,
+ * or that is thin and covers little of its class, is printed but does not
+ * lead the report: the reader should meet the split that carries the corpus
+ * first. */
+static int class_is_weak(const rg_multi_class_row *row) {
+    if (row->contrast_count > row->count) {
+        return 1;
+    }
+    if (row->count < 8 && row->confidence < 0.25) {
+        return 1;
+    }
+    return 0;
+}
+
+static void append_conditioned_row(
+    string_builder *builder,
+    const rg_multi_class_row *row,
+    const rg_multi_class_row *uncond_rows,
+    size_t uncond_total,
+    const rg_multi_class_row *cond_rows,
+    size_t cond_total
+) {
+    builder_append(builder, "  count=");
+    append_count(builder, row->count);
+    /* The pivot's other reflex out of the environment, and where to read it.
+     * This is the comparison the split was scored on; `elsewhere` below is
+     * the same reflex out of the environment, ~0 whenever the rule is real,
+     * and shown second so the two are not confused. */
+    if (row->contrast_class_id >= 0) {
+        builder_append(builder, " vs ");
+        append_count(builder, row->contrast_alternative_count);
+        builder_appendf(builder, " as #%d", row->contrast_class_id);
+    }
+    builder_append(builder, " elsewhere=");
+    append_count(builder, row->contrast_count);
+    builder_appendf(builder, " sets=%lu", (unsigned long)row->supporting_cognate_count);
+    builder_appendf(builder, "  #%d", row->evidence.decision_index);
+    if (row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE) {
+        builder_append(builder, " STANDS");
+    } else if (row->evidence.standing == RG_RULE_STANDING_UNMEASURED) {
+        /* No permutations ran, so nothing about standing is claimed; say so
+         * rather than let the row read as measured. */
+        builder_append(builder, " unmeasured");
+    } else {
+        builder_append(builder, " within-noise");
+    }
+    builder_appendf(builder, " cov=%.2f %s=%.1f margin=%.2f [%.2f,%.2f]%s  ",
+                    row->confidence, score_label(row->evidence.scorer),
+                    row->evidence.delta_score, row->evidence.search_margin,
+                    row->uncertainty.lower, row->uncertainty.upper,
+                    row->uncertainty.post_selection ? "*" : "");
+    if (row->environment_alternatives > 0) {
+        builder_append(builder, "TIED ");
+    }
+    append_class_segments(builder, row);
+    if (row->environment_alternatives > 0) {
+        builder_appendf(builder, "  [environment not identifiable: %d other%s carve%s it the same]",
+                        row->environment_alternatives,
+                        row->environment_alternatives == 1 ? "" : "s",
+                        row->environment_alternatives == 1 ? "s" : "");
+    }
+    append_class_contexts(builder, row);
+    if (row->evidence.predictive.status != RG_PREDICTIVE_UNMEASURED) {
+        builder_appendf(builder, " predictive=%s gain=%+.3f n=%lu",
+                        rg_predictive_status_string(row->evidence.predictive.status),
+                        row->evidence.predictive.log_loss_gain,
+                        (unsigned long)row->evidence.predictive.conditioned.observation_count);
+    }
+    /* Two in five committed rules are X ~ X. Most are the retention side
+     * of a real split, with the change sitting in the contrast class, and
+     * "p ~ p before a vowel" is a null statement to read: a reader has to
+     * notice the graphemes are the same and then chase an id to find the
+     * event. Name which half of the pair is the event instead. */
+    if (class_is_identity(row)) {
+        const rg_multi_class_row *contrast = class_by_id(
+            uncond_rows, uncond_total, cond_rows, cond_total, row->contrast_class_id);
+        if (contrast != 0 && !class_is_identity(contrast)) {
+            builder_append(builder, "  [unchanged here; the change is #");
+            builder_appendf(builder, "%d]", contrast->class_id);
+        }
+    }
+    builder_append(builder, "\n");
+}
+
 char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_options *options) {
     string_builder builder;
     const char *const *lect_names;
@@ -594,15 +687,23 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     uncond_rows = rg_multi_model_unconditioned_classes(model, &uncond_total);
     cond_rows = rg_multi_model_conditioned_classes(model, &cond_total);
     xdim_rows = rg_multi_model_cross_dimensional_rows(model, &xdim_total);
-    builder_appendf(&builder, "lects (%lu): ", (unsigned long)lect_total);
-    for (i = 0; i < lect_total; i++) {
-        builder_appendf(&builder, "%s%s", i > 0 ? ", " : "", lect_names[i]);
+    {
+        size_t xp = 0;
+        for (i = 0; i < xdim_total; i++) {
+            if (rg_cross_dim_row_publishable_internal(&xdim_rows[i].rule)) {
+                xp++;
+            }
+        }
+        builder_appendf(&builder, "lects (%lu): ", (unsigned long)lect_total);
+        for (i = 0; i < lect_total; i++) {
+            builder_appendf(&builder, "%s%s", i > 0 ? ", " : "", lect_names[i]);
+        }
+        builder_append(&builder, "\n");
+        builder_appendf(&builder, "pairwise models:     %lu\n", (unsigned long)rg_multi_model_pair_model_count(model));
+        builder_appendf(&builder, "unconditioned cls:   %lu\n", (unsigned long)uncond_total);
+        builder_appendf(&builder, "conditioned cls:     %lu\n", (unsigned long)cond_total);
+        builder_appendf(&builder, "cross-dimensional:   %lu\n", (unsigned long)xp);
     }
-    builder_append(&builder, "\n");
-    builder_appendf(&builder, "pairwise models:     %lu\n", (unsigned long)rg_multi_model_pair_model_count(model));
-    builder_appendf(&builder, "unconditioned cls:   %lu\n", (unsigned long)uncond_total);
-    builder_appendf(&builder, "conditioned cls:     %lu\n", (unsigned long)cond_total);
-    builder_appendf(&builder, "cross-dimensional:   %lu\n", (unsigned long)xdim_total);
     {
         const rg_corpus_fit *fit = rg_multi_model_fit(model);
         builder_appendf(&builder, "cost/segment:        %.4f over %lu sets\n",
@@ -628,12 +729,12 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
          * the line. */
         if (fit->cost_split_separation > 4.0) {
             builder_appendf(&builder,
-                            "  the sets fall in two groups, %.0f%% of them in the worse-aligning\n"
-                            "  one, %.1f standard deviations apart. That is a corpus made of two\n"
-                            "  things -- a borrowed layer, a block of bad judgements, two sources,\n"
-                            "  or half a lexicon that underwent a change the other half did not.\n"
-                            "  `outliers --model` lists them worst first; which of those it is,\n"
-                            "  the distributions cannot say.\n",
+                            "  alignment cost is bimodal: %.0f%% of the sets align notably worse,\n"
+                            "  %.1f standard deviations from the rest. Causes include a regular\n"
+                            "  structural split (a diphthong against a monophthong, a transposition\n"
+                            "  against none), a lexical stratum, or bad cognates. `outliers --model`\n"
+                            "  lists the expensive sets first; which of these it is, the\n"
+                            "  distributions cannot say.\n",
                             100.0 * fit->cost_split_fraction, fit->cost_split_separation);
         }
         if (fit->inferred_nucleus_form_count > 0) {
@@ -756,77 +857,107 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     if (total == 0) {
         builder_append(&builder, "  (none - class-level discovery committed no splits)\n");
     }
-    for (i = 0; i < total && i < (size_t)opts.top_classes; i++) {
-        const rg_multi_class_row *row = &cond_rows[decision_order[i]];
-        builder_append(&builder, "  count=");
-        append_count(&builder, row->count);
-        /* The pivot's other reflex out of the environment, and where to read it.
-         * This is the comparison the split was scored on; `elsewhere` below is
-         * the same reflex out of the environment, ~0 whenever the rule is real,
-         * and shown second so the two are not confused. */
-        if (row->contrast_class_id >= 0) {
-            builder_append(&builder, " vs ");
-            append_count(&builder, row->contrast_alternative_count);
-            builder_appendf(&builder, " as #%d", row->contrast_class_id);
-        }
-        builder_append(&builder, " elsewhere=");
-        append_count(&builder, row->contrast_count);
-        builder_appendf(&builder, " sets=%lu", (unsigned long)row->supporting_cognate_count);
-        builder_appendf(&builder, "  #%d", row->evidence.decision_index);
-        if (row->evidence.standing != RG_RULE_STANDING_UNMEASURED) {
-            builder_appendf(&builder, " %s",
-                            row->evidence.standing == RG_RULE_STANDING_ABOVE_NOISE ? "STANDS" : "within-noise");
-        }
-        builder_appendf(&builder, " cov=%.2f %s=%.1f margin=%.2f [%.2f,%.2f]%s  ",
-                        row->confidence, score_label(row->evidence.scorer),
-                        row->evidence.delta_score, row->evidence.search_margin,
-                        row->uncertainty.lower, row->uncertainty.upper,
-                        row->uncertainty.post_selection ? "*" : "");
-        append_class_segments(&builder, row);
-        append_class_contexts(&builder, row);
-        if (row->evidence.predictive.status != RG_PREDICTIVE_UNMEASURED) {
-            builder_appendf(&builder, " predictive=%s gain=%+.3f n=%lu",
-                            rg_predictive_status_string(row->evidence.predictive.status),
-                            row->evidence.predictive.log_loss_gain,
-                            (unsigned long)row->evidence.predictive.conditioned.observation_count);
-        }
-        if (row->environment_alternatives > 0) {
-            /* Another neighbour's feature carves this split the same way; the
-             * named environment is one of several the corpus supports. */
-            builder_appendf(&builder, "  [environment not identifiable: %d other%s carve%s it the same]",
-                            row->environment_alternatives,
-                            row->environment_alternatives == 1 ? "" : "s",
-                            row->environment_alternatives == 1 ? "s" : "");
-        }
-        /* Two in five committed rules are X ~ X. Most are the retention side
-         * of a real split, with the change sitting in the contrast class, and
-         * "p ~ p before a vowel" is a null statement to read: a reader has to
-         * notice the graphemes are the same and then chase an id to find the
-         * event. Name which half of the pair is the event instead. */
-        if (class_is_identity(row)) {
-            const rg_multi_class_row *contrast = class_by_id(
-                uncond_rows, uncond_total, cond_rows, cond_total, row->contrast_class_id);
-            if (contrast != 0 && !class_is_identity(contrast)) {
-                builder_append(&builder, "  [unchanged here; the change is #");
-                builder_appendf(&builder, "%d]", contrast->class_id);
+    {
+        size_t shown = 0;
+        size_t complement_total = 0;
+        size_t weak_total = 0;
+        /* Changes lead. Retentions (every lect shows the same grapheme) are
+         * the complement of a real split, and thin or elsewhere-heavy rows
+         * are not peers of the split that carries the corpus; both print
+         * under their own headings below. */
+        for (i = 0; i < total && shown < (size_t)opts.top_classes; i++) {
+            const rg_multi_class_row *row = &cond_rows[decision_order[i]];
+            if (class_is_identity(row)) {
+                complement_total++;
+                continue;
             }
+            if (class_is_weak(row)) {
+                weak_total++;
+                continue;
+            }
+            append_conditioned_row(&builder, row,
+                                   uncond_rows, uncond_total, cond_rows, cond_total);
+            shown++;
         }
-        builder_append(&builder, "\n");
-    }
-    if (total > (size_t)opts.top_classes) {
-        builder_appendf(&builder, "  ... (%lu more)\n", (unsigned long)(total - (size_t)opts.top_classes));
+        if (total > 0 && shown == 0) {
+            builder_append(&builder, "  (none - every committed row is a complement or below the reporting floor)\n");
+        }
+        for (i = 0; i < total; i++) {
+            const rg_multi_class_row *row = &cond_rows[decision_order[i]];
+            if (!class_is_identity(row)) {
+                continue;
+            }
+            if (complement_total > 0) {
+                builder_append(&builder, "\n--- Complements (unchanged in the environment) ---\n");
+                complement_total = 0;
+            }
+            append_conditioned_row(&builder, row,
+                                   uncond_rows, uncond_total, cond_rows, cond_total);
+        }
+        for (i = 0; i < total; i++) {
+            const rg_multi_class_row *row = &cond_rows[decision_order[i]];
+            if (class_is_identity(row) || !class_is_weak(row)) {
+                continue;
+            }
+            if (weak_total > 0) {
+                builder_append(&builder, "\n--- Weak conditioned classes (elsewhere-heavy or thin) ---\n");
+                weak_total = 0;
+            }
+            append_conditioned_row(&builder, row,
+                                   uncond_rows, uncond_total, cond_rows, cond_total);
+        }
     }
     free(decision_order);
     decision_order = 0;
+
+    /* Spans of more than one segment are a first-class result: kt answering
+     * tʃ, or two segments trading places, is one fact, not several segment
+     * correspondences. The pairwise report has always shown these; the
+     * default report reaches them through the pair models. */
+    {
+        size_t pair_total = rg_multi_model_pair_model_count(model);
+        size_t p;
+        size_t any_chunks = 0;
+        builder_append(&builder, "\n--- Multi-segment correspondences ---\n");
+        for (p = 0; p < pair_total; p++) {
+            const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, p);
+            size_t chunk_total = 0;
+            size_t ci;
+            size_t shown = 0;
+            const rg_chunk_row *chunks;
+            if (pair == 0) {
+                continue;
+            }
+            chunks = rg_pairwise_model_chunks(pair->model, &chunk_total);
+            for (ci = 0; ci < chunk_total && shown < (size_t)opts.top_chunks; ci++) {
+                const rg_chunk_row *chunk = &chunks[ci];
+                builder_appendf(&builder, "  %s>%s  ", pair->lect_a, pair->lect_b);
+                append_segments(&builder, chunk->source, chunk->source_count);
+                builder_append(&builder, " ~ ");
+                append_segments(&builder, chunk->target, chunk->target_count);
+                builder_append(&builder, "  count=");
+                append_count(&builder, chunk->count);
+                if (chunk->reordering) {
+                    builder_append(&builder, "  [reordering]");
+                }
+                builder_append(&builder, "\n");
+                shown++;
+                any_chunks++;
+            }
+        }
+        if (any_chunks == 0) {
+            builder_append(&builder, "  (none)\n");
+        }
+    }
 
     total = xdim_total;
     {
         size_t event_total = 0;
         const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &event_total);
         size_t e;
-        builder_append(&builder, "\n--- Conditioned classes that look like one change ---\n");
+        builder_append(&builder, "\n--- Classes that look like one change ---\n");
         if (event_total == 0) {
-            builder_append(&builder, "  (none - every committed environment names one correspondence)\n");
+            builder_append(&builder, "  (none)\n");
         }
         for (e = 0; e < event_total; e++) {
             const rg_proposed_event_row *event = &events[e];
@@ -868,8 +999,16 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
 
     builder_append(&builder, "\n--- Cross-dimensional rules, in the order they were decided ---\n");
-    if (total == 0) {
-        builder_append(&builder, "  (none)\n");
+    {
+        size_t publishable = 0;
+        for (i = 0; i < total; i++) {
+            if (rg_cross_dim_row_publishable_internal(&xdim_rows[i].rule)) {
+                publishable++;
+            }
+        }
+        if (publishable == 0) {
+            builder_append(&builder, "  (none)\n");
+        }
     }
     decision_order = decision_order_of(total, multi_cross_dimensional_decision_index, xdim_rows);
     if (decision_order == 0) {
@@ -878,8 +1017,13 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
     }
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[decision_order[i]];
-        const char *env_lect = row->rule.context_is_target ? row->target_lect : row->source_lect;
-        const char *other_lect = row->rule.context_is_target ? row->source_lect : row->target_lect;
+        const char *env_lect;
+        const char *other_lect;
+        if (!rg_cross_dim_row_publishable_internal(&row->rule)) {
+            continue;
+        }
+        env_lect = row->rule.context_is_target ? row->target_lect : row->source_lect;
+        other_lect = row->rule.context_is_target ? row->source_lect : row->target_lect;
         if (row->rule.dimension_from_environment) {
             /* Lect-internal: one lect's onset conditions its own tone. Written
              * `lect (self)` so it does not read as a cross-lect prediction. */
@@ -981,6 +1125,27 @@ char *rg_describe_multi_class(const rg_multi_model *model, const char *lect_id, 
     }
     if (shown == 0) {
         builder_append(&builder, "  (none)\n");
+    }
+    return builder_finish(&builder);
+}
+
+char *rg_format_drift(const rg_transcription_drift_row *rows, size_t count) {
+    string_builder builder;
+    size_t i;
+    builder_init(&builder);
+    for (i = 0; i < count; i++) {
+        builder_appendf(&builder, "DRIFT\t%s\t%s\t%s\t%s\t%lu/%lu\n",
+                        rows[i].lect, rows[i].other_lect, rows[i].grapheme,
+                        rows[i].written_as,
+                        (unsigned long)rows[i].corroborated,
+                        (unsigned long)rows[i].forms);
+    }
+    if (count > 0) {
+        builder_appendf(&builder,
+                        "  %lu transcription-drift row%s: one lect writes one grapheme where the\n"
+                        "  other writes its pieces. `regulae check` reports this before training;\n"
+                        "  what follows trains over it as if it were a correspondence.\n",
+                        (unsigned long)count, count == 1 ? "" : "s");
     }
     return builder_finish(&builder);
 }
@@ -1185,6 +1350,9 @@ char *rg_format_multi_model_summary(const rg_multi_model *model) {
     for (i = 0; i < total; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
         char environment[2048];
+        if (!rg_cross_dim_row_publishable_internal(&row->rule)) {
+            continue;
+        }
         summary_context_key(&row->rule.environment, environment, sizeof(environment));
         {
         const char *env_lect = row->rule.context_is_target ? row->target_lect : row->source_lect;

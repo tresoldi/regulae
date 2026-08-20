@@ -307,6 +307,41 @@ static rg_status distinct_partition_count(
     return RG_OK;
 }
 
+/* Tie-breaking priority tier for a candidate. Lower is preferred.
+ * Only morphological and stress annotations are promoted: they carry
+ * information the segmental inventory cannot express.  Position and
+ * phonological features compete on specificity within the same slot. */
+static int candidate_tier(const rg_split_candidate *c) {
+    if (c->slot == 0) {
+        return 2;
+    }
+    if (strcmp(c->slot, "morphological") == 0 || strcmp(c->slot, "morpheme_index") == 0) {
+        return 0;
+    }
+    if (strstr(c->slot, "stress") != 0) {
+        return 1;
+    }
+    return 2;
+}
+
+/* How many observations in the group carry the candidate's predicate. Fewer
+ * matching observations means a more specific feature — the kind that names a
+ * smaller natural class in this inventory. No hard-coded feature names. */
+static size_t candidate_specificity(
+    const rg_split_observation *rows,
+    size_t count,
+    const rg_split_candidate *c
+) {
+    size_t matching = 0;
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (rg_predicate_holds_internal(rows[i].context, c)) {
+            matching++;
+        }
+    }
+    return matching;
+}
+
 rg_status rg_split_find_best(
     rg_split_search *search,
     const rg_split_observation *rows,
@@ -440,6 +475,77 @@ rg_status rg_split_find_best(
             out->yes_count = yes_count;
             out->no_count = no_count;
             *found = 1;
+        }
+    }
+    /* When a best candidate was found, collect every other candidate within
+     * RG_TIE_EPSILON that carves the same partition (same direction) and rank
+     * the tie set:
+     *   0. morphological / morpheme_index
+     *   1. stress slots
+     *   2. everything else — within the same slot, ranked by specificity
+     *      (fewer matching observations = more specific), then candidate order
+     * The highest-priority candidate becomes the committed label; the score and
+     * partition stay the same because all tied candidates produce them. */
+    if (*found && status == RG_OK) {
+        int best_tier = candidate_tier(&out->candidate);
+        size_t best_specificity = candidate_specificity(rows, count, &out->candidate);
+        size_t best_index = 0;
+        size_t ti;
+        for (ti = 0; ti < candidate_count; ti++) {
+            if (strcmp(candidates[ti].feature, out->candidate.feature) == 0 &&
+                ((candidates[ti].slot == 0 && out->candidate.slot == 0) ||
+                 (candidates[ti].slot != 0 && out->candidate.slot != 0 &&
+                  strcmp(candidates[ti].slot, out->candidate.slot) == 0))) {
+                best_index = ti;
+                break;
+            }
+        }
+        for (ti = 0; ti < candidate_count; ti++) {
+            int tier;
+            size_t spec;
+            double tie_margin;
+            int same_dir;
+            size_t di;
+            if (ti == best_index) {
+                continue;
+            }
+            tie_margin = gates[ti].delta_threshold - out->delta_score;
+            if (tie_margin < best_margin - RG_TIE_EPSILON) {
+                continue;
+            }
+            same_dir = 1;
+            for (di = 0; di < count; di++) {
+                int a_holds = rg_predicate_holds_internal(rows[di].context, &out->candidate) != 0;
+                int b_holds = rg_predicate_holds_internal(rows[di].context, &candidates[ti]) != 0;
+                if (a_holds != b_holds) {
+                    same_dir = 0;
+                    break;
+                }
+            }
+            if (!same_dir) {
+                continue;
+            }
+            tier = candidate_tier(&candidates[ti]);
+            if (tier > best_tier) {
+                continue;
+            }
+            if (tier == best_tier) {
+                int same_slot = (candidates[ti].slot == 0 && out->candidate.slot == 0) ||
+                                (candidates[ti].slot != 0 && out->candidate.slot != 0 &&
+                                 strcmp(candidates[ti].slot, out->candidate.slot) == 0);
+                if (!same_slot) {
+                    continue;
+                }
+            }
+            spec = candidate_specificity(rows, count, &candidates[ti]);
+            if (tier < best_tier ||
+                (tier == best_tier && spec < best_specificity) ||
+                (tier == best_tier && spec == best_specificity && ti < best_index)) {
+                out->candidate = candidates[ti];
+                best_tier = tier;
+                best_specificity = spec;
+                best_index = ti;
+            }
         }
     }
     free(pooled_items);

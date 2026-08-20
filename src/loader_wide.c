@@ -12,6 +12,107 @@ static int has_suffix(const char *value, const char *suffix) {
     return v >= s && strcmp(value + v - s, suffix) == 0;
 }
 
+static rg_status append_break_index(int **breaks, size_t *count, size_t *cap, size_t value) {
+    if (*count > 0 && (size_t)(*breaks)[*count - 1] == value) {
+        return RG_OK;
+    }
+    if (*count == *cap) {
+        size_t next_cap = *cap == 0 ? 4 : *cap * 2;
+        int *next = (int *)realloc(*breaks, next_cap * sizeof(*next));
+        if (next == 0) {
+            return RG_ERR_OOM;
+        }
+        *breaks = next;
+        *cap = next_cap;
+    }
+    (*breaks)[(*count)++] = (int)value;
+    return RG_OK;
+}
+
+/* Wide cells carry two inline marks a long-format row writes as tokens: "+"
+ * for a morpheme boundary and "-" for a syllable break. Neither is a sound,
+ * and merkmal is right to refuse both, so the cell is cut at the marks here
+ * and each piece segmented on its own. A break is recorded as the running
+ * segment count, the same indexing the "<lect>_breaks" and "<lect>_syllables"
+ * columns use; when a column supplies breaks of its own it wins, so the two
+ * are never double-counted. "_" and "#" are not stripped: they reach merkmal
+ * and are refused there. A cell of nothing but marks segments to nothing and
+ * is treated as absent, never as a segment. */
+static rg_status segment_wide_cell(
+    const rg_context *ctx,
+    const char *word,
+    int record_morpheme,
+    int record_syllable,
+    loader_form *form
+) {
+    size_t seg_cap = 0;
+    size_t morph_cap = 0;
+    size_t syll_cap = 0;
+    const char *cursor = word;
+    rg_status status = RG_OK;
+
+    if (strpbrk(word, "+-") == 0) {
+        return rg_context_segment_word(ctx, word, &form->segments, &form->segment_count);
+    }
+    while (status == RG_OK) {
+        const char *mark = cursor;
+        rg_segment *piece = 0;
+        size_t piece_count = 0;
+        char mark_char;
+
+        while (*mark != '\0' && *mark != '+' && *mark != '-') {
+            mark++;
+        }
+        mark_char = *mark;
+        if (mark != cursor) {
+            char *cut = (char *)malloc((size_t)(mark - cursor) + 1);
+            if (cut == 0) {
+                return RG_ERR_OOM;
+            }
+            memcpy(cut, cursor, (size_t)(mark - cursor));
+            cut[mark - cursor] = '\0';
+            status = rg_context_segment_word(ctx, cut, &piece, &piece_count);
+            free(cut);
+            if (status != RG_OK) {
+                return status;
+            }
+            if (piece_count > 0) {
+                if (form->segment_count + piece_count > seg_cap) {
+                    size_t next_cap = seg_cap == 0 ? 8 : seg_cap;
+                    rg_segment *next;
+                    while (form->segment_count + piece_count > next_cap) {
+                        next_cap *= 2;
+                    }
+                    next = (rg_segment *)realloc(form->segments, next_cap * sizeof(*next));
+                    if (next == 0) {
+                        rg_segments_free(piece, piece_count);
+                        return RG_ERR_OOM;
+                    }
+                    form->segments = next;
+                    seg_cap = next_cap;
+                }
+                memcpy(form->segments + form->segment_count, piece, piece_count * sizeof(*piece));
+                form->segment_count += piece_count;
+            }
+            free(piece);
+        }
+        if (mark_char == '\0') {
+            break;
+        }
+        if (form->segment_count > 0) {
+            if (mark_char == '+' && record_morpheme) {
+                status = append_break_index(&form->morpheme_breaks, &form->morpheme_break_count,
+                                            &morph_cap, form->segment_count);
+            } else if (mark_char == '-' && record_syllable) {
+                status = append_break_index(&form->syllable_breaks, &form->syllable_break_count,
+                                            &syll_cap, form->segment_count);
+            }
+        }
+        cursor = mark + 1;
+    }
+    return status;
+}
+
 /* Parses a "<lect>_breaks" cell: comma-separated morpheme boundary indices,
  * with "-" or an empty cell meaning none. */
 rg_status parse_break_indices(const char *raw, int **out, size_t *out_count) {
@@ -253,28 +354,38 @@ rg_status load_wide_tsv(
                 continue;
             }
             memset(&form, 0, sizeof(form));
-            status = rg_context_segment_word(ctx, word, &form.segments, &form.segment_count);
+            if (break_cols[c] >= 0) {
+                status = parse_break_indices(cell(row, break_cols[c]), &form.morpheme_breaks, &form.morpheme_break_count);
+                if (status != RG_OK) {
+                    free(word);
+                    loader_form_clear(&form);
+                    break;
+                }
+            }
+            if (syllable_cols[c] >= 0) {
+                status = parse_break_indices(cell(row, syllable_cols[c]), &form.syllable_breaks, &form.syllable_break_count);
+                if (status != RG_OK) {
+                    free(word);
+                    loader_form_clear(&form);
+                    break;
+                }
+            }
+            status = segment_wide_cell(ctx, word,
+                                       form.morpheme_break_count == 0,
+                                       form.syllable_break_count == 0,
+                                       &form);
             free(word);
             if (status != RG_OK) {
+                loader_form_clear(&form);
                 break;
             }
             if (form.segment_count == 0) {
                 loader_form_clear(&form);
                 continue;
             }
-            if (break_cols[c] >= 0) {
-                status = parse_break_indices(cell(row, break_cols[c]), &form.morpheme_breaks, &form.morpheme_break_count);
-            }
-            if (status == RG_OK && length_cols[c] >= 0) {
+            if (length_cols[c] >= 0) {
                 status = attach_dimension(cell(row, length_cols[c]), form.segments,
                                           form.segment_count, RG_DIMENSION_LENGTH);
-            }
-            if (status == RG_OK && syllable_cols[c] >= 0) {
-                status = parse_break_indices(cell(row, syllable_cols[c]), &form.syllable_breaks, &form.syllable_break_count);
-                if (status != RG_OK) {
-                    loader_form_clear(&form);
-                    break;
-                }
             }
             if (tone_cols[c] >= 0) {
                 status = attach_dimension(cell(row, tone_cols[c]), form.segments, form.segment_count, RG_DIMENSION_TONE);

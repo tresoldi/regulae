@@ -113,10 +113,11 @@ for (const id of [
   'baseline-check', 'baseline-unavailable', 'predictive', 'predictive-panel',
   'predictive-body', 'predictive-table', 'provenance', 'provenance-body',
   'gaps-panel', 'gaps', 'gaps-hint', 'copy-csv', 'copy-markdown',
-  'lect-pair', 'lect-pair-wrap',
+  'lect-pair', 'lect-pair-wrap', 'drift-panel', 'drift-list',
+  'chunks-panel', 'chunks', 'chunks-hint',
 ]) {
   byId.set(id, new Element(
-    ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'gaps'].includes(id) ? 'table' : 'div'));
+    ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'gaps', 'chunks'].includes(id) ? 'table' : 'div'));
 }
 // The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
@@ -126,6 +127,7 @@ byId.get('events').appendChild(new Element('tbody'));
 byId.get('crossdim').appendChild(new Element('tbody'));
 byId.get('predictive-table').appendChild(new Element('tbody'));
 byId.get('gaps').appendChild(new Element('tbody'));
+byId.get('chunks').appendChild(new Element('tbody'));
 
 // The classes table has sortable headers app.js wires and reads; the shim
 // carries them so a sort click has something to act on.
@@ -135,10 +137,11 @@ for (const key of ['default', 'count', 'sets', 'rate']) {
   byId.get('classes').appendChild(th);
 }
 // The filter chips, so a chip click reaches the same handler the page wires.
-for (const chip of ['all', 'conditioned', 'unconditioned', 'recurring', 'changes', 'stands']) {
+for (const chip of ['all', 'conditioned', 'unconditioned', 'recurring', 'changes', 'weak', 'stands']) {
   const button = new Element('button');
   button.dataset.chip = chip;
-  if (chip === 'all') button.classList.add('on');
+  // The page defaults: the kind filter is 'all' and the retention rows hide.
+  if (chip === 'all' || chip === 'changes') button.classList.add('on');
   byId.get('class-chips').appendChild(button);
 }
 
@@ -194,7 +197,7 @@ check('the example list offers every corpus, grouped', () => {
   // One placeholder plus every corpus.
   assert.equal(options.length, CORPUS_LIST.length + 1);
   const unreadable = CORPUS_LIST.filter((e) => !e.readable);
-  assert.ok(unreadable.length > 0, 'expected some corpora to be unreadable');
+  // None need be blocked; whatever is must say what blocks it.
   for (const entry of unreadable) {
     const option = options.find((o) => o.value === entry.path);
     assert.ok(option.textContent.includes(entry.blockedBy),
@@ -215,6 +218,24 @@ const model = JSON.parse(execFileSync(
 const worker = FakeWorker.instances[0];
 worker.onmessage({ data: { type: 'ready', version: '0.1.0' } });
 worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1234 } });
+
+/* Re-render the latin/spanish model, so a view test starts from a known table
+   rather than whichever model the previous check left rendered. */
+const rerender = () => worker.onmessage(
+  { data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+
+const classRowCount = () => byId.get('classes').querySelectorAll('tr[data-class-id]').length;
+
+/* The page defaults hide retentions and weak conditioned rows. Checks that
+   read the whole table lift both first, through the same chips a visitor
+   would use. */
+const chipButton = (name) =>
+  byId.get('class-chips').children.find((c) => c.dataset.chip === name);
+const showEverything = () => {
+  rerender();
+  if (chipButton('changes').classList.contains('on')) chipButton('changes').click();
+  if (!chipButton('weak').classList.contains('on')) chipButton('weak').click();
+};
 
 /* The decision list is a finding: each rule was committed against what the
    earlier ones left unexplained. The JSON sorts every table by id, so a
@@ -237,6 +258,7 @@ check('conditioned classes render in the order they were decided', () => {
    real split with the change in the contrast class. "p ~ p before a vowel" is a
    null statement to read, so the row has to say which half is the event. */
 check('a retention row names the change it is the complement of', () => {
+  showEverything();
   const conditioned = model.classes.conditioned;
   const identity = conditioned.find((entry) => {
     if (new Set(entry.segments.map((s) => s.grapheme)).size !== 1) return false;
@@ -292,6 +314,7 @@ check('selecting a residue row shows that set and nothing else', () => {
 });
 
 check('a result renders classes and alignments', () => {
+  showEverything();
   const rows = byId.get('classes').querySelectorAll('tr[data-class-id]');
   assert.equal(rows.length,
     model.classes.unconditioned.length + model.classes.conditioned.length);
@@ -301,6 +324,7 @@ check('a result renders classes and alignments', () => {
 });
 
 check('every conditioned class shows its environment', () => {
+  showEverything();
   const rows = byId.get('classes').querySelectorAll('tr[data-class-id]');
   for (const entry of model.classes.conditioned) {
     const row = rows.find((r) => r.dataset.classId === String(entry.id));
@@ -312,6 +336,7 @@ check('every conditioned class shows its environment', () => {
 });
 
 check('selecting a class shows exactly the alignments the model says realise it', () => {
+  showEverything();
   const conditioned = model.classes.conditioned[0];
   const expected = model.alignments
     .filter((a) => a.links.some((l) => (l.classes || []).includes(conditioned.id)))
@@ -332,6 +357,7 @@ check('selecting a class shows exactly the alignments the model says realise it'
 });
 
 check('a conditioned class lights fewer columns than its unconditioned twin', () => {
+  showEverything();
   const key = (c) => c.segments.map((s) => `${s.lect}:${s.grapheme}`).join('|');
   const plain = new Map(model.classes.unconditioned.map((c) => [key(c), c.id]));
   const pair = model.classes.conditioned.find((c) => plain.has(key(c)));
@@ -435,6 +461,8 @@ check('the baseline pane appears only when the shuffle was run', () => {
    one visible sign the option did anything. */
 check('every class shows its rate interval, marked when bootstrapped', () => {
   worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  if (chipButton('changes').classList.contains('on')) chipButton('changes').click();
+  if (!chipButton('weak').classList.contains('on')) chipButton('weak').click();
   const first = model.classes.unconditioned[0];
   const rows = byId.get('classes').querySelectorAll('tr[data-class-id]');
   const row = rows.find((r) => r.dataset.classId === String(first.id));
@@ -454,6 +482,9 @@ check('every class shows its rate interval, marked when bootstrapped', () => {
     c.uncertainty.method = 'bootstrap';
   }
   worker.onmessage({ data: { type: 'result', json: JSON.stringify(boot), elapsedMs: 1 } });
+  /* A fresh render resets the defaults; lift them again before reading rows. */
+  if (chipButton('changes').classList.contains('on')) chipButton('changes').click();
+  if (!chipButton('weak').classList.contains('on')) chipButton('weak').click();
   const brow = byId.get('classes').querySelectorAll('tr[data-class-id]')
     .find((r) => r.dataset.classId === String(first.id));
   assert.ok(brow.querySelectorAll('.ci')[0].classList.contains('boot'),
@@ -462,18 +493,11 @@ check('every class shows its rate interval, marked when bootstrapped', () => {
     'the hint did not switch to bootstrap');
 });
 
-/* Re-render the latin/spanish model, so a view test starts from a known table
-   rather than whichever model the previous check left rendered. */
-const rerender = () => worker.onmessage(
-  { data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
-
-const classRowCount = () => byId.get('classes').querySelectorAll('tr[data-class-id]').length;
-
 /* A real corpus trains a hundred classes; the filter is how a comparativist
    reaches the one they came for. It matches the written correspondence, so a
    segment typed into it narrows the table to the rows that mention it. */
 check('the filter narrows the classes to those matching the query', () => {
-  rerender();
+  showEverything();
   const total = classRowCount();
   assert.ok(total > 5, 'need a corpus with enough classes to filter');
   const filter = byId.get('class-filter');
@@ -490,18 +514,92 @@ check('the filter narrows the classes to those matching the query', () => {
 
 /* The chips are layered filters. "changes only" hides the retention rows --
    the X ~ X classes where every lect keeps the segment -- which is how a reader
-   asks the table for what actually moved. */
-check('the changes-only chip hides the identity rows', () => {
+   asks the table for what actually moved. It is on by default: the first table
+   a visitor sees is the changes, and the retentions are one click away. */
+check('the changes-only chip hides the identity rows, by default', () => {
   rerender();
+  /* Weak rows stay hidden here so the count compares like with like. */
+  if (!chipButton('weak').classList.contains('on')) chipButton('weak').click();
   const isIdentity = (entry) => new Set(entry.segments.map((s) => s.grapheme)).size === 1;
+  const total = [...model.classes.unconditioned, ...model.classes.conditioned].length;
   const changing = [...model.classes.unconditioned, ...model.classes.conditioned]
     .filter((c) => !isIdentity(c)).length;
-  const chip = byId.get('class-chips').children.find((c) => c.dataset.chip === 'changes');
-  chip.click();
+  const chip = chipButton('changes');
+  assert.ok(chip.classList.contains('on'), 'changes-only is not the default');
   assert.equal(classRowCount(), changing,
-    `changes-only showed ${classRowCount()}, expected ${changing}`);
+    `default table showed ${classRowCount()}, expected the ${changing} changes`);
   chip.click();
-  assert.ok(classRowCount() > changing, 'toggling the chip off did not restore the rows');
+  assert.equal(classRowCount(), total, 'toggling the chip off did not restore the retentions');
+  chip.click();
+  assert.equal(classRowCount(), changing, 'toggling the chip back on did not hide the retentions');
+  chipButton('weak').click();
+});
+
+/* Conditioned rows that are thin or were never measured against the shuffle
+   are not peers of the rows that carry the corpus; they sit behind the weak
+   chip rather than in the first table a visitor reads. */
+check('the weak chip reveals thin and unmeasured conditioned rows', () => {
+  rerender();
+  if (chipButton('changes').classList.contains('on')) chipButton('changes').click();
+  const isWeak = (entry) => entry.count < 8
+    || entry.standing === 'unmeasured' || entry.standing === 'within noise';
+  const weak = model.classes.conditioned.filter(isWeak).length;
+  const strong = model.classes.conditioned.length - weak;
+  const uncond = model.classes.unconditioned.length;
+  assert.ok(weak > 0, 'this corpus has no weak conditioned rows to hide');
+  assert.equal(classRowCount(), uncond + strong,
+    `default showed ${classRowCount()}, expected ${uncond + strong}`);
+  chipButton('weak').click();
+  assert.equal(classRowCount(), uncond + strong + weak,
+    'the weak chip did not restore the hidden rows');
+});
+
+/* An environment the corpus cannot identify uniquely is marked on the row,
+   not only in a hint, so it cannot be quoted as the environment. */
+check('a confounded environment is marked tied', () => {
+  showEverything();
+  const tied = model.classes.conditioned.find((c) => (c.environment_alternatives || 0) > 0);
+  assert.ok(tied, 'this corpus has no confounded environment to mark');
+  const row = byId.get('classes').querySelectorAll('tr[data-class-id]')
+    .find((r) => r.dataset.classId === String(tied.id));
+  assert.ok(row, 'the confounded row is not rendered');
+  assert.ok(row.textContent.includes('tied'), 'the confounded row does not say tied');
+});
+
+/* Spans of more than one segment reach the page beside the model, and a
+   reordering reads as one -- metathesis is visible without --pairwise. */
+check('the chunks pane renders spans and reorderings', () => {
+  const chunks = JSON.stringify({ ok: true, pairs: [{
+    source_lect: 'latin', target_lect: 'spanish',
+    chunks: [
+      { source: 'k t', target: 't͡ʃ', count: 4, reordering: false, transparency: 0.8 },
+      { source: 'e r', target: 'r e', count: 3, reordering: true, transparency: 0.9 },
+    ],
+  }] });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), chunks, elapsedMs: 1 } });
+  assert.ok(!byId.get('chunks-panel').hidden, 'the chunks pane stayed hidden');
+  const rows = byId.get('chunks').querySelectorAll('tr');
+  assert.equal(rows.length, 2);
+  assert.ok(rows[0].textContent.includes('k t ~ t͡ʃ'), 'the span did not render');
+  assert.ok(rows[1].textContent.includes('reordering'), 'the reordering was not marked');
+
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  assert.ok(byId.get('chunks-panel').hidden, 'a run without chunks did not hide the pane');
+});
+
+/* Transcription drift is said above the model: it reads as a correspondence
+   once trained, and it is not one. */
+check('the drift banner appears when the corpus carries drift', () => {
+  const drift = JSON.stringify({ ok: true, drift: [
+    { lect: 'broad', other_lect: 'narrow', grapheme: 'tʃ', written_as: 't ʃ',
+      corroborated: 13, forms: 13 },
+  ] });
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), drift, elapsedMs: 1 } });
+  assert.ok(!byId.get('drift-panel').hidden, 'the drift banner stayed hidden');
+  assert.ok(byId.get('drift-list').textContent.includes('tʃ'), 'the drift row did not render');
+
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(model), elapsedMs: 1 } });
+  assert.ok(byId.get('drift-panel').hidden, 'a run without drift did not hide the banner');
 });
 
 /* Sorting is a view over the same rows: clicking count orders the table by it,
@@ -519,7 +617,7 @@ check('sorting by count orders the visible rows', () => {
    score, the confound and the supporting cognates the class rests on. This is
    the "why this rule?" data that used to be JSON-only. */
 check('expanding a conditioned class opens its evidence, and it reads the score and sets', () => {
-  rerender();
+  showEverything();
   const cond = model.classes.conditioned[0];
   const row = byId.get('classes').querySelectorAll('tr[data-class-id]')
     .find((r) => r.dataset.classId === String(cond.id));

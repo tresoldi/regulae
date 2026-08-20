@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <math.h>
+#include <string.h>
 
 static const rg_context_spec inside = {
     .position = "initial"
@@ -126,10 +127,54 @@ static void test_equivalent_split_encodings_do_not_increase_search_charge(void) 
     rg_split_search_clear(&search);
 }
 
+static void test_tie_ranking_prefers_morphological_over_feature(void) {
+    static const rg_feature_constraint voiced_plus = {"voiced", "+"};
+    static const rg_context_spec morph_and_voiced = {
+        .morphological = "initial",
+        .following = &voiced_plus,
+        .following_count = 1
+    };
+    static const rg_context_spec neither = {0};
+    const rg_split_observation rows[] = {
+        {&morph_and_voiced, "a", 1.0, 0},
+        {&morph_and_voiced, "a", 1.0, 0},
+        {&morph_and_voiced, "a", 1.0, 0},
+        {&morph_and_voiced, "a", 1.0, 0},
+        {&neither, "b", 1.0, 0},
+        {&neither, "b", 1.0, 0},
+        {&neither, "b", 1.0, 0},
+        {&neither, "b", 1.0, 0}
+    };
+    const rg_split_candidate candidates[] = {
+        {"following", "voiced", "+"},
+        {"morphological", "initial", 0}
+    };
+    const rg_split_gate gates[] = {
+        {0.0, -1.0, 0.0},
+        {0.0, -1.0, 0.0}
+    };
+    const rg_split_score_config score = {
+        RG_SPLIT_SCORER_CORRECTED_BIC, 1.0, log(8.0), 0.0, 0, 1.0,
+        RG_CLASS_OUTCOME_SISTER_TUPLE, 0, 0
+    };
+    rg_split_search search;
+    rg_split_result result;
+    int found = 0;
+
+    assert(rg_split_search_init(&search, 8) == RG_OK);
+    assert(rg_split_find_best(&search, rows, 8, candidates, gates, 2,
+                              &score, &result, &found) == RG_OK);
+    assert(found);
+    assert(strcmp(result.candidate.slot, "morphological") == 0);
+    assert(strcmp(result.candidate.feature, "initial") == 0);
+    rg_split_search_clear(&search);
+}
+
 int main(void) {
     test_binary_split_adds_one_parameter();
     test_three_outcomes_add_two_parameters();
     test_fractional_mass_does_not_change_the_outcome_dimension();
     test_equivalent_split_encodings_do_not_increase_search_charge();
+    test_tie_ranking_prefers_morphological_over_feature();
     return 0;
 }

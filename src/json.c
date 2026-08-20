@@ -948,7 +948,11 @@ char *rg_json_from_multi_model_internal(
     xdim_rows = rg_multi_model_cross_dimensional_rows(model, &table_count);
     for (i = 0; i < table_count; i++) {
         const rg_multi_cross_dimensional_row *row = &xdim_rows[i];
-        cJSON *entry = cJSON_CreateObject();
+        cJSON *entry;
+        if (!rg_cross_dim_row_publishable_internal(&row->rule)) {
+            continue;
+        }
+        entry = cJSON_CreateObject();
         if (entry == 0) {
             cJSON_Delete(root);
             return 0;
@@ -1039,6 +1043,128 @@ char *rg_json_from_multi_model_internal(
         }
     }
 
+    text = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return text;
+}
+
+/* A chunk's span as the written string a reader recognises: the graphemes,
+ * space-separated. */
+static cJSON *json_span(const rg_segment *segments, size_t count) {
+    char buffer[512];
+    size_t used = 0;
+    size_t i;
+    buffer[0] = '\0';
+    for (i = 0; i < count; i++) {
+        int written = snprintf(buffer + used, sizeof(buffer) - used, "%s%s",
+                               i == 0 ? "" : " ",
+                               segments[i].grapheme == 0 ? "" : segments[i].grapheme);
+        if (written < 0 || (size_t)written >= sizeof(buffer) - used) {
+            break;
+        }
+        used += (size_t)written;
+    }
+    return cJSON_CreateString(buffer);
+}
+
+char *rg_multi_model_pair_chunks_json(const rg_multi_model *model) {
+    cJSON *root;
+    cJSON *pairs;
+    char *text;
+    size_t i;
+
+    if (model == 0) {
+        return 0;
+    }
+    root = cJSON_CreateObject();
+    if (root == 0) {
+        return 0;
+    }
+    cJSON_AddBoolToObject(root, "ok", 1);
+    cJSON_AddNumberToObject(root, "format_version", RG_JSON_FORMAT_VERSION);
+    pairs = cJSON_AddArrayToObject(root, "pairs");
+    if (pairs == 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
+    for (i = 0; i < rg_multi_model_pair_model_count(model); i++) {
+        const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, i);
+        const rg_chunk_row *chunks;
+        size_t chunk_count = 0;
+        size_t c;
+        cJSON *pair_entry;
+        cJSON *chunk_array;
+        if (pair == 0) {
+            continue;
+        }
+        pair_entry = cJSON_CreateObject();
+        if (pair_entry == 0) {
+            cJSON_Delete(root);
+            return 0;
+        }
+        cJSON_AddStringToObject(pair_entry, "source_lect", pair->lect_a);
+        cJSON_AddStringToObject(pair_entry, "target_lect", pair->lect_b);
+        chunk_array = cJSON_AddArrayToObject(pair_entry, "chunks");
+        chunks = rg_pairwise_model_chunks(pair->model, &chunk_count);
+        for (c = 0; c < chunk_count; c++) {
+            cJSON *entry = cJSON_CreateObject();
+            if (entry == 0) {
+                break;
+            }
+            cJSON_AddItemToObject(entry, "source", json_span(chunks[c].source, chunks[c].source_count));
+            cJSON_AddItemToObject(entry, "target", json_span(chunks[c].target, chunks[c].target_count));
+            cJSON_AddNumberToObject(entry, "count", chunks[c].count);
+            cJSON_AddBoolToObject(entry, "reordering", chunks[c].reordering);
+            cJSON_AddNumberToObject(entry, "transparency", chunks[c].transparency);
+            cJSON_AddItemToArray(chunk_array, entry);
+        }
+        cJSON_AddItemToArray(pairs, pair_entry);
+    }
+    text = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    return text;
+}
+
+char *rg_corpus_drift_json(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count
+) {
+    rg_transcription_drift_row *rows = 0;
+    size_t row_count = 0;
+    cJSON *root;
+    cJSON *array;
+    char *text;
+    size_t i;
+
+    if (ctx == 0) {
+        return 0;
+    }
+    if (rg_find_transcription_drift(ctx, cognates, cognate_count, &rows, &row_count) != RG_OK) {
+        return 0;
+    }
+    root = cJSON_CreateObject();
+    if (root == 0) {
+        rg_transcription_drift_rows_free(rows, row_count);
+        return 0;
+    }
+    cJSON_AddBoolToObject(root, "ok", 1);
+    cJSON_AddNumberToObject(root, "format_version", RG_JSON_FORMAT_VERSION);
+    array = cJSON_AddArrayToObject(root, "drift");
+    for (i = 0; i < row_count && array != 0; i++) {
+        cJSON *entry = cJSON_CreateObject();
+        if (entry == 0) {
+            break;
+        }
+        cJSON_AddStringToObject(entry, "lect", rows[i].lect);
+        cJSON_AddStringToObject(entry, "other_lect", rows[i].other_lect);
+        cJSON_AddStringToObject(entry, "grapheme", rows[i].grapheme);
+        cJSON_AddStringToObject(entry, "written_as", rows[i].written_as);
+        cJSON_AddNumberToObject(entry, "corroborated", (double)rows[i].corroborated);
+        cJSON_AddNumberToObject(entry, "forms", (double)rows[i].forms);
+        cJSON_AddItemToArray(array, entry);
+    }
+    rg_transcription_drift_rows_free(rows, row_count);
     text = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
     return text;

@@ -20,6 +20,22 @@ function post(type, payload) {
   self.postMessage(Object.assign({ type }, payload));
 }
 
+/* Calls a zero-argument JSON export and hands back the string, or null when
+ * the build does not export it. The pointer is always returned to the engine. */
+function callJson(instance, name) {
+  let pointer = 0;
+  try {
+    pointer = instance.ccall(name, "number", [], []);
+    return instance.UTF8ToString(pointer);
+  } catch {
+    return null;
+  } finally {
+    if (pointer !== 0) {
+      instance.ccall("regulae_free", null, ["number"], [pointer]);
+    }
+  }
+}
+
 /* Whether this engine accepts the shuffled baseline over the JSON options
  * surface. The option parser runs before the corpus is read and rejects a key
  * it does not know, so a one-line corpus is enough to ask the question; a build
@@ -112,7 +128,22 @@ self.onmessage = (event) => {
       [corpus, format || "wide", options || null],
     );
     const text = engine.UTF8ToString(pointer);
-    post("result", { json: text, elapsedMs: Date.now() - started });
+    /* The display-only extras ride beside the model rather than inside it:
+     * they come from the run the module keeps live after a successful train,
+     * and the documented model export stays byte-stable. An old build without
+     * the exports just sends neither. */
+    let chunks = null;
+    let drift = null;
+    try {
+        const payload = JSON.parse(text);
+        if (payload.ok !== false) {
+            chunks = callJson(engine, "regulae_chunks_json");
+            drift = callJson(engine, "regulae_drift_json");
+        }
+    } catch {
+        /* chunks and drift are extras; the result stands without them. */
+    }
+    post("result", { json: text, chunks, drift, elapsedMs: Date.now() - started });
   } catch (error) {
     /* An exception here is the engine itself failing, not the corpus being
      * wrong: those come back as an ok:false payload. */

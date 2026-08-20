@@ -43,7 +43,7 @@ the engine changed to allow it.
 | transcription drift between sources | reported, not refused | `regulae check`, or `rg_find_transcription_drift` | `testdata/diagnostics/drift.tsv`: 5 of 5 found, and no corpus in this repository reports a false one |
 | telling borrowing from inheritance | **out of scope** | n/a | `testdata/restraint/contact.tsv`: the correspondences are real either way; the ranking shows the split |
 
-## Corpora regulae reads (22 of 24)
+## Corpora regulae reads (24 of 24)
 
 Trained through the wide loader with default options.
 
@@ -56,12 +56,14 @@ Trained through the wide loader with default options.
 | harmony_synthetic | derived, proto | 14 | 2 |
 | latin_french | french, latin | 107 | 2 |
 | latin_italian | italian, latin | 96 | 11 |
-| latin_spanish | latin, spanish | 96 | 9 |
+| latin_spanish | latin, spanish | 95 | 8 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
 | mandarin_historical | mandarin, middle_chinese | 84 | 2 |
+| morph_boundary_synthetic | derived, proto | 15 | 0 |
 | navajo_chipewyan | chipewyan, navajo | 64 | 0 |
 | oe_english | modern_english, old_english | 81 | 7 |
-| ppn_hawaiian | hawaiian, ppn | 41 | 2 |
+| ppn_hawaiian | hawaiian, ppn | 37 | 2 |
+| stress_conditioned_synthetic | derived, proto | 20 | 2 |
 | swahili_zulu | swahili, zulu | 57 | 0 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 44 | 0 |
 | tone_chinese_like | cantonese, mandarin | 110 | 5 |
@@ -72,12 +74,10 @@ Trained through the wide loader with default options.
 | turkish_azerbaijani | azerbaijani, turkish | 38 | 3 |
 | umlaut_synthetic | derived, proto | 14 | 1 |
 
-## Corpora regulae cannot read yet (2 of 24)
+## Corpora regulae cannot read yet (0 of 24)
 
 Each names the grapheme that blocks it and the capability row it points at.
 None of these is an engine limitation.
 
 | corpus | blocked by | cause | see capability |
 | --- | --- | --- | --- |
-| morph_boundary_synthetic | `+` | in-word morpheme boundary | morpheme boundaries |
-| stress_conditioned_synthetic | `-` | syllable separator | stress conditioning |

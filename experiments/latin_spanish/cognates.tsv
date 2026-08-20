@@ -1,98 +1,104 @@
-gloss	latin	spanish	latin_breaks	spanish_breaks
-father	pater	padre	-	-
-mother	mater	madre	-	-
-brother	frater	ermano	-	-
-sister	soror	ermana	-	-
-son	filiu	ixo	-	-
-daughter	filia	ixa	-	-
-head	kaput	kabeθa	-	-
-eye	okulu	oxo	-	-
-ear	auris	oreʎa	-	-
-nose	nasu	naso	-	-
-mouth	bukka	boka	-	-
-tongue	lingua	lengwa	-	-
-tooth	dentem	djente	-	-
-neck	kollu	kweʎo	-	-
-hand	manu	mano	-	-
-foot	pede	pje	-	-
-heart	kor	koraθon	-	-
-blood	sanguine	sangre	-	-
-bone	ossu	weso	-	-
-skin	pelle	pjel	-	-
-hair	kapillu	kabeʎo	-	-
-milk	lakte	letʃe	-	-
-night	nokte	notʃe	-	-
-day	dje	dia	-	-
-sun	sole	sol	-	-
-moon	luna	luna	-	-
-star	stella	estreʎa	-	-
-water	aqua	agwa	-	-
-fire	fokus	fwego	-	-
-earth	terra	tjerra	-	-
-stone	petra	pjedra	-	-
-wood	lignu	leɲo	-	-
-leaf	folia	oxa	-	-
-tree	arbor	arbol	-	-
-flower	flore	flor	-	-
-fruit	fruktu	fruto	-	-
-seed	semen	semiʎa	-	-
-wind	ventu	bjento	-	-
-rain	pluvia	ʎubja	-	-
-sky	kaelu	θjelo	-	-
-dog	kane	perro	-	-
-cat	kattu	gato	-	-
-horse	kaballu	kabaʎo	-	-
-cow	vakka	baka	-	-
-bird	avis	abe	-	-
-fish	pisce	peθ	-	-
-snake	serpente	serpjente	-	-
-mouse	mure	raton	-	-
-wolf	lupu	lobo	-	-
-bear	ursu	oso	-	-
-man	omo	ombre	-	-
-woman	femina	ember	-	3
-king	rege	rej	-	-
-year	annu	aɲo	-	-
-month	mense	mes	-	-
-name	nomen	nombre	-	-
-three	tres	tres	-	-
-four	quattuor	kwatro	-	-
-five	kinkwe	θinko	-	-
-seven	septem	sjete	-	-
-eight	okto	otʃo	-	-
-nine	novem	nweve	-	-
-ten	decem	djeθ	-	-
-good	bonu	bweno	-	-
-bad	malu	malo	-	-
-new	novu	nweβo	-	-
-old	vetulu	bjexo	-	-
-big	grande	grande	-	-
-small	parvu	peqweɲo	-	-
-long	longu	largo	-	-
-short	kurtu	korto	-	-
-white	blanku	blanko	-	-
-black	nigru	negro	-	-
-red	rubju	roxo	-	-
-green	viride	berde	-	-
-sweet	dulke	dulθe	-	-
-cold	frigidu	frio	-	-
-hot	kalidu	kaljente	-	-
-see	videre	ber	3	-
-hear	audire	ojir	3	2
-eat	komedere	komer	5	3
-drink	bibere	beber	3	3
-speak	loqui	ablar	-	3
-know	sapere	saber	3	3
-come	venire	benir	3	3
-go	ire	ir	-	-
-give	dare	dar	-	-
-take	prendere	prender	5	5
-say	dikere	deθir	3	3
-make	fakere	aθer	3	2
-sleep	dormire	dormir	4	4
-die	morire	morir	3	3
-live	vivere	bibir	3	3
-love	amare	amar	2	2
-die	mori	morir	-	3
-break	frangere	romper	5	4
-walk	ambulare	andar	5	3
+gloss	latin	spanish	latin_breaks	spanish_breaks	confidence
+father	ˈpater	ˈpadre	-	-	1.0
+mother	ˈmater	ˈmadre	-	-	1.0
+son	ˈfiliu	ˈixo	-	-	1.0
+daughter	ˈfilia	ˈixa	-	-	1.0
+chief	ˈkaput	ˈkabo	-	-	1.0
+eye	ˈokulu	ˈoxo	-	-	1.0
+ear	ˈauris	oˈreʎa	-	-	1.0
+nose	ˈnasu	ˈnaso	-	-	1.0
+mouth	ˈbukka	ˈboka	-	-	1.0
+tongue	ˈlingʷa	ˈlengwa	-	-	1.0
+tooth	ˈdentem	ˈdjente	-	-	1.0
+neck	ˈkollu	ˈkweʎo	-	-	1.0
+hand	ˈmanu	ˈmano	-	-	1.0
+foot	ˈpede	ˈpje	-	-	1.0
+heart	ˈkor	koˈraθon	-	-	1.0
+blood	ˈsangʷine	ˈsangre	-	-	1.0
+bone	ˈossu	ˈweso	-	-	1.0
+skin	ˈpelle	ˈpjel	-	-	1.0
+hair	kaˈpillu	kaˈbeʎo	-	-	1.0
+milk	ˈlakte	ˈlet͡ʃe	-	-	1.0
+night	ˈnokte	ˈnot͡ʃe	-	-	1.0
+day	ˈdje	ˈdia	-	-	1.0
+sun	ˈsole	ˈsol	-	-	1.0
+moon	ˈluna	ˈluna	-	-	1.0
+star	ˈstella	esˈtreʎa	-	-	1.0
+water	ˈakʷa	ˈagwa	-	-	1.0
+fire	ˈfokus	ˈfwego	-	-	1.0
+earth	ˈterra	ˈtjerra	-	-	1.0
+stone	ˈpetra	ˈpjedra	-	-	1.0
+wood	ˈlignu	ˈleɲo	-	-	1.0
+leaf	ˈfolia	ˈoxa	-	-	1.0
+tree	ˈarbor	ˈarbol	-	-	1.0
+flower	ˈflore	ˈflor	-	-	1.0
+fruit	ˈfruktu	ˈfruto	-	-	1.0
+seed	ˈsemen	seˈmiʎa	-	-	1.0
+wind	ˈwentu	ˈbjento	-	-	1.0
+rain	ˈpluvia	ˈʎubja	-	-	1.0
+sky	ˈkaelu	ˈθjelo	-	-	1.0
+cat	ˈkattu	ˈgato	-	-	1.0
+horse	kaˈballu	kaˈbaʎo	-	-	1.0
+cow	ˈvakka	ˈbaka	-	-	1.0
+bird	ˈavis	ˈabe	-	-	1.0
+fish	ˈpiske	ˈpeθ	-	-	1.0
+snake	ˈserpente	serˈpjente	-	-	1.0
+wolf	ˈlupu	ˈlobo	-	-	1.0
+bear	ˈursu	ˈoso	-	-	1.0
+man	ˈomo	ˈombre	-	-	1.0
+woman	ˈfemina	ˈembra	-	4	1.0
+king	ˈrege	ˈrej	-	-	1.0
+year	ˈannu	ˈaɲo	-	-	1.0
+month	ˈmense	ˈmes	-	-	1.0
+name	ˈnomen	ˈnombre	-	-	1.0
+three	ˈtres	ˈtres	-	-	1.0
+four	ˈkʷattuor	ˈkwatro	-	-	1.0
+five	ˈkʷinkʷe	ˈθinko	-	-	1.0
+seven	ˈseptem	ˈsjete	-	-	1.0
+eight	ˈokto	ˈot͡ʃo	-	-	1.0
+nine	ˈnovem	ˈnweve	-	-	1.0
+ten	ˈdekem	ˈdjeθ	-	-	1.0
+good	ˈbonu	ˈbweno	-	-	1.0
+bad	ˈmalu	ˈmalo	-	-	1.0
+new	ˈnovu	ˈnweβo	-	-	1.0
+old	ˈvetulu	ˈbjexo	-	-	1.0
+big	ˈgrande	ˈgrande	-	-	1.0
+short	ˈkurtu	ˈkorto	-	-	1.0
+white	ˈblanku	ˈblanko	-	-	1.0
+black	ˈnigru	ˈnegro	-	-	1.0
+red	ˈrubju	ˈroxo	-	-	1.0
+green	ˈviride	ˈberde	-	-	1.0
+sweet	ˈdulke	ˈdulθe	-	-	1.0
+cold	ˈfrigidu	ˈfrio	-	-	1.0
+hot	ˈkalidu	kaˈljente	-	-	1.0
+hundred	ˈkentu	ˈθjento	-	-	1.0
+wax	ˈkera	ˈθera	-	-	1.0
+deer	ˈkerwu	ˈθjerβo	-	-	1.0
+flesh	ˈkarne	ˈkarne	-	-	1.0
+horn	ˈkornu	ˈkwerno	-	-	1.0
+side	ˈkosta	ˈkwesta	-	-	1.0
+see	wiˈdere	ˈber	4	4	1.0
+hear	auˈdire	oˈjir	4	3	1.0
+eat	koˈmedere	koˈmer	6	4	1.0
+drink	ˈbibere	beˈber	4	4	1.0
+know	saˈpere	saˈber	4	4	1.0
+come	weˈnire	beˈnir	4	4	1.0
+go	ˈire	ˈir	-	-	1.0
+give	ˈdare	ˈdar	-	-	1.0
+take	ˈprendere	ˈprender	6	6	1.0
+say	ˈdikere	deˈθir	4	4	1.0
+make	ˈfakere	aˈθer	4	3	1.0
+sleep	dorˈmire	dorˈmir	5	5	1.0
+die	moˈrire	moˈrir	4	4	1.0
+live	ˈvivere	biˈbir	4	4	1.0
+love	aˈmare	aˈmar	3	3	1.0
+brother	ˈfrater	erˈmano	-	-	0.0
+sister	ˈsoror	erˈmana	-	-	0.0
+dog	ˈkane	ˈperro	-	-	0.0
+mouse	ˈmure	raˈton	-	-	0.0
+small	ˈparwu	peˈkeɲo	-	-	0.0
+long	ˈlongu	ˈlargo	-	-	0.0
+speak	ˈlokʷi	aˈblar	-	-	0.0
+break	ˈfrangere	ˈromper	-	-	0.0
+walk	amˈbulare	anˈdar	-	-	0.0
+head	ˈkaput	kaˈbeθa	-	-	0.0

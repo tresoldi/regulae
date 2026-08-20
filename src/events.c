@@ -25,6 +25,19 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int class_is_identity(const rg_multi_class_row *row) {
+    size_t i;
+    if (row->segment_count == 0) {
+        return 0;
+    }
+    for (i = 1; i < row->segment_count; i++) {
+        if (strcmp(row->graphemes[i], row->graphemes[0]) != 0) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 /* Two classes are candidates for one event when they say the same thing about
  * the same lects in the same place: same participating lects, in the same
  * order, and an identical environment on each. Graphemes are what may differ,
@@ -50,6 +63,74 @@ static int classes_share_an_environment(
         }
     }
     return graphemes_differ;
+}
+
+static int feature_set_has(const rg_feature_set *set, const char *feature) {
+    size_t i;
+    for (i = 0; i < rg_feature_set_size(set); i++) {
+        const char *item = rg_feature_set_get(set, i);
+        if (item != 0 && strcmp(item, feature) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Two unconditioned classes share a feature displacement when the feature
+ * difference between their lect-pair graphemes is identical: if class A shows
+ * p~f (losing `stop`, gaining `fricative`) and class B shows t~θ (same), they
+ * share the displacement and group. */
+static int classes_share_displacement(
+    const rg_context *ctx,
+    const rg_multi_class_row *a,
+    const rg_multi_class_row *b
+) {
+    size_t p;
+    size_t q;
+    int graphemes_differ = 0;
+    if (a->segment_count != b->segment_count || a->segment_count < 2) {
+        return 0;
+    }
+    for (p = 0; p < a->segment_count; p++) {
+        if (strcmp(a->lect_ids[p], b->lect_ids[p]) != 0) {
+            return 0;
+        }
+        if (strcmp(a->graphemes[p], b->graphemes[p]) != 0) {
+            graphemes_differ = 1;
+        }
+    }
+    if (!graphemes_differ) {
+        return 0;
+    }
+    for (p = 0; p < a->segment_count; p++) {
+        for (q = p + 1; q < a->segment_count; q++) {
+            const rg_feature_set *sets[4];
+            size_t s;
+            size_t f;
+            if (rg_context_features_internal(ctx, a->graphemes[p], &sets[0]) != RG_OK ||
+                rg_context_features_internal(ctx, a->graphemes[q], &sets[1]) != RG_OK ||
+                rg_context_features_internal(ctx, b->graphemes[p], &sets[2]) != RG_OK ||
+                rg_context_features_internal(ctx, b->graphemes[q], &sets[3]) != RG_OK) {
+                return 0;
+            }
+            for (s = 0; s < 4; s++) {
+                for (f = 0; f < rg_feature_set_size(sets[s]); f++) {
+                    const char *feat = rg_feature_set_get(sets[s], f);
+                    int da;
+                    int db;
+                    if (feat == 0) {
+                        continue;
+                    }
+                    da = feature_set_has(sets[0], feat) - feature_set_has(sets[1], feat);
+                    db = feature_set_has(sets[2], feat) - feature_set_has(sets[3], feat);
+                    if (da != db) {
+                        return 0;
+                    }
+                }
+            }
+        }
+    }
+    return 1;
 }
 
 static int string_array_contains(char *const *items, size_t count, const char *value) {
@@ -387,26 +468,50 @@ static rg_status build_event(
     return status;
 }
 
-rg_status rg_propose_events_internal(
+static int has_conditioned_counterpart(
+    const rg_multi_class_row *cond_classes,
+    size_t cond_count,
+    const rg_multi_class_row *row
+) {
+    size_t i;
+    for (i = 0; i < cond_count; i++) {
+        const rg_multi_class_row *c = &cond_classes[i];
+        size_t j;
+        int match = 1;
+        if (c->segment_count != row->segment_count) {
+            continue;
+        }
+        for (j = 0; j < c->segment_count; j++) {
+            if (strcmp(c->lect_ids[j], row->lect_ids[j]) != 0 ||
+                strcmp(c->graphemes[j], row->graphemes[j]) != 0) {
+                match = 0;
+                break;
+            }
+        }
+        if (match) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static rg_status group_classes(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
     size_t cognate_count,
-    rg_multi_model *model
+    const rg_multi_class_row *classes,
+    size_t class_count,
+    int use_displacement,
+    const rg_multi_class_row *exclude_if_in,
+    size_t exclude_count,
+    rg_proposed_event_row **rows,
+    size_t *row_count
 ) {
-    const rg_multi_class_row *classes;
-    size_t class_count;
     char *grouped = 0;
     size_t *indices = 0;
-    rg_proposed_event_row *rows = 0;
-    size_t row_count = 0;
     size_t i;
     rg_status status = RG_OK;
 
-    if (model == 0) {
-        return RG_ERR_INVALID_ARGUMENT;
-    }
-    classes = model->conditioned_classes;
-    class_count = model->conditioned_class_count;
     if (class_count < 2) {
         return RG_OK;
     }
@@ -417,10 +522,14 @@ rg_status rg_propose_events_internal(
         free(indices);
         return RG_ERR_OOM;
     }
-
-    /* Published tables are sorted by key, so walking them in order and taking
-     * the first unclaimed class as each group's seed is deterministic without
-     * sorting anything here. */
+    for (i = 0; i < class_count; i++) {
+        if (class_is_identity(&classes[i])) {
+            grouped[i] = 1;
+        } else if (exclude_if_in != 0 &&
+                   has_conditioned_counterpart(exclude_if_in, exclude_count, &classes[i])) {
+            grouped[i] = 1;
+        }
+    }
     for (i = 0; i < class_count && status == RG_OK; i++) {
         size_t member_count = 0;
         size_t j;
@@ -430,7 +539,12 @@ rg_status rg_propose_events_internal(
         }
         indices[member_count++] = i;
         for (j = i + 1; j < class_count; j++) {
-            if (!grouped[j] && classes_share_an_environment(&classes[i], &classes[j])) {
+            if (grouped[j]) {
+                continue;
+            }
+            if (use_displacement
+                    ? classes_share_displacement(ctx, &classes[i], &classes[j])
+                    : classes_share_an_environment(&classes[i], &classes[j])) {
                 grouped[j] = 1;
                 indices[member_count++] = j;
             }
@@ -439,21 +553,49 @@ rg_status rg_propose_events_internal(
             continue;
         }
         grouped[i] = 1;
-        next = (rg_proposed_event_row *)realloc(rows, (row_count + 1) * sizeof(*rows));
+        next = (rg_proposed_event_row *)realloc(*rows, (*row_count + 1) * sizeof(*next));
         if (next == 0) {
             status = RG_ERR_OOM;
             break;
         }
-        rows = next;
+        *rows = next;
         status = build_event(ctx, cognates, cognate_count, classes,
-                             indices, member_count, &rows[row_count]);
+                             indices, member_count, &(*rows)[*row_count]);
         if (status == RG_OK) {
-            row_count++;
+            (*row_count)++;
         }
     }
-
     free(grouped);
     free(indices);
+    return status;
+}
+
+rg_status rg_propose_events_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_multi_model *model
+) {
+    rg_proposed_event_row *rows = 0;
+    size_t row_count = 0;
+    rg_status status;
+
+    if (model == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    status = group_classes(ctx, cognates, cognate_count,
+                           model->conditioned_classes,
+                           model->conditioned_class_count,
+                           0, 0, 0, &rows, &row_count);
+    if (status == RG_OK) {
+        status = group_classes(ctx, cognates, cognate_count,
+                               model->unconditioned_classes,
+                               model->unconditioned_class_count,
+                               1,
+                               model->conditioned_classes,
+                               model->conditioned_class_count,
+                               &rows, &row_count);
+    }
     if (status != RG_OK) {
         rg_proposed_events_free_internal(rows, row_count);
         return status;

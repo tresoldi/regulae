@@ -702,10 +702,27 @@ static int command_train(const char *path, const char *format, int pairwise, int
         puts(text);
         rg_string_free(text);
     } else if (human) {
-        char *text = rg_format_multi_model(model, 0);
-        if (text != 0) {
-            fputs(text, stdout);
-            rg_string_free(text);
+        /* Transcription drift reads as a conditioned change once trained, so
+         * it has to be said above the model, not left for `check`. A report
+         * here never fails the train. */
+        rg_transcription_drift_row *drift = 0;
+        size_t drift_count = 0;
+        if (rg_find_transcription_drift(ctx, rg_corpus_cognates(corpus),
+                                        rg_corpus_cognate_count(corpus),
+                                        &drift, &drift_count) == RG_OK) {
+            char *drift_text = rg_format_drift(drift, drift_count);
+            if (drift_text != 0 && drift_text[0] != '\0') {
+                fputs(drift_text, stdout);
+            }
+            rg_string_free(drift_text);
+            rg_transcription_drift_rows_free(drift, drift_count);
+        }
+        {
+            char *text = rg_format_multi_model(model, 0);
+            if (text != 0) {
+                fputs(text, stdout);
+                rg_string_free(text);
+            }
         }
     } else {
         char *text = pairwise ? rg_format_pairwise_tables(model)

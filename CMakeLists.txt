@@ -244,6 +244,7 @@ if(REGULAE_BUILD_TESTS)
     add_test(NAME syllabification COMMAND test_syllabification)
 
     add_executable(test_format tests/c/test_format.c)
+    target_compile_definitions(test_format PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     target_link_libraries(test_format PRIVATE regulae::regulae)
     add_test(NAME format COMMAND test_format)
 
@@ -356,6 +357,14 @@ if(REGULAE_BUILD_TESTS)
         set_tests_properties(cli_train_human PROPERTIES
             PASS_REGULAR_EXPRESSION "MultiLectModel")
 
+        # Transcription drift reads as a conditioned change once trained, so
+        # the human report names it above the model rather than leaving it to
+        # `check`.
+        add_test(NAME cli_train_human_reports_drift
+            COMMAND regulae_cli train --human "${CMAKE_CURRENT_SOURCE_DIR}/testdata/diagnostics/drift.tsv")
+        set_tests_properties(cli_train_human_reports_drift PROPERTIES
+            PASS_REGULAR_EXPRESSION "^DRIFT\tbroad\tnarrow")
+
         add_test(NAME cli_align
             COMMAND regulae_cli align "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/three_lect_basic.tsv")
         set_tests_properties(cli_align PROPERTIES PASS_REGULAR_EXPRESSION "^ALIGN	c1")
@@ -443,14 +452,13 @@ if(REGULAE_BUILD_TESTS)
         # counts it, and shows a form it came from -- rather than stopping at
         # the first occurrence the way training has to.
         # check trains, so it can say which correspondences carry uncertainty
-        # that no environment accounts for. On Latin and Spanish without vowel
-        # quantity or stress that is six of them -- the palatalisations and the
-        # -kt-, -li- and -nn- developments -- and the corpus carries no
-        # annotation any of them could be conditioned on.
+        # that no environment accounts for. On Latin and Spanish, three remain
+        # unexplained after the wordlist was rebuilt; what remains is genuinely
+        # so rather than the palatalisations or diphthongisations.
         add_test(NAME cli_check_reports_unexplained_correspondences
             COMMAND regulae_cli check "${CMAKE_CURRENT_SOURCE_DIR}/testdata/corpora/real_latin_spanish.tsv")
         set_tests_properties(cli_check_reports_unexplained_correspondences PROPERTIES
-            PASS_REGULAR_EXPRESSION "unexplained\t6")
+            PASS_REGULAR_EXPRESSION "unexplained\t3")
 
         # And declines to on two wordlists with no history between them, where
         # every correspondence is unexplained truthfully and uselessly. The

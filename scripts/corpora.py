@@ -60,7 +60,7 @@ LADDER = [
     ("testdata/soundlaws/grimm.tsv",
      "Grimm's Law",
      "Proto-Indo-European to Proto-Germanic. Three consonant shifts at once "
-     "(p to f, t to θ, k to x), and not one conditioned. A single correspondence "
+     "(p ~ f, t ~ θ, k ~ x). A single correspondence "
      "proves little; the claim is the chain shift whole, every rung of it flat."),
     ("testdata/soundlaws/graded_1_adjacent.tsv",
      "One change, one adjacent trigger",
@@ -92,11 +92,12 @@ LADDER = [
     # The first entry whose point is not a segment correspondence. Tone
     # predicted by a segmental environment is a cross-dimensional rule, and it
     # has a pane of its own; the ladder needs one corpus that fills it.
-    ("experiments/tone_chinese_like/cognates.tsv",
-     "Tone from an environment",
-     "Mandarin- and Cantonese-like. Where a segmental environment predicts a "
-     "tone, the rule is cross-dimensional (the shape tonogenesis leaves) and "
-     "lands in a pane of its own, not among the segment correspondences."),
+    ("experiments/tone_chinese_like_clean/cognates.tsv",
+     "Tone from voicing",
+     "A tone split carried by onset voicing (synthetic). Where a segmental "
+     "environment predicts a tone, the rule is cross-dimensional (the shape "
+     "tonogenesis leaves) and lands in a pane of its own, not among the "
+     "segment correspondences."),
     # The last three are what the tool looks like when it is right to find
     # nothing, and they belong on the ladder for the same reason the contrast
     # environments belong in a fixture. A reader who has only seen it succeed
@@ -138,8 +139,8 @@ REAL_LANGUAGES = {
 DESCRIPTIONS = {
     "arabic_hebrew": "Arabic and Hebrew. Semitic consonant correspondences, a "
                      "few conditioned by their environment.",
-    "georgian_svan": "Georgian and Svan. Kartvelian, and the richest "
-                     "conditioning in the set.",
+    "georgian_svan": "Georgian and Svan. Kartvelian, with segmental "
+                     "conditioning.",
     "latin_french": "Latin and French. A Romance daughter carried much further "
                     "from the parent than Spanish.",
     "latin_italian": "Latin and Italian, the most conservative of the three "
@@ -156,8 +157,10 @@ DESCRIPTIONS = {
     "length_conditioned_synthetic": "A change conditioned by vowel length (synthetic).",
     "tone_synthetic": "Tone as a correspondence in its own right (synthetic).",
     "tone_3way_synthetic": "A three-way tone split across three lects (synthetic).",
-    "tone_chinese_like_clean": "A tone system with no segmental conditioning, "
-                               "the control for the tonogenesis example (synthetic).",
+    "tone_chinese_like": "A tone wordlist in loose romanisation: the dirty "
+                          "control for the tonogenesis example (synthetic).",
+    "tone_chinese_like_clean": "A tone split carried by onset voicing "
+                               "(synthetic). On the ladder as \"Tone from voicing\".",
     "tone_vietnamese_like": "A denser tone inventory (synthetic).",
     "tone_yoruba_like": "A three-tone system (synthetic).",
 }
@@ -180,6 +183,10 @@ SOUND_LAWS = {
     "metathesis_distant": "The same, over a longer span.",
     "morphological_rhotacism": "Rhotacism where the boundary is morphological, "
                                "supplied by the corpus and never inferred.",
+    "natural_class": "Four continuants voice between vowels. One change "
+                     "split across four segments, proposed as one event.",
+    "natural_class_control": "The same change on one segment: the control for "
+                             "natural_class, where there is nothing to group.",
     "opaque_umlaut": "The trigger is gone from the surface by the time the change is visible.",
     "place_assimilation": "A nasal takes the place of what follows it.",
     "place_dissimilation": "Two like places, and one of them moves.",

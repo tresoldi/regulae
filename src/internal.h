@@ -423,6 +423,11 @@ const char *rg_merkmal_version_internal(void);
  * to be got backwards. */
 void rg_rule_evidence_judge_internal(rg_rule_evidence *evidence, double null_search_margin);
 
+/* Whether a cross-dimensional row should appear in default output.
+ * Returns 0 when the environment is entirely on the same dimension as the
+ * outcome (tone→tone) or when a same-lect rule has no segmental component. */
+int rg_cross_dim_row_publishable_internal(const rg_cross_dimensional_row *row);
+
 /* A percentile interval over resampled rates. Implemented since the port and
  * unreachable until 2026-08-15, when bootstrap_n stopped being an option that
  * did nothing. */

@@ -177,6 +177,7 @@ static int has_conditioned(
 static void test_grimm(rg_context *ctx) {
     rg_corpus *corpus = load("grimm");
     rg_multi_model *model = train(ctx, corpus);
+    size_t i;
 
     assert(has_correspondence(model, "p", "f"));
     assert(has_correspondence(model, "t", "\xce\xb8"));
@@ -188,6 +189,29 @@ static void test_grimm(rg_context *ctx) {
     assert(has_correspondence(model, "b\xca\xb0", "b"));
     assert(has_correspondence(model, "d\xca\xb0", "d"));
     assert(has_correspondence(model, "g\xca\xb0", "g"));
+
+    /* No conditioned class whose two graphemes differ: Grimm's shifts are
+     * unconditioned, and any conditioned split that changes both graphemes
+     * would be inventing an environment for one of the nine. */
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        if (row->segment_count == 2) {
+            assert(strcmp(row->graphemes[0], row->graphemes[1]) == 0);
+        }
+    }
+
+    /* The unconditioned shifts group by feature displacement: the media
+     * series (PIE voiced → Gmc voiceless) and the media aspirata
+     * (PIE aspirated → Gmc voiced) each form one proposed event. */
+    {
+        size_t event_count = 0;
+        const rg_proposed_event_row *events =
+            rg_multi_model_proposed_events(model, &event_count);
+        assert(event_count >= 2);
+        for (i = 0; i < event_count; i++) {
+            assert(events[i].class_id_count >= 2);
+        }
+    }
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -1776,8 +1800,8 @@ static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ct
     const rg_proposed_event_row *voicing = 0;
     size_t i;
 
-    /* The change and the retention, one event each. */
-    assert(count == 2);
+    /* One event: the change. Identity classes (retentions) are not grouped. */
+    assert(count == 1);
     rg_multi_model_proposed_events(control, &control_count);
     assert(control_count == 0);
 

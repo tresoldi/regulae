@@ -23,9 +23,8 @@
 
   <p class="status-banner">
     <strong>Early release.</strong>
-    Tested on thirteen corpora, including real Latin/Spanish and
-    Proto-Polynesian/Hawaiian. Anomaly detection isn't ported yet, and two
-    synthetic corpora use notations the loaders can't read. The resampling
+    Tested on fifty-six corpora, including real Latin/Spanish and
+    Proto-Polynesian/Hawaiian. Anomaly detection isn't ported yet. The resampling
     checks (bootstrap, cross-validation, shuffled baseline) stay off by default
     because they retrain the model many times; see
     <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
@@ -136,6 +135,13 @@
   <div id="error"></div>
 
   <div class="results" id="results">
+    <!-- One lect writing one grapheme where the other writes its pieces is a
+         transcription difference, not a correspondence; trained over anyway,
+         so it is said before the model. -->
+    <div class="baseline drift" id="drift-panel" hidden>
+      <strong>Transcription drift.</strong> These read as correspondences below; they are not.
+      <ul id="drift-list"></ul>
+    </div>
     <div class="summary" id="summary"></div>
 
     <!-- Whether the pairings carry more cross-lect structure than a shuffle of
@@ -178,6 +184,7 @@
             <button class="chip" data-chip="unconditioned">unconditioned</button>
             <button class="chip" data-chip="recurring" title="two or more distinct cognate sets">recurring</button>
             <button class="chip" data-chip="changes" title="hide the retention rows where every lect keeps the same segment">changes only</button>
+            <button class="chip" data-chip="weak" title="also show conditioned rows that are thin (under eight examples) or never measured against the shuffle">weak</button>
             <button class="chip" data-chip="stands" title="conditioned rules that clear the shuffled baseline — run it first">stands</button>
           </div>
           <span class="count" id="class-count"></span>
@@ -207,6 +214,17 @@
         <p class="hint" id="alignments-hint">Select a column to see which class it belongs to.</p>
         <div class="scroll"><div class="alignments" id="alignments"></div></div>
       </div>
+    </div>
+
+    <!-- Spans of more than one segment, from the pair models: one fact, not
+         several segment correspondences. Hidden when nothing promoted. -->
+    <div class="panel chunks" id="chunks-panel" hidden>
+      <h2>Multi-segment correspondences</h2>
+      <p class="hint" id="chunks-hint"></p>
+      <div class="scroll"><table class="classes" id="chunks">
+        <thead><tr><th>pair</th><th>correspondence</th><th>count</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
     </div>
 
     <div class="panel events">

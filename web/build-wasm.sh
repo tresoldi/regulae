@@ -52,7 +52,7 @@ emcc \
     -sEXPORT_NAME=createRegulae \
     -sALLOW_MEMORY_GROWTH=1 \
     -sENVIRONMENT=web,worker,node \
-    -sEXPORTED_FUNCTIONS='["_regulae_train_json","_regulae_segment_json","_regulae_version","_regulae_free","_malloc","_free"]' \
+    -sEXPORTED_FUNCTIONS='["_regulae_train_json","_regulae_segment_json","_regulae_chunks_json","_regulae_drift_json","_regulae_version","_regulae_free","_malloc","_free"]' \
     -sEXPORTED_RUNTIME_METHODS='["ccall","cwrap","UTF8ToString","stringToNewUTF8"]' \
     -o "$script_dir/regulae.js"
 

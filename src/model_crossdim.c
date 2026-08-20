@@ -1447,3 +1447,56 @@ rg_status discover_cross_dimensional_rows(
     model->cross_dimensional_count = row_count;
     return RG_OK;
 }
+
+static int feature_is_dimension(const char *feature, const char *dimension) {
+    return strcmp(feature, dimension) == 0;
+}
+
+static int context_has_non_dimension_predicate(const rg_context_spec *env, const char *dimension) {
+    size_t i;
+    const struct { const rg_feature_constraint *items; size_t count; } slots[] = {
+        {env->preceding, env->preceding_count},
+        {env->following, env->following_count},
+        {env->somewhere_preceding, env->somewhere_preceding_count},
+        {env->somewhere_following, env->somewhere_following_count},
+        {env->same_syllable, env->same_syllable_count},
+        {env->next_syllable, env->next_syllable_count},
+        {env->previous_syllable, env->previous_syllable_count},
+        {env->self, env->self_count},
+        {env->self_stress, env->self_stress_count},
+        {env->preceding_stress, env->preceding_stress_count},
+        {env->following_stress, env->following_stress_count}
+    };
+    for (i = 0; i < sizeof(slots) / sizeof(slots[0]); i++) {
+        size_t j;
+        for (j = 0; j < slots[i].count; j++) {
+            if (!feature_is_dimension(slots[i].items[j].feature, dimension)) {
+                return 1;
+            }
+        }
+    }
+    for (i = 0; i < env->preceding_at_distance_count; i++) {
+        if (!feature_is_dimension(env->preceding_at_distance[i].constraint.feature, dimension)) {
+            return 1;
+        }
+    }
+    for (i = 0; i < env->following_at_distance_count; i++) {
+        if (!feature_is_dimension(env->following_at_distance[i].constraint.feature, dimension)) {
+            return 1;
+        }
+    }
+    if (env->position != 0 && env->position[0] != '\0') {
+        return 1;
+    }
+    if (env->morphological != 0 && env->morphological[0] != '\0') {
+        return 1;
+    }
+    if (env->morpheme_index != 0 && env->morpheme_index[0] != '\0') {
+        return 1;
+    }
+    return 0;
+}
+
+int rg_cross_dim_row_publishable_internal(const rg_cross_dimensional_row *row) {
+    return context_has_non_dimension_predicate(&row->environment, row->dimension);
+}

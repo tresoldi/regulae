@@ -253,17 +253,25 @@ static void test_wide_repeated_gloss_is_not_merged(rg_context *ctx) {
     rg_corpus *corpus = 0;
     size_t i;
     size_t die_like = 0;
+    FILE *fh = fopen("test_loaders_dup_gloss.tsv", "wb");
 
-    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/latin_spanish/cognates.tsv", 0, &corpus, 0) == RG_OK);
+    assert(fh != 0);
+    fputs("gloss\ta\tb\n"
+          "die\tp a\tpa\n"
+          "die\tm o\tmo\n", fh);
+    fclose(fh);
+
+    assert(rg_corpus_load_wide_tsv(ctx, "test_loaders_dup_gloss.tsv", 0, &corpus, 0) == RG_OK);
     for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
         const char *id = rg_corpus_cognate_at(corpus, i)->cognate_id;
         if (strncmp(id, "die", 3) == 0) {
             die_like++;
         }
     }
-    /* The corpus glosses two separate rows "die"; both must survive. */
+    /* Two rows glossed "die"; both must survive. */
     assert(die_like == 2);
     rg_corpus_free(corpus);
+    remove("test_loaders_dup_gloss.tsv");
 }
 
 /* "<lect>_breaks" carries morpheme boundaries; "<lect>_tone" is recognised so
@@ -666,6 +674,128 @@ static void test_syllable_breaks_column(void) {
     rg_context_free(ctx);
 }
 
+/* Inline "+" and "-" in a wide cell are marks, not segments: "+" records a
+ * morpheme break at the running segment count, "-" a syllable break, and a
+ * cell that is exactly "-" still means the lect is absent. A "<lect>_breaks"
+ * column wins over the inline mark so the two are never double-counted. */
+static void test_wide_inline_marks(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    const rg_cognate_set *set;
+    const rg_form *form;
+    rg_train_options options;
+    rg_multi_model *model = 0;
+
+    /* "pat+a" with no _breaks column: four segments, one break at 3. */
+    assert(rg_corpus_parse_wide_tsv(ctx,
+                                    "gloss\tone\ttwo\n"
+                                    "w1\tpat+a\tpata\n"
+                                    "w2\tmat+a\tmata\n",
+                                    0, &corpus, 0) == RG_OK);
+    set = find_cognate(corpus, "w1");
+    assert(set != 0);
+    form = form_for(set, "one");
+    assert(form != 0);
+    assert(form->segment_count == 4);
+    assert(strcmp(form->segments[0].grapheme, "p") == 0);
+    assert(strcmp(form->segments[3].grapheme, "a") == 0);
+    assert(form->morpheme_break_count == 1);
+    assert(form->morpheme_breaks[0] == 3);
+    rg_corpus_free(corpus);
+    corpus = 0;
+
+    /* The column wins: it says the break sits at 2, so 3 must not appear. */
+    assert(rg_corpus_parse_wide_tsv(ctx,
+                                    "gloss\tone\ttwo\tone_breaks\n"
+                                    "w1\tpat+a\tpata\t2\n"
+                                    "w2\tmat+a\tmata\t2\n",
+                                    0, &corpus, 0) == RG_OK);
+    set = find_cognate(corpus, "w1");
+    form = form_for(set, "one");
+    assert(form->morpheme_break_count == 1);
+    assert(form->morpheme_breaks[0] == 2);
+    rg_corpus_free(corpus);
+    corpus = 0;
+
+    /* "ˈpe-ter": stress on the first nucleus, a syllable break, and no "-"
+     * segment. */
+    assert(rg_corpus_parse_wide_tsv(ctx,
+                                    "gloss\tone\ttwo\n"
+                                    "w1\tˈpe-ter\tpeter\n"
+                                    "w2\tˈme-ter\tmeter\n",
+                                    0, &corpus, 0) == RG_OK);
+    set = find_cognate(corpus, "w1");
+    form = form_for(set, "one");
+    assert(form != 0);
+    assert(form->segment_count == 5);
+    assert(strcmp(form->segments[1].grapheme, "e") == 0);
+    assert(form->segments[1].stress != 0);
+    assert(form->syllable_break_count == 1);
+    assert(form->syllable_breaks[0] == 2);
+    {
+        size_t g;
+        for (g = 0; g < form->segment_count; g++) {
+            assert(strcmp(form->segments[g].grapheme, "-") != 0);
+            assert(strcmp(form->segments[g].grapheme, "+") != 0);
+        }
+    }
+    rg_corpus_free(corpus);
+    corpus = 0;
+
+    /* A cell exactly "-" is the lect absent, and "+" alone segments to
+     * nothing rather than becoming a segment. */
+    assert(rg_corpus_parse_wide_tsv(ctx,
+                                    "gloss\tone\ttwo\tthree\n"
+                                    "w1\tpata\t-\tpata\n"
+                                    "w2\tpata\tpata\tpata\n"
+                                    "w3\t+\tpata\tpata\n"
+                                    "w4\tmata\tmata\tmata\n",
+                                    0, &corpus, 0) == RG_OK);
+    set = find_cognate(corpus, "w1");
+    assert(set != 0);
+    assert(set->form_count == 2);
+    assert(form_for(set, "two") == 0);
+    set = find_cognate(corpus, "w3");
+    assert(set != 0);
+    assert(set->form_count == 2);
+    assert(form_for(set, "one") == 0);
+    rg_corpus_free(corpus);
+    corpus = 0;
+
+    /* The two picker entries that carried these marks load and train. */
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/morph_boundary_synthetic/cognates.tsv",
+                                   0, &corpus, 0) == RG_OK);
+    rg_train_options_init_defaults(&options);
+    options.permutation_count = 0;
+    assert(rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                          &options, &model) == RG_OK);
+    rg_multi_model_free(model);
+    model = 0;
+    set = rg_corpus_cognate_at(corpus, 0);
+    assert(set->forms[0].form.morpheme_break_count == 1);
+    rg_corpus_free(corpus);
+    corpus = 0;
+
+    assert(rg_corpus_load_wide_tsv(ctx, REGULAE_SOURCE_DIR "/experiments/stress_conditioned_synthetic/cognates.tsv",
+                                   0, &corpus, 0) == RG_OK);
+    assert(rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                          &options, &model) == RG_OK);
+    rg_multi_model_free(model);
+    model = 0;
+    {
+        size_t i, f, g;
+        for (i = 0; i < rg_corpus_cognate_count(corpus); i++) {
+            set = rg_corpus_cognate_at(corpus, i);
+            for (f = 0; f < set->form_count; f++) {
+                assert(set->forms[f].form.syllable_break_count == 1);
+                for (g = 0; g < set->forms[f].form.segment_count; g++) {
+                    assert(strcmp(set->forms[f].form.segments[g].grapheme, "-") != 0);
+                }
+            }
+        }
+    }
+    rg_corpus_free(corpus);
+}
+
 /* A lect with two reflexes in one cognate set is a doublet, and it is a fact
  * about the language rather than an error in the file: 3.2% of cognate-set
  * members across the Lexibank datasets with expert judgements. Until
@@ -811,6 +941,7 @@ int main(void) {
     test_segment_word(ctx);
     test_wide_matches_the_parity_verified_corpus(ctx);
     test_wide_repeated_gloss_is_not_merged(ctx);
+    test_wide_inline_marks(ctx);
     test_wide_breaks_and_column_conventions(ctx);
     test_wide_carries_tone(ctx);
     test_wide_confidence_and_bad_input(ctx);

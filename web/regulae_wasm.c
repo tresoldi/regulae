@@ -17,7 +17,7 @@
 #define EMSCRIPTEN_KEEPALIVE
 #endif
 
-/* The four functions -sEXPORTED_FUNCTIONS names. Declared here so the compiler
+/* The six functions -sEXPORTED_FUNCTIONS names. Declared here so the compiler
  * can check each definition against the shape the page calls it with, and so
  * -Wmissing-prototypes has something to match: a definition with no prior
  * declaration is how a wasm export and its JavaScript caller drift apart. */
@@ -27,6 +27,8 @@ EMSCRIPTEN_KEEPALIVE char *regulae_train_json(
     const char *options_json
 );
 EMSCRIPTEN_KEEPALIVE char *regulae_segment_json(const char *word);
+EMSCRIPTEN_KEEPALIVE char *regulae_chunks_json(void);
+EMSCRIPTEN_KEEPALIVE char *regulae_drift_json(void);
 EMSCRIPTEN_KEEPALIVE const char *regulae_version(void);
 EMSCRIPTEN_KEEPALIVE void regulae_free(char *text);
 
@@ -71,6 +73,20 @@ static rg_context *shared_context(void) {
     return ctx;
 }
 
+/* The most recent successful train, kept so the page can ask for the
+ * display-only extras (pair chunks, transcription drift) without retraining
+ * and without growing the documented model export. Replaced on every
+ * successful regulae_train_json, cleared on every failed one. */
+static rg_multi_model *last_model = 0;
+static rg_corpus *last_corpus = 0;
+
+static void clear_last_run(void) {
+    rg_multi_model_free(last_model);
+    rg_corpus_free(last_corpus);
+    last_model = 0;
+    last_corpus = 0;
+}
+
 static char *error_payload(rg_status status, const char *detail) {
     char *text = rg_error_to_json(status, detail);
     if (text != 0) {
@@ -107,6 +123,7 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
     if (ctx == 0) {
         return error_payload(RG_ERR_OOM, "could not create the feature context");
     }
+    clear_last_run();
     if (corpus_text == 0 || corpus_text[0] == '\0') {
         return error_payload(RG_ERR_INVALID_ARGUMENT, "the corpus is empty");
     }
@@ -174,10 +191,57 @@ char *regulae_train_json(const char *corpus_text, const char *format, const char
 
     text = rg_model_to_json(ctx, model, rg_corpus_cognates(corpus),
                             rg_corpus_cognate_count(corpus), &options, true, true);
-    rg_multi_model_free(model);
-    rg_corpus_free(corpus);
     if (text == 0) {
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
         return error_payload(RG_ERR_OOM, "could not render the model");
+    }
+    /* The run stays live for regulae_chunks_json / regulae_drift_json until
+     * the next train replaces it. */
+    last_model = model;
+    last_corpus = corpus;
+    return text;
+}
+
+/* A literal JSON payload as a caller-owned string, for the paths that answer
+ * before a run exists. */
+static char *literal_payload(const char *literal) {
+    size_t length = strlen(literal) + 1;
+    char *copy = (char *)malloc(length);
+    if (copy != 0) {
+        memcpy(copy, literal, length);
+    }
+    return copy;
+}
+
+/* The promoted multi-segment chunks of the most recent successful train, per
+ * lect pair. Empty pairs when nothing promoted or nothing has trained yet. */
+EMSCRIPTEN_KEEPALIVE
+char *regulae_chunks_json(void) {
+    char *text;
+    if (last_model == 0) {
+        return literal_payload("{\"ok\":true,\"pairs\":[]}");
+    }
+    text = rg_multi_model_pair_chunks_json(last_model);
+    if (text == 0) {
+        return error_payload(RG_ERR_OOM, "could not render the chunks");
+    }
+    return text;
+}
+
+/* The transcription-drift rows of the corpus behind the most recent
+ * successful train; drift reads as a conditioned change once trained, so the
+ * page shows it beside the model rather than nowhere. */
+EMSCRIPTEN_KEEPALIVE
+char *regulae_drift_json(void) {
+    char *text;
+    if (last_corpus == 0) {
+        return literal_payload("{\"ok\":true,\"drift\":[]}");
+    }
+    text = rg_corpus_drift_json(shared_context(), rg_corpus_cognates(last_corpus),
+                                rg_corpus_cognate_count(last_corpus));
+    if (text == 0) {
+        return error_payload(RG_ERR_OOM, "could not render the drift report");
     }
     return text;
 }

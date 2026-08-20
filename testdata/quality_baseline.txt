@@ -60,12 +60,12 @@ testdata/corpora/conditioned_multilect.tsv             1   1.00   1.00     0    
 testdata/corpora/conditioned_palatalization.tsv        0    n/a   1.00     0    n/a    n/a
 testdata/corpora/doublet.tsv                           0    n/a   1.00     0    n/a    n/a
 testdata/corpora/gaps_and_length.tsv                   0    n/a   1.00     0    n/a    n/a
-testdata/corpora/joint_tonogenesis.tsv                 0    n/a   1.00    11   0.36    n/a
+testdata/corpora/joint_tonogenesis.tsv                 0    n/a   1.00     6   0.67    n/a
 testdata/corpora/length_dimension_target.tsv           0    n/a   1.00     4   1.00    n/a
 testdata/corpora/long_range.tsv                        1   1.00   1.00     0    n/a   1.00
 testdata/corpora/partial_coverage.tsv                  0    n/a   0.23     0    n/a    n/a
 testdata/corpora/real_contaminated.tsv                 0    n/a   1.00     0    n/a    n/a
-testdata/corpora/real_latin_spanish.tsv                9   0.22   1.00     0    n/a   1.00
+testdata/corpora/real_latin_spanish.tsv                6   0.17   1.00     0    n/a   1.00
 testdata/corpora/real_ppn_hawaiian.tsv                 2   0.50   1.00     0    n/a   1.00
 testdata/corpora/real_romance_4lect.tsv                8   0.12   0.98     0    n/a   1.50
 testdata/corpora/real_tone_chinese.tsv                 0    n/a   1.00     0    n/a    n/a
@@ -73,11 +73,11 @@ testdata/corpora/stress_dimension_target.tsv           0    n/a   1.00     4   1
 testdata/corpora/syllable_breaks_column.tsv            0    n/a   1.00     0    n/a    n/a
 testdata/corpora/three_lect_basic.tsv                  0    n/a   1.00     0    n/a    n/a
 testdata/corpora/tonal_multilect.tsv                   0    n/a   1.00     0    n/a    n/a
-testdata/corpora/tone_three_lect.tsv                   0    n/a   1.00    12   0.00    n/a
+testdata/corpora/tone_three_lect.tsv                   0    n/a   1.00     0    n/a    n/a
 testdata/corpora/tonogenesis_cldf.tsv                  0    n/a   1.00     2   1.00    n/a
 testdata/corpora/tonogenesis_internal.tsv              0    n/a   1.00     4   1.00    n/a
 
-TOTAL identity            64.0 / 143.0    = 0.4476
-TOTAL fragmentation    15795.8 / 16842.8  = 0.9378
-TOTAL density             18.0 / 37.0     = 0.4865
-TOTAL conjuncts          175.0 / 143.0    = 1.2238
+TOTAL identity            63.0 / 140.0    = 0.4500
+TOTAL fragmentation    15757.8 / 16804.8  = 0.9377
+TOTAL density             18.0 / 20.0     = 0.9000
+TOTAL conjuncts          172.0 / 140.0    = 1.2286

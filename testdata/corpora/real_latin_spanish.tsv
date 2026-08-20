@@ -3,159 +3,159 @@ father-000	latin	p a t e r	1.0
 father-000	spanish	p a d r e	1.0
 mother-001	latin	m a t e r	1.0
 mother-001	spanish	m a d r e	1.0
-brother-002	latin	f r a t e r	1.0
-brother-002	spanish	e r m a n o	1.0
-sister-003	latin	s o r o r	1.0
-sister-003	spanish	e r m a n a	1.0
-son-004	latin	f i l i u	1.0
-son-004	spanish	i x o	1.0
-daughter-005	latin	f i l i a	1.0
-daughter-005	spanish	i x a	1.0
-head-006	latin	k a p u t	1.0
-head-006	spanish	k a b e θ a	1.0
-eye-007	latin	o k u l u	1.0
-eye-007	spanish	o x o	1.0
-ear-008	latin	a u r i s	1.0
-ear-008	spanish	o r e ʎ a	1.0
-nose-009	latin	n a s u	1.0
-nose-009	spanish	n a s o	1.0
-mouth-010	latin	b u k k a	1.0
-mouth-010	spanish	b o k a	1.0
-tongue-011	latin	l i n g u a	1.0
-tongue-011	spanish	l e n g w a	1.0
-tooth-012	latin	d e n t e m	1.0
-tooth-012	spanish	d j e n t e	1.0
-neck-013	latin	k o l l u	1.0
-neck-013	spanish	k w e ʎ o	1.0
-hand-014	latin	m a n u	1.0
-hand-014	spanish	m a n o	1.0
-foot-015	latin	p e d e	1.0
-foot-015	spanish	p j e	1.0
-heart-016	latin	k o r	1.0
-heart-016	spanish	k o r a θ o n	1.0
-blood-017	latin	s a n g u i n e	1.0
-blood-017	spanish	s a n g r e	1.0
-bone-018	latin	o s s u	1.0
-bone-018	spanish	w e s o	1.0
-skin-019	latin	p e l l e	1.0
-skin-019	spanish	p j e l	1.0
-hair-020	latin	k a p i l l u	1.0
-hair-020	spanish	k a b e ʎ o	1.0
-milk-021	latin	l a k t e	1.0
-milk-021	spanish	l e t ʃ e	1.0
-night-022	latin	n o k t e	1.0
-night-022	spanish	n o t ʃ e	1.0
-day-023	latin	d j e	1.0
-day-023	spanish	d i a	1.0
-sun-024	latin	s o l e	1.0
-sun-024	spanish	s o l	1.0
-moon-025	latin	l u n a	1.0
-moon-025	spanish	l u n a	1.0
-star-026	latin	s t e l l a	1.0
-star-026	spanish	e s t r e ʎ a	1.0
-water-027	latin	a q u a	1.0
-water-027	spanish	a g w a	1.0
-fire-028	latin	f o k u s	1.0
-fire-028	spanish	f w e g o	1.0
-earth-029	latin	t e r r a	1.0
-earth-029	spanish	t j e r r a	1.0
-stone-030	latin	p e t r a	1.0
-stone-030	spanish	p j e d r a	1.0
-wood-031	latin	l i g n u	1.0
-wood-031	spanish	l e ɲ o	1.0
-leaf-032	latin	f o l i a	1.0
-leaf-032	spanish	o x a	1.0
-tree-033	latin	a r b o r	1.0
-tree-033	spanish	a r b o l	1.0
-flower-034	latin	f l o r e	1.0
-flower-034	spanish	f l o r	1.0
-fruit-035	latin	f r u k t u	1.0
-fruit-035	spanish	f r u t o	1.0
-seed-036	latin	s e m e n	1.0
-seed-036	spanish	s e m i ʎ a	1.0
-wind-037	latin	v e n t u	1.0
-wind-037	spanish	b j e n t o	1.0
-rain-038	latin	p l u v i a	1.0
-rain-038	spanish	ʎ u b j a	1.0
-sky-039	latin	k a e l u	1.0
-sky-039	spanish	θ j e l o	1.0
-dog-040	latin	k a n e	1.0
-dog-040	spanish	p e r r o	1.0
-cat-041	latin	k a t t u	1.0
-cat-041	spanish	g a t o	1.0
-horse-042	latin	k a b a l l u	1.0
-horse-042	spanish	k a b a ʎ o	1.0
-cow-043	latin	v a k k a	1.0
-cow-043	spanish	b a k a	1.0
-bird-044	latin	a v i s	1.0
-bird-044	spanish	a b e	1.0
-fish-045	latin	p i s c e	1.0
-fish-045	spanish	p e θ	1.0
-snake-046	latin	s e r p e n t e	1.0
-snake-046	spanish	s e r p j e n t e	1.0
-mouse-047	latin	m u r e	1.0
-mouse-047	spanish	r a t o n	1.0
-wolf-048	latin	l u p u	1.0
-wolf-048	spanish	l o b o	1.0
-bear-049	latin	u r s u	1.0
-bear-049	spanish	o s o	1.0
-man-050	latin	o m o	1.0
-man-050	spanish	o m b r e	1.0
-woman-051	latin	f e m i n a	1.0
-woman-051	spanish	e m b e r	1.0
-king-052	latin	r e g e	1.0
-king-052	spanish	r e j	1.0
-year-053	latin	a n n u	1.0
-year-053	spanish	a ɲ o	1.0
-month-054	latin	m e n s e	1.0
-month-054	spanish	m e s	1.0
-name-055	latin	n o m e n	1.0
-name-055	spanish	n o m b r e	1.0
-three-056	latin	t r e s	1.0
-three-056	spanish	t r e s	1.0
-four-057	latin	q u a t t u o r	1.0
-four-057	spanish	k w a t r o	1.0
-five-058	latin	k i n k w e	1.0
-five-058	spanish	θ i n k o	1.0
-seven-059	latin	s e p t e m	1.0
-seven-059	spanish	s j e t e	1.0
-eight-060	latin	o k t o	1.0
-eight-060	spanish	o t ʃ o	1.0
-nine-061	latin	n o v e m	1.0
-nine-061	spanish	n w e v e	1.0
-ten-062	latin	d e c e m	1.0
-ten-062	spanish	d j e θ	1.0
-good-063	latin	b o n u	1.0
-good-063	spanish	b w e n o	1.0
-bad-064	latin	m a l u	1.0
-bad-064	spanish	m a l o	1.0
-new-065	latin	n o v u	1.0
-new-065	spanish	n w e β o	1.0
-old-066	latin	v e t u l u	1.0
-old-066	spanish	b j e x o	1.0
-big-067	latin	g r a n d e	1.0
-big-067	spanish	g r a n d e	1.0
-small-068	latin	p a r v u	1.0
-small-068	spanish	p e q w e ɲ o	1.0
-long-069	latin	l o n g u	1.0
-long-069	spanish	l a r g o	1.0
-short-070	latin	k u r t u	1.0
-short-070	spanish	k o r t o	1.0
-white-071	latin	b l a n k u	1.0
-white-071	spanish	b l a n k o	1.0
-black-072	latin	n i g r u	1.0
-black-072	spanish	n e g r o	1.0
-red-073	latin	r u b j u	1.0
-red-073	spanish	r o x o	1.0
-green-074	latin	v i r i d e	1.0
-green-074	spanish	b e r d e	1.0
-sweet-075	latin	d u l k e	1.0
-sweet-075	spanish	d u l θ e	1.0
-cold-076	latin	f r i g i d u	1.0
-cold-076	spanish	f r i o	1.0
-hot-077	latin	k a l i d u	1.0
-hot-077	spanish	k a l j e n t e	1.0
-see-078	latin	v i d e r e	1.0
+son-002	latin	f i l i u	1.0
+son-002	spanish	i x o	1.0
+daughter-003	latin	f i l i a	1.0
+daughter-003	spanish	i x a	1.0
+chief-004	latin	k a p u t	1.0
+chief-004	spanish	k a b o	1.0
+eye-005	latin	o k u l u	1.0
+eye-005	spanish	o x o	1.0
+ear-006	latin	a u r i s	1.0
+ear-006	spanish	o r e ʎ a	1.0
+nose-007	latin	n a s u	1.0
+nose-007	spanish	n a s o	1.0
+mouth-008	latin	b u k k a	1.0
+mouth-008	spanish	b o k a	1.0
+tongue-009	latin	l i n gʷ a	1.0
+tongue-009	spanish	l e n g w a	1.0
+tooth-010	latin	d e n t e m	1.0
+tooth-010	spanish	d j e n t e	1.0
+neck-011	latin	k o l l u	1.0
+neck-011	spanish	k w e ʎ o	1.0
+hand-012	latin	m a n u	1.0
+hand-012	spanish	m a n o	1.0
+foot-013	latin	p e d e	1.0
+foot-013	spanish	p j e	1.0
+heart-014	latin	k o r	1.0
+heart-014	spanish	k o r a θ o n	1.0
+blood-015	latin	s a n gʷ i n e	1.0
+blood-015	spanish	s a n g r e	1.0
+bone-016	latin	o s s u	1.0
+bone-016	spanish	w e s o	1.0
+skin-017	latin	p e l l e	1.0
+skin-017	spanish	p j e l	1.0
+hair-018	latin	k a p i l l u	1.0
+hair-018	spanish	k a b e ʎ o	1.0
+milk-019	latin	l a k t e	1.0
+milk-019	spanish	l e t͡ʃ e	1.0
+night-020	latin	n o k t e	1.0
+night-020	spanish	n o t͡ʃ e	1.0
+day-021	latin	d j e	1.0
+day-021	spanish	d i a	1.0
+sun-022	latin	s o l e	1.0
+sun-022	spanish	s o l	1.0
+moon-023	latin	l u n a	1.0
+moon-023	spanish	l u n a	1.0
+star-024	latin	s t e l l a	1.0
+star-024	spanish	e s t r e ʎ a	1.0
+water-025	latin	a kʷ a	1.0
+water-025	spanish	a g w a	1.0
+fire-026	latin	f o k u s	1.0
+fire-026	spanish	f w e g o	1.0
+earth-027	latin	t e r r a	1.0
+earth-027	spanish	t j e r r a	1.0
+stone-028	latin	p e t r a	1.0
+stone-028	spanish	p j e d r a	1.0
+wood-029	latin	l i g n u	1.0
+wood-029	spanish	l e ɲ o	1.0
+leaf-030	latin	f o l i a	1.0
+leaf-030	spanish	o x a	1.0
+tree-031	latin	a r b o r	1.0
+tree-031	spanish	a r b o l	1.0
+flower-032	latin	f l o r e	1.0
+flower-032	spanish	f l o r	1.0
+fruit-033	latin	f r u k t u	1.0
+fruit-033	spanish	f r u t o	1.0
+seed-034	latin	s e m e n	1.0
+seed-034	spanish	s e m i ʎ a	1.0
+wind-035	latin	w e n t u	1.0
+wind-035	spanish	b j e n t o	1.0
+rain-036	latin	p l u v i a	1.0
+rain-036	spanish	ʎ u b j a	1.0
+sky-037	latin	k a e l u	1.0
+sky-037	spanish	θ j e l o	1.0
+cat-038	latin	k a t t u	1.0
+cat-038	spanish	g a t o	1.0
+horse-039	latin	k a b a l l u	1.0
+horse-039	spanish	k a b a ʎ o	1.0
+cow-040	latin	v a k k a	1.0
+cow-040	spanish	b a k a	1.0
+bird-041	latin	a v i s	1.0
+bird-041	spanish	a b e	1.0
+fish-042	latin	p i s k e	1.0
+fish-042	spanish	p e θ	1.0
+snake-043	latin	s e r p e n t e	1.0
+snake-043	spanish	s e r p j e n t e	1.0
+wolf-044	latin	l u p u	1.0
+wolf-044	spanish	l o b o	1.0
+bear-045	latin	u r s u	1.0
+bear-045	spanish	o s o	1.0
+man-046	latin	o m o	1.0
+man-046	spanish	o m b r e	1.0
+woman-047	latin	f e m i n a	1.0
+woman-047	spanish	e m b r a	1.0
+king-048	latin	r e g e	1.0
+king-048	spanish	r e j	1.0
+year-049	latin	a n n u	1.0
+year-049	spanish	a ɲ o	1.0
+month-050	latin	m e n s e	1.0
+month-050	spanish	m e s	1.0
+name-051	latin	n o m e n	1.0
+name-051	spanish	n o m b r e	1.0
+three-052	latin	t r e s	1.0
+three-052	spanish	t r e s	1.0
+four-053	latin	kʷ a t t u o r	1.0
+four-053	spanish	k w a t r o	1.0
+five-054	latin	kʷ i n kʷ e	1.0
+five-054	spanish	θ i n k o	1.0
+seven-055	latin	s e p t e m	1.0
+seven-055	spanish	s j e t e	1.0
+eight-056	latin	o k t o	1.0
+eight-056	spanish	o t͡ʃ o	1.0
+nine-057	latin	n o v e m	1.0
+nine-057	spanish	n w e v e	1.0
+ten-058	latin	d e k e m	1.0
+ten-058	spanish	d j e θ	1.0
+good-059	latin	b o n u	1.0
+good-059	spanish	b w e n o	1.0
+bad-060	latin	m a l u	1.0
+bad-060	spanish	m a l o	1.0
+new-061	latin	n o v u	1.0
+new-061	spanish	n w e β o	1.0
+old-062	latin	v e t u l u	1.0
+old-062	spanish	b j e x o	1.0
+big-063	latin	g r a n d e	1.0
+big-063	spanish	g r a n d e	1.0
+short-064	latin	k u r t u	1.0
+short-064	spanish	k o r t o	1.0
+white-065	latin	b l a n k u	1.0
+white-065	spanish	b l a n k o	1.0
+black-066	latin	n i g r u	1.0
+black-066	spanish	n e g r o	1.0
+red-067	latin	r u b j u	1.0
+red-067	spanish	r o x o	1.0
+green-068	latin	v i r i d e	1.0
+green-068	spanish	b e r d e	1.0
+sweet-069	latin	d u l k e	1.0
+sweet-069	spanish	d u l θ e	1.0
+cold-070	latin	f r i g i d u	1.0
+cold-070	spanish	f r i o	1.0
+hot-071	latin	k a l i d u	1.0
+hot-071	spanish	k a l j e n t e	1.0
+hundred-072	latin	k e n t u	1.0
+hundred-072	spanish	θ j e n t o	1.0
+wax-073	latin	k e r a	1.0
+wax-073	spanish	θ e r a	1.0
+deer-074	latin	k e r w u	1.0
+deer-074	spanish	θ j e r β o	1.0
+flesh-075	latin	k a r n e	1.0
+flesh-075	spanish	k a r n e	1.0
+horn-076	latin	k o r n u	1.0
+horn-076	spanish	k w e r n o	1.0
+side-077	latin	k o s t a	1.0
+side-077	spanish	k w e s t a	1.0
+see-078	latin	w i d e r e	1.0
 see-078	spanish	b e r	1.0
 hear-079	latin	a u d i r e	1.0
 hear-079	spanish	o j i r	1.0
@@ -163,33 +163,45 @@ eat-080	latin	k o m e d e r e	1.0
 eat-080	spanish	k o m e r	1.0
 drink-081	latin	b i b e r e	1.0
 drink-081	spanish	b e b e r	1.0
-speak-082	latin	l o q u i	1.0
-speak-082	spanish	a b l a r	1.0
-know-083	latin	s a p e r e	1.0
-know-083	spanish	s a b e r	1.0
-come-084	latin	v e n i r e	1.0
-come-084	spanish	b e n i r	1.0
-go-085	latin	i r e	1.0
-go-085	spanish	i r	1.0
-give-086	latin	d a r e	1.0
-give-086	spanish	d a r	1.0
-take-087	latin	p r e n d e r e	1.0
-take-087	spanish	p r e n d e r	1.0
-say-088	latin	d i k e r e	1.0
-say-088	spanish	d e θ i r	1.0
-make-089	latin	f a k e r e	1.0
-make-089	spanish	a θ e r	1.0
-sleep-090	latin	d o r m i r e	1.0
-sleep-090	spanish	d o r m i r	1.0
-die-091	latin	m o r i r e	1.0
-die-091	spanish	m o r i r	1.0
-live-092	latin	v i v e r e	1.0
-live-092	spanish	b i b i r	1.0
-love-093	latin	a m a r e	1.0
-love-093	spanish	a m a r	1.0
-die-094	latin	m o r i	1.0
-die-094	spanish	m o r i r	1.0
-break-095	latin	f r a n g e r e	1.0
-break-095	spanish	r o m p e r	1.0
-walk-096	latin	a m b u l a r e	1.0
-walk-096	spanish	a n d a r	1.0
+know-082	latin	s a p e r e	1.0
+know-082	spanish	s a b e r	1.0
+come-083	latin	w e n i r e	1.0
+come-083	spanish	b e n i r	1.0
+go-084	latin	i r e	1.0
+go-084	spanish	i r	1.0
+give-085	latin	d a r e	1.0
+give-085	spanish	d a r	1.0
+take-086	latin	p r e n d e r e	1.0
+take-086	spanish	p r e n d e r	1.0
+say-087	latin	d i k e r e	1.0
+say-087	spanish	d e θ i r	1.0
+make-088	latin	f a k e r e	1.0
+make-088	spanish	a θ e r	1.0
+sleep-089	latin	d o r m i r e	1.0
+sleep-089	spanish	d o r m i r	1.0
+die-090	latin	m o r i r e	1.0
+die-090	spanish	m o r i r	1.0
+live-091	latin	v i v e r e	1.0
+live-091	spanish	b i b i r	1.0
+love-092	latin	a m a r e	1.0
+love-092	spanish	a m a r	1.0
+brother-093	latin	f r a t e r	0.0
+brother-093	spanish	e r m a n o	0.0
+sister-094	latin	s o r o r	0.0
+sister-094	spanish	e r m a n a	0.0
+dog-095	latin	k a n e	0.0
+dog-095	spanish	p e r r o	0.0
+mouse-096	latin	m u r e	0.0
+mouse-096	spanish	r a t o n	0.0
+small-097	latin	p a r w u	0.0
+small-097	spanish	p e k e ɲ o	0.0
+long-098	latin	l o n g u	0.0
+long-098	spanish	l a r g o	0.0
+speak-099	latin	l o kʷ i	0.0
+speak-099	spanish	a b l a r	0.0
+break-100	latin	f r a n g e r e	0.0
+break-100	spanish	r o m p e r	0.0
+walk-101	latin	a m b u l a r e	0.0
+walk-101	spanish	a n d a r	0.0
+head-102	latin	k a p u t	0.0
+head-102	spanish	k a b e θ a	0.0

@@ -1530,6 +1530,14 @@ RG_API char *rg_describe_multi_class(
     const char *grapheme
 );
 
+/* Renders transcription-drift rows as a human-readable string for printing
+ * above a model report. Caller owns the string (rg_string_free). Returns an
+ * empty string when count is 0. */
+RG_API char *rg_format_drift(
+    const rg_transcription_drift_row *rows,
+    size_t count
+);
+
 /* Renders a trained model as JSON. Caller owns the string (rg_string_free).
  * This is a debug/inspection snapshot, labelled as such in the payload; it is
  * not the interchange format, which carries ensembles rather than a single
@@ -1542,6 +1550,22 @@ RG_API char *rg_model_to_json(
     const rg_train_options *options,
     bool include_alignments,
     bool include_outliers
+);
+
+/* Renders the trained model's promoted multi-segment chunks, per lect pair,
+ * as JSON: { pairs: [{ source_lect, target_lect, chunks: [{ source, target,
+ * count, reordering, transparency }] }] }. Kept out of rg_model_to_json so
+ * the documented model export stays byte-stable; this is the display surface
+ * the page's multi-segment pane reads. Caller owns the string. */
+RG_API char *rg_multi_model_pair_chunks_json(const rg_multi_model *model);
+
+/* Renders rg_find_transcription_drift's rows as JSON: { drift: [{ lect,
+ * other_lect, grapheme, written_as, corroborated, forms }] }. Caller owns
+ * the string. */
+RG_API char *rg_corpus_drift_json(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count
 );
 
 /* Renders an error as the same JSON envelope a successful call uses, so a
