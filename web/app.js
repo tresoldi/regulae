@@ -52,6 +52,10 @@ function startWorker() {
       ready = true;
       runButton.disabled = false;
       $("version").textContent = "v" + message.version;
+      fetch("BUILD_INFO").then(r => r.ok ? r.text() : "").then(text => {
+        const m = text.match(/^git_commit\s+(\S+)/m);
+        if (m) $("version").textContent += " (" + m[1] + ")";
+      }).catch(() => {});
       setBaselineAvailability(message.baselineSupported !== false);
     } else if (message.type === "progress") {
       showProgress(message);

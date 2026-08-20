@@ -42,8 +42,10 @@ current="$(sources_hash)"
 
 case "$mode" in
 --write)
+    commit="$(git -C "$repo_dir" rev-parse --short HEAD 2>/dev/null || echo unknown)"
     printf 'sources_sha256 %s\n' "$current" > "$stamp"
-    echo "wasm-provenance: recorded ${current:0:12}"
+    printf 'git_commit %s\n' "$commit" >> "$stamp"
+    echo "wasm-provenance: recorded ${current:0:12} (${commit})"
     ;;
 --check)
     if [ ! -f "$stamp" ]; then
