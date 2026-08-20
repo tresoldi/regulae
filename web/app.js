@@ -717,8 +717,36 @@ function renderGaps() {
     count.title = `of ${gap.present_total} times the segment is present`;
 
     tr.append(corr, count, rateCell(gap.uncertainty));
+
+    const classId = gapClassId(pair.source_lect, pair.target_lect, gap);
+    if (classId !== null) {
+      tr.dataset.classId = String(classId);
+      tr.addEventListener("click", () => select(classId, true));
+      makeActivatable(tr, () => select(classId, true), "button");
+    }
     body.appendChild(tr);
   }
+}
+
+function gapClassId(sourceLect, targetLect, gap) {
+  for (const c of model.classes.unconditioned) {
+    if (c.segments.length !== 2) {
+      continue;
+    }
+    const [a, b] = c.segments;
+    if (gap.deletion) {
+      if (a.lect === sourceLect && a.grapheme === gap.grapheme
+          && b.lect === targetLect && b.grapheme === "∅") {
+        return c.id;
+      }
+    } else {
+      if (a.lect === sourceLect && a.grapheme === "∅"
+          && b.lect === targetLect && b.grapheme === gap.grapheme) {
+        return c.id;
+      }
+    }
+  }
+  return null;
 }
 
 /* Cognate sets ranked by how badly they align under the trained model. The
@@ -933,11 +961,13 @@ function select(classId, scrollToClass) {
     row.classList.remove("selected");
   }
 
-  for (const row of $("classes").querySelectorAll("tr[data-class-id]")) {
-    const id = Number(row.dataset.classId);
-    row.classList.toggle("selected", id === selectedClass);
-    row.classList.toggle("dimmed", selectedClass !== null && id !== selectedClass);
-    row.setAttribute("aria-selected", id === selectedClass ? "true" : "false");
+  for (const table of [$("classes"), $("gaps")]) {
+    for (const row of table.querySelectorAll("tr[data-class-id]")) {
+      const id = Number(row.dataset.classId);
+      row.classList.toggle("selected", id === selectedClass);
+      row.classList.toggle("dimmed", selectedClass !== null && id !== selectedClass);
+      row.setAttribute("aria-selected", id === selectedClass ? "true" : "false");
+    }
   }
 
   updateAlignmentVisibility();

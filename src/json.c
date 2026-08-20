@@ -479,6 +479,58 @@ static rg_status json_add_alignments(
                                     }
                                 }
                             }
+                            /* The aligner may merge a gap into a
+                             * multi-segment link (e.g. "an ~ a") instead
+                             * of producing a separate gap link. Probe
+                             * each side against the gap sentinel so the
+                             * reconciler's gap class is still found. */
+                            for (si = 0; si < link->source_count && found < 64; si++) {
+                                int candidates[64];
+                                size_t n = rg_model_classes_at_internal(
+                                    model, c,
+                                    lect_index_a, source_pos + si,
+                                    lect_index_b, (size_t)-1,
+                                    candidates, 64);
+                                size_t k;
+                                for (k = 0; k < n && found < 64; k++) {
+                                    size_t seen;
+                                    int duplicate = 0;
+                                    for (seen = 0; seen < found; seen++) {
+                                        if (ids[seen] == candidates[k]) {
+                                            duplicate = 1;
+                                            break;
+                                        }
+                                    }
+                                    if (!duplicate) {
+                                        ids[found++] = candidates[k];
+                                    }
+                                }
+                            }
+                            {
+                                size_t ti;
+                                for (ti = 0; ti < link->target_count && found < 64; ti++) {
+                                    int candidates[64];
+                                    size_t n = rg_model_classes_at_internal(
+                                        model, c,
+                                        lect_index_a, (size_t)-1,
+                                        lect_index_b, target_pos + ti,
+                                        candidates, 64);
+                                    size_t k;
+                                    for (k = 0; k < n && found < 64; k++) {
+                                        size_t seen;
+                                        int duplicate = 0;
+                                        for (seen = 0; seen < found; seen++) {
+                                            if (ids[seen] == candidates[k]) {
+                                                duplicate = 1;
+                                                break;
+                                            }
+                                        }
+                                        if (!duplicate) {
+                                            ids[found++] = candidates[k];
+                                        }
+                                    }
+                                }
+                            }
                         } else if (link->source_count > 0) {
                             size_t si;
                             for (si = 0; si < link->source_count && found < 64; si++) {

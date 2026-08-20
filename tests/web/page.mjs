@@ -162,6 +162,7 @@ const context = {
   },
   Worker: FakeWorker,
   Blob: class {},
+  fetch: () => Promise.resolve({ ok: false, text: () => Promise.resolve('') }),
 };
 context.window = context;
 context.globalThis = context;
