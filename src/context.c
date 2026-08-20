@@ -349,7 +349,7 @@ rg_status rg_context_system_name(const rg_context *ctx, const char **out) {
  * Provenance records it because a feature system's inventory can change between
  * versions. */
 const char *rg_merkmal_version_internal(void) {
-    return mk_version();
+    return REGULAE_MERKMAL_VERSION;
 }
 
 /* Memoised: the scoring path asks this for both graphemes of every link it

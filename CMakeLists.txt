@@ -149,7 +149,10 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(regulae PUBLIC m)
 endif()
 set_target_properties(regulae PROPERTIES C_VISIBILITY_PRESET hidden VISIBILITY_INLINES_HIDDEN YES)
-target_compile_definitions(regulae PRIVATE REGULAE_BUILDING_LIBRARY)
+target_compile_definitions(regulae PRIVATE
+    REGULAE_BUILDING_LIBRARY
+    REGULAE_MERKMAL_VERSION="${merkmal_VERSION}"
+)
 if(BUILD_SHARED_LIBS)
     target_compile_definitions(regulae PUBLIC REGULAE_SHARED)
 endif()
