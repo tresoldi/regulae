@@ -403,6 +403,37 @@ check('the events pane names a grouped class', () => {
     rendered.map((c) => c.textContent).join(' | ')}`);
   assert.match(voicing.textContent, /\[[^\]]* & [^\]]*\]/,
     'the grapheme set is not named by its features');
+
+  /* Clicking an event row selects its member classes and filters alignments to
+     those realising them; clicking a member class highlights the event back.
+     The member classes in the natural_class fixture are conditioned with
+     standing=unmeasured, so enable the weak chip first. */
+  if (!chipButton('weak').classList.contains('on')) chipButton('weak').click();
+
+  const eventRows = byId.get('events').querySelectorAll('tr[data-event-index]');
+  assert.ok(eventRows.length > 0, 'no event rows have data-event-index');
+  const firstEvent = grouped.proposed_events[0];
+  eventRows[0].click();
+  const selectedClasses = byId.get('classes').querySelectorAll('tr.selected');
+  assert.equal(selectedClasses.length, firstEvent.class_ids.length,
+    'selecting an event did not highlight its member classes');
+  const visibleAlignments = byId.get('alignments').querySelectorAll('.alignment:not(.hidden)');
+  assert.ok(visibleAlignments.length > 0, 'selecting an event hid all alignments');
+  assert.ok(visibleAlignments.length < grouped.alignments.length,
+    'selecting an event did not filter alignments');
+
+  eventRows[0].click();
+  const afterDeselect = byId.get('classes').querySelectorAll('tr.selected');
+  assert.equal(afterDeselect.length, 0, 'clicking the event again did not clear selection');
+
+  const classRow = byId.get('classes').querySelectorAll('tr[data-class-id]')[0];
+  const classId = Number(classRow.dataset.classId);
+  classRow.click();
+  const highlightedEvents = byId.get('events').querySelectorAll('tr.selected');
+  const owningEvents = grouped.proposed_events.filter((e) => e.class_ids.includes(classId));
+  assert.equal(highlightedEvents.length, owningEvents.length,
+    'selecting a class did not highlight the events containing it');
+  classRow.click();
 });
 
 /* Cross-dimensional rules -- a segmental environment predicting a tone -- have

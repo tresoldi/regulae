@@ -27,6 +27,7 @@ let running = false;
 let model = null;
 let currentFormat = "wide";
 let selectedClass = null;
+let selectedEvent = null;
 let selectedSet = null;
 let selectedPair = null;
 let baselineSupported = true;
@@ -583,8 +584,11 @@ function renderEvents() {
     body.innerHTML = '<tr><td colspan="3" class="empty">(none)</td></tr>';
     return;
   }
-  for (const event of events) {
+  for (let ei = 0; ei < events.length; ei++) {
+    const event = events[ei];
     const row = document.createElement("tr");
+    row.dataset.eventIndex = String(ei);
+    row.dataset.classIds = JSON.stringify(event.class_ids);
     const corr = document.createElement("td");
     corr.className = "corr";
     corr.textContent = eventCorrespondence(event);
@@ -602,8 +606,54 @@ function renderEvents() {
     sets.textContent = event.supporting_cognates.length;
     sets.title = `${event.class_ids.length} member classes`;
     row.append(corr, count, sets);
+    row.addEventListener("click", () => selectEvent(ei));
+    makeActivatable(row, () => selectEvent(ei), "button");
     body.appendChild(row);
   }
+}
+
+function selectEvent(eventIndex) {
+  selectedEvent = selectedEvent === eventIndex ? null : eventIndex;
+  selectedClass = null;
+  selectedSet = null;
+
+  const events = model.proposed_events || [];
+  const memberIds = selectedEvent !== null
+    ? new Set(events[selectedEvent].class_ids)
+    : null;
+
+  for (const row of $("events").querySelectorAll("tr[data-event-index]")) {
+    const idx = Number(row.dataset.eventIndex);
+    row.classList.toggle("selected", idx === selectedEvent);
+    row.classList.toggle("dimmed", selectedEvent !== null && idx !== selectedEvent);
+    row.setAttribute("aria-selected", idx === selectedEvent ? "true" : "false");
+  }
+
+  for (const table of [$("classes"), $("gaps")]) {
+    for (const row of table.querySelectorAll("tr[data-class-id]")) {
+      const id = Number(row.dataset.classId);
+      const member = memberIds !== null && memberIds.has(id);
+      row.classList.toggle("selected", member);
+      row.classList.toggle("dimmed", selectedEvent !== null && !member);
+      row.setAttribute("aria-selected", member ? "true" : "false");
+    }
+  }
+
+  for (const row of $("residue").querySelectorAll("tr[data-cognate]")) {
+    row.classList.remove("selected");
+  }
+
+  updateAlignmentVisibility();
+  for (const col of $("alignments").querySelectorAll(".col")) {
+    const ids = JSON.parse(col.dataset.classes);
+    col.classList.toggle("lit",
+      memberIds !== null && ids.some((id) => memberIds.has(id)));
+  }
+
+  const shown = $("alignments").querySelectorAll(".alignment:not(.hidden)").length;
+  $("alignments-hint").textContent = selectedEvent === null
+    ? "Select a column to see which class it belongs to."
+    : `${shown} of ${model.alignments.length} alignments realise this event's ${memberIds.size} classes.`;
 }
 
 /* Rules where a segmental feature on one lect predicts a suprasegmental value
@@ -808,10 +858,16 @@ function renderResidue() {
    three used to each hide blocks on their own and stack into a blank panel, so
    they are resolved here in one place. */
 function updateAlignmentVisibility() {
+  const events = model.proposed_events || [];
+  const memberIds = selectedEvent !== null
+    ? new Set(events[selectedEvent].class_ids)
+    : null;
+
   for (const block of $("alignments").querySelectorAll(".alignment")) {
     const ids = JSON.parse(block.dataset.classes);
     let hidden = false;
     if (selectedClass !== null && !ids.includes(selectedClass)) hidden = true;
+    if (memberIds !== null && !ids.some((id) => memberIds.has(id))) hidden = true;
     if (selectedSet !== null && block.dataset.cognate !== selectedSet) hidden = true;
     if (selectedPair !== null && block.dataset.pair !== selectedPair) hidden = true;
     block.classList.toggle("hidden", hidden);
@@ -823,11 +879,16 @@ function updateAlignmentVisibility() {
 function selectSet(cognateId) {
   selectedSet = selectedSet === cognateId ? null : cognateId;
   selectedClass = null;
+  selectedEvent = null;
 
   for (const row of $("residue").querySelectorAll("tr[data-cognate]")) {
     row.classList.toggle("selected", row.dataset.cognate === selectedSet);
   }
   for (const row of $("classes").querySelectorAll("tr[data-class-id]")) {
+    row.classList.remove("selected", "dimmed");
+    row.setAttribute("aria-selected", "false");
+  }
+  for (const row of $("events").querySelectorAll("tr[data-event-index]")) {
     row.classList.remove("selected", "dimmed");
     row.setAttribute("aria-selected", "false");
   }
@@ -955,7 +1016,7 @@ function renderAlignments() {
 
 function select(classId, scrollToClass) {
   selectedClass = selectedClass === classId ? null : classId;
-  /* The two filters would otherwise stack and hide everything. */
+  selectedEvent = null;
   selectedSet = null;
   for (const row of $("residue").querySelectorAll("tr[data-cognate]")) {
     row.classList.remove("selected");
@@ -968,6 +1029,14 @@ function select(classId, scrollToClass) {
       row.classList.toggle("dimmed", selectedClass !== null && id !== selectedClass);
       row.setAttribute("aria-selected", id === selectedClass ? "true" : "false");
     }
+  }
+
+  for (const row of $("events").querySelectorAll("tr[data-event-index]")) {
+    const ids = JSON.parse(row.dataset.classIds);
+    const contains = selectedClass !== null && ids.includes(selectedClass);
+    row.classList.toggle("selected", contains);
+    row.classList.toggle("dimmed", selectedClass !== null && !contains);
+    row.setAttribute("aria-selected", contains ? "true" : "false");
   }
 
   updateAlignmentVisibility();
@@ -1017,6 +1086,7 @@ function renderSummary() {
 
 function render() {
   selectedClass = null;
+  selectedEvent = null;
   resetClassView();
   renderSummary();
   renderProvenance();
