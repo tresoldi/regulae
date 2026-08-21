@@ -97,8 +97,10 @@ struct rg_pairwise_model {
     size_t displacement_row_count;
     rg_tonal_count_row *tonal_counts;
     size_t tonal_count_count;
-    rg_gap_count_row *gap_counts;
-    size_t gap_count_count;
+    /* Correspondences to nothing (loss/epenthesis), one side RG_GAP_GRAPHEME.
+     * Held apart from segment_counts, which also drives alignment scoring. */
+    rg_segment_count_row *null_correspondences;
+    size_t null_correspondence_count;
 };
 
 typedef struct rg_multi_pair_model_owned {

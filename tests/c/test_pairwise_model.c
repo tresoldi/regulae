@@ -378,9 +378,10 @@ static void test_cross_dimensional_dimension_target(rg_context *ctx, const char 
     rg_corpus_free(corpus);
 }
 
-/* A segment answering to nothing has a row now. Six words keep a final -n on
- * side A and drop it on B; the gap table must state A:n ~ -- at 6 of 6, the
- * commonest change and the one the 1-to-1 table cannot express. */
+/* A segment answering to nothing is a correspondence like any other, only with
+ * ∅ on one side. Six words keep a final -n on side A and drop it on B; the null
+ * correspondences must state n ~ ∅ at 6 of 6, the commonest change and the one
+ * the 1-to-1 table cannot express. */
 static void test_gap_correspondence(rg_context *ctx) {
     const char *words[6] = {"apan", "atan", "akan", "aman", "asan", "alan"};
     rg_train_options options;
@@ -416,15 +417,17 @@ static void test_gap_correspondence(rg_context *ctx) {
         pairs[i].weight = 1.0;
     }
     assert(rg_train_pairwise(ctx, pairs, 6, &options, &model) == RG_OK);
-    assert(rg_pairwise_model_gap_count_row_count(model) > 0);
-    for (i = 0; i < rg_pairwise_model_gap_count_row_count(model); i++) {
-        const rg_gap_count_row *row = rg_pairwise_model_gap_count_row_at(model, i);
+    assert(rg_pairwise_model_null_correspondence_row_count(model) > 0);
+    for (i = 0; i < rg_pairwise_model_null_correspondence_row_count(model); i++) {
+        const rg_segment_count_row *row = rg_pairwise_model_null_correspondence_row_at(model, i);
+        int deletion = strcmp(row->target, RG_GAP_GRAPHEME) == 0;
+        double present_total = deletion ? row->source_total : row->target_total;
         assert(row != 0);
         /* Every present grapheme's count is bounded by how often it appears. */
-        assert(row->count <= row->present_total + 1e-9);
-        if (row->deletion && strcmp(row->grapheme, "n") == 0) {
+        assert(row->count <= present_total + 1e-9);
+        if (deletion && strcmp(row->source, "n") == 0) {
             assert(row->count == 6.0);
-            assert(row->present_total == 6.0);
+            assert(present_total == 6.0);
             assert_uncertainty_contains(&row->uncertainty, 1.0);
             found_deletion = 1;
         }

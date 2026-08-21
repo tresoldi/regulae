@@ -42,7 +42,7 @@ let alnView = "ribbon";
    state the view reads rather than a rebuild of the model. classRows is built
    once per run; classView says which subset to show and in what order. */
 let classRows = [];
-const classView = { query: "", chip: "all", recurring: false, changes: true, weak: false, stands: false, sort: "default", desc: true };
+const classView = { query: "", chip: "all", recurring: false, changes: true, losses: false, weak: false, stands: false, sort: "default", desc: true };
 /* Which classes have their evidence drawer open. Kept as ids so the open state
    survives a filter or sort re-render rather than being tied to a DOM row. */
 const expandedClasses = new Set();
@@ -507,6 +507,7 @@ function classMatches({ entry, conditioned }) {
   if (classView.chip === "unconditioned" && conditioned) return false;
   if (classView.recurring && setCount(entry) < 2) return false;
   if (classView.changes && isIdentity(entry)) return false;
+  if (classView.losses && !hasNullSegment(entry)) return false;
   if (classView.stands && entry.standing !== "above noise") return false;
   if (!classView.weak && conditioned
       && (entry.count < 8 || entry.standing === "unmeasured" || entry.standing === "within noise")) {
@@ -647,7 +648,7 @@ function selectEvent(eventIndex) {
     row.setAttribute("aria-selected", idx === selectedEvent ? "true" : "false");
   }
 
-  for (const table of [$("classes"), $("gaps")]) {
+  for (const table of [$("classes")]) {
     for (const row of table.querySelectorAll("tr[data-class-id]")) {
       const id = Number(row.dataset.classId);
       const member = memberIds !== null && memberIds.has(id);
@@ -734,85 +735,6 @@ function renderBaseline() {
   }
   panel.hidden = false;
   $("baseline-body").textContent = baselineReading(model.fit);
-}
-
-/* Segments that answer to nothing across a lect pair, read off the per-pair
-   tables and written x ~ ∅. Loss and epenthesis are first-class objects of
-   comparative work but were only ever visible as ∅ cells inside an alignment.
-   Framed as correspondences with rates, never as "deletions": the rate is how
-   often, of the times the segment is present, it aligns to a gap. */
-function renderGaps() {
-  const panel = $("gaps-panel");
-  const body = $("gaps").querySelector("tbody");
-  body.innerHTML = "";
-
-  const multiPair = (model.lects || []).length > 2;
-  const rows = [];
-  for (const pair of model.pairwise || []) {
-    for (const gap of pair.gaps || []) {
-      rows.push({ pair, gap });
-    }
-  }
-  panel.hidden = rows.length === 0;
-  if (!rows.length) {
-    $("gaps-hint").textContent = "";
-    return;
-  }
-  rows.sort((a, b) => b.gap.count - a.gap.count);
-  $("gaps-hint").textContent =
-    "A segment that answers to nothing, written x ~ ∅. The rate is how often it aligns to "
-    + "a gap when it's present, not a claim that anything was lost.";
-
-  for (const { pair, gap } of rows) {
-    const tr = document.createElement("tr");
-    tr.dataset.pair = `${pair.source_lect}~${pair.target_lect}`;
-
-    const corr = document.createElement("td");
-    corr.className = "corr";
-    corr.textContent = gapCorrespondence(pair.source_lect, pair.target_lect, gap);
-    if (multiPair) {
-      const tag = document.createElement("span");
-      tag.className = "env";
-      tag.textContent = `${pair.source_lect} ~ ${pair.target_lect}`;
-      corr.appendChild(tag);
-    }
-
-    const count = document.createElement("td");
-    count.className = "count";
-    count.textContent = gap.count;
-    count.title = `of ${gap.present_total} times the segment is present`;
-
-    tr.append(corr, count, rateCell(gap.uncertainty));
-
-    const classId = gapClassId(pair.source_lect, pair.target_lect, gap);
-    if (classId !== null) {
-      tr.dataset.classId = String(classId);
-      tr.addEventListener("click", () => selectClass(classId));
-      makeActivatable(tr, () => selectClass(classId), "button");
-    }
-    body.appendChild(tr);
-  }
-}
-
-function gapClassId(sourceLect, targetLect, gap) {
-  for (const c of model.classes.unconditioned) {
-    if (c.segments.length !== 2) {
-      continue;
-    }
-    const [a, b] = c.segments;
-    if (gap.deletion) {
-      if (a.lect === sourceLect && a.grapheme === gap.grapheme
-          && b.lect === targetLect && b.grapheme === "∅") {
-        return c.id;
-      }
-    } else {
-      if (a.lect === sourceLect && a.grapheme === "∅"
-          && b.lect === targetLect && b.grapheme === gap.grapheme) {
-        return c.id;
-      }
-    }
-  }
-  return null;
 }
 
 /* Cognate sets ranked by how badly they align under the trained model. The
@@ -953,13 +875,10 @@ function renderLectPair() {
   }
 }
 
-/* Narrow the alignments and the gaps to the chosen lect pair, or restore all. */
+/* Narrow the alignments to the chosen lect pair, or restore all. */
 function applyPairFilter() {
   selectedPair = $("lect-pair").value || null;
   updateAlignmentVisibility();
-  for (const tr of $("gaps").querySelectorAll("tr[data-pair]")) {
-    tr.hidden = selectedPair !== null && tr.dataset.pair !== selectedPair;
-  }
 }
 
 /* ---- alignment ribbon -------------------------------------------------- */
@@ -1195,7 +1114,7 @@ function select(classId, scrollToClass) {
     row.classList.remove("selected");
   }
 
-  for (const table of [$("classes"), $("gaps")]) {
+  for (const table of [$("classes")]) {
     for (const row of table.querySelectorAll("tr[data-class-id]")) {
       const id = Number(row.dataset.classId);
       row.classList.toggle("selected", id === selectedClass);
@@ -1252,12 +1171,9 @@ function updateResultTabs() {
   set("tabc-corr", model.classes.unconditioned.length + model.classes.conditioned.length);
   set("tabc-align", (model.alignments || []).length);
   set("tabc-events", (model.proposed_events || []).length);
-  const gapCount = (model.pairwise || []).reduce((a, p) => a + ((p.gaps || []).length), 0);
-  set("tabc-gaps", gapCount);
   set("tabc-outliers", (model.outliers || []).length);
   const xdim = (model.cross_dimensional || []).length;
   set("tabc-crossdim", xdim);
-  const gapsTab = $("tab-gaps"); if (gapsTab) { gapsTab.hidden = gapCount === 0; }
   const xdimTab = $("tab-crossdim"); if (xdimTab) { xdimTab.hidden = xdim === 0; }
 
   const noStats = $("baseline-panel").hidden && $("predictive-panel").hidden;
@@ -1356,7 +1272,6 @@ function render() {
   renderEvents();
   renderCrossDimensional();
   renderChunks();
-  renderGaps();
   renderResidue();
   renderClasses();
   renderAlignments();
@@ -1429,6 +1344,7 @@ function resetClassView() {
   classView.chip = "all";
   classView.recurring = false;
   classView.changes = true;
+  classView.losses = false;
   classView.weak = false;
   classView.stands = false;
   classView.sort = "default";
@@ -1877,6 +1793,8 @@ function handleChip(name) {
     classView.recurring = !classView.recurring;
   } else if (name === "changes") {
     classView.changes = !classView.changes;
+  } else if (name === "losses") {
+    classView.losses = !classView.losses;
   } else if (name === "weak") {
     classView.weak = !classView.weak;
   } else if (name === "stands") {
@@ -1888,9 +1806,10 @@ function handleChip(name) {
     const key = chip.dataset.chip;
     const on = key === "recurring" ? classView.recurring
       : key === "changes" ? classView.changes
-        : key === "weak" ? classView.weak
-          : key === "stands" ? classView.stands
-            : classView.chip === key;
+        : key === "losses" ? classView.losses
+          : key === "weak" ? classView.weak
+            : key === "stands" ? classView.stands
+              : classView.chip === key;
     chip.classList.toggle("on", on);
     chip.setAttribute("aria-pressed", on ? "true" : "false");
   }

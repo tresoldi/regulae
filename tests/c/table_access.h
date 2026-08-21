@@ -39,8 +39,8 @@ RG_TEST_TABLE(rg_pairwise_model_displacement_row, rg_displacement_row,
               rg_pairwise_model, rg_pairwise_model_displacements)
 RG_TEST_TABLE(rg_pairwise_model_tonal_count_row, rg_tonal_count_row,
               rg_pairwise_model, rg_pairwise_model_tonal_counts)
-RG_TEST_TABLE(rg_pairwise_model_gap_count_row, rg_gap_count_row,
-              rg_pairwise_model, rg_pairwise_model_gap_counts)
+RG_TEST_TABLE(rg_pairwise_model_null_correspondence_row, rg_segment_count_row,
+              rg_pairwise_model, rg_pairwise_model_null_correspondences)
 RG_TEST_TABLE(rg_pairwise_model_conditioned_segment_count_row, rg_conditioned_segment_count_row,
               rg_pairwise_model, rg_pairwise_model_conditioned_segment_counts)
 RG_TEST_TABLE(rg_pairwise_model_chunk_row, rg_chunk_row,

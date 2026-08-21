@@ -182,25 +182,44 @@ class CrossDimensionalRule:
 
 
 @dataclass(frozen=True)
-class GapCorrespondence:
-    """A segment answering to nothing, per pair.
+class NullCorrespondence:
+    """A segment answering to nothing, per pair: a correspondence like any other,
+    only with :data:`GAP_GRAPHEME` on one side.
 
-    ``deletion`` is true for the source-to-target loss direction, false for an
-    epenthesis; ``count / present_total`` is the rate the grapheme is dropped.
+    ``source ~ target`` is ``g ~ ∅`` for a loss and ``∅ ~ g`` for an epenthesis;
+    :attr:`deletion` reports which. ``count`` over the kept side's total (the one
+    that is not ``∅``) is the rate the grapheme is dropped or inserted.
     """
 
-    grapheme: str
-    deletion: bool
+    source: str
+    target: str
     count: float
-    present_total: float
+    source_total: float
+    target_total: float
+
+    @property
+    def deletion(self) -> bool:
+        return self.target == GAP_GRAPHEME
+
+    @property
+    def grapheme(self) -> str:
+        """The segment on the side that keeps it."""
+        return self.source if self.deletion else self.target
+
+    @property
+    def present_total(self) -> float:
+        """How often the kept grapheme appears on its side; ``count`` over this
+        is the loss (or epenthesis) rate."""
+        return self.source_total if self.deletion else self.target_total
 
     @classmethod
-    def from_json(cls, data: Mapping[str, Any]) -> GapCorrespondence:
+    def from_json(cls, data: Mapping[str, Any]) -> NullCorrespondence:
         return cls(
-            grapheme=data.get("grapheme", ""),
-            deletion=bool(data.get("deletion", False)),
+            source=data.get("source", ""),
+            target=data.get("target", ""),
             count=data.get("count", 0.0),
-            present_total=data.get("present_total", 0.0),
+            source_total=data.get("source_total", 0.0),
+            target_total=data.get("target_total", 0.0),
         )
 
 
@@ -231,12 +250,13 @@ class ConditionedCorrespondence:
 
 @dataclass(frozen=True)
 class PairwiseModel:
-    """One lect pair's tables: conditioned correspondences and gaps."""
+    """One lect pair's tables: conditioned correspondences and correspondences
+    to ∅ (losses and epentheses)."""
 
     source_lect: str
     target_lect: str
     conditioned: tuple[ConditionedCorrespondence, ...]
-    gaps: tuple[GapCorrespondence, ...]
+    null_correspondences: tuple[NullCorrespondence, ...]
 
     @classmethod
     def from_json(cls, data: Mapping[str, Any]) -> PairwiseModel:
@@ -246,7 +266,9 @@ class PairwiseModel:
             conditioned=tuple(
                 ConditionedCorrespondence.from_json(r) for r in data.get("conditioned", ())
             ),
-            gaps=tuple(GapCorrespondence.from_json(r) for r in data.get("gaps", ())),
+            null_correspondences=tuple(
+                NullCorrespondence.from_json(r) for r in data.get("null_correspondences", ())
+            ),
         )
 
 

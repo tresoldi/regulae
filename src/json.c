@@ -953,37 +953,38 @@ char *rg_json_from_multi_model_internal(
             cJSON_Delete(root);
             return 0;
         }
-        const rg_gap_count_row *gap_rows;
-        size_t gap_row_count = 0;
-        size_t gap_i;
-        cJSON *gaps;
+        const rg_segment_count_row *null_rows;
+        size_t null_row_count = 0;
+        size_t null_i;
+        cJSON *null_correspondences;
         cJSON_AddStringToObject(pair_entry, "source_lect", pair->lect_a);
         cJSON_AddStringToObject(pair_entry, "target_lect", pair->lect_b);
         cJSON_AddItemToObject(pair_entry, "conditioned", conditioned);
-        /* A segment answering to nothing: the row shape the 1-to-1 table lacks.
-         * `deletion` reads on the source->target direction, so its inverse on
-         * the pair is an epenthesis and vice versa. */
-        gaps = cJSON_CreateArray();
-        if (gaps == 0) {
+        /* Correspondences to nothing: `g ~ ∅` a loss, `∅ ~ g` an epenthesis.
+         * Correspondence-shaped like every other row, only with the gap
+         * grapheme on one side; count over the kept side's total is the rate. */
+        null_correspondences = cJSON_CreateArray();
+        if (null_correspondences == 0) {
             cJSON_Delete(pair_entry);
             cJSON_Delete(root);
             return 0;
         }
-        cJSON_AddItemToObject(pair_entry, "gaps", gaps);
-        gap_rows = rg_pairwise_model_gap_counts(pair->model, &gap_row_count);
-        for (gap_i = 0; gap_i < gap_row_count; gap_i++) {
-            const rg_gap_count_row *row = &gap_rows[gap_i];
+        cJSON_AddItemToObject(pair_entry, "null_correspondences", null_correspondences);
+        null_rows = rg_pairwise_model_null_correspondences(pair->model, &null_row_count);
+        for (null_i = 0; null_i < null_row_count; null_i++) {
+            const rg_segment_count_row *row = &null_rows[null_i];
             cJSON *entry = cJSON_CreateObject();
             if (entry == 0) {
                 cJSON_Delete(root);
                 return 0;
             }
-            cJSON_AddStringToObject(entry, "grapheme", row->grapheme);
-            cJSON_AddBoolToObject(entry, "deletion", row->deletion);
+            cJSON_AddStringToObject(entry, "source", row->source);
+            cJSON_AddStringToObject(entry, "target", row->target);
             cJSON_AddNumberToObject(entry, "count", row->count);
-            cJSON_AddNumberToObject(entry, "present_total", row->present_total);
+            cJSON_AddNumberToObject(entry, "source_total", row->source_total);
+            cJSON_AddNumberToObject(entry, "target_total", row->target_total);
             cJSON_AddItemToObject(entry, "uncertainty", json_uncertainty(row->uncertainty));
-            cJSON_AddItemToArray(gaps, entry);
+            cJSON_AddItemToArray(null_correspondences, entry);
         }
         rows = rg_pairwise_model_conditioned_segment_counts(pair->model, &row_count);
         for (row_i = 0; row_i < row_count; row_i++) {

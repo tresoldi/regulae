@@ -42,6 +42,13 @@ function isIdentity(entry) { // eslint-disable-line no-unused-vars
   return new Set(entry.segments.map((s) => s.grapheme)).size === 1;
 }
 
+/* Whether some lect answers to nothing: a correspondence to ∅, the loss (or
+ * epenthesis) that the "losses" chip narrows to. Not a separate kind of row --
+ * it sits in the correspondence table like any other. */
+function hasNullSegment(entry) { // eslint-disable-line no-unused-vars
+  return entry.segments.some((s) => s.grapheme === "∅");
+}
+
 /* The suprasegmentals a segment carries, bracketed as the CLI renders them --
  * `a[⁵⁵]` -- and empty when it carries none. A tone correspondence is part of
  * the outcome, so it reads on the row. */
@@ -204,16 +211,6 @@ function residueReading(fit) { // eslint-disable-line no-unused-vars
     + "two populations, not a tail. The number gives the shape, not the cause. Borrowing, a change "
     + "that spread through part of the lexicon, or contact could each produce it, and this won't "
     + "separate them.";
-}
-
-/* A segment answering to nothing across a lect pair, written as a correspondence
- * to ∅. `deletion` reads on the source→target direction, so its inverse is an
- * epenthesis and the ∅ moves to the source side; the flag is bookkeeping, not a
- * directional claim, so both are written with the tilde and never an arrow. */
-function gapCorrespondence(sourceLect, targetLect, gap) { // eslint-disable-line no-unused-vars
-  return gap.deletion
-    ? `${sourceLect}:${gap.grapheme}  ~  ${targetLect}:∅`
-    : `${sourceLect}:∅  ~  ${targetLect}:${gap.grapheme}`;
 }
 
 /* The score the search committed a class on: the improvement in the chosen

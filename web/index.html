@@ -152,7 +152,7 @@
       <div class="step"><div class="n">2</div><h3>Run</h3>
         <p>Get a table of correspondence classes: which segment answers which, and where.</p></div>
       <div class="step"><div class="n">3</div><h3>Read the table</h3>
-        <p>Select a correspondence to see the alignments it rests on. Open a tab for events, gaps, outliers.</p></div>
+        <p>Select a correspondence to see the alignments it rests on. Open a tab for events, outliers, or cross-dimensional rules.</p></div>
     </div>
   </div>
 
@@ -168,13 +168,12 @@
 
     <div class="summary" id="summary"></div>
 
-    <!-- Hairline tabs: one question per screen. Empty tabs (no gaps, no
+    <!-- Hairline tabs: one question per screen. Empty tabs (no
          cross-dimensional rules) are hidden rather than shown empty. -->
     <div class="tabs" id="result-tabs" role="tablist">
       <button data-tab="corr" class="on" role="tab" aria-selected="true">Correspondences <span class="c" id="tabc-corr"></span></button>
       <button data-tab="align" role="tab" aria-selected="false">Alignments <span class="c" id="tabc-align"></span></button>
       <button data-tab="events" role="tab" aria-selected="false">Events <span class="c" id="tabc-events"></span></button>
-      <button data-tab="gaps" id="tab-gaps" role="tab" aria-selected="false">Gaps &amp; ∅ <span class="c" id="tabc-gaps"></span></button>
       <button data-tab="outliers" role="tab" aria-selected="false">Outliers <span class="c" id="tabc-outliers"></span></button>
       <button data-tab="crossdim" id="tab-crossdim" role="tab" aria-selected="false">Cross-dimensional <span class="c" id="tabc-crossdim"></span></button>
       <button data-tab="stats" role="tab" aria-selected="false">Statistics</button>
@@ -199,6 +198,7 @@
             <button class="chip" data-chip="unconditioned">unconditioned</button>
             <button class="chip" data-chip="recurring" title="two or more distinct cognate sets">recurring</button>
             <button class="chip" data-chip="changes" title="hide the retention rows where every lect keeps the same segment">changes only</button>
+            <button class="chip" data-chip="losses" title="only correspondences to ∅ — a segment lost in one lect and kept in another">losses (∅)</button>
             <button class="chip" data-chip="weak" title="also show conditioned rows that are thin (under eight examples) or never measured against the shuffle">weak</button>
             <button class="chip" data-chip="stands" title="conditioned rules that clear the shuffled baseline — run it first">stands</button>
           </div>
@@ -258,18 +258,6 @@
         <p class="hint" id="events-hint"></p>
         <div class="scroll"><table class="classes" id="events">
           <thead><tr><th>event</th><th>count</th><th>sets</th></tr></thead>
-          <tbody></tbody>
-        </table></div>
-      </div>
-    </div>
-
-    <!-- GAPS -->
-    <div class="tabpane" data-pane="gaps" role="tabpanel">
-      <div class="panel gaps" id="gaps-panel">
-        <h2>Correspondences to ∅</h2>
-        <p class="hint" id="gaps-hint"></p>
-        <div class="scroll"><table class="classes" id="gaps">
-          <thead><tr><th>correspondence</th><th>count</th><th>rate · 95% CI</th></tr></thead>
           <tbody></tbody>
         </table></div>
       </div>

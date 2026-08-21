@@ -74,7 +74,7 @@ static void test_progress_is_monotonic_and_bounded(rg_context *ctx) {
         }
     }
     /* Three lects means three pairs, each running the nine pairwise stages
-     * (gap aggregation is one of them), plus the three multi-lect stages.
+     * (null-correspondence aggregation is one of them), plus the three multi-lect stages.
      * IBM Model 1 is off by default and adds a tenth stage when enabled. */
     assert(r.totals[0] == 3 * 9 + 3);
     assert(r.count == r.totals[0]);
@@ -164,7 +164,7 @@ static void test_pairwise_progress(rg_context *ctx) {
     assert(rg_train_pairwise(ctx, pairs, 4, &options, &model) == RG_OK);
     assert(r.count == 9);
     assert(strcmp(r.stages[0], "initial prior") == 0);
-    assert(strcmp(r.stages[3], "gap aggregation") == 0);
+    assert(strcmp(r.stages[3], "null-correspondence aggregation") == 0);
     assert(strcmp(r.stages[8], "long-range discovery") == 0);
     rg_pairwise_model_free(model);
 

@@ -112,12 +112,12 @@ for (const id of [
   'format', 'class-filter', 'class-chips', 'class-count', 'copy-summary',
   'baseline-check', 'baseline-unavailable', 'predictive', 'predictive-panel',
   'predictive-body', 'predictive-table', 'provenance', 'provenance-body',
-  'gaps-panel', 'gaps', 'gaps-hint', 'copy-csv', 'copy-markdown',
+  'copy-csv', 'copy-markdown',
   'lect-pair', 'lect-pair-wrap', 'drift-panel', 'drift-list',
   'chunks-panel', 'chunks', 'chunks-hint',
 ]) {
   byId.set(id, new Element(
-    ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'gaps', 'chunks'].includes(id) ? 'table' : 'div'));
+    ['classes', 'residue', 'events', 'crossdim', 'predictive-table', 'chunks'].includes(id) ? 'table' : 'div'));
 }
 // The tables need a tbody for app.js to fill.
 const tbody = new Element('tbody');
@@ -126,7 +126,6 @@ byId.get('residue').appendChild(new Element('tbody'));
 byId.get('events').appendChild(new Element('tbody'));
 byId.get('crossdim').appendChild(new Element('tbody'));
 byId.get('predictive-table').appendChild(new Element('tbody'));
-byId.get('gaps').appendChild(new Element('tbody'));
 byId.get('chunks').appendChild(new Element('tbody'));
 
 // The classes table has sortable headers app.js wires and reads; the shim
@@ -754,27 +753,20 @@ check('an alignment names the two forms it aligns', () => {
   assert.ok(gloss.textContent.includes(src), `the source form ${src} is not shown`);
 });
 
-/* Segment losses read as x ~ ∅. Latin/Spanish has few; the gaps_and_length
-   fixture exists to exercise the pane, and a copy with the gaps emptied checks
-   that the pane hides rather than standing open and blank. */
-check('the gaps pane reads losses as x ~ ∅, and hides when there are none', () => {
+/* A segment loss is a correspondence to ∅, not a separate kind of fact: it sits
+   in the correspondence table like any other row, written with ∅ on one side.
+   The gaps_and_length fixture carries several. */
+check('losses appear as ∅ correspondences in the classes table', () => {
   const gapModel = JSON.parse(execFileSync(
     cli, ['train', '--json', join(repo, 'testdata/corpora/gaps_and_length.tsv')],
     { encoding: 'utf8', maxBuffer: 1 << 28 }));
-  const gapCount = (gapModel.pairwise || []).reduce((n, p) => n + (p.gaps || []).length, 0);
-  assert.ok(gapCount > 0, 'fixture stopped producing gaps');
+  const nullClasses = [...gapModel.classes.unconditioned, ...gapModel.classes.conditioned]
+    .filter((c) => c.segments.some((s) => s.grapheme === '∅'));
+  assert.ok(nullClasses.length > 0, 'fixture stopped producing ∅ correspondences');
   worker.onmessage({ data: { type: 'result', json: JSON.stringify(gapModel), elapsedMs: 1 } });
-  assert.ok(!byId.get('gaps-panel').hidden, 'the gaps pane hid despite gaps');
-  const rows = byId.get('gaps').querySelectorAll('tr');
-  assert.equal(rows.length, gapCount, 'the gaps pane dropped rows');
-  for (const r of rows) {
-    assert.match(r.querySelectorAll('td.corr')[0].textContent, /∅/, 'a gap row is not written to ∅');
-  }
-
-  const noGaps = JSON.parse(JSON.stringify(gapModel));
-  noGaps.pairwise.forEach((p) => { p.gaps = []; });
-  worker.onmessage({ data: { type: 'result', json: JSON.stringify(noGaps), elapsedMs: 1 } });
-  assert.ok(byId.get('gaps-panel').hidden, 'the gaps pane showed with no gaps');
+  const withNull = [...byId.get('classes').querySelectorAll('tr[data-class-id]')]
+    .filter((r) => /∅/.test(r.textContent));
+  assert.ok(withNull.length > 0, 'no ∅ correspondence rendered in the classes table');
 });
 
 /* The residue carries each set's confidence, but the column is worth showing

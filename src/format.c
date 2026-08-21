@@ -351,7 +351,7 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
     size_t xdim_total = 0;
     size_t xdim_published = 0;
     size_t tonal_total = 0;
-    size_t gap_total = 0;
+    size_t null_total = 0;
 
     if (model == 0) {
         return 0;
@@ -374,34 +374,50 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         }
     }
     rg_pairwise_model_tonal_counts(model, &tonal_total);
-    rg_pairwise_model_gap_counts(model, &gap_total);
-    builder_appendf(&builder, "segment correspondences: %lu\n", (unsigned long)segment_total);
-    builder_appendf(&builder, "gap correspondences:     %lu\n", (unsigned long)gap_total);
+    rg_pairwise_model_null_correspondences(model, &null_total);
+    builder_appendf(&builder, "segment correspondences: %lu\n",
+                    (unsigned long)(segment_total + null_total));
     builder_appendf(&builder, "conditioned entries:     %lu\n", (unsigned long)conditioned_total);
     builder_appendf(&builder, "promoted chunks:         %lu\n", (unsigned long)chunk_total);
     builder_appendf(&builder, "cross-dimensional rules: %lu\n", (unsigned long)xdim_published);
     builder_appendf(&builder, "tonal correspondences:   %lu\n\n", (unsigned long)tonal_total);
 
+    /* One section: a correspondence to ∅ (a loss `g ~ ∅` or epenthesis `∅ ~ g`)
+     * is a segment correspondence like any other, ranked by count alongside the
+     * 1-to-1 rows. */
     builder_appendf(&builder, "--- Top %d segment correspondences ---\n", opts.top_segments);
     {
-        size_t row_count = segment_total;
+        const rg_segment_count_row *null_rows =
+            rg_pairwise_model_null_correspondences(model, &null_total);
+        size_t row_count = segment_total + null_total;
+        const rg_segment_count_row **all =
+            (const rg_segment_count_row **)calloc(row_count == 0 ? 1 : row_count, sizeof(*all));
         counts = (double *)calloc(row_count == 0 ? 1 : row_count, sizeof(*counts));
-        if (counts == 0) {
+        if (all == 0 || counts == 0) {
+            free((void *)all);
+            free(counts);
             builder.failed = 1;
             return builder_finish(&builder);
         }
+        for (i = 0; i < segment_total; i++) {
+            all[i] = &segment_rows[i];
+        }
+        for (i = 0; i < null_total; i++) {
+            all[segment_total + i] = &null_rows[i];
+        }
         for (i = 0; i < row_count; i++) {
-            counts[i] = segment_rows[i].count;
+            counts[i] = all[i]->count;
         }
         order = order_by_count_desc(counts, row_count);
         if (order == 0) {
+            free((void *)all);
             free(counts);
             builder.failed = 1;
             return builder_finish(&builder);
         }
         shown = 0;
         for (i = 0; i < row_count && shown < (size_t)opts.top_segments; i++) {
-            const rg_segment_count_row *row = &segment_rows[order[i]];
+            const rg_segment_count_row *row = all[order[i]];
             if (row->count < opts.min_count) {
                 continue;
             }
@@ -413,36 +429,9 @@ char *rg_format_pairwise_model(const rg_pairwise_model *model, const rg_format_m
         if (shown == 0) {
             builder_append(&builder, "  (none)\n");
         }
+        free((void *)all);
         free(counts);
         free(order);
-    }
-
-    builder_appendf(&builder, "\n--- Top %d gap correspondences ---\n", opts.top_segments);
-    {
-        const rg_gap_count_row *gap_rows = rg_pairwise_model_gap_counts(model, &gap_total);
-        shown = 0;
-        for (i = 0; i < gap_total && shown < (size_t)opts.top_segments; i++) {
-            const rg_gap_count_row *row = &gap_rows[i];
-            if (row->count < opts.min_count) {
-                continue;
-            }
-            builder_append(&builder, "  count=");
-            append_count(&builder, row->count);
-            builder_append(&builder, "/");
-            append_count(&builder, row->present_total);
-            /* Written source-side first, so a deletion reads "n ~ -" and an
-             * epenthesis "- ~ n" -- the same shape the 1-to-1 table above uses,
-             * with a gap where it cannot put a grapheme. */
-            if (row->deletion) {
-                builder_appendf(&builder, "  %s ~ -\n", row->grapheme);
-            } else {
-                builder_appendf(&builder, "  - ~ %s\n", row->grapheme);
-            }
-            shown++;
-        }
-        if (shown == 0) {
-            builder_append(&builder, "  (none)\n");
-        }
     }
 
     builder_appendf(&builder, "\n--- Top %d promoted chunks ---\n", opts.top_chunks);
@@ -1489,19 +1478,18 @@ char *rg_format_pairwise_tables(const rg_multi_model *model) {
                             tone->source_tone, tone->target_tone, tone->count);
         }
         {
-            const rg_gap_count_row *gap_rows = rg_pairwise_model_gap_counts(pm, &n);
+            /* Correspondences to ∅ ride the same SEG rows as the 1-to-1 table,
+             * with the gap grapheme in the source (a loss) or target (an
+             * epenthesis) column. */
+            const rg_segment_count_row *null_rows =
+                rg_pairwise_model_null_correspondences(pm, &n);
             for (i = 0; i < n; i++) {
-                const rg_gap_count_row *gap = &gap_rows[i];
-                /* Source-side first, a gap where the row has none: "n\t-" is a
-                 * deletion, "-\tn" an epenthesis. count/present_total is the
-                 * rate at which the grapheme is dropped. */
-                builder_appendf(&builder, "GAP\t%s>%s\t%s\t%s\t%.6f\t%.6f\t[%.4f,%.4f]\t%s\n",
+                const rg_segment_count_row *seg = &null_rows[i];
+                builder_appendf(&builder, "SEG\t%s>%s\t%s\t%s\t-\t%.6f\t[%.4f,%.4f]\t%s\n",
                                 row->lect_a, row->lect_b,
-                                gap->deletion ? gap->grapheme : "-",
-                                gap->deletion ? "-" : gap->grapheme,
-                                gap->count, gap->present_total,
-                                gap->uncertainty.lower, gap->uncertainty.upper,
-                                rg_uncertainty_method_string(gap->uncertainty.method));
+                                seg->source, seg->target, seg->count,
+                                seg->uncertainty.lower, seg->uncertainty.upper,
+                                rg_uncertainty_method_string(seg->uncertainty.method));
             }
         }
     }

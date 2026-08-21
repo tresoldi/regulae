@@ -120,15 +120,6 @@ rg_status add_tonal_count(
     const char *target_tone,
     double weight
 );
-rg_status add_gap_count(
-    rg_gap_count_row **rows,
-    size_t *count,
-    size_t *cap,
-    const char *grapheme,
-    int deletion,
-    double weight
-);
-int gap_row_cmp(const void *a, const void *b);
 rg_status add_present_count(
     rg_segment_count_row **rows,
     size_t *count,

@@ -157,10 +157,10 @@ void rg_pairwise_model_free(rg_pairwise_model *model) {
         rg_free_owned_internal(model->tonal_counts[i].target_tone);
     }
     free(model->tonal_counts);
-    for (i = 0; i < model->gap_count_count; i++) {
-        rg_free_owned_internal(model->gap_counts[i].grapheme);
+    for (i = 0; i < model->null_correspondence_count; i++) {
+        segment_count_row_clear(&model->null_correspondences[i]);
     }
-    free(model->gap_counts);
+    free(model->null_correspondences);
     for (i = 0; i < model->segment_prior_count; i++) {
         free(model->segment_priors[i].source);
         free(model->segment_priors[i].target);
@@ -324,52 +324,6 @@ double source_total_for_rows(const rg_segment_count_row *rows, size_t count, con
         }
     }
     return 0.0;
-}
-
-int gap_row_cmp(const void *a, const void *b) {
-    const rg_gap_count_row *ra = (const rg_gap_count_row *)a;
-    const rg_gap_count_row *rb = (const rg_gap_count_row *)b;
-    if (ra->deletion != rb->deletion) {
-        /* Deletions before epentheses, so the commoner direction reads first. */
-        return ra->deletion > rb->deletion ? -1 : 1;
-    }
-    return strcmp(ra->grapheme, rb->grapheme);
-}
-
-rg_status add_gap_count(
-    rg_gap_count_row **rows,
-    size_t *count,
-    size_t *cap,
-    const char *grapheme,
-    int deletion,
-    double weight
-) {
-    size_t i;
-    rg_gap_count_row *next;
-    for (i = 0; i < *count; i++) {
-        if ((*rows)[i].deletion == deletion && strcmp((*rows)[i].grapheme, grapheme) == 0) {
-            (*rows)[i].count += weight;
-            return RG_OK;
-        }
-    }
-    if (*count == *cap) {
-        size_t next_cap = *cap == 0 ? 8 : *cap * 2;
-        next = (rg_gap_count_row *)realloc(*rows, next_cap * sizeof(**rows));
-        if (next == 0) {
-            return RG_ERR_OOM;
-        }
-        *rows = next;
-        *cap = next_cap;
-    }
-    memset(&(*rows)[*count], 0, sizeof((*rows)[*count]));
-    (*rows)[*count].grapheme = rg_strdup_internal(grapheme);
-    if ((*rows)[*count].grapheme == 0) {
-        return RG_ERR_OOM;
-    }
-    (*rows)[*count].deletion = deletion;
-    (*rows)[*count].count = weight;
-    (*count)++;
-    return RG_OK;
 }
 
 /* A grapheme-keyed presence tally, reusing rg_segment_count_row as the store:

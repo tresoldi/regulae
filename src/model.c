@@ -352,14 +352,33 @@ static rg_status aggregate_displacement_counts(
  * occurrence of the grapheme on its side, gap and non-gap, so the count reads as
  * a rate. Non-gap non-1-to-1 links (a 2-to-1 fusion) are not gaps and belong to
  * the chunk table; they are skipped here. */
-static rg_status aggregate_gap_counts(
+/* A loss `g ~ ∅` sorts before an epenthesis `∅ ~ g`, so the commoner direction
+ * reads first, then by the kept grapheme. */
+static int null_correspondence_cmp(const void *a, const void *b) {
+    const rg_segment_count_row *ra = (const rg_segment_count_row *)a;
+    const rg_segment_count_row *rb = (const rg_segment_count_row *)b;
+    int a_deletion = strcmp(ra->target, RG_GAP_GRAPHEME) == 0;
+    int b_deletion = strcmp(rb->target, RG_GAP_GRAPHEME) == 0;
+    if (a_deletion != b_deletion) {
+        return a_deletion > b_deletion ? -1 : 1;
+    }
+    return strcmp(a_deletion ? ra->source : ra->target,
+                  b_deletion ? rb->source : rb->target);
+}
+
+/* A segment answering to nothing is a correspondence like any other, only with
+ * RG_GAP_GRAPHEME on one side: `g ~ ∅` for a loss, `∅ ~ g` for an epenthesis.
+ * They are counted apart from segment_counts because that table also drives
+ * alignment scoring and must stay 1-to-1, not because they are a separate kind
+ * of fact. */
+static rg_status aggregate_null_correspondences(
     const rg_context *ctx,
     const rg_form_pair *pairs,
     size_t pair_count,
     const rg_train_options *options,
     rg_pairwise_model *model
 ) {
-    rg_gap_count_row *rows = 0;
+    rg_segment_count_row *rows = 0;
     size_t row_count = 0;
     size_t row_cap = 0;
     /* Per-grapheme totals on each side, so a gap count can be read as a rate. */
@@ -404,8 +423,8 @@ static rg_status aggregate_gap_counts(
                     status = add_present_count(&source_present, &source_present_count,
                                                &source_present_cap, link->source[s].grapheme, weight);
                     if (status == RG_OK) {
-                        status = add_gap_count(&rows, &row_count, &row_cap,
-                                               link->source[s].grapheme, 1, weight);
+                        status = add_segment_count(&rows, &row_count, &row_cap,
+                                                   link->source[s].grapheme, RG_GAP_GRAPHEME, weight);
                     }
                 }
             } else if (link->source_count == 0 && link->target_count >= 1) {
@@ -413,8 +432,8 @@ static rg_status aggregate_gap_counts(
                     status = add_present_count(&target_present, &target_present_count,
                                                &target_present_cap, link->target[s].grapheme, weight);
                     if (status == RG_OK) {
-                        status = add_gap_count(&rows, &row_count, &row_cap,
-                                               link->target[s].grapheme, 0, weight);
+                        status = add_segment_count(&rows, &row_count, &row_cap,
+                                                   RG_GAP_GRAPHEME, link->target[s].grapheme, weight);
                     }
                 }
             }
@@ -423,13 +442,19 @@ static rg_status aggregate_gap_counts(
     }
     if (status == RG_OK) {
         for (i = 0; i < row_count; i++) {
-            const rg_segment_count_row *side = rows[i].deletion ? source_present : target_present;
-            size_t side_count = rows[i].deletion ? source_present_count : target_present_count;
-            rows[i].present_total = present_total_for(side, side_count, rows[i].grapheme);
-            rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, rows[i].present_total);
+            /* The kept side holds the grapheme; the other is RG_GAP_GRAPHEME.
+             * `count / <kept side>_total` is the loss (or epenthesis) rate. */
+            int deletion = strcmp(rows[i].target, RG_GAP_GRAPHEME) == 0;
+            const rg_segment_count_row *side = deletion ? source_present : target_present;
+            size_t side_count = deletion ? source_present_count : target_present_count;
+            const char *grapheme = deletion ? rows[i].source : rows[i].target;
+            double present_total = present_total_for(side, side_count, grapheme);
+            rows[i].source_total = deletion ? present_total : 0.0;
+            rows[i].target_total = deletion ? 0.0 : present_total;
+            rows[i].uncertainty = rg_wilson_default_internal(rows[i].count, present_total);
         }
         if (row_count > 1) {
-            qsort(rows, row_count, sizeof(*rows), gap_row_cmp);
+            qsort(rows, row_count, sizeof(*rows), null_correspondence_cmp);
         }
     }
     for (i = 0; i < source_present_count; i++) {
@@ -442,17 +467,17 @@ static rg_status aggregate_gap_counts(
     free(target_present);
     if (status != RG_OK) {
         for (i = 0; i < row_count; i++) {
-            rg_free_owned_internal(rows[i].grapheme);
+            segment_count_row_clear(&rows[i]);
         }
         free(rows);
         return status;
     }
-    for (i = 0; i < model->gap_count_count; i++) {
-        rg_free_owned_internal(model->gap_counts[i].grapheme);
+    for (i = 0; i < model->null_correspondence_count; i++) {
+        segment_count_row_clear(&model->null_correspondences[i]);
     }
-    free(model->gap_counts);
-    model->gap_counts = rows;
-    model->gap_count_count = row_count;
+    free(model->null_correspondences);
+    model->null_correspondences = rows;
+    model->null_correspondence_count = row_count;
     return RG_OK;
 }
 
@@ -680,7 +705,7 @@ rg_status rg_train_pairwise_internal(
     } while (0)
 
     RUN_STAGE("displacement aggregation", aggregate_displacement_counts(ctx, pairs, pair_count, opts, model));
-    RUN_STAGE("gap aggregation", aggregate_gap_counts(ctx, pairs, pair_count, opts, model));
+    RUN_STAGE("null-correspondence aggregation", aggregate_null_correspondences(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("context discovery", discover_immediate_context_counts(ctx, pairs, pair_count, opts, model, &vocabulary));
     RUN_STAGE("chunk promotion", promote_chunk_rows(ctx, pairs, pair_count, opts, model));
     RUN_STAGE("tonal aggregation", aggregate_tonal_counts(ctx, pairs, pair_count, opts, model));
@@ -730,7 +755,7 @@ rg_status rg_train_pairwise(
 RG_PAIRWISE_TABLE(rg_pairwise_model_segment_counts, rg_segment_count_row, segment_counts, segment_count_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_displacements, rg_displacement_row, displacement_rows, displacement_row_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_tonal_counts, rg_tonal_count_row, tonal_counts, tonal_count_count)
-RG_PAIRWISE_TABLE(rg_pairwise_model_gap_counts, rg_gap_count_row, gap_counts, gap_count_count)
+RG_PAIRWISE_TABLE(rg_pairwise_model_null_correspondences, rg_segment_count_row, null_correspondences, null_correspondence_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_conditioned_segment_counts, rg_conditioned_segment_count_row, conditioned_segment_counts, conditioned_segment_count_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_chunks, rg_chunk_row, chunks, chunk_count)
 RG_PAIRWISE_TABLE(rg_pairwise_model_cross_dimensional_rows, rg_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)

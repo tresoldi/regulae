@@ -52,10 +52,17 @@ def test_deletion_has_a_class_row() -> None:
     assert any(s.is_gap for s in deletion[0].segments)
 
 
-def test_gap_table_states_the_loss() -> None:
+def test_null_correspondence_states_the_loss() -> None:
     model = regulae.train_model(DELETION_TSV, fmt="tsv")
-    losses = [g for p in model.pairwise_models for g in p.gaps if g.deletion and g.grapheme == "n"]
+    losses = [
+        g
+        for p in model.pairwise_models
+        for g in p.null_correspondences
+        if g.deletion and g.grapheme == "n"
+    ]
     assert losses
+    assert losses[0].source == "n"
+    assert losses[0].target == regulae.GAP_GRAPHEME
     assert losses[0].count == losses[0].present_total  # dropped every time
 
 

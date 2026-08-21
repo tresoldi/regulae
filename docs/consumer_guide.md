@@ -197,8 +197,8 @@ model = regulae.train_model(open("cognates.tsv").read(), fmt="tsv")
 regulae.MultiLectModel           # the output (§4)
 regulae.CorrespondenceClass      # a class row (§4.2, §4.3)
 regulae.CrossDimensionalRule     # §6
-regulae.PairwiseModel            # a pair's tables, incl. gaps (§4.1, §6)
-regulae.GapCorrespondence        # a deletion or epenthesis (§6)
+regulae.PairwiseModel            # a pair's tables, incl. correspondences to ∅ (§4.1, §6)
+regulae.NullCorrespondence       # a correspondence to ∅ (loss or epenthesis) (§6)
 regulae.Segment, regulae.Uncertainty, regulae.PredictiveEvidence
 regulae.GAP_GRAPHEME             # the "∅" a deleting lect carries
 regulae.RegulaeError, regulae.SourceMarkerError
@@ -292,8 +292,8 @@ Read the pair as a labelled edge, not as a direction of change.
 The wrapper's `PairwiseModel` surfaces the two per-pair tables a
 downstream consumer usually reaches for: `conditioned`, a tuple of
 `ConditionedCorrespondence` (one source grapheme to one target
-under one `Context`, §5), and `gaps`, a tuple of `GapCorrespondence`
-(a segment answering to nothing, §6). The C `rg_pairwise_model`
+under one `Context`, §5), and `null_correspondences`, a tuple of
+`NullCorrespondence` (a segment answering to nothing, §6). The C `rg_pairwise_model`
 carries more, each with its own accessor and each present in the
 JSON on `MultiLectModel.raw`:
 
@@ -307,7 +307,8 @@ JSON on `MultiLectModel.raw`:
   correspondences (e.g. Latin `kt → tʃ` in Italian).
 - `rg_pairwise_model_tonal_counts`: source tone to target tone,
   for pairs where tone is present.
-- `rg_pairwise_model_gap_counts`: the gap table §6 describes.
+- `rg_pairwise_model_null_correspondences`: the null-correspondence
+  rows §6 describes — `rg_segment_count_row` rows with `∅` on one side.
 - `rg_pairwise_model_cross_dimensional_rows`: the pair's
   cross-dimensional rules, lifted into `model.cross_dimensional`.
 
@@ -716,18 +717,20 @@ The tables, and what each yields:
 | `rg_pairwise_model_cross_dimensional_rows` | `rg_cross_dimensional_row` |
 | `rg_pairwise_model_displacements` | `rg_displacement_row` |
 | `rg_pairwise_model_tonal_counts` | `rg_tonal_count_row` |
-| `rg_pairwise_model_gap_counts` | `rg_gap_count_row` |
+| `rg_pairwise_model_null_correspondences` | `rg_segment_count_row` |
 
 Passing `NULL` for the count is allowed; passing a `NULL` model
 yields a `NULL` table and a zero count.
 
-`rg_pairwise_model_gap_counts` is where a deletion or an
-epenthesis has a row. The segment tables are one-to-one and cannot
-say "this answers to nothing"; the gap table does, keyed by the
-grapheme on the side that keeps it, with `deletion` for the
-source-to-target loss direction and `count / present_total` the
-rate it is dropped. It is a post-EM aggregation, not the scoring
-model, so a consumer reads it exactly like the tonal table.
+`rg_pairwise_model_null_correspondences` is where a deletion or an
+epenthesis has a row. It returns `rg_segment_count_row` rows — the
+same shape as the ordinary segment table — with `∅`
+(`RG_GAP_GRAPHEME`) on one side: `g ~ ∅` is a loss, `∅ ~ g` an
+epenthesis. There is no `deletion` flag; the side holding `∅` tells
+the direction. The rate is `count` over the kept side's total
+(`source_total` for a loss, `target_total` for an epenthesis — the
+`∅` side's total is 0). It is a post-EM aggregation, not the
+scoring model, so a consumer reads it exactly like the tonal table.
 
 The multi-lect class table states losses too: a lect
 that dropped a segment the others keep appears in the class with
@@ -954,23 +957,29 @@ multi-lect table. Counting the per-pair copies as well would count
 them twice. The *conditioned correspondences* are the ones not
 lifted, which is why they have their own pair of counts (§4.6).
 
-### 6.1 Gaps: a segment answering to nothing
+### 6.1 Correspondences to ∅: a segment answering to nothing
 
 ```python
 @dataclass(frozen=True)
-class GapCorrespondence:               # C: rg_gap_count_row
-    grapheme:      str                 # the segment on the side that keeps it
-    deletion:      bool                # True: a loss; False: an epenthesis
-    count:         float               # times the gap link occurred
-    present_total: float               # count / present_total is the drop rate
+class NullCorrespondence:              # C: rg_segment_count_row
+    source:       str                  # source grapheme, or "∅" for an epenthesis
+    target:       str                  # target grapheme, or "∅" for a loss
+    count:        float                # times the null link occurred
+    source_total: float                # count / source_total is the loss rate
+    target_total: float                # count / target_total is the epenthesis rate
+    # convenience properties: .deletion (target == GAP_GRAPHEME),
+    # .grapheme (the kept side), .present_total (the kept side's total)
 ```
 
 A 1-to-1 table cannot say "this answers to nothing", so a deletion
-— the commonest sound change — needs a row shape of its own. The
-gap table (`PairwiseModel.gaps`, `rg_pairwise_model_gap_counts`)
-gives it one, per pair, keyed by the grapheme on the side that
-kept it. On real Romance data it recovers French apocope as
-`- ~ e`, `- ~ a`, `- ~ o` where Italian keeps the vowel.
+— the commonest sound change — is stated as a correspondence with
+`∅` on one side. These null-correspondence rows
+(`PairwiseModel.null_correspondences`,
+`rg_pairwise_model_null_correspondences`) are ordinary
+`rg_segment_count_row` rows: `g ~ ∅` a loss, `∅ ~ g` an epenthesis,
+with `count` over the kept side's total the rate. On real Romance
+data it recovers French apocope as `∅ ~ e`, `∅ ~ a`, `∅ ~ o` where
+Italian keeps the vowel.
 
 At the multi-lect level a loss is a class row too: a
 lect that dropped a segment the others keep appears in the class
@@ -1068,9 +1077,9 @@ time rather than silently, which is the intent.
   from a lect absent from the cognate (§6). A redistribution of the unconditioned
   table, not an addition — present-only classes that were losses in disguise
   become gap-bearing.
-- **32** — `rg_gap_count_row` and `rg_pairwise_model_gap_counts`: a per-pair gap
-  table gives a deletion or epenthesis a row (§6). A post-EM aggregation beside
-  displacement and tone, not the scoring model.
+- **32** — `rg_pairwise_model_null_correspondences` returns `rg_segment_count_row`
+  rows with `∅` on one side, giving a deletion or epenthesis a row (§6). A post-EM
+  aggregation beside displacement and tone, not the scoring model.
 - **31** — `rg_multi_class_row` gained `contrast_class_id` and
   `contrast_alternative_count`: a conditioned class links to the row holding the
   pivot's other reflex out of the environment — the comparison `contrast_count`
@@ -1205,7 +1214,7 @@ regulae. In API terms:
 | multi-lect correspondence classes as likelihood constraints | `MultiLectModel.unconditioned_classes` + `.conditioned_classes` |
 | evidence for structured sound change (regularity) | a `CorrespondenceClass` with `.conditioned` true |
 | evidence for cluster-level change | the chunk table on a `rg_pairwise_model` (`.raw`) |
-| loss as evidence | a class carrying `GAP_GRAPHEME`, and `PairwiseModel.gaps` |
+| loss as evidence | a class carrying `GAP_GRAPHEME`, and `PairwiseModel.null_correspondences` |
 | provenance / exemplar walk-back | `CorrespondenceClass.supporting_cognates` (the cognate ids) |
 
 A natural consumption sketch:
@@ -1299,7 +1308,7 @@ for klass in model.conditioned_classes[:5]:
 
 # Deletions, per pair.
 for pair in model.pairwise_models:
-    for gap in pair.gaps:
+    for gap in pair.null_correspondences:
         if gap.deletion:
             print(f"{pair.source_lect}: {gap.grapheme} lost "
                   f"{gap.count:g}/{gap.present_total:g}")
