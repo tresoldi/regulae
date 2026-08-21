@@ -1018,12 +1018,25 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                 builder_appendf(&builder, "  one change, %lu environments (see members)",
                                 (unsigned long)event->class_id_count);
             }
-            if (event->environment_alternatives > 0) {
-                builder_appendf(&builder,
-                                "  [%d rival conditioner%s: the corpus cannot tell this "
-                                "environment from another]",
-                                event->environment_alternatives,
-                                event->environment_alternatives == 1 ? "" : "s");
+            /* Not just how many rivals, but which: "after a sonorant, or
+             * equally before a front vowel" is something a comparativist can
+             * go and test, where a count is only a warning. */
+            if (event->environment_rival_count > 0) {
+                size_t r;
+                builder_append(&builder, "  [or equally");
+                for (r = 0; r < event->environment_rival_count; r++) {
+                    const rg_environment_rival *rival = &event->environment_rivals[r];
+                    builder_appendf(&builder, "%s %s%s%s%s%s[%s:%s]",
+                                    r == 0 ? "" : ",",
+                                    rival->lect == 0 ? "" : rival->lect,
+                                    rival->lect == 0 ? "" : ":",
+                                    rival->inverted ? "not " : "",
+                                    rival->slot == 0 ? "self" : rival->slot,
+                                    rival->slot == 0 ? "" : " ",
+                                    rival->feature,
+                                    rival->value == 0 ? "+" : rival->value);
+                }
+                builder_append(&builder, " -- the corpus cannot choose]");
             }
             /* A set no feature picks out may still be the set a change applied
              * to; saying so is not the same as doubting the grouping. */

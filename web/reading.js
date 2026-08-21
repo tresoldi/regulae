@@ -123,6 +123,23 @@ function eventEnvironment(event) { // eslint-disable-line no-unused-vars
   return "";
 }
 
+/* The environments the corpus cannot tell a committed one from, written the
+ * way the committed one is. A count alone is a warning; these are something a
+ * reader can go and check against the wordlist.
+ *
+ * `inverted` marks a rival that holds exactly where the committed environment
+ * does not -- the same split seen from the other side -- so it has to read as
+ * a negation or it states the complement of what was found. */
+function environmentRivals(row) { // eslint-disable-line no-unused-vars
+  const rivals = row.environment_rivals || [];
+  return rivals.map((r) => {
+    const where = r.slot ? r.slot.replace(/_/g, " ") : "self";
+    const value = r.value === undefined ? "+" : r.value;
+    const lect = r.lect ? `${r.lect} — ` : "";
+    return `${lect}${r.inverted ? "not " : ""}${where} [${r.feature}:${value}]`;
+  });
+}
+
 /* A cross-dimensional rule: a segmental feature on one lect predicting a
  * suprasegmental value on another (tonogenesis is the type case). Written as a
  * correspondence, never a rewrite -- the conditioned lect *carries* the value

@@ -193,11 +193,16 @@ static void masses_in_alphabet(
     }
 }
 
+/* Whether `b` carves `rows` exactly as `a` does, and from which side.
+ * `inverted` is written when it carves them exactly oppositely, which is the
+ * same partition seen from the other side and has to be said so: the change
+ * happens where such a predicate is false. */
 static int candidates_same_split(
     const rg_split_observation *rows,
     size_t count,
     const rg_split_candidate *a,
-    const rg_split_candidate *b
+    const rg_split_candidate *b,
+    int *inverted
 ) {
     size_t i;
     int same = 1;
@@ -207,6 +212,9 @@ static int candidates_same_split(
         int b_holds = rg_predicate_holds_internal(rows[i].context, b) != 0;
         same = same && a_holds == b_holds;
         opposite = opposite && a_holds != b_holds;
+    }
+    if (inverted != 0) {
+        *inverted = !same && opposite;
     }
     return same || opposite;
 }
@@ -227,14 +235,21 @@ size_t rg_split_environment_alternatives(
     size_t count,
     const rg_split_candidate *committed,
     const rg_split_candidate *candidates,
-    size_t candidate_count
+    size_t candidate_count,
+    rg_environment_rival *rivals,
+    size_t rival_capacity,
+    size_t *rival_count
 ) {
     const char *seen[64];
     size_t seen_count = 0;
     size_t c;
+    if (rival_count != 0) {
+        *rival_count = 0;
+    }
     for (c = 0; c < candidate_count; c++) {
         size_t s;
         int already;
+        int inverted = 0;
         if (committed->slot != 0 && candidates[c].slot != 0 &&
             strcmp(candidates[c].slot, committed->slot) == 0) {
             continue;
@@ -245,7 +260,7 @@ size_t rg_split_environment_alternatives(
         if (strcmp(candidates[c].feature, committed->feature) == 0) {
             continue;
         }
-        if (!candidates_same_split(rows, count, committed, &candidates[c])) {
+        if (!candidates_same_split(rows, count, committed, &candidates[c], &inverted)) {
             continue;
         }
         already = 0;
@@ -255,8 +270,21 @@ size_t rg_split_environment_alternatives(
                 break;
             }
         }
-        if (!already && seen_count < sizeof(seen) / sizeof(seen[0])) {
+        if (already) {
+            continue;
+        }
+        if (seen_count < sizeof(seen) / sizeof(seen[0])) {
             seen[seen_count++] = candidates[c].feature;
+        }
+        if (rivals != 0 && rival_count != 0 && *rival_count < rival_capacity) {
+            /* Set every field: the caller's array is stack scratch, and a
+             * `lect` left as whatever was there gets copied and freed. */
+            rivals[*rival_count].lect = 0;
+            rivals[*rival_count].slot = candidates[c].slot;
+            rivals[*rival_count].feature = candidates[c].feature;
+            rivals[*rival_count].value = candidates[c].value;
+            rivals[*rival_count].inverted = inverted ? true : false;
+            (*rival_count)++;
         }
     }
     return seen_count;
@@ -292,7 +320,7 @@ static rg_status distinct_partition_count(
         hash = hash < complement_hash ? hash : complement_hash;
         for (i = 0; i < c; i++) {
             if (hashes[i] == hash &&
-                candidates_same_split(rows, count, &candidates[c], &candidates[i])) {
+                candidates_same_split(rows, count, &candidates[c], &candidates[i], 0)) {
                 duplicate = 1;
                 break;
             }

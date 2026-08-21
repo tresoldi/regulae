@@ -314,6 +314,9 @@ textarea:focus { border-color: var(--ink); outline: none; }
 .panel.events .scroll { max-height: 30vh; }
 .panel.events .unnamed { color: var(--muted); }
 .panel.events .displacement { color: var(--accent); }
+/* The environments the corpus cannot tell the committed one from. Warm rather
+   than muted: it qualifies the line above it and has to be read, not skimmed. */
+.panel.events .tied-rivals { color: var(--warn); }
 
 /* Cross-dimensional rules, hidden entirely on the corpora that have none so the
    pane is never an empty promise. */

@@ -175,6 +175,8 @@ static void multi_class_clear(rg_multi_class_row *klass) {
         rg_free_owned_internal(klass->contexts);
     }
     string_array_clear(rg_owned_internal(klass->supporting_cognates), klass->supporting_cognate_count);
+    rg_environment_rivals_free_internal(rg_owned_internal(klass->environment_rivals),
+                                        klass->environment_rival_count);
     memset(klass, 0, sizeof(*klass));
 }
 

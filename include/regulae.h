@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 42
+#define RG_ABI_VERSION 43
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -321,6 +321,42 @@ typedef struct rg_feature_displacement {
     const char *from_value;
     const char *to_value;
 } rg_feature_displacement;
+
+/* An environment the corpus cannot tell a committed one from.
+ *
+ * A conditioned class names one conditioner, and on a small or a skewed corpus
+ * a predicate somewhere else may carve exactly the same observations. The count
+ * of those has been published for a while; the rivals themselves are what a
+ * reader can act on. `conditioned_confound.tsv` commits "after a sonorant", and
+ * knowing that "before a front vowel" fits the same eight words equally well is
+ * the difference between a rule to write down and a question to go and test.
+ *
+ * `inverted` marks a rival that holds exactly where the committed environment
+ * does not, so it is the same partition read from the other side: the change
+ * happens where this predicate is *false*. Reading such a rival as a positive
+ * environment would state the complement of what was found. */
+typedef struct rg_environment_rival {
+    /* The lect the rival is stated over, when it is stated over a different one
+     * than the committed environment -- NULL otherwise.
+     *
+     * Two lects of one correspondence can each condition it, and the search
+     * runs a pivot per lect, so the same observations get described twice and
+     * both descriptions land on the row. Read as a conjunction that says the
+     * change needs both, which is not what was found: each covers all the
+     * observations on its own and the corpus cannot say which does the work.
+     * On Verner, `gothic fol[vowel:+]` and `pgmc fol-stress[stress:primary]`
+     * are that pair, and the stress one is the law. */
+    const char *lect;
+    /* The slot the rival predicate sits at -- "preceding", "next_syllable" and
+     * so on, in RG_ENV_SLOTS' spelling. NULL for a predicate on the segment
+     * itself. Always a different slot from the committed one: a feature of the
+     * *same* neighbour that co-varies is one environment to a reader, not a
+     * rival. */
+    const char *slot;
+    const char *feature;
+    const char *value;
+    bool inverted;
+} rg_environment_rival;
 
 /* How an interval was produced. A consumer cannot otherwise tell a closed-form
  * interval from a resampled one, and the two answer different questions: the
@@ -781,6 +817,15 @@ typedef struct rg_multi_class_row {
      * uniquely identifiable; >0 when a different neighbour's feature carves the
      * split the same way and the corpus cannot say which conditions it. */
     int environment_alternatives;
+    /* Those rivals themselves, up to what the discovery pass records. Empty
+     * when `environment_alternatives` is 0, and it may hold fewer than that
+     * count on a corpus carrying a great many.
+     *
+     * The count says the environment cannot be trusted on its own; this says
+     * what else it might be, which is the half a reader can act on. Owned by
+     * the model and valid until it is freed. */
+    const rg_environment_rival *environment_rivals;
+    size_t environment_rival_count;
     rg_rule_evidence evidence;
     /* The distinct cognate sets this class rests on, each listed once however
      * many aligned positions in it realise the class. Owned by the model and
@@ -942,17 +987,27 @@ typedef struct rg_proposed_event_row {
     /* What holds the members together, and so how to read an empty
      * `rg_event_member.context`. */
     rg_event_axis axis;
-    /* Rival conditioners the corpus cannot tell this event's environment from,
-     * taken as the largest any member reports. 0 when the environment is
-     * pinned, or when there is no environment.
+    /* Rival conditioners the corpus cannot tell this event's environment from:
+     * those *every* member reports, and how many that is. 0 when the
+     * environment is pinned, or when there is no environment.
+     *
+     * Shared rather than pooled, for the reason the environment itself is
+     * intersected. A rival every member is confusable with is a rival for the
+     * event's own observations; one that only a single member reports is a
+     * fact about that member, and is on its class row where a reader following
+     * `class_ids` will find it. So a grouping can be better pinned down than
+     * any of the rules in it, which is a real property of grouping and not an
+     * artefact of the summary.
      *
      * The same flag `rg_multi_class_row` carries (§4.3), lifted so that an
      * event stating an environment also states whether that environment is the
      * one doing the work. On `testdata/soundlaws/conditioned_confound.tsv` the
      * change is committed after a sonorant and "before a front vowel" carves
-     * the same split, so the event names one conditioner and this says the
-     * corpus cannot choose between them. */
+     * the same split, so the event names one conditioner and these say what
+     * else it might have been. Owned. */
     int environment_alternatives;
+    const rg_environment_rival *environment_rivals;
+    size_t environment_rival_count;
     /* The weakest member's evidence: the lowest `search_margin` and the
      * highest (least negative) `delta_score` any member class carries, so both
      * read as "every member clears at least this".

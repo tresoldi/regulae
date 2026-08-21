@@ -116,9 +116,17 @@ routinely carries a conjunct the others did not need, and on Verner's Law the
 event states `following_stress[primary]` and drops the "before a vowel" that
 one member also picked up. Where the members differ in environment — that is
 what a decision-list grouping *is* — the column says so instead of going blank,
-because a blank there would read as unconditioned. A `tied` chip marks an
-environment the corpus cannot tell from a rival, the same flag a correspondence
-row carries.
+because a blank there would read as unconditioned. Where the corpus cannot tell the environment
+from a rival, the row names the rivals rather than only counting them — "after
+a sonorant, or equally: following [front:+]" is something you can go and check
+against the wordlist, where a count is only a warning. A rival written with
+"not" holds exactly where the stated environment does not, which is the same
+split seen from the other side.
+
+Only rivals that every member of an event shares are shown, so a grouping can
+be pinned down where none of its rules is: each of lenition's three rules is
+confusable with something on its own five words, and no rival survives all
+three.
 
 A change that lands on a single segment still appears, alone, with a member
 count of one — vowel harmony, umlaut and rhotacism are each one class in these

@@ -477,8 +477,13 @@ check('an event shows the environment its members condition on', () => {
     'the event row shows no environment');
   assert.match(cells[0].textContent, /sonorant/,
     `the environment is not the one the class conditions on: ${cells[0].textContent}`);
-  assert.match(cells[0].textContent, /tied/,
-    'the row does not mark the environment as one the corpus cannot pin down');
+  /* And says what the rivals are, not merely that there are some: a count tells
+     a reader to distrust the environment, the rivals tell them what else to go
+     and look at. */
+  assert.match(cells[0].textContent, /or equally/,
+    `the row does not name the rival environments: ${cells[0].textContent}`);
+  assert.match(cells[0].textContent, /front/,
+    `the rival the fixture is built around is missing: ${cells[0].textContent}`);
 
   /* And where there is nothing to condition on, the column says so plainly
      rather than being left to read as an environment of none. Grimm's shifts

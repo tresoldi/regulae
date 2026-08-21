@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 42. The public surface has moved since this
+`RG_ABI_VERSION` is 43. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1055,6 +1055,22 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **43** — the rival environments themselves, not only how many. `rg_multi_class_row`
+  and `rg_proposed_event_row` gained `environment_rivals` /
+  `environment_rival_count`, arrays of the new `rg_environment_rival` (`slot`,
+  `feature`, `value`, `inverted`). `environment_alternatives` already said an
+  environment could not be trusted; this says what else it might be, which is
+  the half a reader can act on — `conditioned_confound.tsv` commits "after a
+  sonorant" and now names "before a front vowel" as fitting the same eight
+  words. `inverted` marks a rival that holds exactly where the committed
+  environment does not, so it reads as a negation rather than stating the
+  complement of what was found. On an event the rivals are those *every* member
+  reports, and `environment_alternatives` is that count rather than the largest
+  a member reports: a grouping can be better pinned down than any of its rules,
+  which is why lenition's event names no rival though each of its three rules
+  does. The class row records up to `RG_MAX_RECORDED_RIVALS`; the count may
+  exceed what is listed. JSON gains `environment_rivals` where non-empty.
+  Additive.
 - **42** — a proposed event states its environment. `rg_event_member` gained
   `context`, the `rg_context_spec` every member class states at that slot and
   nothing else — intersected rather than taken from a member, because each

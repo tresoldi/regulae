@@ -11,7 +11,8 @@
 
 /* global CORPORA, CORPUS_LIST, GUIDE_STEPS,
    correspondence, decisionOrder, environment, eventCorrespondence,
-   eventDisplacement, eventEnvironment, isIdentity, residueReading */
+   environmentRivals, eventDisplacement, eventEnvironment, isIdentity,
+   residueReading */
 
 const $ = (id) => document.getElementById(id);
 
@@ -646,12 +647,16 @@ function renderEvents() {
     if (!reading) {
       env.classList.add("empty");
     }
-    if (event.environment_alternatives > 0) {
+    /* Not just that the environment is tied, but with what. A count tells a
+       reader to distrust the environment; the rivals tell them what else to
+       look at, which is the half they can act on. */
+    const rivals = environmentRivals(event);
+    if (rivals.length) {
       const tied = document.createElement("span");
-      tied.className = "chip tied";
-      tied.textContent = "tied";
-      tied.title = `${event.environment_alternatives} other environment(s) carve this `
-        + "split the same way, and the corpus cannot say which conditions it";
+      tied.className = "env tied-rivals";
+      tied.textContent = `or equally: ${rivals.join(", ")}`;
+      tied.title = "The corpus cannot tell these apart from the environment above: "
+        + "each carves exactly the same observations.";
       env.appendChild(tied);
     }
     const count = document.createElement("td");

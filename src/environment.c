@@ -426,6 +426,70 @@ rg_status rg_context_spec_intersect_internal(
     return RG_OK;
 }
 
+/* Every constraint in a spec, as a rival stated over `lect`. Appends up to
+ * `capacity` and reports how many it wrote. */
+size_t rg_context_spec_as_rivals_internal(
+    const rg_context_spec *spec,
+    const char *lect,
+    rg_environment_rival *out,
+    size_t capacity,
+    size_t used
+) {
+#define AS_RIVAL_STRING(name, key)                                              \
+    if (!string_absent(spec->name) && used < capacity) {                        \
+        out[used].lect = lect;                                                  \
+        out[used].slot = #name;                                                   \
+        out[used].feature = spec->name;                                         \
+        out[used].value = 0;                                                    \
+        out[used].inverted = false;                                             \
+        used++;                                                                 \
+    }
+    RG_ENV_STRING_SLOTS(AS_RIVAL_STRING)
+#undef AS_RIVAL_STRING
+#define AS_RIVAL_FEATURES(name, label, key)                                     \
+    {                                                                          \
+        size_t i;                                                              \
+        for (i = 0; i < spec->name##_count && used < capacity; i++) {          \
+            out[used].lect = lect;                                             \
+            out[used].slot = #name;                                              \
+            out[used].feature = spec->name[i].feature;                         \
+            out[used].value = spec->name[i].value;                             \
+            out[used].inverted = false;                                        \
+            used++;                                                            \
+        }                                                                      \
+    }
+#define AS_RIVAL_DISTANCES(name, label, key)                                    \
+    {                                                                          \
+        size_t i;                                                              \
+        for (i = 0; i < spec->name##_count && used < capacity; i++) {          \
+            out[used].lect = lect;                                             \
+            out[used].slot = #name;                                              \
+            out[used].feature = spec->name[i].constraint.feature;              \
+            out[used].value = spec->name[i].constraint.value;                  \
+            out[used].inverted = false;                                        \
+            used++;                                                            \
+        }                                                                      \
+    }
+    RG_ENV_SLOTS(AS_RIVAL_FEATURES, AS_RIVAL_DISTANCES)
+#undef AS_RIVAL_FEATURES
+#undef AS_RIVAL_DISTANCES
+    return used;
+}
+
+void rg_environment_rivals_free_internal(rg_environment_rival *rivals, size_t count) {
+    size_t i;
+    if (rivals == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        rg_free_owned_internal(rivals[i].lect);
+        rg_free_owned_internal(rivals[i].slot);
+        rg_free_owned_internal(rivals[i].feature);
+        rg_free_owned_internal(rivals[i].value);
+    }
+    free(rivals);
+}
+
 void rg_context_spec_clear_internal(rg_context_spec *context) {
     if (context == 0) {
         return;

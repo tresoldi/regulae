@@ -71,6 +71,10 @@ typedef struct committed_split {
     /* Rival conditioners at another position the corpus cannot tell this split's
      * environment from. 0 when identifiable. */
     int environment_alternatives;
+    /* Those rivals, owned: the candidate list they came from is scratch that
+     * does not outlive the search. */
+    rg_environment_rival *environment_rivals;
+    size_t environment_rival_count;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -114,6 +118,13 @@ typedef struct merged_class {
      * so this reads the tuple without copying it. */
     size_t contrast_split;
     int environment_alternatives;
+    /* Borrowed from the committed split, which outlives the merge. */
+    const rg_environment_rival *environment_rivals;
+    size_t environment_rival_count;
+    /* The lect whose split this row reports, so the assembly can tell the
+     * committed environment from another lect's description of the same
+     * observations. NULL when no split is linked. */
+    const char *reporting_lect;
     double delta_bic;
     double search_margin;
     int decision_index;
@@ -185,6 +196,8 @@ static void discovery_state_clear(discovery_state *state) {
         string_array_clear(state->committed[i].contrast_graphemes,
                            state->committed[i].contrast_segment_count);
         rg_context_spec_clear_internal(&state->committed[i].context);
+        rg_environment_rivals_free_internal(state->committed[i].environment_rivals,
+                                            state->committed[i].environment_rival_count);
     }
     free(state->committed);
     string_array_clear(state->stress_values, state->stress_count);
@@ -832,6 +845,8 @@ static rg_status append_committed_split(
     int has_contrast,
     double contrast_alternative_count,
     int environment_alternatives,
+    const rg_environment_rival *environment_rivals,
+    size_t environment_rival_count,
     double delta_bic,
     double search_margin,
     int decision_index,
@@ -875,6 +890,33 @@ static rg_status append_committed_split(
     slot->bucket_size = bucket_size;
     slot->contrast_alternative_count = contrast_alternative_count;
     slot->environment_alternatives = environment_alternatives;
+    /* Owned: the candidate list the rivals point into is search scratch. */
+    if (environment_rival_count > 0) {
+        size_t r;
+        slot->environment_rivals = (rg_environment_rival *)calloc(
+            environment_rival_count, sizeof(*slot->environment_rivals));
+        if (slot->environment_rivals == 0) {
+            rg_context_spec_clear_internal(&slot->context);
+            free(slot->pivot_lect);
+            free(slot->pivot_grapheme);
+            memset(slot, 0, sizeof(*slot));
+            return RG_ERR_OOM;
+        }
+        for (r = 0; r < environment_rival_count; r++) {
+            slot->environment_rivals[r].slot =
+                environment_rivals[r].slot == 0 ? 0
+                                                : rg_strdup_internal(environment_rivals[r].slot);
+            slot->environment_rivals[r].feature = rg_strdup_internal(environment_rivals[r].feature);
+            slot->environment_rivals[r].value =
+                environment_rivals[r].value == 0 ? 0
+                                                 : rg_strdup_internal(environment_rivals[r].value);
+            slot->environment_rivals[r].lect =
+                environment_rivals[r].lect == 0 ? 0
+                                                : rg_strdup_internal(environment_rivals[r].lect);
+            slot->environment_rivals[r].inverted = environment_rivals[r].inverted;
+        }
+        slot->environment_rival_count = environment_rival_count;
+    }
     if (has_contrast && contrast_sister_index != sister_index) {
         /* Skip the self-link when the pivot's majority reflex is the same in
          * and out of the environment; the split would then not change the
@@ -922,6 +964,8 @@ static rg_status emit_sister_classes(
     const rg_split_observation *no_obs,
     size_t no_count,
     int environment_alternatives,
+    const rg_environment_rival *environment_rivals,
+    size_t environment_rival_count,
     double delta_bic,
     double search_margin,
     int decision_index,
@@ -1007,6 +1051,8 @@ static rg_status emit_sister_classes(
             has_dominant,
             has_dominant ? contrast_masses[dominant] : 0.0,
             environment_alternatives,
+            environment_rivals,
+            environment_rival_count,
             delta_bic,
             search_margin,
             decision_index,
@@ -1118,6 +1164,8 @@ static rg_status refine_pivot_split(
 ) {
     rg_split_search search;
     rg_split_result best;
+    rg_environment_rival rivals[RG_MAX_RECORDED_RIVALS] = {{0}};
+    size_t rival_count = 0;
     rg_status status = RG_OK;
     int found = 0;
 
@@ -1137,11 +1185,16 @@ static rg_status refine_pivot_split(
             if (sink != 0) {
                 status = margin_sink_push(sink, best.search_margin);
             } else {
+                /* Called before the argument list, not inside it: it writes
+                 * `rival_count`, and C does not say which argument is evaluated
+                 * first. */
+                int alternatives = (int)rg_split_environment_alternatives(
+                    rows, count, &best.candidate, state->all, state->all_count,
+                    rivals, RG_MAX_RECORDED_RIVALS, &rival_count);
                 status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                              &narrowed, search.best_yes, best.yes_count,
                                              search.best_no, best.no_count,
-                                             (int)rg_split_environment_alternatives(rows, count,
-                                                 &best.candidate, state->all, state->all_count),
+                                             alternatives, rivals, rival_count,
                                              best.delta_score,
                                              best.search_margin,
                                              state->decision_count++, min_commit, n_total);
@@ -1200,6 +1253,8 @@ static rg_status commit_splits_for_pivot(
 
     while (committed_count < RG_SPLIT_MAX_COMMITS(max_depth) && rg_split_total_weight(remaining, remaining_count) >= min_obs) {
         rg_split_result best;
+        rg_environment_rival rivals[RG_MAX_RECORDED_RIVALS] = {{0}};
+        size_t rival_count = 0;
         int found = 0;
 
         status = rg_split_find_best(&search, remaining, remaining_count, candidates, gates,
@@ -1214,6 +1269,12 @@ static rg_status commit_splits_for_pivot(
                 if (sink != 0) {
                     status = margin_sink_push(sink, best.search_margin);
                 } else {
+                    /* Before the argument list: it writes `rival_count`, and C
+                     * does not say which argument is evaluated first. */
+                    int alternatives = (int)rg_split_environment_alternatives(
+                        remaining, remaining_count, &best.candidate,
+                        candidates, candidate_count,
+                        rivals, RG_MAX_RECORDED_RIVALS, &rival_count);
                     status = emit_sister_classes(
                         state,
                         bucket->lect,
@@ -1223,8 +1284,8 @@ static rg_status commit_splits_for_pivot(
                         best.yes_count,
                         search.best_no,
                         best.no_count,
-                        (int)rg_split_environment_alternatives(remaining, remaining_count,
-                            &best.candidate, candidates, candidate_count),
+                        alternatives,
+                        rivals, rival_count,
                         best.delta_score,
                         best.search_margin,
                         state->decision_count++,
@@ -1467,6 +1528,8 @@ static rg_status merge_committed_splits(
                 entry->contrast_count = split->contrast_count;
                 entry->contrast_split = i;
                 entry->environment_alternatives = split->environment_alternatives;
+                entry->environment_rivals = split->environment_rivals;
+                entry->environment_rival_count = split->environment_rival_count;
                 entry->delta_bic = split->delta_bic;
                 entry->search_margin = split->search_margin;
                 entry->standing = split->standing;
@@ -1519,6 +1582,8 @@ static rg_status merge_committed_splits(
         merged[count].contrast_count = split->contrast_count;
         merged[count].contrast_split = i;
         merged[count].environment_alternatives = split->environment_alternatives;
+        merged[count].environment_rivals = split->environment_rivals;
+        merged[count].environment_rival_count = split->environment_rival_count;
         merged[count].delta_bic = split->delta_bic;
         merged[count].search_margin = split->search_margin;
         merged[count].standing = split->standing;
@@ -1599,6 +1664,7 @@ static rg_status merge_committed_splits(
             if (reporting == 0) {
                 continue;
             }
+            merged[entry].reporting_lect = reporting;
             for (slot = 0; slot < merged[entry].segment_count; slot++) {
                 if (strcmp(merged[entry].lects[slot], reporting) == 0) {
                     continue;
@@ -2168,6 +2234,54 @@ rg_status multi_lect_context_discovery(
                 model->conditioned_classes[i].confidence = merged[i].confidence;
                 model->conditioned_classes[i].contrast_count = merged[i].contrast_count;
                 model->conditioned_classes[i].environment_alternatives = merged[i].environment_alternatives;
+                /* Deep-copied: the discovery state's splits are freed with it,
+                 * and the model outlives them. */
+                {
+                    /* Rivals from two places: those one pivot's search found
+                     * among its own candidates, and another lect's environment
+                     * describing the same observations, which sits on this row
+                     * already and would otherwise read as the second half of a
+                     * conjunction. Gathered here, where the row's own contexts
+                     * are the ones being published and so are certainly
+                     * alive. */
+                    rg_environment_rival cross[RG_MAX_RECORDED_RIVALS] = {{0}};
+                    size_t cross_count = 0;
+                    size_t total;
+                    if (merged[i].reporting_lect != 0) {
+                        size_t slot;
+                        for (slot = 0; slot < merged[i].segment_count; slot++) {
+                            if (strcmp(merged[i].lects[slot], merged[i].reporting_lect) == 0) {
+                                continue;
+                            }
+                            cross_count = rg_context_spec_as_rivals_internal(
+                                &merged[i].contexts[slot], merged[i].lects[slot],
+                                cross, RG_MAX_RECORDED_RIVALS, cross_count);
+                        }
+                    }
+                    total = merged[i].environment_rival_count + cross_count;
+                    if (total > 0) {
+                        size_t r;
+                        rg_environment_rival *copy = (rg_environment_rival *)calloc(
+                            total, sizeof(*copy));
+                        if (copy == 0) {
+                            status = RG_ERR_OOM;
+                            break;
+                        }
+                        for (r = 0; r < total; r++) {
+                            const rg_environment_rival *from =
+                                r < merged[i].environment_rival_count
+                                    ? &merged[i].environment_rivals[r]
+                                    : &cross[r - merged[i].environment_rival_count];
+                            copy[r].lect = from->lect == 0 ? 0 : rg_strdup_internal(from->lect);
+                            copy[r].slot = from->slot == 0 ? 0 : rg_strdup_internal(from->slot);
+                            copy[r].feature = rg_strdup_internal(from->feature);
+                            copy[r].value = from->value == 0 ? 0 : rg_strdup_internal(from->value);
+                            copy[r].inverted = from->inverted;
+                        }
+                        model->conditioned_classes[i].environment_rivals = copy;
+                        model->conditioned_classes[i].environment_rival_count = total;
+                    }
+                }
                 /* Resolved to a class id in a second pass below, once every
                  * class has one. */
                 model->conditioned_classes[i].contrast_class_id = -1;

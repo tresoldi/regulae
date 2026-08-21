@@ -36,6 +36,14 @@
  * than an edit in two places. */
 #define RG_SPLIT_MAX_COMMITS(max_depth) ((max_depth) * 4)
 
+/* How many rival environments a conditioned class records.
+ *
+ * A bound on the report, not on the finding: `environment_alternatives` counts
+ * every rival the search saw, and this caps only how many are kept to show. A
+ * reader who is told the environment is confusable with eight others has the
+ * point after the first few, and the count says how many were not listed. */
+#define RG_MAX_RECORDED_RIVALS 8
+
 typedef struct rg_split_observation {
     const rg_context_spec *context;
     const char *key;
@@ -78,13 +86,26 @@ typedef struct rg_split_result {
  * the partition is in search->best_yes/best_no. */
 /* Distinct different-position features that carve a split the same way: the
  * confound count for a conditioned class. 0 when the environment is uniquely
- * identifiable. See the definition for the position rule. */
+ * identifiable. See the definition for the position rule.
+ *
+ * `rivals`, when non-NULL, is filled with the rivals themselves up to
+ * `rival_capacity`, and `rival_count` written with how many were stored. The
+ * count returned is the number found, which may exceed what was stored. The
+ * strings are borrowed from `candidates` and must be copied to outlive it.
+ *
+ * Publishing the count alone says a reader cannot trust the environment
+ * without saying what else it might be, which is the half they can act on:
+ * "after a sonorant, or equally before a front vowel" is a statement a
+ * comparativist can go and test. */
 size_t rg_split_environment_alternatives(
     const rg_split_observation *rows,
     size_t count,
     const rg_split_candidate *committed,
     const rg_split_candidate *candidates,
-    size_t candidate_count
+    size_t candidate_count,
+    rg_environment_rival *rivals,
+    size_t rival_capacity,
+    size_t *rival_count
 );
 
 rg_status rg_split_find_best(

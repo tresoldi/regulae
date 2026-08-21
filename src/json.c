@@ -152,6 +152,48 @@ static cJSON *json_context(const rg_context_spec *context) {
     return out;
 }
 
+/* The environments the corpus cannot tell the committed one from. The count
+ * alone says the environment is not to be trusted; these say what else it
+ * might be, which is what a reader can go and check. */
+static void json_add_environment_rivals(
+    cJSON *out,
+    const rg_environment_rival *rivals,
+    size_t count
+) {
+    cJSON *array;
+    size_t i;
+    if (rivals == 0 || count == 0) {
+        return;
+    }
+    array = cJSON_CreateArray();
+    if (array == 0) {
+        return;
+    }
+    for (i = 0; i < count; i++) {
+        cJSON *entry = cJSON_CreateObject();
+        if (entry == 0) {
+            continue;
+        }
+        if (rivals[i].lect != 0) {
+            cJSON_AddStringToObject(entry, "lect", rivals[i].lect);
+        }
+        if (rivals[i].slot != 0) {
+            cJSON_AddStringToObject(entry, "slot", rivals[i].slot);
+        }
+        cJSON_AddStringToObject(entry, "feature", rivals[i].feature);
+        if (rivals[i].value != 0) {
+            cJSON_AddStringToObject(entry, "value", rivals[i].value);
+        }
+        /* Holds exactly where the committed environment does not, so the change
+         * happens where this predicate is false. */
+        if (rivals[i].inverted) {
+            cJSON_AddBoolToObject(entry, "inverted", 1);
+        }
+        cJSON_AddItemToArray(array, entry);
+    }
+    cJSON_AddItemToObject(out, "environment_rivals", array);
+}
+
 static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     cJSON *out = cJSON_CreateObject();
     cJSON *segments;
@@ -175,6 +217,7 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     /* Rival conditioners at another position the corpus cannot distinguish;
      * 0 = identifiable (and always 0 on an unconditioned class). */
     cJSON_AddNumberToObject(out, "environment_alternatives", row->environment_alternatives);
+    json_add_environment_rivals(out, row->environment_rivals, row->environment_rival_count);
     if (row->evidence.decision_index >= 0) {
         cJSON_AddStringToObject(out, "score_kind", rg_split_scorer_string(row->evidence.scorer));
         cJSON_AddNumberToObject(out, "delta_score", row->evidence.delta_score);
@@ -331,6 +374,7 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
                           : row->axis == RG_EVENT_AXIS_DISPLACEMENT ? "displacement"
                                                                     : "environment");
     cJSON_AddNumberToObject(out, "environment_alternatives", row->environment_alternatives);
+    json_add_environment_rivals(out, row->environment_rivals, row->environment_rival_count);
     cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
     cJSON_AddNumberToObject(out, "delta_score", row->delta_score);
     if (row->shared_displacement_count > 0) {

@@ -782,6 +782,8 @@ static void event_row_clear(rg_proposed_event_row *row) {
     rg_feature_displacement_free(
         rg_owned_internal(row->shared_displacement),
         row->shared_displacement_count);
+    rg_environment_rivals_free_internal(rg_owned_internal(row->environment_rivals),
+                                        row->environment_rival_count);
     memset(row, 0, sizeof(*row));
 }
 
@@ -964,6 +966,75 @@ static rg_status member_environment(
     return RG_OK;
 }
 
+static int rivals_equal(const rg_environment_rival *a, const rg_environment_rival *b) {
+    const char *a_slot = a->slot == 0 ? "" : a->slot;
+    const char *b_slot = b->slot == 0 ? "" : b->slot;
+    const char *a_value = a->value == 0 ? "" : a->value;
+    const char *b_value = b->value == 0 ? "" : b->value;
+    return strcmp(a_slot, b_slot) == 0 &&
+           strcmp(a->feature, b->feature) == 0 &&
+           strcmp(a_value, b_value) == 0 &&
+           a->inverted == b->inverted;
+}
+
+/* The rivals every member reports, which is the set that is a rival to the
+ * event's own observations. One that a single member reports is a fact about
+ * that member and stays on its class row -- so a grouping can be better pinned
+ * down than any of the rules in it, which is a real property of grouping. */
+static rg_status shared_environment_rivals(
+    const rg_multi_class_row *classes,
+    const size_t *indices,
+    size_t index_count,
+    rg_environment_rival **out,
+    size_t *out_count
+) {
+    const rg_multi_class_row *first = &classes[indices[0]];
+    rg_environment_rival *kept = 0;
+    size_t kept_count = 0;
+    size_t r;
+
+    *out = 0;
+    *out_count = 0;
+    if (first->environment_rival_count == 0) {
+        return RG_OK;
+    }
+    kept = (rg_environment_rival *)calloc(first->environment_rival_count, sizeof(*kept));
+    if (kept == 0) {
+        return RG_ERR_OOM;
+    }
+    for (r = 0; r < first->environment_rival_count; r++) {
+        const rg_environment_rival *candidate = &first->environment_rivals[r];
+        size_t i;
+        int in_all = 1;
+        for (i = 1; i < index_count && in_all; i++) {
+            const rg_multi_class_row *other = &classes[indices[i]];
+            size_t k;
+            in_all = 0;
+            for (k = 0; k < other->environment_rival_count; k++) {
+                if (rivals_equal(candidate, &other->environment_rivals[k])) {
+                    in_all = 1;
+                    break;
+                }
+            }
+        }
+        if (!in_all) {
+            continue;
+        }
+        kept[kept_count].slot = candidate->slot == 0 ? 0 : rg_strdup_internal(candidate->slot);
+        kept[kept_count].feature = rg_strdup_internal(candidate->feature);
+        kept[kept_count].value = candidate->value == 0 ? 0 : rg_strdup_internal(candidate->value);
+        kept[kept_count].inverted = candidate->inverted;
+        kept_count++;
+    }
+    if (kept_count == 0) {
+        free(kept);
+        return RG_OK;
+    }
+    *out = kept;
+    *out_count = kept_count;
+    return RG_OK;
+}
+
 /* One event out of the classes at `indices`. */
 static rg_status build_event(
     const rg_context *ctx,
@@ -1012,17 +1083,26 @@ static rg_status build_event(
         if (i == 0 || row->evidence.delta_score > out->delta_score) {
             out->delta_score = row->evidence.delta_score;
         }
-        /* The least identifiable member's flag: an event is only as pinned as
-         * its worst-pinned rule. */
-        if (row->environment_alternatives > out->environment_alternatives) {
-            out->environment_alternatives = row->environment_alternatives;
-        }
         for (k = 0; k < row->supporting_cognate_count && status == RG_OK; k++) {
             status = string_array_add(&cognate_ids, &cognate_id_count,
                                       row->supporting_cognates[k]);
         }
     }
     out->featurally_definable = true;
+    {
+        rg_environment_rival *rivals = 0;
+        size_t rival_count = 0;
+        status = shared_environment_rivals(classes, indices, index_count,
+                                           &rivals, &rival_count);
+        if (status != RG_OK) {
+            free(members);
+            free(class_ids);
+            return status;
+        }
+        out->environment_rivals = rivals;
+        out->environment_rival_count = rival_count;
+        out->environment_alternatives = (int)rival_count;
+    }
     out->axis = mode == GROUP_BY_OUTCOME ? RG_EVENT_AXIS_OUTCOME
               : mode == GROUP_BY_DISPLACEMENT ? RG_EVENT_AXIS_DISPLACEMENT
                                               : RG_EVENT_AXIS_ENVIRONMENT;

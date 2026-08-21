@@ -2213,8 +2213,64 @@ static void test_an_event_states_its_environment(rg_context *ctx) {
         }
     }
     assert(stated);
-    /* And it says the corpus cannot pin that environment down. */
+    /* And it says the corpus cannot pin that environment down -- naming the
+     * rivals, not merely counting them. The fixture's whole point is that
+     * "before a front vowel" fits the same eight words as "after a sonorant",
+     * and a reader who is told only that a rival exists cannot go and check. */
     assert(event->environment_alternatives > 0);
+    assert(event->environment_rival_count == (size_t)event->environment_alternatives);
+    {
+        int names_the_vowel = 0;
+        size_t r;
+        for (r = 0; r < event->environment_rival_count; r++) {
+            if (strcmp(event->environment_rivals[r].feature, "front") == 0) {
+                names_the_vowel = 1;
+            }
+            /* Every rival sits at a different slot from the committed one; a
+             * feature of the same neighbour is one environment, not a rival. */
+            assert(event->environment_rivals[r].feature != 0);
+        }
+        assert(names_the_vowel);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A grouping can pin an environment down that none of its rules could alone.
+ *
+ * Each of lenition's three rules is confusable with several other predicates on
+ * its own handful of observations -- a five-word split has a lot of features
+ * that happen to carve it. What survives as a rival to the *grouping* is what
+ * is a rival to every member, and on this corpus nothing is. That is a real
+ * property of grouping rather than an artefact of the summary, and it is why
+ * the event reports the shared rivals rather than pooling the members'. */
+static void test_grouping_can_resolve_a_confound_its_members_have(rg_context *ctx) {
+    rg_corpus *corpus = load("lenition");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *voicing = event_over(model, "latin", "k,p,t");
+    size_t i;
+    int a_member_is_confounded = 0;
+
+    assert(voicing != 0);
+    assert(voicing->class_id_count == 3);
+
+    for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
+        size_t k;
+        for (k = 0; k < voicing->class_id_count; k++) {
+            if (row->class_id == voicing->class_ids[k] &&
+                row->environment_alternatives > 0) {
+                a_member_is_confounded = 1;
+            }
+        }
+    }
+    assert(a_member_is_confounded);
+
+    /* The members disagree about what their rivals are, so none is a rival to
+     * the grouping, and the event says its environment is pinned. */
+    assert(voicing->environment_rival_count == 0);
+    assert(voicing->environment_alternatives == 0);
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -2368,6 +2424,7 @@ int main(void) {
     test_admitting_single_changes_does_not_move_the_baseline(ctx);
     test_an_event_states_its_environment(ctx);
     test_an_event_states_only_the_shared_environment(ctx);
+    test_grouping_can_resolve_a_confound_its_members_have(ctx);
     test_a_grouping_by_outcome_claims_no_shared_environment(ctx);
     test_a_displacement_grouping_states_no_environment(ctx);
     test_events_are_ranked_by_their_pooled_count(ctx);

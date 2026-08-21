@@ -200,6 +200,16 @@ void rg_segment_clear_internal(rg_segment *segment);
 rg_status rg_segment_copy_internal(const rg_segment *src, rg_segment *out);
 void rg_context_spec_clear_internal(rg_context_spec *context);
 rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_spec *out);
+void rg_environment_rivals_free_internal(rg_environment_rival *rivals, size_t count);
+/* Every constraint in a spec, as a rival stated over `lect`; borrowed strings.
+ * Returns the new used count. */
+size_t rg_context_spec_as_rivals_internal(
+    const rg_context_spec *spec,
+    const char *lect,
+    rg_environment_rival *out,
+    size_t capacity,
+    size_t used
+);
 /* What both environments state and nothing else; empty when they share none. */
 rg_status rg_context_spec_intersect_internal(
     const rg_context_spec *a,
