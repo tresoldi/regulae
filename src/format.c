@@ -528,6 +528,59 @@ static const rg_multi_class_row *class_by_id(
     return 0;
 }
 
+/* The environments a committed one could not be told from, or was only just
+ * preferred to. Written so the two do not read alike: a reader who takes a near
+ * tie for a confound will not go looking for the evidence that separates them,
+ * and a reader who takes a confound for a near tie will believe there is some. */
+static void append_rivals(
+    string_builder *builder,
+    const rg_environment_rival *rivals,
+    size_t count,
+    double committed_margin
+) {
+    size_t r;
+    int wrote_confound = 0;
+    int wrote_near = 0;
+    if (rivals == 0 || count == 0) {
+        return;
+    }
+    for (r = 0; r < count; r++) {
+        if (!rivals[r].same_partition) {
+            continue;
+        }
+        builder_append(builder, wrote_confound ? "," : "  [or equally");
+        wrote_confound = 1;
+        builder_appendf(builder, " %s%s%s%s%s[%s:%s]",
+                        rivals[r].lect == 0 ? "" : rivals[r].lect,
+                        rivals[r].lect == 0 ? "" : ":",
+                        rivals[r].inverted ? "not " : "",
+                        rivals[r].slot == 0 ? "self" : rivals[r].slot,
+                        rivals[r].slot == 0 ? "" : " ",
+                        rivals[r].feature,
+                        rivals[r].value == 0 ? "+" : rivals[r].value);
+    }
+    if (wrote_confound) {
+        builder_append(builder, " -- the corpus cannot choose]");
+    }
+    for (r = 0; r < count; r++) {
+        if (rivals[r].same_partition) {
+            continue;
+        }
+        builder_append(builder, wrote_near ? "," : "  [also fits");
+        wrote_near = 1;
+        builder_appendf(builder, " %s%s%s[%s:%s] at %.2f",
+                        rivals[r].lect == 0 ? "" : rivals[r].lect,
+                        rivals[r].lect == 0 ? "" : ":",
+                        rivals[r].slot == 0 ? "self " : rivals[r].slot,
+                        rivals[r].feature,
+                        rivals[r].value == 0 ? "+" : rivals[r].value,
+                        rivals[r].search_margin);
+    }
+    if (wrote_near) {
+        builder_appendf(builder, " -- against %.2f committed]", committed_margin);
+    }
+}
+
 static void append_class_segments(string_builder *builder, const rg_multi_class_row *row) {
     size_t i;
     for (i = 0; i < row->segment_count; i++) {
@@ -1021,23 +1074,12 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             /* Not just how many rivals, but which: "after a sonorant, or
              * equally before a front vowel" is something a comparativist can
              * go and test, where a count is only a warning. */
-            if (event->environment_rival_count > 0) {
-                size_t r;
-                builder_append(&builder, "  [or equally");
-                for (r = 0; r < event->environment_rival_count; r++) {
-                    const rg_environment_rival *rival = &event->environment_rivals[r];
-                    builder_appendf(&builder, "%s %s%s%s%s%s[%s:%s]",
-                                    r == 0 ? "" : ",",
-                                    rival->lect == 0 ? "" : rival->lect,
-                                    rival->lect == 0 ? "" : ":",
-                                    rival->inverted ? "not " : "",
-                                    rival->slot == 0 ? "self" : rival->slot,
-                                    rival->slot == 0 ? "" : " ",
-                                    rival->feature,
-                                    rival->value == 0 ? "+" : rival->value);
-                }
-                builder_append(&builder, " -- the corpus cannot choose]");
-            }
+            /* Two findings, and they must not read alike. A confound is an
+             * environment no evidence collected this way could separate from
+             * the committed one; a near tie is one the corpus can separate and
+             * preferred against, and its margin says by how much. */
+            append_rivals(&builder, event->environment_rivals,
+                          event->environment_rival_count, event->search_margin);
             /* A set no feature picks out may still be the set a change applied
              * to; saying so is not the same as doubting the grouping. */
             if (!event->featurally_definable) {

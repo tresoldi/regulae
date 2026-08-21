@@ -123,6 +123,15 @@ against the wordlist, where a count is only a warning. A rival written with
 "not" holds exactly where the stated environment does not, which is the same
 split seen from the other side.
 
+Two kinds, and they mean different things. "or equally" is a confound: that
+predicate carves exactly the same words, and no more data collected this way
+would separate the two. "also fits" is a near tie: it splits the words
+*differently* and would still have been committed on its own, so the corpus did
+prefer the stated environment — the number beside it is how strongly, against
+the margin of the one that won. Latin rhotacism commits a syllable-shape
+environment at 3.50 and reports `following[vowel:+]` at 2.14, which is the
+intervocalic reading, in the running and beaten.
+
 Only rivals that every member of an event shares are shown, so a grouping can
 be pinned down where none of its rules is: each of lenition's three rules is
 confusable with something on its own five words, and no rival survives all

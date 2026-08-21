@@ -914,6 +914,8 @@ static rg_status append_committed_split(
                 environment_rivals[r].lect == 0 ? 0
                                                 : rg_strdup_internal(environment_rivals[r].lect);
             slot->environment_rivals[r].inverted = environment_rivals[r].inverted;
+            slot->environment_rivals[r].same_partition = environment_rivals[r].same_partition;
+            slot->environment_rivals[r].search_margin = environment_rivals[r].search_margin;
         }
         slot->environment_rival_count = environment_rival_count;
     }
@@ -954,6 +956,22 @@ static rg_status append_committed_split(
 
 /* Commits one class per distinct sister tuple in the YES partition whose mass
  * meets the adaptive minimum, in sorted sister-key order. */
+/* The confounds first, then the near ties, up to the cap. A confound is the
+ * stronger finding -- no evidence collected this way could separate the two --
+ * so it keeps its place when there is not room for everything. */
+static size_t append_near_rivals(
+    rg_environment_rival *rivals,
+    size_t capacity,
+    size_t used,
+    const rg_split_result *best
+) {
+    size_t i;
+    for (i = 0; i < best->near_rival_count && used < capacity; i++) {
+        rivals[used++] = best->near_rivals[i];
+    }
+    return used;
+}
+
 static rg_status emit_sister_classes(
     discovery_state *state,
     const char *pivot_lect,
@@ -1191,6 +1209,8 @@ static rg_status refine_pivot_split(
                 int alternatives = (int)rg_split_environment_alternatives(
                     rows, count, &best.candidate, state->all, state->all_count,
                     rivals, RG_MAX_RECORDED_RIVALS, &rival_count);
+                rival_count = append_near_rivals(rivals, RG_MAX_RECORDED_RIVALS,
+                                                 rival_count, &best);
                 status = emit_sister_classes(state, bucket->lect, bucket->grapheme,
                                              &narrowed, search.best_yes, best.yes_count,
                                              search.best_no, best.no_count,
@@ -1275,6 +1295,8 @@ static rg_status commit_splits_for_pivot(
                         remaining, remaining_count, &best.candidate,
                         candidates, candidate_count,
                         rivals, RG_MAX_RECORDED_RIVALS, &rival_count);
+                    rival_count = append_near_rivals(rivals, RG_MAX_RECORDED_RIVALS,
+                                                     rival_count, &best);
                     status = emit_sister_classes(
                         state,
                         bucket->lect,
@@ -2277,6 +2299,8 @@ rg_status multi_lect_context_discovery(
                             copy[r].feature = rg_strdup_internal(from->feature);
                             copy[r].value = from->value == 0 ? 0 : rg_strdup_internal(from->value);
                             copy[r].inverted = from->inverted;
+                            copy[r].same_partition = from->same_partition;
+                            copy[r].search_margin = from->search_margin;
                         }
                         model->conditioned_classes[i].environment_rivals = copy;
                         model->conditioned_classes[i].environment_rival_count = total;

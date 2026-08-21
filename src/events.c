@@ -1024,6 +1024,8 @@ static rg_status shared_environment_rivals(
         kept[kept_count].feature = rg_strdup_internal(candidate->feature);
         kept[kept_count].value = candidate->value == 0 ? 0 : rg_strdup_internal(candidate->value);
         kept[kept_count].inverted = candidate->inverted;
+        kept[kept_count].same_partition = candidate->same_partition;
+        kept[kept_count].search_margin = candidate->search_margin;
         kept_count++;
     }
     if (kept_count == 0) {
@@ -1099,9 +1101,19 @@ static rg_status build_event(
             free(class_ids);
             return status;
         }
+        size_t r;
         out->environment_rivals = rivals;
         out->environment_rival_count = rival_count;
-        out->environment_alternatives = (int)rival_count;
+        /* Confounds only. A near tie is an alternative reading the corpus can
+         * see past; `environment_alternatives` has always meant the reading it
+         * cannot, and both kinds are in the list with `same_partition` saying
+         * which. */
+        out->environment_alternatives = 0;
+        for (r = 0; r < rival_count; r++) {
+            if (rivals[r].same_partition) {
+                out->environment_alternatives++;
+            }
+        }
     }
     out->axis = mode == GROUP_BY_OUTCOME ? RG_EVENT_AXIS_OUTCOME
               : mode == GROUP_BY_DISPLACEMENT ? RG_EVENT_AXIS_DISPLACEMENT

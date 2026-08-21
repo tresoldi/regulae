@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 43. The public surface has moved since this
+`RG_ABI_VERSION` is 44. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1055,6 +1055,19 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **44** — a rival says which kind it is. `rg_environment_rival` gained
+  `same_partition` and `search_margin`. True is a **confound**: it carves
+  exactly the same observations, so no evidence collected this way could
+  separate it from the committed environment, and `search_margin` is 0 because
+  it scores identically by construction. False is a **near tie**: it splits the
+  rows differently and its own split would still have been committed, so the
+  corpus supports two analyses and preferred one — `search_margin` is what it
+  would have committed at, comparable with the rule's own. There is no second
+  threshold: the gate the committed rule had to clear is the bar, and rivals
+  carving the same partition as one already listed are dropped, so
+  `following[vowel:+]`, `[sonorant:+]`, `[continuant:+]` and `[vocoid:+]` on
+  Latin rhotacism appear once rather than four times. `environment_alternatives`
+  still counts confounds only. Additive.
 - **43** — the rival environments themselves, not only how many. `rg_multi_class_row`
   and `rg_proposed_event_row` gained `environment_rivals` /
   `environment_rival_count`, arrays of the new `rg_environment_rival` (`slot`,

@@ -2218,7 +2218,7 @@ static void test_an_event_states_its_environment(rg_context *ctx) {
      * "before a front vowel" fits the same eight words as "after a sonorant",
      * and a reader who is told only that a rival exists cannot go and check. */
     assert(event->environment_alternatives > 0);
-    assert(event->environment_rival_count == (size_t)event->environment_alternatives);
+    assert(event->environment_rival_count >= (size_t)event->environment_alternatives);
     {
         int names_the_vowel = 0;
         size_t r;
@@ -2231,6 +2231,15 @@ static void test_an_event_states_its_environment(rg_context *ctx) {
             assert(event->environment_rivals[r].feature != 0);
         }
         assert(names_the_vowel);
+    }
+    /* Every rival here is a confound: this fixture is built so nothing in it
+     * can separate the two readings, which is a stronger finding than a near
+     * tie and has to be published as one. */
+    {
+        size_t r;
+        for (r = 0; r < event->environment_rival_count; r++) {
+            assert(event->environment_rivals[r].same_partition);
+        }
     }
 
     rg_multi_model_free(model);
@@ -2271,6 +2280,44 @@ static void test_grouping_can_resolve_a_confound_its_members_have(rg_context *ct
      * the grouping, and the event says its environment is pinned. */
     assert(voicing->environment_rival_count == 0);
     assert(voicing->environment_alternatives == 0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* An environment the corpus preferred over another it can see past is a
+ * different finding from one it cannot separate at all.
+ *
+ * Latin rhotacism commits `prev-syl[syllable_shape:open]` on the Latin side at
+ * a margin of 3.50. `following[vowel:+]` splits the same words *differently*
+ * and would still have been committed, at 2.14 -- so the corpus does prefer
+ * the committed reading and a reader who is shown only the winner never learns
+ * that the intervocalic analysis was in the running. Published as a near tie
+ * with its margin, not as a confound: someone who takes the second for the
+ * first stops looking for evidence that exists. */
+static void test_a_preferred_environment_names_what_it_was_preferred_to(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "latin", "r");
+    size_t r;
+    int found_near = 0;
+
+    assert(event != 0);
+    assert(event->environment_rival_count > 0);
+    for (r = 0; r < event->environment_rival_count; r++) {
+        const rg_environment_rival *rival = &event->environment_rivals[r];
+        if (rival->same_partition) {
+            /* A confound is not scored separately: it carves the same rows. */
+            assert(rival->search_margin == 0.0);
+            continue;
+        }
+        found_near = 1;
+        /* It cleared the same gate the committed rule had to clear... */
+        assert(rival->search_margin > 0.0);
+        /* ...and lost, or it would be the committed one. */
+        assert(rival->search_margin <= event->search_margin);
+    }
+    assert(found_near);
 
     rg_multi_model_free(model);
     rg_corpus_free(corpus);
@@ -2423,6 +2470,7 @@ int main(void) {
     test_a_change_on_one_segment_is_still_an_event(ctx);
     test_admitting_single_changes_does_not_move_the_baseline(ctx);
     test_an_event_states_its_environment(ctx);
+    test_a_preferred_environment_names_what_it_was_preferred_to(ctx);
     test_an_event_states_only_the_shared_environment(ctx);
     test_grouping_can_resolve_a_confound_its_members_have(ctx);
     test_a_grouping_by_outcome_claims_no_shared_environment(ctx);

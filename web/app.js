@@ -650,14 +650,17 @@ function renderEvents() {
     /* Not just that the environment is tied, but with what. A count tells a
        reader to distrust the environment; the rivals tell them what else to
        look at, which is the half they can act on. */
-    const rivals = environmentRivals(event);
-    if (rivals.length) {
-      const tied = document.createElement("span");
-      tied.className = "env tied-rivals";
-      tied.textContent = `or equally: ${rivals.join(", ")}`;
-      tied.title = "The corpus cannot tell these apart from the environment above: "
-        + "each carves exactly the same observations.";
-      env.appendChild(tied);
+    for (const rival of environmentRivals(event)) {
+      const line = document.createElement("span");
+      line.className = `env ${rival.kind === "confound" ? "tied-rivals" : "near-rivals"}`;
+      line.textContent = rival.text;
+      line.title = rival.kind === "confound"
+        ? "The corpus cannot tell these apart from the environment above: each "
+          + "carves exactly the same observations."
+        : "These split the observations differently and would each have been "
+          + "committed on their own. The number is the search margin, against "
+          + `${(event.search_margin || 0).toFixed(2)} for the environment above.`;
+      env.appendChild(line);
     }
     const count = document.createElement("td");
     count.className = "count";

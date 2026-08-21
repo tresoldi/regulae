@@ -79,6 +79,17 @@ typedef struct rg_split_result {
     rg_split_scorer scorer;
     double delta_score;
     double search_margin;
+    /* Predicates at another slot that split these rows differently and would
+     * still have been committed on their own: the corpus supports more than one
+     * analysis and preferred this one. Ranked by margin, best first.
+     *
+     * The gate is the threshold and there is no second one: a candidate that
+     * clears the same bar the committed rule had to clear is an alternative
+     * reading of the data, and how much weaker it is, is what `search_margin`
+     * on each says. A confound -- a predicate carving the *identical*
+     * partition -- is a different finding and is not collected here. */
+    rg_environment_rival near_rivals[RG_MAX_RECORDED_RIVALS];
+    size_t near_rival_count;
 } rg_split_result;
 
 /* The best split of `rows` under the configured categorical criterion.

@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 43
+#define RG_ABI_VERSION 44
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -356,6 +356,24 @@ typedef struct rg_environment_rival {
     const char *feature;
     const char *value;
     bool inverted;
+    /* Whether it carves exactly the same observations as the committed
+     * environment -- identically, or, with `inverted`, exactly oppositely.
+     *
+     * True is a confound: the corpus holds no evidence at all that could
+     * separate the two, and no amount of it collected the same way would.
+     * False is a near tie: this predicate splits the rows differently and its
+     * own split would still have been committed, so the corpus supports two
+     * analyses and prefers one. The second is the weaker claim and the more
+     * common one, and telling them apart is the point of the field. */
+    bool same_partition;
+    /* How heavy a search charge this rival's own split could carry and still
+     * commit, on the rows the committed rule was found on -- the same quantity
+     * as `rg_rule_evidence.search_margin` and comparable with the committed
+     * rule's. Equal margins mean the corpus cannot choose at all.
+     *
+     * 0 on a confound, which is not scored separately: it carves the same
+     * partition and so scores identically by construction. */
+    double search_margin;
 } rg_environment_rival;
 
 /* How an interval was produced. A consumer cannot otherwise tell a closed-form

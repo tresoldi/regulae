@@ -189,6 +189,13 @@ static void json_add_environment_rivals(
         if (rivals[i].inverted) {
             cJSON_AddBoolToObject(entry, "inverted", 1);
         }
+        /* A confound cannot be separated by evidence collected this way; a near
+         * tie splits the rows differently and would still have committed, and
+         * its margin says how much weaker it is than the rule that won. */
+        cJSON_AddBoolToObject(entry, "same_partition", rivals[i].same_partition ? 1 : 0);
+        if (!rivals[i].same_partition) {
+            cJSON_AddNumberToObject(entry, "search_margin", rivals[i].search_margin);
+        }
         cJSON_AddItemToArray(array, entry);
     }
     cJSON_AddItemToObject(out, "environment_rivals", array);

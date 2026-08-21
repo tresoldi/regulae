@@ -442,6 +442,8 @@ size_t rg_context_spec_as_rivals_internal(
         out[used].feature = spec->name;                                         \
         out[used].value = 0;                                                    \
         out[used].inverted = false;                                             \
+        out[used].same_partition = true;                                        \
+        out[used].search_margin = 0.0;                                          \
         used++;                                                                 \
     }
     RG_ENV_STRING_SLOTS(AS_RIVAL_STRING)
@@ -455,6 +457,8 @@ size_t rg_context_spec_as_rivals_internal(
             out[used].feature = spec->name[i].feature;                         \
             out[used].value = spec->name[i].value;                             \
             out[used].inverted = false;                                        \
+            out[used].same_partition = true;                                   \
+            out[used].search_margin = 0.0;                                     \
             used++;                                                            \
         }                                                                      \
     }
@@ -467,6 +471,8 @@ size_t rg_context_spec_as_rivals_internal(
             out[used].feature = spec->name[i].constraint.feature;              \
             out[used].value = spec->name[i].constraint.value;                  \
             out[used].inverted = false;                                        \
+            out[used].same_partition = true;                                   \
+            out[used].search_margin = 0.0;                                     \
             used++;                                                            \
         }                                                                      \
     }

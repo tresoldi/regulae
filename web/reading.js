@@ -131,13 +131,29 @@ function eventEnvironment(event) { // eslint-disable-line no-unused-vars
  * does not -- the same split seen from the other side -- so it has to read as
  * a negation or it states the complement of what was found. */
 function environmentRivals(row) { // eslint-disable-line no-unused-vars
-  const rivals = row.environment_rivals || [];
-  return rivals.map((r) => {
+  const name = (r) => {
     const where = r.slot ? r.slot.replace(/_/g, " ") : "self";
     const value = r.value === undefined ? "+" : r.value;
     const lect = r.lect ? `${r.lect} — ` : "";
     return `${lect}${r.inverted ? "not " : ""}${where} [${r.feature}:${value}]`;
-  });
+  };
+  const rivals = row.environment_rivals || [];
+  const confounds = rivals.filter((r) => r.same_partition).map(name);
+  const near = rivals.filter((r) => !r.same_partition)
+    .map((r) => `${name(r)} at ${r.search_margin.toFixed(2)}`);
+  const lines = [];
+  /* Two findings, and they must not read alike. A confound is an environment no
+     evidence collected this way could separate from the committed one; a near
+     tie is one the corpus did separate and preferred against, and its margin
+     says by how much. A reader who takes the second for the first stops looking
+     for evidence that exists. */
+  if (confounds.length) {
+    lines.push({ kind: "confound", text: `or equally: ${confounds.join(", ")}` });
+  }
+  if (near.length) {
+    lines.push({ kind: "near", text: `also fits: ${near.join(", ")}` });
+  }
+  return lines;
 }
 
 /* A cross-dimensional rule: a segmental feature on one lect predicting a

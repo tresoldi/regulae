@@ -317,6 +317,9 @@ textarea:focus { border-color: var(--ink); outline: none; }
 /* The environments the corpus cannot tell the committed one from. Warm rather
    than muted: it qualifies the line above it and has to be read, not skimmed. */
 .panel.events .tied-rivals { color: var(--warn); }
+/* A near tie is a weaker finding than a confound and reads as one: the corpus
+   did separate these and preferred the environment above. */
+.panel.events .near-rivals { color: var(--muted); }
 
 /* Cross-dimensional rules, hidden entirely on the corpora that have none so the
    pane is never an empty promise. */

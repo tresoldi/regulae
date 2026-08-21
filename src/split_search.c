@@ -284,6 +284,8 @@ size_t rg_split_environment_alternatives(
             rivals[*rival_count].feature = candidates[c].feature;
             rivals[*rival_count].value = candidates[c].value;
             rivals[*rival_count].inverted = inverted ? true : false;
+            rivals[*rival_count].same_partition = true;
+            rivals[*rival_count].search_margin = 0.0;
             (*rival_count)++;
         }
     }
@@ -390,12 +392,19 @@ rg_status rg_split_find_best(
     rg_status status;
     size_t partition_count = 0;
     size_t ci;
+    /* Every candidate that cleared its own gate, with the margin it cleared by.
+     * Kept for all of them because which ones count as rivals is not known
+     * until the winner is: a rival has to sit at a different slot from
+     * whichever candidate wins, and that is decided by this same loop. */
+    double *cleared = 0;
 
     if (search == 0 || rows == 0 || candidates == 0 || gates == 0 ||
         score_config == 0 || out == 0 || found == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
     *found = 0;
+    out->near_rival_count = 0;
+    memset(out->near_rivals, 0, sizeof(out->near_rivals));
     status = distinct_partition_count(rows, count, candidates, candidate_count, &partition_count);
     if (status != RG_OK) {
         return status;
@@ -412,6 +421,14 @@ rg_status rg_split_find_best(
     yes_mass = (double *)calloc(outcome_count, sizeof(*yes_mass));
     no_mass = (double *)calloc(outcome_count, sizeof(*no_mass));
     if (pooled_mass == 0 || yes_mass == 0 || no_mass == 0) {
+        free(pooled_items);
+        free(pooled_mass);
+        free(yes_mass);
+        free(no_mass);
+        return RG_ERR_OOM;
+    }
+    cleared = (double *)calloc(candidate_count == 0 ? 1 : candidate_count, sizeof(*cleared));
+    if (cleared == 0) {
         free(pooled_items);
         free(pooled_mass);
         free(yes_mass);
@@ -478,6 +495,14 @@ rg_status rg_split_find_best(
             break;
         }
         margin = delta_threshold - scored.delta;
+        /* What this candidate would have committed at, had it been alone. The
+         * gate it cleared is the same one the winner had to clear, so a
+         * positive value here is an alternative analysis the corpus supports
+         * and not merely the runner-up. */
+        cleared[ci] = margin > 0.0 && partition_count > 1
+            ? (delta_threshold - (scored.delta - scored.search_charge)) /
+              (2.0 * log((double)partition_count))
+            : 0.0;
         /* Two predicates can carve the same partition and so clear their bar by
          * the same amount. Requiring a later candidate to beat the incumbent by
          * more than the tie epsilon hands the tie to candidate order, which is
@@ -576,6 +601,85 @@ rg_status rg_split_find_best(
             }
         }
     }
+    /* The alternative analyses: predicates at another slot that carve these
+     * rows *differently* and would still have been committed on their own.
+     *
+     * A different slot for the same reason the confound detector wants one --
+     * another feature of the same neighbour is one environment to a reader, not
+     * a second one. A different partition because a predicate carving the
+     * identical one is a confound, which is a stronger finding reported
+     * separately; here the corpus can tell the two apart and preferred this
+     * one, and how much it preferred it by is the margin on each. */
+    if (*found && status == RG_OK) {
+        size_t ti;
+        for (ti = 0; ti < candidate_count; ti++) {
+            size_t at;
+            size_t worst;
+            if (cleared[ti] <= 0.0) {
+                continue;
+            }
+            if (out->candidate.slot == 0 && candidates[ti].slot == 0) {
+                continue;
+            }
+            if (out->candidate.slot != 0 && candidates[ti].slot != 0 &&
+                strcmp(candidates[ti].slot, out->candidate.slot) == 0) {
+                continue;
+            }
+            if (candidates_same_split(rows, count, &out->candidate, &candidates[ti], 0)) {
+                continue;
+            }
+            /* One alternative analysis, not four. `following[vowel:+]`,
+             * `[sonorant:+]`, `[continuant:+]` and `[vocoid:+]` carve Latin
+             * rhotacism's rows identically and score identically; listing all
+             * of them says nothing the first does not, and crowds out the
+             * genuinely different readings. */
+            {
+                size_t k;
+                int duplicate = 0;
+                for (k = 0; k < out->near_rival_count && !duplicate; k++) {
+                    rg_split_candidate kept;
+                    kept.slot = out->near_rivals[k].slot;
+                    kept.feature = out->near_rivals[k].feature;
+                    kept.value = out->near_rivals[k].value;
+                    duplicate = candidates_same_split(rows, count, &kept, &candidates[ti], 0);
+                }
+                if (duplicate) {
+                    continue;
+                }
+            }
+            /* Keep the strongest few, in margin order. */
+            worst = out->near_rival_count;
+            if (out->near_rival_count == RG_MAX_RECORDED_RIVALS) {
+                size_t k;
+                worst = 0;
+                for (k = 1; k < out->near_rival_count; k++) {
+                    if (out->near_rivals[k].search_margin <
+                        out->near_rivals[worst].search_margin) {
+                        worst = k;
+                    }
+                }
+                if (out->near_rivals[worst].search_margin >= cleared[ti]) {
+                    continue;
+                }
+            } else {
+                out->near_rival_count++;
+            }
+            for (at = worst; at > 0; at--) {
+                if (out->near_rivals[at - 1].search_margin >= cleared[ti]) {
+                    break;
+                }
+                out->near_rivals[at] = out->near_rivals[at - 1];
+            }
+            out->near_rivals[at].lect = 0;
+            out->near_rivals[at].slot = candidates[ti].slot;
+            out->near_rivals[at].feature = candidates[ti].feature;
+            out->near_rivals[at].value = candidates[ti].value;
+            out->near_rivals[at].inverted = false;
+            out->near_rivals[at].same_partition = false;
+            out->near_rivals[at].search_margin = cleared[ti];
+        }
+    }
+    free(cleared);
     free(pooled_items);
     free(pooled_mass);
     free(yes_mass);
