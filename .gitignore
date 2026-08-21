@@ -17,5 +17,3 @@ build/
 .venv/
 docs/html/
 
-# Local agent/session state
-.claude/
