@@ -883,7 +883,17 @@ typedef struct rg_proposed_event_row {
     const rg_event_member *members;
     size_t member_count;
     /* The classes this event proposes to join, in ascending order. Each is
-     * published in its own right; nothing here replaces them. */
+     * published in its own right; nothing here replaces them.
+     *
+     * One id is a real answer and the common one: a change that happened to
+     * land on a single segment is a change, and a table that showed only
+     * groupings was empty on eighteen of the twenty-three corpora it had
+     * nothing to say about -- vowel harmony, umlaut, rhotacism and most of the
+     * conditioning ladder among them. Only a *conditioned* class earns a row
+     * this way, having been committed by a search against a contrast; an
+     * unconditioned class is an aggregate no search decided, and admitting
+     * those would reprint the correspondence table. Filter on
+     * `class_id_count > 1` for groupings alone. */
     const int *class_ids;
     size_t class_id_count;
     /* Aligned positions across every member class, and the distinct cognate

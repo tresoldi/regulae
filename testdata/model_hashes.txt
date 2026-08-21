@@ -5,30 +5,30 @@
 # untouched; that it is untouched is the evidence that it was one.
 #
 # status  sha256-of-stdout  corpus
-     0  1b63167be22c3835ba054d362f90405070cd3075571f2fd7d80b2e77048c50bc  experiments/arabic_hebrew/cognates.tsv
+     0  92cbf57313531f4bc095ed5105e57858cad1d2b8ce70affd061f29f12d7632e4  experiments/arabic_hebrew/cognates.tsv
      0  d5ccdc760f73da4e59978dfe7c5cdc8c0c60ba0d61e54525fa13e36508387b2c  experiments/contaminated_cognates_synthetic/cognates.tsv
-     0  866231b285a999c23057b712894d25888df5b37e2ca66e5526de4b95a6f282d5  experiments/finnish_estonian/cognates.tsv
-     0  21f09b17a1d356f27ad8baf314af3a54c6ae528755605edb31d8e5df58966d53  experiments/georgian_svan/cognates.tsv
-     0  672309d4c9fef7fd44f89dacc57d3fa4aa31b638b1fc0d8814325aa88e4cdb10  experiments/harmony_synthetic/cognates.tsv
-     0  36c1781f8b3bf10d5e3613c3ec52fe800c2705a078d1cf9944864b5e169facc9  experiments/latin_french/cognates.tsv
-     0  f10be099500ec3093d78f7c81e6623e4b57b5401c1f027fd724c341a3234f216  experiments/latin_italian/cognates.tsv
-     0  28276046c539519087ff87ddb1bd144346700c19ef66d4272946d2ddfa22605b  experiments/latin_spanish/cognates.tsv
-     0  c26412fe54bcd6978e70fa8767de38a129b83651e0539f3593b905935ba9a5a2  experiments/length_conditioned_synthetic/cognates.tsv
-     0  498f34b661016deb0fced0000878bd555b527a41571ec8d05a2ab7b73e7de461  experiments/mandarin_historical/cognates.tsv
+     0  f3cb49146524d0b8b51c63a67835a9918c352945367fbdfe82fcafadf52b7924  experiments/finnish_estonian/cognates.tsv
+     0  9c2b82bda588033fd2a47b7269a209fd0fe46e559cbd639fcdb6700e7f6a83f4  experiments/georgian_svan/cognates.tsv
+     0  1d79b155f395abf87f349bfbb330b61ae277ba3f594d02ec3468991463ba5c4d  experiments/harmony_synthetic/cognates.tsv
+     0  ffe5d7ce7400b9cfd2e81b8f7519ab4bd2bc232c718d010f4bbe0421de29acf6  experiments/latin_french/cognates.tsv
+     0  ee9b10cd8b5682a4e5fb5aff304e9372a36263dce01c01d94106ad09bdbe0cbb  experiments/latin_italian/cognates.tsv
+     0  1dd0508bbf1bc05d7eb81dc60a0eb4f8c7cdb8a8137a6180ad344b7484c5978b  experiments/latin_spanish/cognates.tsv
+     0  025f66ef2e6ec9b2113b027e2b7074921f7c62962307e05fb7d46ca4f3551883  experiments/length_conditioned_synthetic/cognates.tsv
+     0  643e0c63238af0369f3bc2bcc5b00daee34decd57400589dcb1d4de77079d980  experiments/mandarin_historical/cognates.tsv
      0  6428d4ccf478c5db876805365bffb1be4c823dcb26dead7f083245c063cf81f6  experiments/morph_boundary_synthetic/cognates.tsv
      0  be45c12ac00e138c4325a957a178dffd4e1fcdeea196bb3b7d2059c8582723da  experiments/navajo_chipewyan/cognates.tsv
-     0  5970f4d51a4ea728006c8918175fdc7353f4c5b58b8036f8e5934db73e0e6e9e  experiments/oe_english/cognates.tsv
-     0  8efdec70d23d7374fd13c57d11378481cffd74dd4a2a2d50bf5b3cdc9deb5cd1  experiments/ppn_hawaiian/cognates.tsv
+     0  2053dd152db67d7b9bdf7f8ef1e691640620151a425dc410abcc10513e4523fa  experiments/oe_english/cognates.tsv
+     0  468c912170f6255124bb28eefaa82a7dc4ea1b5626e2c7d65303904f2f1d5f56  experiments/ppn_hawaiian/cognates.tsv
      0  6f7ba481905d23d51dacdde974af15d9eae0524761926585dad6dd02370276ae  experiments/stress_conditioned_synthetic/cognates.tsv
      0  fe4a55b35bfd7da34b3f8f6a67422ba2ebc59e679af2bacdfb039661358ab9ca  experiments/swahili_zulu/cognates.tsv
      0  aea04bc194a4e179a00920ca454d9874e41f74128109f125a1496e25d446a0b3  experiments/tone_3way_synthetic/cognates.tsv
-     0  7e7683cd41ec782ad6fff6bd2362ba572d21334b07d1f20305f5fa672b61ec3d  experiments/tone_chinese_like/cognates.tsv
+     0  560082992d413a681ec113ebb307606b1f85763741e669c131a84843832a000f  experiments/tone_chinese_like/cognates.tsv
      0  02c7dc15e0816e3116aa8723f0f0092db76d08aa615f7746aa6800ff9f164111  experiments/tone_chinese_like_clean/cognates.tsv
      0  967da826087d5569d7867146e86a5818a9eb58aa806e55194e43c6bb987be45e  experiments/tone_synthetic/cognates.tsv
      0  da3e149375ad6e2e17daefe78174679fdf24433a169784c3b2902f67a69dd7c1  experiments/tone_vietnamese_like/cognates.tsv
      0  ad0f57f68f5741cfd171862bb80e0e3d2491b10e3e5c3459960651aeca42dc5a  experiments/tone_yoruba_like/cognates.tsv
-     0  3acb9aa83cd17e9606bb76e25aa926a53e59198573e2adb6ba302780fe977a1a  experiments/turkish_azerbaijani/cognates.tsv
-     0  6ac185ca83e063d1d20648162c9ce43b4f12aa1eda7892f019438c74f5d8fd71  experiments/umlaut_synthetic/cognates.tsv
+     0  153dfb5c9f2da13470ecd4f421bd88655bddae916fa1c2361d3dd670c1da7dc2  experiments/turkish_azerbaijani/cognates.tsv
+     0  f65090911eb859621ac1951b8aef4bdcb2ec5e3f6d79974e21a6062495c32655  experiments/umlaut_synthetic/cognates.tsv
      0  4bc2f27ff062aa27559ef5289904098c8e33132dbebc8c08de92ecc9a217d9d7  testdata/corpora/conditioned_multilect.tsv
      0  b9fc9fe6175e34d393fef3b8510789ef4684694308653175d2bef0e2645d5c7a  testdata/corpora/conditioned_palatalization.tsv
      0  c385703b2125d7353786fa17100bcb44e1a1a9493c0323d646cb554618937068  testdata/corpora/doublet.tsv
@@ -40,9 +40,9 @@
      0  307f941a7790a80f048b9bf076888c4caa773a943b25fc86d47c0d6ccd51a536  testdata/corpora/morph_boundary.csv
      0  64150cc3dc805334d688f4c4eada1c837744e091579a72de25518b03d2a00645  testdata/corpora/partial_coverage.tsv
      0  8a95dbee9f8f18071fe9f2214b785618f119ea3b1e819769b8d1dc299d66871c  testdata/corpora/real_contaminated.tsv
-     0  21de2001cf8a2eb221a0c0d6794e705049140a9827ab60e99e25159aeae8b934  testdata/corpora/real_latin_spanish.tsv
-     0  242c5c75caeb9d0bc4f7f305009407d80c4d839e76d3ee675a3bc33d19981e7d  testdata/corpora/real_ppn_hawaiian.tsv
-     0  48e0999400bc1e69fb4de2b0235bc7fbdc7119b96dd74cebce55274346660e8a  testdata/corpora/real_romance_4lect.tsv
+     0  636ddc5e614df31dc043c23f470c05aed126c720c31e20f1785ba83dd5a66ed1  testdata/corpora/real_latin_spanish.tsv
+     0  b776b33558def3d80336761356c2a9dceabe1950ccf1d2fc793b3bb443418e3f  testdata/corpora/real_ppn_hawaiian.tsv
+     0  6038768804ee4698a284c50dc0068ce03bcb2cb9303ed36b17bda4bb4649f6f6  testdata/corpora/real_romance_4lect.tsv
      0  7a8c698d2afa466defb0b103c301b6fea58ac822cdb407524fd6b77f98e129a9  testdata/corpora/real_tone_chinese.tsv
      0  eebd3b72b156cf5a65d48fb8b3e419a108204f446d754c7b928bc30c0757a564  testdata/corpora/stress_dimension_target.tsv
      0  28780ae199ada68bec40fe0b6bdd8307f7b954108733a3e2ad4a6506fdd0c4a8  testdata/corpora/syllable_breaks_column.tsv
@@ -52,53 +52,53 @@
      0  92a9d2e72122f34602afaa62b9a6e376a23e3f33dcefc5c5de21f7c1aaabf1c6  testdata/corpora/tonogenesis_cldf.tsv
      0  f74698d1e5591114eb2c56dc1ed3624844be8804d3354a5e0da70efcd9196fe1  testdata/corpora/tonogenesis_internal.tsv
      0  f96a2f548662303c32081b5c0e78677855477ccea14ea8023bb259b4378697ae  testdata/diagnostics/contaminated.tsv
-     0  570e2c6728ecd709ca206ca10493b6e102cc88271460392222e8bf6790d34c39  testdata/diagnostics/drift.tsv
+     0  3c21c3c9175ee3c72dd5b862a1049e0c047c09e6c922681bad78ef864abb0798  testdata/diagnostics/drift.tsv
      0  1e90c53faa27bc8ede0e394d63d3a4a9219dbaea16f3ca5187d7bad17e5ad794  testdata/diagnostics/partial.tsv
      0  d0897982385f8363832db13fd001c327fd8922de77aa7b9b14d9f5b122b95f04  testdata/restraint/arity_2.tsv
-     0  137896a92ba9f710fbd3c8b87fd4a75bdfe30cb36278d96b87cf75eca7245bf1  testdata/restraint/arity_3.tsv
-     0  b336727b5313371ede63c76cbda42c7c56f3af849980b3514a45fa7435b1bf6b  testdata/restraint/arity_4.tsv
-     0  4fb05e8adf6f524c56e356452346da4f5fa8959b71f86cf4b51385ed80459410  testdata/restraint/arity_5.tsv
+     0  c04cbb104d7c5bf4d2bc4516db2010d84eba44bb863ae52d0efef2f9a0295349  testdata/restraint/arity_3.tsv
+     0  6be8167106ad28e65a77328a939ca2b56c2ce2ec00eba16bf19cc28376c08228  testdata/restraint/arity_4.tsv
+     0  b00e568dec5a0b45ea41157a2f82c4c2116c24b1ee8b61e7826d7c7251949af7  testdata/restraint/arity_5.tsv
      0  8f4704663f848858d0bf7f440262ed1590307069a7a66c1c4f8b5e3a9a058eda  testdata/restraint/chance.tsv
      0  a92b70a4fba36b4b24e2fc2fcda367c81c5f8473db090fed9f0f9a8ea6e78362  testdata/restraint/contact.tsv
      0  f247edd97bcda29ee56e4511cec1ca93eef6706f857a282a9869d07c00f52616  testdata/restraint/diffusion.tsv
      0  c8bc864f082ea03630abf965df211f3b62a3a8618f2220405102348a6d2bcb9a  testdata/restraint/distant_003.tsv
      0  7ab96226028d8a8783725954b0ab4d6bab6b2b0eb971a22ba5a6f952031225c3  testdata/restraint/distant_004.tsv
-     0  70d6414df585acba50bcdaa6517c2fa6f94e5a9afe0e1ea754e734f7ffb21e18  testdata/restraint/distant_005.tsv
-     0  d003401e695c93d883bb9f53bbc2ffb112e63a53fa57a7fa54ddab49d8d75b98  testdata/restraint/distant_008.tsv
-     0  7704b5c56ed0bd13d1584d0a41243a5cfddf31f825ecd469e172a2e79a612ab6  testdata/restraint/merger_gap.tsv
-     0  ef0aced5acf98510f1912e4479a63cc54e2d7eaf58bf6fd6460acd86767675f0  testdata/restraint/noise_unconditioned.tsv
+     0  952b08774c6bf2bd61fb25c21729af4bceb2958a9c5ee5a5de5bfb71ede4b1af  testdata/restraint/distant_005.tsv
+     0  6d480e9f5fd450f6e7056dd9c7a7977ba14dae50592fd1b21f744432d2378be2  testdata/restraint/distant_008.tsv
+     0  f798b54c385cf85376c88e4c65f4e0cb08f6179a9421fdc293bb799ae4e5f950  testdata/restraint/merger_gap.tsv
+     0  f664a7cea3e17c6c5358c6e1eba5746eccfbe96e3b58eb44dba95da31e84eb11  testdata/restraint/noise_unconditioned.tsv
      0  ef789af9e7f4a13d6e34994da7d243ffd76e681984472c305e654f5e50125971  testdata/restraint/sparse_008.tsv
-     0  5188ff180865ba603c700a3e3ee3ecf8ab9a3df2eca855b9bc6c2e068bac9b4f  testdata/restraint/sparse_016.tsv
-     0  e312477ffc575c3b4330ba95ea9942243b0684b686668a7c0ddd385fd90f78e4  testdata/restraint/sparse_032.tsv
-     0  d472039506fd4d49b79520f3ab2a2e3abe5a4f7ad0f48d9a946149973de25044  testdata/restraint/sparse_064.tsv
-     0  dcf6fe2b11592b92b9ee9c5d53bff5a69d26ae7874734abfc34d016efb31e685  testdata/restraint/sparse_128.tsv
+     0  07689bed4963dfa769ebc1dc07c54e3aca82cad5bb3647d1b21502a0c13beb55  testdata/restraint/sparse_016.tsv
+     0  04aeeea7422ec4842dc4df4f709f0c26070ee7d6900d55828733af13bcd9c8da  testdata/restraint/sparse_032.tsv
+     0  9a4e0e19a3bdebe4339ef614d8368f5311eac850dafced2b66e3ed8edaf86d14  testdata/restraint/sparse_064.tsv
+     0  3af7a90f67da644472c6af9b3c928cb3d9dab922cfe9caf32055686583d948f5  testdata/restraint/sparse_128.tsv
      0  995ce0a8bdd743e5157a06ab611c357b744b51290d45acee03d6f6d0a41fbd49  testdata/restraint/stratum.tsv
-     0  9d522f3ce6024e078c7cf9a174ca0d71121fac551240585592a5fafc95866300  testdata/soundlaws/compensatory_lengthening.tsv
-     0  ce724d8b17496d75e907165be0ccad6c5f39464dbce1056b96a43abbb41b5d8a  testdata/soundlaws/conditioned_confound.tsv
-     0  cd74c5ce1ef6fdcf0351a39b2dd8e1d0c479dcff0311033617de1222fa4a9a21  testdata/soundlaws/final_devoicing.tsv
+     0  183cf6e2646c4830b1b8683058f08bac030c8f94bc85fb624b4848b27b6a1853  testdata/soundlaws/compensatory_lengthening.tsv
+     0  9089b586bb68b1675a570f664de18203cd382ddf2724ac1c8c85d25acf7f78c2  testdata/soundlaws/conditioned_confound.tsv
+     0  7697c27972447d667b865403f750fd47e69621f348d06771588c6b5a46c56eca  testdata/soundlaws/final_devoicing.tsv
      0  d15088b8adf6214cf4936228add395766b4256603166ac18dab3ec03bf433015  testdata/soundlaws/graded_0_unconditioned.tsv
-     0  747dc88bdaab16438c217127841a2589c30c8fbb41075e63ba7a27d13bc64c79  testdata/soundlaws/graded_1_adjacent.tsv
-     0  f4d25862e8b3410866db2d6e4e206bc25e8f9849fb3fb2d7915fba8d986b67f0  testdata/soundlaws/graded_2_position.tsv
-     0  2da3733d5290e37e356d140499d0d519401e87fd816a52e57b3c864fa6c59771  testdata/soundlaws/graded_3_stress.tsv
-     0  f08a988e0ac3d043b22a94c4052cec0d386c76a51007f2f3fa21e2158a41bf7c  testdata/soundlaws/graded_4_conjunction.tsv
-     0  8135e2436246f741686afc10cb2085aa89024bfd17dfe344f6e60a9ba75a87b4  testdata/soundlaws/graded_5_distance_two.tsv
-     0  9560cc8b6a13bf6e6ee66977fbaf2acfb4fa0f4222980546ace1185a7aa7239a  testdata/soundlaws/graded_6_existential.tsv
+     0  a5e8dfcabda6ed8d7a6ee816391f215aa87d861f2664972b74105594b859673a  testdata/soundlaws/graded_1_adjacent.tsv
+     0  f5c3d33b58b8d799c9fae119e6c3be788562fe43a27364a1646af81db232da76  testdata/soundlaws/graded_2_position.tsv
+     0  a37309315278f0256c5c0673ebf57e4f74c11328f576e70ebd05c56f6afe53c3  testdata/soundlaws/graded_3_stress.tsv
+     0  74f3b26f15c82a7f01c52f3df6a86d4baea569495a744a7238bd72523559b407  testdata/soundlaws/graded_4_conjunction.tsv
+     0  dc2f144599c19250f1304befac961b22b079194c35f042ef998adc698ea69f17  testdata/soundlaws/graded_5_distance_two.tsv
+     0  28219661611beec7d6b44a4a065618afd1d1b3fad8e97fa26e2af99400068f9d  testdata/soundlaws/graded_6_existential.tsv
      0  4458d018b0f3499fd5370cff967e1f0c21d1bce1c28b16393c69b5d0f7904fdb  testdata/soundlaws/graded_7_disjunction.tsv
-     0  30d26473df0141f394000030f15dcd1e416371b398ef380dda6d137eb9955d7c  testdata/soundlaws/graded_8_weight.tsv
-     0  8ba3ffd7e2c9b33c072517208b94b4f0d1eef9770fcd7b2bb920bf2e3fd18828  testdata/soundlaws/graded_9_lost_trigger.tsv
+     0  52c7ff667ed14ac18b76e94f0c9a380e06724ab6071ffc7b923aa3da66396125  testdata/soundlaws/graded_8_weight.tsv
+     0  3ea1cdaf25ace6a6574ff4272cddaeab065b27482b69936ffe86cf99b0bee92b  testdata/soundlaws/graded_9_lost_trigger.tsv
      0  9aa470f62601f16c8af6f2999665713795195cbe7ea2d09cc51c0c8a6414def6  testdata/soundlaws/grassmann.tsv
-     0  29b754f7d8dbe1504c2614176db7309a6f8538e3ea46d01d7bae810da44079b5  testdata/soundlaws/great_vowel_shift.tsv
-     0  ed8de90a2ba4c83ff8df458c189e2cf9f67da67efe7b92db7b87cc4659cb9f99  testdata/soundlaws/grimm.tsv
+     0  8fb86d4f0bebb711e5df462ef6a6be4909b7b81fdb05b901533b0b60a8703548  testdata/soundlaws/great_vowel_shift.tsv
+     0  8a78ce6a3826aea4354e3d4da093ffa125c754050e8e4fda32cb20e9218551b2  testdata/soundlaws/grimm.tsv
      0  2206e54eb7b67417b5faf88f6bed438820052e4d3109146be41c3a6a0c3cd33f  testdata/soundlaws/lenition.tsv
      0  7c924503221c2e42b5f600aeffae4e0232a8fe87995b43acfc5f805158c5f2a6  testdata/soundlaws/metathesis_adjacent.tsv
      0  52614d7bde829c2ab1634cc5be4c88aaa1cdbd94b5b94e062954b5fea99c1a45  testdata/soundlaws/metathesis_distant.tsv
-     0  67d2ef2addc39d3f06e95410867ce0936ae45f7c210ef9810bfd2d238ba1069f  testdata/soundlaws/morphological_rhotacism.tsv
+     0  361faf25d8eab7a736d0c31ab3822e60360a0ad4854bf302deefbd8b7a03e015  testdata/soundlaws/morphological_rhotacism.tsv
      0  ff9d5052c234a765ff344aa88be630c01c4f44e0cf276ac81299efcd09eea995  testdata/soundlaws/natural_class.tsv
-     0  925eba1018e421662188ba5f34c6357647bfaa75d4a3db23fee31f6d3d37ab14  testdata/soundlaws/natural_class_control.tsv
-     0  b690d855bee8d7775f2a96f98beec66ed59c9fa4afcd5c33c443751906616a57  testdata/soundlaws/opaque_umlaut.tsv
-     0  5d996031e4ae88405ffee67a0fe568ffb94657ab5eda04fabbaa68f55ed51240  testdata/soundlaws/place_assimilation.tsv
-     0  e947c4e499927cef4e75a348085d73e1907dd8994f216f6a841f2de7492ad06e  testdata/soundlaws/place_dissimilation.tsv
-     0  3439c276fdee83d5c21a0528a9bf284d6e285ccfd0d99ccfd317b1920156138d  testdata/soundlaws/rhotacism.tsv
-     0  3679ec04373afa843898e0d2c36643e171c50ca89bdf860e718e62435fe502b3  testdata/soundlaws/rhotacism_reordered.tsv
-     0  c044f903778d8085f8039f165a32de12a9e74a462f11150a3fe7c8336944e939  testdata/soundlaws/rounding_harmony.tsv
+     0  355f3c4833274c478d191e4bf0e598604f1bcc7db2ab2cd513dd1bd7486fcafd  testdata/soundlaws/natural_class_control.tsv
+     0  557f9db6550e04aa16a733b21fb1c6c9b40570a8da904e4aa05f84feb79b4b7b  testdata/soundlaws/opaque_umlaut.tsv
+     0  a851dca448b9e64a800c4796fcfc2eea871988d62954478a3e4b0c1b0b05a431  testdata/soundlaws/place_assimilation.tsv
+     0  3e0ecc08827cba854977e076b560e6ace52f058551c1cb021e054c5145db8d07  testdata/soundlaws/place_dissimilation.tsv
+     0  0ceb25d1aa08e68167f1fc0169d2136ae1f1c1869721bd54347b07967d8cbff4  testdata/soundlaws/rhotacism.tsv
+     0  e9136a792f82a3bd287029df9f0ddb0a9dd8572905348e88523d8886a0cdb8c6  testdata/soundlaws/rhotacism_reordered.tsv
+     0  e3b73ed5413b331279c92a5e1aeee2f8f1ba3f1f2cd16b103da104c687201edd  testdata/soundlaws/rounding_harmony.tsv
      0  06e142b2c9d17d7b229f28c772e66cf10c60a0046ac947751d5ea7d3f6452486  testdata/soundlaws/verner.tsv

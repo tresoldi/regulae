@@ -437,36 +437,40 @@ check('the events pane names a grouped class', () => {
   classRow.click();
 });
 
-/* An empty events pane is not one finding. Most often it means the corpus
-   states its change on a single segment, so there was never a second class to
-   group it with -- and a bare "(none)" reads instead as "the change was not
-   found", which is the opposite of what happened. The pane has to say which
-   case it is. umlaut_synthetic is the single-class case: one conditioned class,
-   no events. */
-check('an empty events pane says why it is empty', () => {
+/* A change on one segment still reaches the events pane.
+   umlaut_synthetic states its change on a single conditioned class and has no
+   second row anywhere to group with, which used to leave the pane blank --
+   read by anyone opening a textbook umlaut corpus as "no change was found". */
+check('a change stated on one class still reaches the events pane', () => {
   const single = JSON.parse(execFileSync(
     cli, ['train', '--json', '--format', 'wide',
       join(repo, 'experiments/umlaut_synthetic/cognates.tsv')],
     { encoding: 'utf8', maxBuffer: 1 << 28 }));
-  const stated = single.classes.conditioned.filter(
-    (c) => new Set(c.segments.map((s) => s.grapheme)).size > 1);
-  assert.equal(single.proposed_events.length, 0, 'fixture started producing events');
-  assert.equal(stated.length, 1, 'fixture no longer states its change on one class');
+  assert.equal(single.proposed_events.length, 1, 'fixture stopped stating one change');
+  assert.equal(single.proposed_events[0].class_ids.length, 1,
+    'the event grouped, so this no longer tests the single-class case');
   worker.onmessage({ data: { type: 'result', json: JSON.stringify(single), elapsedMs: 1 } });
 
-  const hint = byId.get('events-hint').textContent;
-  assert.ok(hint.length > 0, 'the empty pane said nothing about why it is empty');
-  assert.match(hint, /at least two/,
-    `the hint does not explain the single-class case: ${hint}`);
+  const rendered = byId.get('events').querySelectorAll('td.corr');
+  assert.equal(rendered.length, 1, 'the single-class event did not render');
+  assert.match(rendered[0].textContent, /æ/,
+    `the event row does not name the fronting: ${rendered[0].textContent}`);
+});
 
-  /* And the other empty case reads differently: nothing conditioned at all. */
+/* And when the pane really is empty, it says why rather than "(none)": a bare
+   "(none)" reads as "the change was not found". metathesis_adjacent conditions
+   nothing -- what moved there is the order of two segments, which is a chunk. */
+check('an empty events pane says why it is empty', () => {
   const none = JSON.parse(execFileSync(
     cli, ['train', '--json', join(repo, 'testdata/soundlaws/metathesis_adjacent.tsv')],
     { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.equal(none.proposed_events.length, 0, 'fixture started producing events');
   assert.equal(none.classes.conditioned.length, 0, 'fixture started conditioning');
   worker.onmessage({ data: { type: 'result', json: JSON.stringify(none), elapsedMs: 1 } });
-  assert.notEqual(byId.get('events-hint').textContent, hint,
-    'both empty cases read the same');
+
+  const hint = byId.get('events-hint').textContent;
+  assert.ok(hint.length > 0, 'the empty pane said nothing about why it is empty');
+  assert.match(hint, /chunk/, `the hint does not say where a reordering went: ${hint}`);
 });
 
 /* Cross-dimensional rules -- a segmental environment predicting a tone -- have

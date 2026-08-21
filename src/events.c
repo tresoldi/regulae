@@ -1389,6 +1389,82 @@ static rg_status group_classes(
     return status;
 }
 
+/* A change stated on one class is still a change.
+ *
+ * Grouping needs two rows to group, so a corpus whose change happens to land on
+ * a single segment proposed nothing at all -- and that is the ordinary case,
+ * not a corner: eighteen of the twenty-three corpora with an empty table had
+ * exactly this shape, among them vowel harmony, umlaut, rhotacism and most of
+ * the conditioning ladder. A reader who opens the table on a textbook harmony
+ * corpus and finds it blank reads that as "no change was found", which is the
+ * opposite of what happened; the change is right there in the conditioned
+ * table with its environment and its margin.
+ *
+ * Conditioned classes only. The distinction is not fussiness about which table
+ * a row came from -- a conditioned class was committed by a search, against a
+ * contrast, and carries the margin that says how well it paid; an
+ * unconditioned class is an aggregate of observations that no search ever
+ * decided. Publishing the first as an event of one adds sixty-seven rows
+ * across the example corpora, near enough one apiece and never more than six.
+ * Publishing the second would add seven hundred and one, and the table would
+ * become a second printing of the correspondence table -- which is what "a
+ * grouper that fires on a single correspondence would find events everywhere"
+ * was always about. The unrelated-wordlist corpus has no conditioned class at
+ * all, so the restraint baseline does not move.
+ *
+ * `class_id_count == 1` marks these, and a consumer that wants only groupings
+ * filters on it. */
+static rg_status add_single_conditioned_changes(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_multi_class_row *classes,
+    size_t class_count,
+    rg_proposed_event_row **rows,
+    size_t *row_count
+) {
+    supra_scope scope;
+    size_t i;
+    rg_status status = supra_scope_build(classes, class_count, &scope);
+    if (status != RG_OK) {
+        return status;
+    }
+    for (i = 0; i < class_count && status == RG_OK; i++) {
+        size_t index = i;
+        size_t e;
+        int already = 0;
+        rg_proposed_event_row *next;
+        if (class_is_identity(&scope, &classes[i])) {
+            continue;
+        }
+        for (e = 0; e < *row_count && !already; e++) {
+            size_t k;
+            for (k = 0; k < (*rows)[e].class_id_count; k++) {
+                if ((*rows)[e].class_ids[k] == classes[i].class_id) {
+                    already = 1;
+                    break;
+                }
+            }
+        }
+        if (already) {
+            continue;
+        }
+        next = (rg_proposed_event_row *)realloc(*rows, (*row_count + 1) * sizeof(*next));
+        if (next == 0) {
+            status = RG_ERR_OOM;
+            break;
+        }
+        *rows = next;
+        status = build_event(ctx, &scope, cognates, cognate_count, classes,
+                             &index, 1, &(*rows)[*row_count]);
+        if (status == RG_OK) {
+            (*row_count)++;
+        }
+    }
+    supra_scope_free(&scope);
+    return status;
+}
+
 /* Heaviest first, and the pooled count is the weight.
  *
  * The three passes run in the order the axes were written, which is an
@@ -1453,6 +1529,13 @@ rg_status rg_propose_events_internal(
                                model->conditioned_classes,
                                model->conditioned_class_count,
                                &rows, &row_count);
+    }
+    if (status == RG_OK) {
+        /* Last, so "not already grouped" is read over every pass. */
+        status = add_single_conditioned_changes(ctx, cognates, cognate_count,
+                                                model->conditioned_classes,
+                                                model->conditioned_class_count,
+                                                &rows, &row_count);
     }
     if (status != RG_OK) {
         rg_proposed_events_free_internal(rows, row_count);

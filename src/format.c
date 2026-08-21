@@ -959,9 +959,10 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
             size_t m;
             builder_append(&builder, "  count=");
             append_count(&builder, event->count);
-            builder_appendf(&builder, " sets=%lu over %lu classes  margin=%.2f  ",
+            builder_appendf(&builder, " sets=%lu over %lu class%s  margin=%.2f  ",
                             (unsigned long)event->supporting_cognate_count,
                             (unsigned long)event->class_id_count,
+                            event->class_id_count == 1 ? "" : "es",
                             event->search_margin);
             for (m = 0; m < event->member_count; m++) {
                 const rg_event_member *member = &event->members[m];

@@ -232,7 +232,23 @@ static void test_grimm(rg_context *ctx) {
             rg_multi_model_proposed_events(model, &event_count);
         assert(event_count >= 2);
         for (i = 0; i < event_count; i++) {
-            assert(events[i].class_id_count >= 2);
+            size_t j;
+            int conditioned = 0;
+            if (events[i].class_id_count >= 2) {
+                continue;
+            }
+            /* A single-class event is allowed, but only for a conditioned
+             * class: an unconditioned correspondence standing alone is an
+             * aggregate no search decided, and admitting one here would make
+             * this table a second printing of the class table. Grimm's is the
+             * vowel class the plausibility prior conditions, not a shift. */
+            for (j = 0; j < rg_multi_model_conditioned_class_count(model); j++) {
+                if (rg_multi_model_conditioned_class_at(model, j)->class_id ==
+                    events[i].class_ids[0]) {
+                    conditioned = 1;
+                }
+            }
+            assert(conditioned);
         }
     }
 
@@ -1814,10 +1830,16 @@ static void test_fragmenting_a_change_over_a_class_costs_its_standing(rg_context
  * description is better -- which this does not decide, and the members stay
  * published either way.
  *
- * The control is the same change on one segment. There is nothing to group and
- * it proposes nothing, which is the half of the commitment that can fail
- * quietly: a grouper that fires on a single correspondence would find events
- * everywhere. */
+ * The control is the same change on one segment, and the pair is what makes
+ * the grouping claim checkable: the same thirty-two observations, stated once
+ * over four classes and once over one. Both propose an event -- a change on one
+ * segment is still a change -- and `class_id_count` is what separates them, so
+ * the control failing to group is visible rather than merely absent.
+ *
+ * The control's event exists because its member is *conditioned*, committed by
+ * a search against a contrast. A grouper that fired on any single
+ * correspondence would reprint the correspondence table; one that fires on a
+ * committed rule restates the decision list, which is bounded by it. */
 static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ctx) {
     rg_corpus *spread_corpus = load("natural_class");
     rg_corpus *control_corpus = load("natural_class_control");
@@ -1831,8 +1853,15 @@ static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ct
 
     /* One event: the change. Identity classes (retentions) are not grouped. */
     assert(count == 1);
-    rg_multi_model_proposed_events(control, &control_count);
-    assert(control_count == 0);
+    {
+        const rg_proposed_event_row *control_events =
+            rg_multi_model_proposed_events(control, &control_count);
+        /* The same change, and it did not group, because there was nothing to
+         * group it with. */
+        assert(control_count == 1);
+        assert(control_events[0].class_id_count == 1);
+        assert(control_events[0].count == 32.0);
+    }
 
     for (i = 0; i < count; i++) {
         size_t m;
@@ -2087,6 +2116,80 @@ static void test_an_annotation_only_one_lect_carries_is_not_an_event(rg_context 
     rg_corpus_free(corpus);
 }
 
+/* A change that lands on one segment is still a change.
+ *
+ * Vowel harmony in `harmony_synthetic` is a final /a/ rounding to /o/ after a
+ * back vowel: one conditioned class, no second row anywhere in the corpus to
+ * group it with, and so nothing at all in a table that published only
+ * groupings. Eighteen of the twenty-three corpora with an empty table had this
+ * shape, which is the ordinary case and not a corner.
+ *
+ * The event of one still says what changed -- the displacement is computed the
+ * same way -- and `class_id_count` says it did not group. */
+static void test_a_change_on_one_segment_is_still_an_event(rg_context *ctx) {
+    rg_corpus *corpus = load_wide(ctx, "harmony_synthetic");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *harmony = event_over(model, "derived", "o");
+
+    assert(harmony != 0);
+    assert(harmony->class_id_count == 1);
+    assert(harmony->count == 15.0);
+    /* Committed by a search, which is what earns an ungrouped row its place
+     * here: it carries the margin that says how well it paid. */
+    assert(harmony->search_margin > 0.0);
+    /* And it states the rounding. */
+    assert(event_displaces(harmony, "rounded"));
+
+    /* Its member is conditioned. An unconditioned aggregate never earns a row
+     * of its own, or this table would reprint the correspondence table. */
+    {
+        size_t j;
+        int conditioned = 0;
+        for (j = 0; j < rg_multi_model_conditioned_class_count(model); j++) {
+            if (rg_multi_model_conditioned_class_at(model, j)->class_id ==
+                harmony->class_ids[0]) {
+                conditioned = 1;
+            }
+        }
+        assert(conditioned);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* Two unrelated wordlists condition nothing, so nothing is proposed on that
+ * account -- the restraint the single-class rule must not spend.
+ *
+ * `chance.tsv` has no conditioned class at all, so admitting single
+ * conditioned changes cannot move it. Its events are what the displacement
+ * pass makes of accidental correspondences, and that number is the one to
+ * watch when this file's predicates are loosened. */
+static void test_admitting_single_changes_does_not_move_the_baseline(rg_context *ctx) {
+    rg_corpus *corpus = 0;
+    rg_multi_model *model = 0;
+    char path[512];
+    size_t count = 0;
+    size_t i;
+
+    snprintf(path, sizeof(path), "%s/testdata/restraint/chance.tsv", REGULAE_SOURCE_DIR);
+    assert(rg_corpus_load_tsv(path, 0, &corpus, 0) == RG_OK);
+    model = train(ctx, corpus);
+
+    assert(rg_multi_model_conditioned_class_count(model) == 0);
+    rg_multi_model_proposed_events(model, &count);
+    {
+        const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &count);
+        for (i = 0; i < count; i++) {
+            /* Every one is a grouping, none is a single class waved through. */
+            assert(events[i].class_id_count > 1);
+        }
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* The table is ranked by the evidence behind each grouping.
  *
  * It used to come out in the order the grouping passes run, which is an
@@ -2151,6 +2254,8 @@ int main(void) {
     test_one_change_over_several_environments_is_proposed_as_one_event(ctx);
     test_a_tone_shift_is_proposed_as_one_event(ctx);
     test_an_annotation_only_one_lect_carries_is_not_an_event(ctx);
+    test_a_change_on_one_segment_is_still_an_event(ctx);
+    test_admitting_single_changes_does_not_move_the_baseline(ctx);
     test_events_are_ranked_by_their_pooled_count(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);

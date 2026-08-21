@@ -581,21 +581,23 @@ function applyClassView() {
 }
 
 
-/* Why the pane is empty, which is not one thing. An empty pane most often
-   means the corpus states its change on a single segment, so there is nothing
-   to group with -- and a bare "(none)" reads instead as "the change was not
-   found", which is the opposite of what happened. Say which case this is. */
+/* Why the pane is empty, since a bare "(none)" reads as "no change was found"
+   and that is rarely what happened.
+
+   Every conditioned change reaches this pane, alone if nothing groups with it,
+   so an empty pane means the corpus conditioned nothing at all: the change is
+   unconditioned and shared no displacement with another, or -- on the
+   metathesis fixtures -- what moved was the order of two segments, which is a
+   chunk and is reported as one. */
 function emptyEventsReading() {
-  const stated = model.classes.conditioned.filter((c) => !isIdentity(c)).length;
-  if (stated === 0) {
-    return "No conditioned class states a change here, so there is nothing to group.";
+  const unconditioned = model.classes.unconditioned.filter((c) => !isIdentity(c)).length;
+  if (unconditioned === 0) {
+    return "No segment changed: every correspondence here is a lect answering to itself. "
+      + "Where segments swapped places the change is a reordering, which is a chunk "
+      + "rather than a segment change and is reported as one.";
   }
-  if (stated === 1) {
-    return "One conditioned class states a change here, and grouping takes at least two. "
-      + "The change is that row in the table above; a single class is not proposed as an event.";
-  }
-  return `${stated} conditioned classes state a change, and no two of them share an `
-    + "environment or a feature displacement.";
+  return "No conditioned class states a change here, and no two of the "
+    + `${unconditioned} unconditioned changes share a feature displacement.`;
 }
 
 /* Conditioned classes that look like one change. A proposal: every member is

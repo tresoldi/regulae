@@ -110,11 +110,20 @@ stop→fricative and disagree on place, and that shared step is what groups them
 Click an event row: the member classes light up in the table, and the
 alignments filter to the cognate sets behind them.
 
-An empty pane is not a failed search. Most often it means the corpus states its
-change on a single class, and grouping takes at least two — the change is in the
-table above, and the pane says which case it is rather than only `(none)`.
-Retentions never group: a row where nothing changed is evidence about a split,
-and the member row's contrast link is where to read it.
+A change that lands on a single segment still appears, alone, with a member
+count of one — vowel harmony, umlaut and rhotacism are each one class in these
+corpora, and a pane that showed only groupings was blank on exactly the corpora
+whose change is easiest to name. Only a conditioned class earns a row that way:
+it was committed by a search, against a contrast, and carries the margin that
+says how well it paid. An unconditioned correspondence standing alone is an
+aggregate no search decided, and admitting those would reprint the
+correspondence table.
+
+So an empty pane now means the corpus conditioned nothing and nothing grouped —
+and where the change was a reordering, look in the chunks pane instead, because
+a swap is not a segment change. Retentions never appear: a row where nothing
+changed is evidence about a split, and the member row's contrast link is where
+to read it.
 
 This is a proposal, not an assertion. Whether the grouped classes really
 reflect a single historical event is a question about history, and regulae
