@@ -42,9 +42,24 @@ if(NOT TARGET merkmal::merkmal)
     if(EXISTS "${REGULAE_MERKMAL_SOURCE_DIR}/CMakeLists.txt")
         set(MERKMAL_BUILD_TESTS OFF CACHE BOOL "Build merkmal tests" FORCE)
         add_subdirectory("${REGULAE_MERKMAL_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/_deps/merkmal")
+        # project() sets merkmal_VERSION in the subdirectory's own scope, which
+        # does not write back here, so the parent sees an empty string. Lift it
+        # out explicitly: it is compiled into every model's provenance below,
+        # and it recorded "" from this path until it was checked against a
+        # find_package build.
+        get_directory_property(merkmal_VERSION
+            DIRECTORY "${REGULAE_MERKMAL_SOURCE_DIR}"
+            DEFINITION merkmal_VERSION)
     else()
         message(FATAL_ERROR "merkmal::merkmal not found; install merkmal or set REGULAE_MERKMAL_SOURCE_DIR")
     endif()
+endif()
+
+# Guessing would put an unearned version in every model's provenance, and an
+# empty one is how this went unnoticed, so neither is allowed to build.
+if(NOT merkmal_VERSION)
+    message(FATAL_ERROR
+        "merkmal version unknown; it is compiled into each model's provenance")
 endif()
 
 # Warnings are set as a directory property, not per target, so that a target

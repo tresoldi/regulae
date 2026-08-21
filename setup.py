@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import glob
 import os
+import re
 import subprocess
 
 from setuptools import Extension, setup
@@ -33,6 +34,37 @@ if not os.path.exists(os.path.join(MERKMAL_DIR, "include", "merkmal.h")):
 
 def rel(path: str) -> str:
     return os.path.relpath(path, HERE)
+
+
+# src/context.c compiles REGULAE_MERKMAL_VERSION into the model's provenance, so
+# a consumer can tell which feature system produced a grapheme's features -- an
+# inventory changes between merkmal releases. CMake passes it from the version
+# `project()` declares; nothing here did, so this build did not compile at all.
+# Read it from the same declaration, so a wheel and a CMake build record the
+# same string rather than two guesses at it.
+def merkmal_version() -> str:
+    override = os.environ.get("REGULAE_MERKMAL_VERSION")
+    if override:
+        return override
+    cmakelists = os.path.join(MERKMAL_DIR, "CMakeLists.txt")
+    try:
+        with open(cmakelists, encoding="utf-8") as handle:
+            declaration = handle.read()
+    except OSError:
+        declaration = ""
+    found = re.search(
+        r"project\s*\(\s*merkmal\b[^)]*?\bVERSION\s+([0-9]+(?:\.[0-9]+)*)",
+        declaration,
+    )
+    if found is None:
+        # Guessing here would put an unearned version in every model's
+        # provenance, which is worse than asking for it.
+        raise SystemExit(
+            f"regulae: no merkmal version found in {cmakelists!r}. Set "
+            "REGULAE_MERKMAL_VERSION to the version of the merkmal sources "
+            "being compiled in."
+        )
+    return found.group(1)
 
 
 SOURCES = (
@@ -98,6 +130,10 @@ setup(
             ],
             define_macros=[
                 ("Py_LIMITED_API", "0x030C0000"),
+                # Quoted because the C is a string literal, not an identifier.
+                # setuptools spawns the compiler without a shell, so the quotes
+                # reach the preprocessor rather than being eaten by one.
+                ("REGULAE_MERKMAL_VERSION", f'"{merkmal_version()}"'),
                 *utf8proc_macros,
             ],
             py_limited_api=True,
