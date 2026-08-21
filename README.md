@@ -328,7 +328,7 @@ lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
 moves on any layout, signature or ownership change. It is at
-**39**. `docs/consumer_guide.md` §7 has the full list of rules;
+**44**. `docs/consumer_guide.md` §7 has the full list of rules;
 a few of the design choices it reflects:
 
 - Each published table is handed out whole — the rows and a count
@@ -351,6 +351,11 @@ a few of the design choices it reflects:
 - **Guide** at [`docs/GUIDE.md`](docs/GUIDE.md) — what the output means and
   how to read a conditioned environment. Also the source for the in-page
   walkthrough.
+- **Rule notation** at [`docs/NOTATION.md`](docs/NOTATION.md) — every published
+  environment is printed twice, once exactly and once as `A ~ B / lect: X _ Y`.
+  The core of that notation is the field's; the rest regulae defines, because
+  past `_ / # ∅ {} [±F] σ …` nothing is agreed, and a correspondence whose
+  environment belongs to a *named lect* has no notation at all.
 - **What regulae reads** at [`docs/capabilities.md`](docs/capabilities.md) —
   generated: which capabilities are implemented, and which corpora the loaders
   can currently express. A corpus it cannot read says something about the input

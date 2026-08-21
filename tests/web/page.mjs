@@ -505,6 +505,44 @@ check('an event shows the environment its members condition on', () => {
   }
 });
 
+/* The environment is also shown in rule notation, under the exact reading.
+   The slot syntax is what the model states and is what gets quoted; the
+   notation is the line a comparativist reads, and a pane that shows only the
+   first is a finding published in a dialect nobody outside this repository
+   speaks. rhotacism is the case that needs both halves of the rule: each lect
+   states a different frame, so each is attributed. */
+check('an event shows its environment in rule notation', () => {
+  const rhotacism = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/soundlaws/rhotacism.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.equal(rhotacism.proposed_events.length, 1, 'fixture stopped stating one change');
+  const notation = rhotacism.proposed_events[0].notation;
+  assert.ok(notation, 'the event carries no notation');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(rhotacism), elapsedMs: 1 } });
+
+  const lines = byId.get('events').querySelectorAll('.notation');
+  assert.equal(lines.length, 1, 'the event row shows no notation line');
+  assert.equal(lines[0].textContent, notation,
+    `the page rendered its own notation instead of the model's: ${lines[0].textContent}`);
+  /* Intervocalic in Old Latin, and named as Old Latin's: which lect's word the
+     frame is read in is the finding, not a formatting detail. */
+  assert.match(lines[0].textContent, /old_latin: V _ V/,
+    `the notation lost the intervocalic frame: ${lines[0].textContent}`);
+
+  /* A row with nothing to condition on gets no line: the notation there would
+     be the correspondence written twice. */
+  const grimm = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/soundlaws/grimm.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(grimm), elapsedMs: 1 } });
+  const rows = byId.get('events').querySelectorAll('td.env-cell');
+  for (let i = 0; i < grimm.proposed_events.length; i += 1) {
+    if (grimm.proposed_events[i].notation) continue;
+    assert.equal(rows[i].querySelectorAll('.notation').length, 0,
+      'an unconditioned grouping was given a notation line');
+  }
+});
+
 /* And when the pane really is empty, it says why rather than "(none)": a bare
    "(none)" reads as "the change was not found". metathesis_adjacent conditions
    nothing -- what moved there is the order of two segments, which is a chunk. */

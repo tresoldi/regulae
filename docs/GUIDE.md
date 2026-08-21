@@ -99,6 +99,36 @@ The score there (`dBIC`) says how much better the model got from the split,
 charged for the parameters and the partitions searched. More negative is a
 stronger split. It is not a p-value.
 
+### Rule notation
+
+Under each environment is the same environment written a second time, in rule
+notation:
+
+```
+latin r ~ old_latin s · latin — previous_syllable: syllable_shape:open …
+r  ~  s  /  latin: σ⁻[open] _ ;  old_latin: V _ V
+```
+
+The first line is what the model states and is what to quote. The second is
+the reading. `_` is this position, `/` is "where", `V` is a vowel, `#` a word
+boundary, `+` a morpheme boundary, `…` any number of segments, `·` exactly
+one, and `σ⁻` `σ⁼` `σ⁺` the previous, same and next syllable.
+
+One thing in it is a claim rather than a convention. The standard notation is
+`A > B / X _ Y` — directional, with the environment sitting, unstated, in the
+ancestor's word. regulae has no ancestor, and its environment belongs to a
+**named lect**: only a lect that still shows the conditioning contrast has an
+environment to state, and which lect that is says what each lect preserved. So
+the lect is named before its frame, and the label is dropped only when every
+lect states the same one. Above, Latin conditions on an open preceding
+syllable and old Latin on being between vowels, and those are two different
+findings about two different words.
+
+Some of what regulae can condition on has no notation anywhere in the
+literature — the syllable-scoped predicates, the counted distances, the
+morpheme index. Where none existed, regulae defines one and publishes the key:
+see [docs/NOTATION.md](https://github.com/tresoldi/regulae/blob/master/docs/NOTATION.md).
+
 ## Events
 
 The events pane groups classes that look like one change. Rows join along

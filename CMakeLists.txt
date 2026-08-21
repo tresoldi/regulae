@@ -127,6 +127,8 @@ add_library(regulae
     src/chunk_diagnostics.c
     src/ibm1.c
     src/model.c
+    src/notation.c
+    src/strbuf.c
     src/model_chunks.c
     src/model_tables.c
     src/model_context.c
@@ -319,6 +321,12 @@ if(REGULAE_BUILD_TESTS)
     target_include_directories(test_split_search PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
     target_link_libraries(test_split_search PRIVATE regulae::regulae)
     add_test(NAME split_complexity COMMAND test_split_search)
+
+    add_executable(test_notation tests/c/test_notation.c)
+    target_include_directories(test_notation PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_compile_definitions(test_notation PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    target_link_libraries(test_notation PRIVATE regulae::regulae)
+    add_test(NAME notation COMMAND test_notation)
 
     add_executable(test_split_score tests/c/test_split_score.c)
     target_include_directories(test_split_score PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)

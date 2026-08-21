@@ -386,6 +386,7 @@ function buildClassRow(entry, conditioned) {
         : ` · else ${correspondence(contrast)}`;
     }
     corr.appendChild(env);
+    appendNotation(corr, entry.notation);
   }
 
   const count = document.createElement("td");
@@ -601,6 +602,29 @@ function emptyEventsReading() {
     + `${unconditioned} unconditioned changes share a feature displacement.`;
 }
 
+/* The same environment in rule notation, under the exact reading and never
+   instead of it.
+
+   The slot syntax above it is what the model states and is what a consumer
+   parses; this is the line a comparativist reads. The model carries the string
+   ready-made -- it is rendered in C beside the exact form, so the two cannot
+   drift and the page has no second implementation of the notation to keep in
+   step. Absent whenever no side states an environment, which is why this is a
+   no-op rather than a dash: a notation with no frame is the correspondence
+   written twice. The key is docs/NOTATION.md, reachable from the guide. */
+function appendNotation(cell, notation) {
+  if (!notation) {
+    return;
+  }
+  const line = document.createElement("span");
+  line.className = "env notation";
+  line.textContent = notation;
+  line.title = "The same environment in rule notation. See the guide for the key: "
+    + "_ is this position, / is “where”, and the lect named before a frame "
+    + "is the one whose word it is read in.";
+  cell.appendChild(line);
+}
+
 /* Conditioned classes that look like one change. A proposal: every member is
    still in the table above, and clicking an event shows the members' alignments
    rather than replacing anything. */
@@ -647,6 +671,7 @@ function renderEvents() {
     if (!reading) {
       env.classList.add("empty");
     }
+    appendNotation(env, event.notation);
     /* Not just that the environment is tied, but with what. A count tells a
        reader to distrust the environment; the rivals tell them what else to
        look at, which is the half they can act on. */
@@ -752,6 +777,7 @@ function renderCrossDimensional() {
       env.classList.add("unnamed");
     }
     corr.appendChild(env);
+    appendNotation(corr, row.notation);
 
     const count = document.createElement("td");
     count.className = "count";

@@ -2403,6 +2403,90 @@ static void test_a_displacement_grouping_states_no_environment(rg_context *ctx) 
     rg_corpus_free(corpus);
 }
 
+/* The laws, in the notation the field reads them in.
+ *
+ * These are the same findings the tests above assert slot by slot, checked once
+ * more at the surface a linguist actually sees. The slot syntax is exact and
+ * nobody outside this repository reads it; if `pgmc fol-stress[stress:primary]`
+ * never becomes `_ [\xc2\xb4]` on the page, the law was found and not
+ * published. docs/NOTATION.md is the key, and tests/c/test_notation.c checks
+ * the renderer symbol by symbol; what is checked here is that the renderer is
+ * reached, with the right environment, from a real corpus. */
+static void test_the_report_states_its_laws_in_notation(rg_context *ctx) {
+    struct {
+        const char *corpus;
+        const char *expected;
+    } cases[] = {
+        /* Verner: voicing turns on where the Proto-Germanic accent fell. */
+        {"verner", "    {b,z}  ~  {f,s}  /  pgmc: _ [\xc2\xb4]\n"},
+        /* Grassmann: an aspirate somewhere ahead, at any distance. */
+        {"grassmann", "    {k,t}  ~  {k\xca\xb0,t\xca\xb0}  /  pie: _ \xe2\x80\xa6 [+aspirated]\n"},
+        /* Lenition, and the cover symbol the whole set exists for. */
+        {"lenition", "    {k,p,t}  ~  {b,d,\xc9\xa3}  /  latin: V _\n"},
+        /* Palatalisation before a sonorant, one lect conditioning, labelled. */
+        {"conditioned_confound", "    k  ~  t\xca\x83  /  A: R _\n"},
+        /* Rhotacism: both lects condition, differently, so both are named --
+         * and the Latin side needs a syllable predicate that no notation in
+         * the literature had a symbol for. */
+        {"rhotacism",
+         "    r  ~  s  /  latin: \xcf\x83\xe2\x81\xbb[open] _ ;  old_latin: V _ V\n"}
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        rg_corpus *corpus = load(cases[i].corpus);
+        rg_multi_model *model = train(ctx, corpus);
+        char *report = rg_format_multi_model(model, 0);
+        assert(report != 0);
+        if (strstr(report, cases[i].expected) == 0) {
+            fprintf(stderr, "%s: report does not contain \"%s\"\n",
+                    cases[i].corpus, cases[i].expected);
+            assert(0);
+        }
+        free(report);
+        rg_multi_model_free(model);
+        rg_corpus_free(corpus);
+    }
+}
+
+/* A row with no environment gets no notation line.
+ *
+ * Without a frame the notation is the correspondence written a second time, in
+ * the same symbols, directly under the first. Two in three rows of a large
+ * model are unconditioned, so emitting it anyway would double the report for
+ * no reading -- and a reader who found the line on every row would stop
+ * treating its presence as meaning anything. */
+static void test_an_unconditioned_row_gets_no_notation(rg_context *ctx) {
+    rg_corpus *corpus = load("rhotacism");
+    rg_multi_model *model = train(ctx, corpus);
+    char *report = rg_format_multi_model(model, 0);
+    const rg_multi_class_row *rows;
+    size_t total = 0;
+    size_t i;
+    int checked = 0;
+
+    assert(report != 0);
+    rows = rg_multi_model_unconditioned_classes(model, &total);
+    assert(total > 0);
+    for (i = 0; i < total && !checked; i++) {
+        /* `h ~ h` with nothing conditioning it: the notation line would say
+         * "h  ~  h" and stop. */
+        char wanted[256];
+        if (rows[i].segment_count != 2) {
+            continue;
+        }
+        snprintf(wanted, sizeof(wanted), "    %s  ~  %s\n",
+                 rows[i].graphemes[0], rows[i].graphemes[1]);
+        assert(strstr(report, wanted) == 0);
+        checked = 1;
+    }
+    assert(checked);
+
+    free(report);
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* The table is ranked by the evidence behind each grouping.
  *
  * It used to come out in the order the grouping passes run, which is an
@@ -2475,6 +2559,8 @@ int main(void) {
     test_grouping_can_resolve_a_confound_its_members_have(ctx);
     test_a_grouping_by_outcome_claims_no_shared_environment(ctx);
     test_a_displacement_grouping_states_no_environment(ctx);
+    test_the_report_states_its_laws_in_notation(ctx);
+    test_an_unconditioned_row_gets_no_notation(ctx);
     test_events_are_ranked_by_their_pooled_count(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);

@@ -393,6 +393,12 @@ td.sets { color: var(--muted); }
 .env { display: block; font-size: 12px; color: var(--muted); font-family: var(--mono);
   white-space: normal; margin-top: 3px; }
 
+/* The same environment in rule notation, under the exact reading. Darker than
+   the muted line above it and not italic: it is the line most readers will
+   actually read, and a restatement that looks like an aside gets skipped. The
+   slot syntax stays above it as the thing to quote. */
+.notation { color: var(--ink); letter-spacing: 0.01em; }
+
 /* The caret that opens a row's evidence drawer. Sits before the correspondence,
    quiet until hovered, and does not select the row. */
 .caret {

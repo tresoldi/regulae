@@ -1,7 +1,8 @@
 #include "internal.h"
 #include "environment.h"
+#include "notation.h"
+#include "strbuf.h"
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,85 +13,6 @@
  * both of which are stable contracts. Mirrors format.go. */
 
 #define RG_EMPTY_CHUNK_SYMBOL "\xe2\x88\x85"
-
-typedef struct string_builder {
-    char *data;
-    size_t length;
-    size_t capacity;
-    int failed;
-} string_builder;
-
-static void builder_init(string_builder *builder) {
-    memset(builder, 0, sizeof(*builder));
-}
-
-static void builder_reserve(string_builder *builder, size_t extra) {
-    size_t needed = builder->length + extra + 1;
-    char *next;
-    size_t capacity;
-    if (builder->failed || needed <= builder->capacity) {
-        return;
-    }
-    capacity = builder->capacity == 0 ? 256 : builder->capacity;
-    while (capacity < needed) {
-        capacity *= 2;
-    }
-    next = (char *)realloc(builder->data, capacity);
-    if (next == 0) {
-        builder->failed = 1;
-        return;
-    }
-    builder->data = next;
-    builder->capacity = capacity;
-}
-
-static void builder_append(string_builder *builder, const char *text) {
-    size_t length;
-    if (builder->failed || text == 0) {
-        return;
-    }
-    length = strlen(text);
-    builder_reserve(builder, length);
-    if (builder->failed) {
-        return;
-    }
-    memcpy(builder->data + builder->length, text, length);
-    builder->length += length;
-    builder->data[builder->length] = '\0';
-}
-
-static void builder_appendf(string_builder *builder, const char *format, ...);
-
-#if defined(__GNUC__) || defined(__clang__)
-__attribute__((format(printf, 2, 3)))
-#endif
-static void builder_appendf(string_builder *builder, const char *format, ...) {
-    char scratch[512];
-    va_list args;
-    int written;
-    if (builder->failed) {
-        return;
-    }
-    va_start(args, format);
-    written = vsnprintf(scratch, sizeof(scratch), format, args);
-    va_end(args);
-    if (written < 0) {
-        builder->failed = 1;
-        return;
-    }
-    builder_append(builder, scratch);
-}
-
-static char *builder_finish(string_builder *builder) {
-    if (builder->failed) {
-        free(builder->data);
-        return 0;
-    }
-    if (builder->data == 0) {
-        builder->data = (char *)calloc(1, 1);
-    }
-    return builder->data;
-}
 
 /* Whole counts print without a decimal point; anything else gets one place. */
 static void append_count(string_builder *builder, double count) {
@@ -159,6 +81,38 @@ static void append_constraint_bracket(
         builder_appendf(builder, "%s%s:%s", i > 0 ? "," : "", items[i].feature, items[i].value);
     }
     builder_append(builder, "]");
+}
+
+/* The notation line, indented under the exact one it restates.
+ *
+ * Emitted only when some side states an environment. Without one the notation
+ * says `{f,x,\xce\xb8} ~ {k,p,t}` -- which is what the line above already says,
+ * in the same symbols -- and printing it anyway would put a second copy of
+ * every unconditioned row in the report for no reading.
+ *
+ * A failed render is silence, not a broken line: this is a reading aid beside
+ * an exact form that is still there. */
+static void append_notation_line(
+    string_builder *builder,
+    const rg_notation_side *sides,
+    size_t count
+) {
+    char *line = 0;
+    size_t i;
+    int conditioned = 0;
+    for (i = 0; i < count; i++) {
+        if (rg_context_spec_constraint_count(sides[i].context) > 0) {
+            conditioned = 1;
+        }
+    }
+    if (!conditioned) {
+        return;
+    }
+    line = rg_notation_line_internal(sides, count);
+    if (line != 0 && line[0] != '\0') {
+        builder_appendf(builder, "    %s\n", line);
+    }
+    free(line);
 }
 
 static void append_context(string_builder *builder, const rg_context_spec *context) {
@@ -233,6 +187,18 @@ char *rg_format_alignment(const rg_alignment *alignment) {
         builder_append(&builder, " ~ ");
         append_segments(&builder, link->target, link->target_count);
         append_context(&builder, &link->context);
+        /* Deliberately no rule notation here, though every other published
+         * environment carries one.
+         *
+         * A link's context is not a rule. It is the exhaustive description of
+         * the segment's surroundings -- every feature of both neighbours, the
+         * union over everything anywhere before and after, every syllable, both
+         * edges -- which is the space rules are *searched over*, and a
+         * committed rule keeps one or two constraints out of it. Rendered as a
+         * rule it comes out as a hundred-conjunct frame that no reader would
+         * write and no search committed, and it would read as a finding
+         * because everything else printed in that notation is one. The exact
+         * form above says what it is: a description. */
         builder_append(&builder, "\n");
     }
     if (rg_alignment_link_count(alignment) == 0) {
@@ -706,6 +672,23 @@ static void append_conditioned_row(
         }
     }
     builder_append(builder, "\n");
+    {
+        rg_notation_side *sides = (rg_notation_side *)calloc(
+            row->segment_count == 0 ? 1 : row->segment_count, sizeof(*sides));
+        if (sides != 0) {
+            size_t s;
+            for (s = 0; s < row->segment_count; s++) {
+                sides[s].lect = row->lect_ids[s];
+                sides[s].graphemes = &row->graphemes[s];
+                sides[s].grapheme_count = 1;
+                sides[s].suprasegmentals =
+                    row->suprasegmentals == 0 ? 0 : &row->suprasegmentals[s];
+                sides[s].context = row->contexts == 0 ? 0 : &row->contexts[s];
+            }
+            append_notation_line(builder, sides, row->segment_count);
+            free(sides);
+        }
+    }
 }
 
 char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_options *options) {
@@ -1105,6 +1088,23 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                 }
             }
             builder_append(&builder, "\n");
+            {
+                rg_notation_side *sides =
+                    (rg_notation_side *)calloc(event->member_count == 0 ? 1 : event->member_count,
+                                               sizeof(*sides));
+                if (sides != 0) {
+                    for (m = 0; m < event->member_count; m++) {
+                        const rg_event_member *member = &event->members[m];
+                        sides[m].lect = member->lect_id;
+                        sides[m].graphemes = member->graphemes;
+                        sides[m].grapheme_count = member->grapheme_count;
+                        sides[m].suprasegmentals = member->suprasegmentals;
+                        sides[m].context = &member->context;
+                    }
+                    append_notation_line(&builder, sides, event->member_count);
+                    free(sides);
+                }
+            }
         }
         if (event_total > 0) {
             builder_append(&builder,
@@ -1171,6 +1171,15 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                             row->rule.environment_alternatives == 1 ? "s" : "");
         }
         builder_append(&builder, "\n");
+        if (rg_context_spec_constraint_count(&row->rule.environment) > 0) {
+            char *line = rg_notation_cross_dimensional_internal(
+                row->rule.dimension_from_environment ? env_lect : other_lect,
+                row->rule.dimension, row->rule.value, env_lect, &row->rule.environment);
+            if (line != 0 && line[0] != '\0') {
+                builder_appendf(&builder, "    %s\n", line);
+            }
+            free(line);
+        }
     }
     free(decision_order);
     return builder_finish(&builder);

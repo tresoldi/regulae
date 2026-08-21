@@ -1,5 +1,6 @@
 #include "internal.h"
 #include "environment.h"
+#include "notation.h"
 
 #include "cJSON.h"
 
@@ -152,6 +153,33 @@ static cJSON *json_context(const rg_context_spec *context) {
     return out;
 }
 
+/* The same environment in rule notation, under `notation`, beside the exact
+ * `context` objects and never instead of them. docs/NOTATION.md is the key.
+ *
+ * Present only when some side states an environment: without one the notation
+ * is the correspondence written twice, and a consumer that found the key on
+ * every row would reasonably read it as always meaning something. Absent is a
+ * fact about the row, and `format_version` does not move for an added key
+ * (consumer_guide 7), so a reader that has never heard of this ignores it. */
+static void json_add_notation(cJSON *out, const rg_notation_side *sides, size_t count) {
+    char *line;
+    size_t i;
+    int conditioned = 0;
+    for (i = 0; i < count; i++) {
+        if (rg_context_spec_constraint_count(sides[i].context) > 0) {
+            conditioned = 1;
+        }
+    }
+    if (!conditioned) {
+        return;
+    }
+    line = rg_notation_line_internal(sides, count);
+    if (line != 0 && line[0] != '\0') {
+        cJSON_AddStringToObject(out, "notation", line);
+    }
+    free(line);
+}
+
 /* The environments the corpus cannot tell the committed one from. The count
  * alone says the environment is not to be trusted; these say what else it
  * might be, which is what a reader can go and check. */
@@ -275,6 +303,23 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
     }
     cJSON_AddItemToObject(out, "segments", segments);
 
+    if (with_contexts && row->contexts != 0) {
+        rg_notation_side *sides = (rg_notation_side *)calloc(
+            row->segment_count == 0 ? 1 : row->segment_count, sizeof(*sides));
+        if (sides != 0) {
+            for (i = 0; i < row->segment_count; i++) {
+                sides[i].lect = row->lect_ids[i];
+                sides[i].graphemes = &row->graphemes[i];
+                sides[i].grapheme_count = 1;
+                sides[i].suprasegmentals =
+                    row->suprasegmentals == 0 ? 0 : &row->suprasegmentals[i];
+                sides[i].context = &row->contexts[i];
+            }
+            json_add_notation(out, sides, row->segment_count);
+            free(sides);
+        }
+    }
+
     {
         /* Always, even when empty. Omitting the key would make a conditioned
          * class with no support behind it a KeyError in the consumer rather
@@ -368,6 +413,22 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
         cJSON_AddItemToArray(members, entry);
     }
     cJSON_AddItemToObject(out, "members", members);
+    {
+        rg_notation_side *sides = (rg_notation_side *)calloc(
+            row->member_count == 0 ? 1 : row->member_count, sizeof(*sides));
+        if (sides != 0) {
+            for (i = 0; i < row->member_count; i++) {
+                const rg_event_member *member = &row->members[i];
+                sides[i].lect = member->lect_id;
+                sides[i].graphemes = member->graphemes;
+                sides[i].grapheme_count = member->grapheme_count;
+                sides[i].suprasegmentals = member->suprasegmentals;
+                sides[i].context = &member->context;
+            }
+            json_add_notation(out, sides, row->member_count);
+            free(sides);
+        }
+    }
     for (i = 0; i < row->supporting_cognate_count; i++) {
         cJSON_AddItemToArray(support, cJSON_CreateString(row->supporting_cognates[i]));
     }
@@ -1175,6 +1236,16 @@ char *rg_json_from_multi_model_internal(
              * other. */
             cJSON_AddStringToObject(entry, "conditioned_lect",
                                     row->rule.dimension_from_environment ? environment_lect : other_lect);
+            if (rg_context_spec_constraint_count(&row->rule.environment) > 0) {
+                char *line = rg_notation_cross_dimensional_internal(
+                    row->rule.dimension_from_environment ? environment_lect : other_lect,
+                    row->rule.dimension, row->rule.value,
+                    environment_lect, &row->rule.environment);
+                if (line != 0 && line[0] != '\0') {
+                    cJSON_AddStringToObject(entry, "notation", line);
+                }
+                free(line);
+            }
         }
         cJSON_AddStringToObject(entry, "dimension", row->rule.dimension);
         cJSON_AddStringToObject(entry, "value", row->rule.value);

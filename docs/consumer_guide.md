@@ -816,6 +816,23 @@ a prefixing one, where the same index is a different thing.
 A non-empty field is a **conjunction**: every `FeatureConstraint`
 in the list must hold for the context to apply.
 
+**`notation`** is the same environment in rule notation —
+`"r  ~  s  /  latin: σ⁻[open] _ ;  old_latin: V _ V"` — carried as
+a string on conditioned classes, proposed events and
+cross-dimensional rules. It is a **rendering, not a contract**: it
+is there so a report can be read by a comparativist without a
+second implementation of the notation on every consumer, and the
+`context` objects beside it remain the thing to parse. The key is
+`docs/NOTATION.md`; the one part of it a consumer needs to know is
+that the lect named before a frame is the lect whose word the
+frame is read in, since regulae has no ancestor to leave it
+implicit in. The key is absent whenever no side states an
+environment, where the notation would only restate the
+correspondence. Being an added key it does not move
+`format_version` (§7), and there is no C accessor for it: nothing
+in the library reads it back, and a public field nothing reads is
+what §7's ABI discipline is about.
+
 To tell an unconditioned environment from a conditioned one, check
 whether any slot carries a constraint — the total constraint count
 across slots is zero for the empty environment, and rises with
@@ -1017,7 +1034,7 @@ contract.
 public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
-signature or ownership change. It is at **40**.
+signature or ownership change. It is at **44**.
 
 **The JSON export is named and versioned.** `export_kind` is
 `"surface_relationship_model"` — the maximum-a-posteriori surface
