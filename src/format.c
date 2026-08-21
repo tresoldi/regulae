@@ -174,6 +174,12 @@ static void append_context(string_builder *builder, const rg_context_spec *conte
     if (context->morphological != 0 && context->morphological[0] != '\0') {
         builder_appendf(builder, " morph=%s", context->morphological);
     }
+    if (context->syllable_role != 0 && context->syllable_role[0] != '\0') {
+        builder_appendf(builder, " syl=%s", context->syllable_role);
+    }
+    if (context->syllable_position != 0 && context->syllable_position[0] != '\0') {
+        builder_appendf(builder, " syl@%s", context->syllable_position);
+    }
     /* Every feature slot, then every distance slot, each under the short label
      * the slot list carries. */
 #define SLOT(name, label, key) \

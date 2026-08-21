@@ -149,6 +149,12 @@ void build_link_context_borrowed(
             out->previous_syllable_count = syllables->syllable_feature_counts[syllable_index - 1];
         }
     }
+    if (syllables->syllable_role != 0) {
+        out->syllable_role = syllables->syllable_role[source_start];
+    }
+    if (syllables->syllable_position != 0) {
+        out->syllable_position = syllables->syllable_position[source_start];
+    }
     out->self_stress = syllables->stress[source_start];
     out->self_stress_count = syllables->stress_counts[source_start];
     if (source_start > 0) {
@@ -338,6 +344,20 @@ rg_status build_link_context(
             if (status != RG_OK) {
                 rg_context_spec_clear_internal(out);
                 return status;
+            }
+        }
+        if (syllables->syllable_role != 0 && syllables->syllable_role[source_start] != 0) {
+            out->syllable_role = rg_strdup_internal(syllables->syllable_role[source_start]);
+            if (out->syllable_role == 0) {
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
+            }
+        }
+        if (syllables->syllable_position != 0 && syllables->syllable_position[source_start] != 0) {
+            out->syllable_position = rg_strdup_internal(syllables->syllable_position[source_start]);
+            if (out->syllable_position == 0) {
+                rg_context_spec_clear_internal(out);
+                return RG_ERR_OOM;
             }
         }
     }

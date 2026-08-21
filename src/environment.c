@@ -205,6 +205,14 @@ int rg_context_spec_compare_internal(const rg_context_spec *a, const rg_context_
     if (c != 0) {
         return c;
     }
+    c = nullable_strcmp(a->syllable_role, b->syllable_role);
+    if (c != 0) {
+        return c;
+    }
+    c = nullable_strcmp(a->syllable_position, b->syllable_position);
+    if (c != 0) {
+        return c;
+    }
 #define CMP_FEATURES(name, label, key)                                               \
     c = constraint_list_cmp(a->name, a->name##_count, b->name, b->name##_count); \
     if (c != 0) {                                                               \

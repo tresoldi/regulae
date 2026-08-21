@@ -1494,6 +1494,12 @@ static int context_has_non_dimension_predicate(const rg_context_spec *env, const
     if (env->morpheme_index != 0 && env->morpheme_index[0] != '\0') {
         return 1;
     }
+    if (env->syllable_role != 0 && env->syllable_role[0] != '\0') {
+        return 1;
+    }
+    if (env->syllable_position != 0 && env->syllable_position[0] != '\0') {
+        return 1;
+    }
     return 0;
 }
 

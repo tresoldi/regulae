@@ -1653,8 +1653,14 @@ static void test_conditioning_is_found_from_both_sides(rg_context *ctx) {
         if (row->context_is_target) {
             target_side = 1;
             /* The environment named on the ancestor's side is the real one:
-             * between vowels, not merely before one. */
+             * between vowels, not merely before one. It may also be stated
+             * as syllable_role=ambisyllabic, which captures the same partition
+             * as a single predicate. */
             if (row->context.preceding_count > 0 && row->context.following_count > 0) {
+                source_side |= 2;
+            }
+            if (row->context.syllable_role != 0 &&
+                strcmp(row->context.syllable_role, "ambisyllabic") == 0) {
                 source_side |= 2;
             }
         } else {

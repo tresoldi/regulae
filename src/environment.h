@@ -72,9 +72,11 @@
  * out. Two orders over three fields is not worth a second macro, and the total
  * order is worth seeing spelled out at the place it is decided. */
 #define RG_ENV_STRING_SLOTS(X)          \
-    X(position,        "pos")           \
-    X(morpheme_index,  "morphidx")      \
-    X(morphological,   "morph")
+    X(position,            "pos")       \
+    X(morpheme_index,      "morphidx")  \
+    X(morphological,       "morph")     \
+    X(syllable_role,       "sylrole")   \
+    X(syllable_position,   "sylpos")
 
 /* A total order over everything an environment can express.
  *

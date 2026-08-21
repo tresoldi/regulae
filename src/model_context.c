@@ -225,6 +225,18 @@ static void collect_observed_morphology(morphology_inventory *inventory, const r
     morphology_inventory_add(inventory->indices, &inventory->index_count, 8, context->morpheme_index);
 }
 
+typedef struct syllable_inventory {
+    const char *roles[8];
+    size_t role_count;
+    const char *positions[8];
+    size_t position_count;
+} syllable_inventory;
+
+static void collect_observed_syllable(syllable_inventory *inventory, const rg_context_spec *context) {
+    morphology_inventory_add(inventory->roles, &inventory->role_count, 8, context->syllable_role);
+    morphology_inventory_add(inventory->positions, &inventory->position_count, 8, context->syllable_position);
+}
+
 /* Properties of a syllable rather than of its segments, so they are not in the
  * feature vocabulary and are offered directly. A predicate true of every
  * syllable in a corpus partitions nothing and is dropped by the split gate, so
@@ -242,6 +254,7 @@ static size_t immediate_candidates_for(
     const rg_context_spec *base_context,
     const stress_inventory *stress,
     const morphology_inventory *morphology,
+    const syllable_inventory *syllable,
     const rg_feature_vocabulary *vocabulary,
     split_candidate *out,
     size_t capacity
@@ -365,6 +378,26 @@ static size_t immediate_candidates_for(
                 out[count].slot = rg_env_syllable_slots[s];
                 out[count].feature = syllable_shape_candidates[i].feature;
                 out[count].value = syllable_shape_candidates[i].value;
+                count++;
+            }
+        }
+    }
+    if (base_context->syllable_role == 0 || base_context->syllable_role[0] == '\0') {
+        for (i = 0; i < syllable->role_count; i++) {
+            if (count < capacity) {
+                out[count].slot = "syllable_role";
+                out[count].feature = syllable->roles[i];
+                out[count].value = "+";
+                count++;
+            }
+        }
+    }
+    if (base_context->syllable_position == 0 || base_context->syllable_position[0] == '\0') {
+        for (i = 0; i < syllable->position_count; i++) {
+            if (count < capacity) {
+                out[count].slot = "syllable_position";
+                out[count].feature = syllable->positions[i];
+                out[count].value = "+";
                 count++;
             }
         }
@@ -866,6 +899,7 @@ static rg_status discover_context_counts(
     size_t source_cap = 0;
     stress_inventory stress;
     morphology_inventory morphology;
+    syllable_inventory syllable;
     split_candidate *long_range_list = 0;
     size_t long_range_count = 0;
     rg_split_observation *rows = 0;
@@ -893,6 +927,7 @@ static rg_status discover_context_counts(
     }
     memset(&stress, 0, sizeof(stress));
     memset(&morphology, 0, sizeof(morphology));
+    memset(&syllable, 0, sizeof(syllable));
     if (options != 0) {
         max_depth = options->bic.max_split_depth > 0 ? options->bic.max_split_depth : 3;
         if (options->bic.min_split_observations > 0) {
@@ -923,6 +958,7 @@ static rg_status discover_context_counts(
             status = collect_observed_stress(&stress, &observations[i].context);
         }
         collect_observed_morphology(&morphology, &observations[i].context);
+        collect_observed_syllable(&syllable, &observations[i].context);
     }
     /* Both lists are built whatever this stage leads with: the stage decides
      * which kind of predicate opens a split, and refinement may then conjoin
@@ -932,6 +968,7 @@ static rg_status discover_context_counts(
             2 * vocabulary->count +
             sizeof(split_positions) / sizeof(split_positions[0]) +
             3 * stress.count + 8 + morphology.placement_count + morphology.index_count +
+            syllable.role_count + syllable.position_count +
             rg_env_syllable_slot_count *
             (sizeof(syllable_shape_candidates) / sizeof(syllable_shape_candidates[0]));
         size_t long_cap =
@@ -951,7 +988,7 @@ static rg_status discover_context_counts(
             status = RG_ERR_OOM;
         } else {
             rg_context_spec_init_empty(&empty);
-            immediate_count = immediate_candidates_for(&empty, &stress, &morphology, vocabulary, immediate_list, immediate_cap);
+            immediate_count = immediate_candidates_for(&empty, &stress, &morphology, &syllable, vocabulary, immediate_list, immediate_cap);
             rg_context_spec_clear_internal(&empty);
         }
     }

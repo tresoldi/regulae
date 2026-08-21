@@ -141,6 +141,10 @@ typedef struct discovery_state {
     size_t morph_placement_count;
     const char *morph_indices[8];
     size_t morph_index_count;
+    const char *syllable_roles[8];
+    size_t syllable_role_count;
+    const char *syllable_positions[8];
+    size_t syllable_position_count;
     rg_split_candidate *immediate;
     size_t immediate_count;
     rg_split_candidate *long_range;
@@ -453,6 +457,11 @@ static void record_morphology_value(const char **values, size_t *count, const ch
 static void collect_morphology_values(discovery_state *state, const rg_context_spec *context) {
     record_morphology_value(state->morph_placements, &state->morph_placement_count, context->morphological);
     record_morphology_value(state->morph_indices, &state->morph_index_count, context->morpheme_index);
+}
+
+static void collect_syllable_values(discovery_state *state, const rg_context_spec *context) {
+    record_morphology_value(state->syllable_roles, &state->syllable_role_count, context->syllable_role);
+    record_morphology_value(state->syllable_positions, &state->syllable_position_count, context->syllable_position);
 }
 
 static rg_status record_stress_value_cb(void *user, const char *value) {
@@ -1862,6 +1871,7 @@ rg_status multi_lect_context_discovery(
             if (status == RG_OK) {
                 status = collect_stress_values(&state, &form_contexts[cache_index][obs->positions[p]]);
                 collect_morphology_values(&state, &form_contexts[cache_index][obs->positions[p]]);
+                collect_syllable_values(&state, &form_contexts[cache_index][obs->positions[p]]);
             }
         }
     }

@@ -50,6 +50,8 @@ typedef struct syllable_data {
     size_t *following_at_distance_counts;
     const rg_feature_constraint **stress;
     size_t *stress_counts;
+    const char **syllable_role;
+    const char **syllable_position;
 } syllable_data;
 
 /* ---- search.c: the alignment DP and the forms it copies */

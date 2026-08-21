@@ -283,6 +283,8 @@ typedef struct rg_context_spec {
      * stated in it does not travel between a suffixing language and a
      * prefixing one, where the same index is a different thing. */
     const char *morpheme_index;
+    const char *syllable_role;
+    const char *syllable_position;
     const rg_distance_constraint *preceding_at_distance;
     size_t preceding_at_distance_count;
     const rg_distance_constraint *following_at_distance;

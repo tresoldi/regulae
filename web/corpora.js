@@ -378,7 +378,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.79"
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.73"
   },
   {
     "path": "testdata/soundlaws/rhotacism_reordered.tsv",
@@ -387,7 +387,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.79"
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.73"
   },
   {
     "path": "testdata/soundlaws/rounding_harmony.tsv",

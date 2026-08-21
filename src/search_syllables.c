@@ -81,6 +81,8 @@ void syllable_data_clear(syllable_data *data) {
     free(data->following_at_distance_counts);
     free(data->stress);
     free(data->stress_counts);
+    free(data->syllable_role);
+    free(data->syllable_position);
     memset(data, 0, sizeof(*data));
 }
 
@@ -278,6 +280,74 @@ rg_status syllable_data_build(
             free(starts);
             syllable_data_clear(out);
             return status;
+        }
+    }
+
+    out->syllable_role = (const char **)calloc(n, sizeof(*out->syllable_role));
+    out->syllable_position = (const char **)calloc(n, sizeof(*out->syllable_position));
+    if (out->syllable_role == 0 || out->syllable_position == 0) {
+        free(starts);
+        syllable_data_clear(out);
+        return RG_ERR_OOM;
+    }
+    {
+        size_t *nucleus_of_syl = (size_t *)calloc(syllable_count, sizeof(*nucleus_of_syl));
+        if (nucleus_of_syl == 0) {
+            free(starts);
+            syllable_data_clear(out);
+            return RG_ERR_OOM;
+        }
+        for (s = 0; s < syllable_count; s++) {
+            size_t j;
+            nucleus_of_syl[s] = starts[s + 1];
+            for (j = starts[s]; j < starts[s + 1]; j++) {
+                size_t c;
+                for (c = 0; c < source_feature_counts[j]; c++) {
+                    const char *f = source_features[j][c].feature;
+                    if (strcmp(f, "vowel") == 0 || strcmp(f, "syllabic") == 0) {
+                        nucleus_of_syl[s] = j;
+                        goto found_nucleus;
+                    }
+                }
+            }
+            found_nucleus:;
+        }
+        for (i = 0; i < n; i++) {
+            size_t syl = out->syllable_of[i];
+            size_t nuc = nucleus_of_syl[syl];
+            if (nuc >= starts[syl + 1]) {
+                out->syllable_role[i] = "coda";
+            } else if (i < nuc) {
+                out->syllable_role[i] = "onset";
+            } else if (i == nuc) {
+                out->syllable_role[i] = "nucleus";
+            } else {
+                out->syllable_role[i] = "coda";
+            }
+            if (syl > 0 && i == starts[syl] && nuc == i + 1 &&
+                strcmp(out->syllable_role[i], "onset") == 0) {
+                size_t prev_nuc = nucleus_of_syl[syl - 1];
+                if (prev_nuc < starts[syl] && prev_nuc + 1 == starts[syl]) {
+                    out->syllable_role[i] = "ambisyllabic";
+                }
+            }
+        }
+        free(nucleus_of_syl);
+    }
+    for (i = 0; i < n; i++) {
+        size_t syl = out->syllable_of[i];
+        if (syllable_count <= 1) {
+            out->syllable_position[i] = "initial";
+        } else if (syl == 0) {
+            out->syllable_position[i] = "initial";
+        } else if (syl == syllable_count - 1) {
+            out->syllable_position[i] = "final";
+        } else if (syl == syllable_count - 2) {
+            out->syllable_position[i] = "penultimate";
+        } else if (syl == syllable_count - 3) {
+            out->syllable_position[i] = "antepenultimate";
+        } else {
+            out->syllable_position[i] = "other";
         }
     }
 
