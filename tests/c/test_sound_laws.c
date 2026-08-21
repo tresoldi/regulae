@@ -39,24 +39,28 @@ static rg_multi_model *train(rg_context *ctx, rg_corpus *corpus) {
     return model;
 }
 
-/* Whether some unconditioned class pairs these two graphemes, in either lect
- * order: which lect a class lists first is a labelling detail. */
+/* Whether one class states this correspondence, in either lect order: which
+ * lect a class lists first is a labelling detail. */
+static int states_pair(const rg_multi_class_row *row, const char *a, const char *b) {
+    size_t j;
+    int seen_a = 0;
+    int seen_b = 0;
+    for (j = 0; j < row->segment_count; j++) {
+        if (strcmp(row->graphemes[j], a) == 0) {
+            seen_a = 1;
+        }
+        if (strcmp(row->graphemes[j], b) == 0) {
+            seen_b = 1;
+        }
+    }
+    return seen_a && seen_b;
+}
+
+/* Whether some unconditioned class states it. */
 static int has_correspondence(const rg_multi_model *model, const char *a, const char *b) {
     size_t i;
     for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
-        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
-        size_t j;
-        int seen_a = 0;
-        int seen_b = 0;
-        for (j = 0; j < row->segment_count; j++) {
-            if (strcmp(row->graphemes[j], a) == 0) {
-                seen_a = 1;
-            }
-            if (strcmp(row->graphemes[j], b) == 0) {
-                seen_b = 1;
-            }
-        }
-        if (seen_a && seen_b) {
+        if (states_pair(rg_multi_model_unconditioned_class_at(model, i), a, b)) {
             return 1;
         }
     }
@@ -175,28 +179,35 @@ static int has_conditioned(
  * unconditioned classes -- a tool that split them on environment would be
  * inventing conditioning that the change does not have. */
 static void test_grimm(rg_context *ctx) {
+    /* The shifts themselves, PIE segment and Germanic reflex, in the three
+     * series the law describes: voiceless stops to fricatives, voiced stops to
+     * voiceless, aspirates to plain voiced. Eight of the nine cells are filled
+     * -- PIE *b is missing by the proto-language's own famous gap. */
+    static const char *const shifts[][2] = {
+        {"p", "f"}, {"t", "\xce\xb8"}, {"k", "x"},
+        {"d", "t"}, {"g", "k"},
+        {"b\xca\xb0", "b"}, {"d\xca\xb0", "d"}, {"g\xca\xb0", "g"},
+    };
+    const size_t shift_count = sizeof(shifts) / sizeof(shifts[0]);
     rg_corpus *corpus = load("grimm");
     rg_multi_model *model = train(ctx, corpus);
     size_t i;
+    size_t s;
 
-    assert(has_correspondence(model, "p", "f"));
-    assert(has_correspondence(model, "t", "\xce\xb8"));
-    assert(has_correspondence(model, "k", "x"));
+    for (s = 0; s < shift_count; s++) {
+        assert(has_correspondence(model, shifts[s][0], shifts[s][1]));
+    }
 
-    assert(has_correspondence(model, "d", "t"));
-    assert(has_correspondence(model, "g", "k"));
-
-    assert(has_correspondence(model, "b\xca\xb0", "b"));
-    assert(has_correspondence(model, "d\xca\xb0", "d"));
-    assert(has_correspondence(model, "g\xca\xb0", "g"));
-
-    /* No conditioned class whose two graphemes differ: Grimm's shifts are
-     * unconditioned, and any conditioned split that changes both graphemes
-     * would be inventing an environment for one of the nine. */
+    /* None of the shifts may appear as a conditioned class: Grimm's changes are
+     * unconditioned, so conditioning one would be inventing an environment it
+     * does not have. Correspondences outside the law may be conditioned -- the
+     * vowels answer to PIE's syllabic sonorants and are a separate story, and
+     * the plausibility prior exists so that the consonants stay out of chunks
+     * and remain available as the environment those vowels are read against. */
     for (i = 0; i < rg_multi_model_conditioned_class_count(model); i++) {
         const rg_multi_class_row *row = rg_multi_model_conditioned_class_at(model, i);
-        if (row->segment_count == 2) {
-            assert(strcmp(row->graphemes[0], row->graphemes[1]) == 0);
+        for (s = 0; s < shift_count; s++) {
+            assert(!states_pair(row, shifts[s][0], shifts[s][1]));
         }
     }
 
