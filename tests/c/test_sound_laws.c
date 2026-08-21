@@ -29,6 +29,18 @@ static rg_corpus *load(const char *name) {
     return corpus;
 }
 
+/* The tone fixtures live under experiments/ in the one-row-per-cognate
+ * spelling, because a tone corpus is written as whole words. */
+static rg_corpus *load_wide(rg_context *ctx, const char *name) {
+    rg_corpus *corpus = 0;
+    char path[512];
+    snprintf(path, sizeof(path), "%s/experiments/%s/cognates.tsv",
+             REGULAE_SOURCE_DIR, name);
+    assert(rg_corpus_load_wide_tsv(ctx, path, 0, &corpus, 0) == RG_OK);
+    assert(corpus != 0);
+    return corpus;
+}
+
 static rg_multi_model *train(rg_context *ctx, rg_corpus *corpus) {
     rg_multi_model *model = 0;
     rg_train_options options;
@@ -1884,6 +1896,224 @@ static void test_one_change_over_a_class_is_proposed_as_one_event(rg_context *ct
     rg_corpus_free(control_corpus);
 }
 
+/* Whether some proposed event has this lect contributing exactly this set of
+ * graphemes, given as a sorted comma-joined string. */
+static const rg_proposed_event_row *event_over(
+    const rg_multi_model *model,
+    const char *lect,
+    const char *graphemes
+) {
+    size_t count = 0;
+    const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &count);
+    size_t i;
+    for (i = 0; i < count; i++) {
+        size_t m;
+        for (m = 0; m < events[i].member_count; m++) {
+            const rg_event_member *member = &events[i].members[m];
+            char joined[128];
+            size_t used = 0;
+            size_t g;
+            if (strcmp(member->lect_id, lect) != 0) {
+                continue;
+            }
+            joined[0] = '\0';
+            for (g = 0; g < member->grapheme_count; g++) {
+                size_t len = strlen(member->graphemes[g]);
+                if (used + len + 2 >= sizeof(joined)) {
+                    break;
+                }
+                if (used > 0) {
+                    joined[used++] = ',';
+                }
+                memcpy(joined + used, member->graphemes[g], len);
+                used += len;
+                joined[used] = '\0';
+            }
+            if (strcmp(joined, graphemes) == 0) {
+                return &events[i];
+            }
+        }
+    }
+    return 0;
+}
+
+static int event_displaces(const rg_proposed_event_row *event, const char *feature) {
+    size_t d;
+    for (d = 0; event != 0 && d < event->shared_displacement_count; d++) {
+        if (strcmp(event->shared_displacement[d].feature, feature) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* A chain shift is grouped by the step its rungs share, not by an identical
+ * feature delta.
+ *
+ * Grimm's first shift is the case the identical-delta reading could not reach:
+ * p~f loses `bilabial` for `labio-dental`, t~θ loses `alveolar` for `dental`,
+ * and k~x moves no place at all, so no two of the three deltas are equal and
+ * the best known sound change in the literature came out as three unrelated
+ * rows. What they share is stop→fricative, and that is the shift. */
+static void test_a_chain_shift_groups_on_the_step_its_rungs_share(rg_context *ctx) {
+    rg_corpus *corpus = load("grimm");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *fricatives = event_over(model, "gmc", "f,x,\xce\xb8");
+    const rg_proposed_event_row *voiceless = event_over(model, "gmc", "k,p,t");
+    const rg_proposed_event_row *voiced = event_over(model, "gmc", "b,d,g");
+
+    /* Every rung of the law, each as one event. */
+    assert(fricatives != 0);
+    assert(voiceless != 0);
+    assert(voiced != 0);
+    assert(fricatives->class_id_count == 3);
+
+    /* And each says what it is: the shared displacement is the rule the
+     * grouping implies, which is the whole reason to intersect rather than
+     * to demand equality. */
+    assert(event_displaces(fricatives, "fricative"));
+    assert(event_displaces(voiced, "aspirated"));
+
+    /* The three rungs stay apart. A predicate loose enough to find the first
+     * shift is loose enough to pour all three into one row, and the members'
+     * intersected displacement is what keeps them separate. */
+    assert(fricatives != voiceless);
+    assert(voiceless != voiced);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* One change may be stated as several rules over one outcome.
+ *
+ * The mirror of the natural-class fixture: there, one environment covers
+ * several outcomes; here, `graded_7_disjunction` puts one outcome under four
+ * environments no single predicate covers, which is what a decision list is.
+ * Grouping used to *require* the outcomes to differ, so this shape -- four
+ * rows all reading `f ~ p` -- was unreachable by construction. */
+static void test_one_change_over_several_environments_is_proposed_as_one_event(
+    rg_context *ctx
+) {
+    rg_corpus *corpus = load("graded_7_disjunction");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "daughter", "f");
+    size_t i;
+
+    assert(event != 0);
+    assert(event->class_id_count > 1);
+
+    /* Every member is a conditioned class, and they are the rules of the list
+     * rather than the same rule listed twice: the outcome is shared, so what
+     * differs has to be the environment. */
+    for (i = 0; i < event->class_id_count; i++) {
+        size_t j;
+        int found = 0;
+        for (j = 0; j < rg_multi_model_conditioned_class_count(model); j++) {
+            if (rg_multi_model_conditioned_class_at(model, j)->class_id ==
+                event->class_ids[i]) {
+                found = 1;
+            }
+        }
+        assert(found);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A tone correspondence is an outcome, so a tone shift is an event.
+ *
+ * Grouping read `graphemes` alone, which put `a[¹¹] ~ a[³³]` down as a
+ * retention -- every class in a tone corpus is a retention on that reading, so
+ * no tone change could reach this table at all. The event states which tone
+ * moved; without `suprasegmentals` on the member the row would read
+ * `{a,i,u} ~ {a,i,u}`. */
+static void test_a_tone_shift_is_proposed_as_one_event(rg_context *ctx) {
+    rg_corpus *corpus = load_wide(ctx, "tone_synthetic");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t count = 0;
+    const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &count);
+    const rg_proposed_event_row *shift = event_over(model, "src", "a,i,u");
+    size_t i;
+    int stated_a_tone = 0;
+
+    assert(count > 0);
+    assert(shift != 0);
+    for (i = 0; i < shift->member_count; i++) {
+        assert(shift->members[i].suprasegmentals != 0);
+        assert(shift->members[i].suprasegmentals->tone[0] != '\0');
+    }
+    /* The two sides carry different tones, or the event states no change. */
+    assert(strcmp(shift->members[0].suprasegmentals->tone,
+                  shift->members[1].suprasegmentals->tone) != 0);
+
+    for (i = 0; i < count; i++) {
+        if (events[i].members[0].suprasegmentals != 0) {
+            stated_a_tone = 1;
+        }
+    }
+    assert(stated_a_tone);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A dimension only one side of the corpus writes is a transcription
+ * convention, and must not read as a change.
+ *
+ * Verner's fixture marks stress on Proto-Germanic and not on Gothic, so every
+ * vowel in it pairs `a[str:primary]` with `a`. Read literally that is five
+ * vowels agreeing on one change and forty observations behind it -- a
+ * thoroughly attested fact about the file and nothing about the language. */
+static void test_an_annotation_only_one_lect_carries_is_not_an_event(rg_context *ctx) {
+    rg_corpus *corpus = load("verner");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t count = 0;
+    const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &count);
+    size_t i;
+
+    /* Verner's own voicing is found -- this is not a test that the pane is
+     * empty, which would pass for the wrong reason. */
+    assert(count > 0);
+    assert(event_over(model, "gothic", "b,z") != 0);
+
+    /* No event is the vowels losing a stress mark Gothic never writes. */
+    for (i = 0; i < count; i++) {
+        assert(event_over(model, "gothic", "a,e,i,o,u") == 0);
+        assert(events[i].members[0].suprasegmentals == 0);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The table is ranked by the evidence behind each grouping.
+ *
+ * It used to come out in the order the grouping passes run, which is an
+ * implementation detail: on a corpus with sixteen events that put
+ * eleven-observation groupings above sixty-observation ones, and the first row
+ * of a table is read as its strongest claim. */
+static void test_events_are_ranked_by_their_pooled_count(rg_context *ctx) {
+    rg_corpus *corpus = load_wide(ctx, "mandarin_historical");
+    rg_multi_model *model = train(ctx, corpus);
+    size_t count = 0;
+    const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &count);
+    size_t i;
+
+    assert(count > 2);
+    for (i = 1; i < count; i++) {
+        assert(events[i - 1].count >= events[i].count);
+        /* Ties are broken on a fixed key, or the JSON stops being
+         * reproducible between runs. */
+        if (events[i - 1].count == events[i].count) {
+            assert(events[i - 1].class_ids[0] < events[i].class_ids[0]);
+        }
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 int main(void) {
     rg_context *ctx = 0;
     assert(rg_context_new_builtin(&ctx) == RG_OK);
@@ -1917,6 +2147,11 @@ int main(void) {
     test_a_confounded_environment_is_flagged(ctx);
     test_fragmenting_a_change_over_a_class_costs_its_standing(ctx);
     test_one_change_over_a_class_is_proposed_as_one_event(ctx);
+    test_a_chain_shift_groups_on_the_step_its_rungs_share(ctx);
+    test_one_change_over_several_environments_is_proposed_as_one_event(ctx);
+    test_a_tone_shift_is_proposed_as_one_event(ctx);
+    test_an_annotation_only_one_lect_carries_is_not_an_event(ctx);
+    test_events_are_ranked_by_their_pooled_count(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);
     test_class_counts_are_not_evidence_but_the_fit_is(ctx);

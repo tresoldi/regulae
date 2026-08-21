@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 40. The public surface has moved since this
+`RG_ABI_VERSION` is 41. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -762,6 +762,14 @@ static inline const rg_multi_class_row *conditioned_at(
 binary-search it. That is not the order the rules were decided
 in, which is on each row's `evidence.decision_index` (§4.6).
 
+`proposed_events` is the exception and is ranked rather than
+keyed: heaviest pooled `count` first, ties broken on the first
+member's class id. What a reader wants from that table is which
+grouping carries the most evidence, and the axis a grouping came
+from — which is what its order used to reflect — says nothing
+about how strong it is. The order is fixed for a given model, so
+it is still reproducible; it is just not a key to search on.
+
 ## 5. The conditioning environment
 
 A conditioning environment is `rg_context_spec` in C. In the JSON —
@@ -1047,6 +1055,13 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **41** — `rg_event_member` gained `suprasegmentals`: the tone, length and
+  stress one lect carries across a proposed event's member classes, or NULL
+  where it carries none. One value rather than an array parallel to
+  `graphemes`, because every member class of an event agrees on the
+  suprasegmentals at each slot. A tone shift over several vowels used to render
+  as `{a,e} ~ {a,e}`; it now states which tone moved. The JSON event member
+  gains `tone`/`length`/`stress` only where non-empty. Additive.
 - **39** — `rg_multi_class_row` gained `suprasegmentals`, an array parallel to
   `graphemes` of `rg_suprasegmentals` (`tone`, `length`, `stress`). A tone
   correspondence set is a correspondence set, and now gets a class row: the same

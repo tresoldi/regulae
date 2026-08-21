@@ -303,7 +303,7 @@ function predictiveReading(p) { // eslint-disable-line no-unused-vars
 function eventCorrespondence(event) { // eslint-disable-line no-unused-vars
   return event.members
     .map((m) => {
-      const set = `${m.lect}:{${m.graphemes.join(",")}}`;
+      const set = `${m.lect}:{${m.graphemes.join(",")}}${suprasegmentals(m)}`;
       return m.class_features.length ? `${set}=[${m.class_features.join(" & ")}]` : set;
     })
     .join("  ~  ");

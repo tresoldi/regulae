@@ -290,6 +290,20 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
             cJSON_AddItemToArray(graphemes, cJSON_CreateString(member->graphemes[j]));
         }
         cJSON_AddItemToObject(entry, "graphemes", graphemes);
+        /* As on a class segment: only where carried, so a segmental corpus's
+         * events are byte-for-byte what they were. */
+        if (member->suprasegmentals != 0) {
+            const rg_suprasegmentals *s = member->suprasegmentals;
+            if (s->tone[0] != '\0') {
+                cJSON_AddStringToObject(entry, "tone", s->tone);
+            }
+            if (s->length[0] != '\0') {
+                cJSON_AddStringToObject(entry, "length", s->length);
+            }
+            if (s->stress[0] != '\0') {
+                cJSON_AddStringToObject(entry, "stress", s->stress);
+            }
+        }
         for (j = 0; j < member->class_feature_count; j++) {
             cJSON_AddItemToArray(features, cJSON_CreateString(member->class_features[j]));
         }

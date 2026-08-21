@@ -581,6 +581,23 @@ function applyClassView() {
 }
 
 
+/* Why the pane is empty, which is not one thing. An empty pane most often
+   means the corpus states its change on a single segment, so there is nothing
+   to group with -- and a bare "(none)" reads instead as "the change was not
+   found", which is the opposite of what happened. Say which case this is. */
+function emptyEventsReading() {
+  const stated = model.classes.conditioned.filter((c) => !isIdentity(c)).length;
+  if (stated === 0) {
+    return "No conditioned class states a change here, so there is nothing to group.";
+  }
+  if (stated === 1) {
+    return "One conditioned class states a change here, and grouping takes at least two. "
+      + "The change is that row in the table above; a single class is not proposed as an event.";
+  }
+  return `${stated} conditioned classes state a change, and no two of them share an `
+    + "environment or a feature displacement.";
+}
+
 /* Conditioned classes that look like one change. A proposal: every member is
    still in the table above, and clicking an event shows the members' alignments
    rather than replacing anything. */
@@ -591,7 +608,7 @@ function renderEvents() {
   $("events-hint").textContent = events.length
     ? "Classes that differ only in their graphemes and share an environment or "
       + "a feature displacement. Whether a single pooled rule beats them isn't decided here."
-    : "";
+    : emptyEventsReading();
   if (!events.length) {
     body.innerHTML = '<tr><td colspan="3" class="empty">(none)</td></tr>';
     return;

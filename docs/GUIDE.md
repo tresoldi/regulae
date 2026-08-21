@@ -101,10 +101,20 @@ stronger split. It is not a p-value.
 
 ## Events
 
-The events pane groups conditioned classes that look like one change — same
-segments, same environment or a shared feature displacement. Click an event
-row: the member classes light up in the table, and the alignments filter to
-the cognate sets behind them.
+The events pane groups classes that look like one change. Rows join along
+whichever axis holds them together: one environment over several outcomes (a
+change across a class of segments), one outcome over several environments (a
+change stated as a decision list), or, where there is no environment, a shared
+feature displacement — Grimm's `p ~ f`, `t ~ θ` and `k ~ x` agree on
+stop→fricative and disagree on place, and that shared step is what groups them.
+Click an event row: the member classes light up in the table, and the
+alignments filter to the cognate sets behind them.
+
+An empty pane is not a failed search. Most often it means the corpus states its
+change on a single class, and grouping takes at least two — the change is in the
+table above, and the pane says which case it is rather than only `(none)`.
+Retentions never group: a row where nothing changed is evidence about a split,
+and the member row's contrast link is where to read it.
 
 This is a proposal, not an assertion. Whether the grouped classes really
 reflect a single historical event is a question about history, and regulae

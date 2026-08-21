@@ -971,6 +971,26 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                     builder_appendf(&builder, "%s%s", g == 0 ? "" : ",", member->graphemes[g]);
                 }
                 builder_append(&builder, "}");
+                /* The suprasegmentals every member agrees on, bracketed as a
+                 * class row writes them: without this a tone shift over two
+                 * vowels reads as `{a,e} ~ {a,e}`. */
+                if (member->suprasegmentals != 0) {
+                    const rg_suprasegmentals *s = member->suprasegmentals;
+                    int first_bit = 1;
+                    builder_append(&builder, "[");
+                    if (s->tone[0] != '\0') {
+                        builder_appendf(&builder, "%s", s->tone);
+                        first_bit = 0;
+                    }
+                    if (s->length[0] != '\0') {
+                        builder_appendf(&builder, "%slen:%s", first_bit ? "" : ",", s->length);
+                        first_bit = 0;
+                    }
+                    if (s->stress[0] != '\0') {
+                        builder_appendf(&builder, "%sstr:%s", first_bit ? "" : ",", s->stress);
+                    }
+                    builder_append(&builder, "]");
+                }
                 for (g = 0; g < member->class_feature_count; g++) {
                     builder_appendf(&builder, "%s%s", g == 0 ? "=[" : " & ",
                                     member->class_features[g]);

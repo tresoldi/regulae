@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 40
+#define RG_ABI_VERSION 41
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -822,6 +822,20 @@ typedef struct rg_event_member {
     const char *lect_id;
     const char *const *graphemes;
     size_t grapheme_count;
+    /* The suprasegmentals this lect carries across the member classes, or NULL
+     * where it carries none.
+     *
+     * One value, not an array parallel to `graphemes`: every member class of an
+     * event agrees with every other on the suprasegmentals at each slot, which
+     * is what makes them one change rather than several landing together. A
+     * tone shift over several vowels -- `a[¹¹] ~ a[³³]` beside `e[¹¹] ~ e[³³]`
+     * -- is one event whose grapheme sets are `{a,e}` on both sides, and
+     * without this the row reads as `{a,e} ~ {a,e}` and states nothing.
+     *
+     * A dimension neither lect writes, and a dimension only one of them writes,
+     * are both NULL here: an asymmetry between transcriptions is not a change.
+     * Owned. */
+    const rg_suprasegmentals *suprasegmentals;
     /* Features carried by every grapheme above and by no other grapheme this
      * lect shows in the corpus -- what makes the set a class rather than a
      * list. Empty when no feature separates it, which is the common case
@@ -850,6 +864,20 @@ typedef struct rg_event_member {
  * answer has to be scored on. Every member class stays published exactly as
  * it was, so a consumer that disagrees ignores this table and loses nothing.
  *
+ * Rows group along whichever of three axes holds them together: one
+ * environment over several outcomes (a change across a class of segments), one
+ * outcome over several environments (a change stated as a decision list), or,
+ * where there is no environment, a shared feature displacement. A displacement
+ * grouping asks for a displacement its members *share*, not an identical one --
+ * Grimm's p~f, t~θ and k~x agree on stop→fricative and disagree on place --
+ * held in check by requiring the group's intersected displacement to stay
+ * non-empty and its members to read as one regular change from some lect's
+ * side: distinct inputs, each the leading answer for its own segment.
+ *
+ * Retentions are not members. An identity row is evidence about a split and
+ * `contrast_class_id` on the member row links to it; an event made of identity
+ * rows would group what did not happen.
+ *
  * A proposal, and the field name says so. */
 typedef struct rg_proposed_event_row {
     const rg_event_member *members;
@@ -866,9 +894,20 @@ typedef struct rg_proposed_event_row {
     size_t supporting_cognate_count;
     /* Whether every lect named its grapheme set with a feature. */
     bool featurally_definable;
-    /* Shared by the members, and the reason they group: identical scores on
-     * identical environments are what a single change looks like once it has
-     * been split per segment. */
+    /* The weakest member's evidence: the lowest `search_margin` and the
+     * highest (least negative) `delta_score` any member class carries, so both
+     * read as "every member clears at least this".
+     *
+     * Not a pooled score. Scoring the pooled description against the
+     * fragmented one is the model-selection question this table does not
+     * answer, and a number that looked pooled would be read as that answer.
+     * The members' scores are close where the grouping is right -- one change
+     * split per segment lands them within a fraction of each other -- but they
+     * are not identical, and the spread is itself worth seeing: members far
+     * apart are a grouping to look at twice.
+     *
+     * Zero on an event grouped from unconditioned classes, which carry no
+     * search evidence to summarise. */
     double search_margin;
     double delta_score;
     /* The feature displacement shared by every member class, measured
@@ -1621,9 +1660,15 @@ RG_API const rg_multi_class_row *rg_multi_model_conditioned_classes(
     const rg_multi_model *model,
     size_t *count
 );
-/* Conditioned classes that look like one change, grouped. Borrowed, valid
- * while the model lives. See rg_proposed_event_row: a proposal, not a verdict,
- * and the member classes remain published. */
+/* Classes that look like one change, grouped. Borrowed, valid while the model
+ * lives. See rg_proposed_event_row: a proposal, not a verdict, and the member
+ * classes remain published.
+ *
+ * Ordered by pooled `count`, heaviest first, ties broken on the first member's
+ * class id. Not a binary-searchable key like the other tables': what a reader
+ * wants from this one is which grouping carries the most evidence, and the
+ * grouping axis it came from -- which is what the order used to reflect -- is
+ * not a claim about strength. */
 RG_API const rg_proposed_event_row *rg_multi_model_proposed_events(
     const rg_multi_model *model,
     size_t *count
