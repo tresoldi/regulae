@@ -136,29 +136,34 @@ button:disabled:hover { border-color: var(--line); }
 
 /* ---- options and the segment preview --------------------------------- */
 
-/* The knobs that change a claim the tables make. Quieter than the run
-   controls: a visitor should find them when looking, not be steered to them. */
-.options {
-  display: flex;
-  align-items: center;
-  gap: 6px 14px;
-  margin: 4px 0 0;
-  flex-wrap: wrap;
-  font-size: 13px;
-  color: var(--muted);
-  font-family: var(--mono);
+/* The knobs that change a claim the tables make, folded away so the first
+   screen is the data and the Run. Quiet: a visitor finds them when looking. */
+.options { margin: 10px 0 0; }
+.options > summary {
+  list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+  font: 12.5px var(--mono); color: var(--muted); padding: 4px 0;
 }
-.options label { color: var(--muted); }
-.options select { max-width: 220px; font-family: var(--mono); font-size: 12.5px; }
-.options .check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
-.options .check input { cursor: pointer; }
-.options .slow { font-size: 12px; color: var(--warn); }
-.options .hint-inline { font-size: 12px; color: var(--muted); }
+.options > summary::-webkit-details-marker { display: none; }
+.options > summary::before { content: "▸"; font-size: 10px; }
+.options[open] > summary::before { content: "▾"; }
+.options .opt-note { color: var(--warn); }
+.options-body {
+  display: flex; flex-direction: column; gap: 9px;
+  margin: 8px 0 2px; padding: 12px 0 4px; border-top: 1px solid var(--line);
+  font-size: 13px; color: var(--muted); font-family: var(--mono);
+}
+.options-body .opt-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.options-body label { color: var(--muted); }
+.options-body select { max-width: 240px; font-family: var(--mono); font-size: 12.5px; }
+.options-body .check { display: inline-flex; align-items: baseline; gap: 7px; cursor: pointer; flex-wrap: wrap; }
+.options-body .check input { cursor: pointer; }
+.options-body .slow { font-size: 12px; color: var(--warn); }
+.options-body .hint-inline { font-size: 12px; color: var(--muted); }
 /* A gated option: the box is disabled and this says why, so an unavailable
    diagnostic reads as a stated gap rather than a dead control. */
-.options .check.disabled { opacity: 0.55; cursor: default; }
-.options .check.disabled input { cursor: default; }
-.options .unavailable { font-size: 12px; color: var(--warn); }
+.options-body .check.disabled { opacity: 0.55; cursor: default; }
+.options-body .check.disabled input { cursor: default; }
+.options-body .unavailable { font-size: 12px; color: var(--warn); }
 
 /* The input-format selector sits with the run controls, not the options, since
    it changes how the corpus is read rather than a claim the tables make. */
@@ -484,8 +489,118 @@ td.rate .point { font-family: var(--mono); font-variant-numeric: tabular-nums;
 .guide .steps button { padding: 3px 8px; font-size: 12px; font-family: var(--mono); }
 .guide .steps button.current { background: var(--accent); border-color: var(--accent); color: var(--bg); }
 
+/* ---- empty-state onboarding ------------------------------------------ */
+
+/* Before the first run the results area carries the boundary and the three
+   steps; it is replaced by results, not stacked above them. */
+.empty-state { margin-top: 20px; }
+.empty-state[hidden] { display: none; }
+.empty-state .status-banner { margin-top: 0; }
+.empty-state .boundary { margin-top: 18px; }
+
+.steps-guide {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  margin: 22px 0 0; padding-top: 18px; border-top: 1px solid var(--line);
+}
+.steps-guide .step .n { font: 600 12px/1 var(--mono); color: var(--accent); }
+.steps-guide .step h3 { margin: 6px 0 3px; font: 600 13px/1.3 var(--mono); }
+.steps-guide .step p { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* ---- results tabs ---------------------------------------------------- */
+
+.tabs {
+  display: flex; gap: 2px; margin: 16px 0 0; border-bottom: 1px solid var(--line);
+  overflow-x: auto; scrollbar-width: thin;
+}
+.tabs button {
+  font: 13px var(--mono); white-space: nowrap; padding: 8px 12px;
+  border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); cursor: pointer;
+}
+.tabs button:hover { color: var(--ink); }
+.tabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+.tabs button[hidden] { display: none; }
+.tabs button .c {
+  color: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums;
+  margin-left: 4px; padding: 0 4px; border: 1px solid var(--line);
+}
+.tabs button.on .c { color: var(--accent); border-color: var(--accent); }
+
+.tabpane { display: none; margin-top: 18px; }
+.tabpane.on { display: block; }
+.tabpane .panel + .panel { margin-top: 22px; }
+
+.download-bar { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--line); }
+.download-note { margin-top: 6px; }
+.stats-empty { font-size: 13.5px; color: var(--muted); margin: 4px 0 0; }
+.stats-empty:empty { display: none; }
+
+/* ---- alignments tab -------------------------------------------------- */
+
+.aln-head { display: flex; align-items: center; gap: 12px; margin: 2px 0 8px; flex-wrap: wrap; }
+.aln-head .spacer { flex: 1; }
+.aln-view { display: inline-flex; border: 1px solid var(--line); }
+.aln-view button {
+  font: 12.5px var(--mono); padding: 3px 10px; border: 0; border-right: 1px solid var(--line);
+  background: var(--bg); color: var(--muted); cursor: pointer;
+}
+.aln-view button:last-child { border-right: 0; }
+.aln-view button.on { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+
+/* The banner naming the current selection, and the way back to all sets. */
+.aln-selection {
+  display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  margin: 0 0 10px; padding: 8px 12px; background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent); font-size: 13px;
+}
+.aln-selection[hidden] { display: none; }
+.aln-selection .aln-sel-label { font-family: var(--mono); font-size: 12.5px; }
+.aln-selection .aln-sel-clear {
+  margin-left: auto; font: 12.5px var(--mono); color: var(--link);
+  border: 0; background: none; padding: 0; cursor: pointer;
+}
+.aln-selection .aln-sel-clear:hover { text-decoration: underline; }
+
+/* The alignments list is the scroll surface itself now that it fills a tab. */
+.alignments {
+  max-height: 66vh; overflow: auto; border: 1px solid var(--line); padding: 2px 0;
+}
+.alignments .alignment { overflow-x: auto; }
+
+/* The ribbon is the default; columns are the compact toggle over the same data. */
+.alignments .ribbon { display: block; }
+.alignments .alignment .cols { display: none; }
+.alignments.show-cols .ribbon { display: none; }
+.alignments.show-cols .alignment .cols { display: flex; }
+
+/* ---- the ribbon ------------------------------------------------------ */
+
+svg.ribbon { display: block; margin: 4px 0 2px; }
+svg.ribbon text { font-family: var(--mono); }
+.rib-ch { fill: var(--bg); stroke: var(--line); }
+.rib-ch.chg { fill: var(--accent-soft); stroke: var(--accent); }
+.rib-tx { fill: var(--ink); font-size: 13px; }
+.rib-tx.b { fill: var(--muted); }
+.rib-nul { fill: var(--muted); font-size: 13px; }
+.rib-brk { fill: none; stroke: var(--accent); stroke-width: 1.3; }
+.ln { fill: none; stroke: var(--muted); stroke-width: 1.4; opacity: 0.75; }
+.ln.chg { stroke: var(--accent); stroke-width: 1.6; opacity: 1; }
+.ln.gap { stroke: var(--muted); stroke-dasharray: 2 3; opacity: 0.8; }
+
+/* A ribbon link is operable like a column: it reveals its class. Its whole
+   group lights when its class is selected. */
+.rib-link { cursor: pointer; }
+.rib-link:hover .rib-ch { stroke: var(--ink); }
+.rib-link.lit .rib-ch { stroke: var(--accent); fill: var(--accent-soft); }
+.rib-link.lit .rib-tx.b { fill: var(--ink); }
+.rib-link.lit .ln { stroke: var(--accent); opacity: 1; }
+/* When something is selected, the alignments are already filtered to the sets
+   that realise it; within a shown set the un-selected links stay quiet. */
+.alignments .alignment .rib-link:not(.lit) { opacity: 1; }
+
 @media (max-width: 900px) {
-  .panels { grid-template-columns: 1fr; }
   .boundary { grid-template-columns: 1fr; }
-  .boundary section + section { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; }
+  .boundary section { padding: 0; }
+  .boundary section + section { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 14px; margin-top: 14px; }
+  .steps-guide { grid-template-columns: 1fr; gap: 14px; }
+  .alignments { max-height: none; }
 }

@@ -21,40 +21,8 @@
 
   <p class="tagline">Systematic sound correspondences between lects, discovered from cognate data.</p>
 
-  <p class="status-banner">
-    <strong>Early release.</strong>
-    Tested on fifty-six corpora, including real Latin/Spanish and
-    Proto-Polynesian/Hawaiian. Anomaly detection isn't ported yet. The resampling
-    checks (bootstrap, cross-validation, shuffled baseline) stay off by default
-    because they retrain the model many times; see
-    <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
-  </p>
-
-  <!-- The boundary is regulae's most misread property: a table of
-       latin:p ~ spanish:f invites exactly the historical reading the framework
-       forbids it from making, so it is stated before the tool, not after. -->
-  <div class="boundary">
-    <section>
-      <h2>What this does</h2>
-      <ul>
-        <li>Aligns cognate forms across two or more lects</li>
-        <li>Finds which segments answer to which, and how often</li>
-        <li>Discovers the environments a correspondence is conditioned by</li>
-        <li>Ranks cognate sets by how badly they fit what it learned</li>
-      </ul>
-    </section>
-    <section class="is-not">
-      <h2>What this does not do</h2>
-      <ul>
-        <li>Decide which words are cognate (that's your input)</li>
-        <li>Reconstruct proto-forms</li>
-        <li>Claim a direction of change: correspondences are written
-            <code>a&nbsp;~&nbsp;b</code>, never <code>a&nbsp;→&nbsp;b</code></li>
-        <li>Build family trees or date anything</li>
-      </ul>
-    </section>
-  </div>
-
+  <!-- The essential path: choose data, then Run. Nothing statistical sits here;
+       the knobs that change a claim are one disclosure down. -->
   <div class="controls">
     <select id="examples" aria-label="Example corpus"></select>
     <input type="file" id="file" accept=".tsv,.csv,.txt" aria-label="Load a file">
@@ -74,42 +42,49 @@
     <button id="cancel" hidden>Cancel</button>
   </div>
 
-  <!-- The engine can run several ways the default run does not. These stay
-       here rather than in a settings panel because each one changes a claim the
-       tables below make, so a visitor should see the knob next to the answer it
-       moves. The baseline is opt-in and slow: it retrains on the shuffled
-       corpus once per shuffle. -->
-  <div class="options">
-    <label for="scorer">Split scorer</label>
-    <select id="scorer" aria-label="Split scorer">
-      <option value="corrected_bic">corrected BIC (default)</option>
-      <option value="multinomial_nml">exact NML</option>
-      <option value="dirichlet_marginal">Dirichlet marginal</option>
-    </select>
-    <label class="check">
-      <input type="checkbox" id="bootstrap">
-      Bootstrap the intervals
-      <span class="hint-inline">resamples cognate sets; replaces the Wilson interval</span>
-    </label>
-    <!-- Held-out prediction: the correspondences are trained on part of the
-         corpus and asked to recover reflexes masked out of the rest, then scored
-         against three naive baselines. It answers "do these generalise", which a
-         within-corpus fit cannot. Opt-in because it retrains once per fold. -->
-    <label class="check">
-      <input type="checkbox" id="predictive">
-      Cross-validate the predictions
-      <span class="slow">slow: retrains once per fold</span>
-    </label>
-    <!-- The shuffled baseline retrains on a permuted corpus. It runs in the CLI
-         (`--permutations`); whether this committed engine accepts it over JSON is
-         probed at load, and the box is disabled with a note when it does not. -->
-    <label class="check" id="baseline-check">
-      <input type="checkbox" id="baseline">
-      Compare against a shuffled baseline
-      <span class="slow">slow: retrains on 20 shuffles</span>
-      <span class="unavailable" id="baseline-unavailable" hidden></span>
-    </label>
-  </div>
+  <!-- The engine can run several ways the default run does not, and each one
+       changes a claim the tables below make. They stay closed by default so the
+       first screen is the data and the Run, not a statistics course; a visitor
+       looking for them finds them, and is not steered to them. The baseline and
+       the cross-validation are slow — they retrain many times over. -->
+  <details class="options" id="options">
+    <summary>Statistics &amp; options <span class="opt-note">— extra checks, slower, off by default</span></summary>
+    <div class="options-body">
+      <div class="opt-row">
+        <label for="scorer">How splits are scored</label>
+        <select id="scorer" aria-label="Split scorer">
+          <option value="corrected_bic">corrected BIC (default)</option>
+          <option value="multinomial_nml">exact NML</option>
+          <option value="dirichlet_marginal">Dirichlet marginal</option>
+        </select>
+        <span class="hint-inline">change only for a controlled comparison</span>
+      </div>
+      <!-- The shuffled baseline retrains on a permuted corpus. Whether this
+           committed engine accepts it over JSON is probed at load; the box is
+           disabled with a note when it does not. -->
+      <label class="check" id="baseline-check">
+        <input type="checkbox" id="baseline">
+        Is there a relationship at all?
+        <span class="hint-inline">compares the pairings against shuffled ones</span>
+        <span class="slow">slow: retrains on 20 shuffles</span>
+        <span class="unavailable" id="baseline-unavailable" hidden></span>
+      </label>
+      <!-- Held-out prediction: the correspondences are trained on part of the
+           corpus and asked to recover reflexes masked out of the rest. It answers
+           "do these generalise", which a within-corpus fit cannot. -->
+      <label class="check">
+        <input type="checkbox" id="predictive">
+        Do the rules predict held-out forms?
+        <span class="hint-inline">cross-validation</span>
+        <span class="slow">slow: retrains once per fold</span>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="bootstrap">
+        Tighten the confidence intervals
+        <span class="hint-inline">bootstrap; replaces the Wilson interval</span>
+      </label>
+    </div>
+  </details>
 
   <p class="example-note" id="example-note"></p>
   <p class="example-stats" id="example-stats"></p>
@@ -134,46 +109,86 @@
 
   <div id="error"></div>
 
+  <!-- Before the first run the results area does the onboarding: what the tool
+       is for, the boundary it will not cross, and the three steps. Hidden once a
+       run has produced results. -->
+  <div class="empty-state" id="empty">
+    <p class="status-banner">
+      <strong>Early release.</strong>
+      Tested on fifty-six corpora, including real Latin/Spanish and
+      Proto-Polynesian/Hawaiian. Anomaly detection isn't ported yet. The resampling
+      checks stay off by default because they retrain the model many times; see
+      <a href="https://github.com/tresoldi/regulae/blob/master/docs/capabilities.md">capabilities</a>.
+    </p>
+
+    <!-- The boundary is regulae's most misread property: a table of
+         latin:p ~ spanish:f invites exactly the historical reading the framework
+         forbids it from making, so it is stated before the tool is used. -->
+    <div class="boundary">
+      <section>
+        <h2>What this does</h2>
+        <ul>
+          <li>Aligns cognate forms across two or more lects</li>
+          <li>Finds which segments answer to which, and how often</li>
+          <li>Discovers the environments a correspondence is conditioned by</li>
+          <li>Ranks cognate sets by how badly they fit what it learned</li>
+        </ul>
+      </section>
+      <section class="is-not">
+        <h2>What this does not do</h2>
+        <ul>
+          <li>Decide which words are cognate (that's your input)</li>
+          <li>Reconstruct proto-forms</li>
+          <li>Claim a direction of change: correspondences are written
+              <code>a&nbsp;~&nbsp;b</code>, never <code>a&nbsp;→&nbsp;b</code></li>
+          <li>Build family trees or date anything</li>
+        </ul>
+      </section>
+    </div>
+
+    <div class="steps-guide">
+      <div class="step"><div class="n">1</div><h3>Load cognates</h3>
+        <p>One row per meaning, one column per lect. Whole words — segmentation is automatic.</p></div>
+      <div class="step"><div class="n">2</div><h3>Run</h3>
+        <p>Get a table of correspondence classes: which segment answers which, and where.</p></div>
+      <div class="step"><div class="n">3</div><h3>Read the table</h3>
+        <p>Select a correspondence to see the alignments it rests on. Open a tab for events, gaps, outliers.</p></div>
+    </div>
+  </div>
+
   <div class="results" id="results">
+
     <!-- One lect writing one grapheme where the other writes its pieces is a
          transcription difference, not a correspondence; trained over anyway,
-         so it is said before the model. -->
+         so it is said before the model, above the tabs. -->
     <div class="baseline drift" id="drift-panel" hidden>
       <strong>Transcription drift.</strong> These read as correspondences below; they are not.
       <ul id="drift-list"></ul>
     </div>
+
     <div class="summary" id="summary"></div>
 
-    <!-- Whether the pairings carry more cross-lect structure than a shuffle of
-         them does. Present only when the shuffled baseline was run, since the
-         default run does not measure it. -->
-    <div class="baseline" id="baseline-panel" hidden>
-      <h2>Against a shuffled baseline</h2>
-      <p id="baseline-body"></p>
+    <!-- Hairline tabs: one question per screen. Empty tabs (no gaps, no
+         cross-dimensional rules) are hidden rather than shown empty. -->
+    <div class="tabs" id="result-tabs" role="tablist">
+      <button data-tab="corr" class="on" role="tab" aria-selected="true">Correspondences <span class="c" id="tabc-corr"></span></button>
+      <button data-tab="align" role="tab" aria-selected="false">Alignments <span class="c" id="tabc-align"></span></button>
+      <button data-tab="events" role="tab" aria-selected="false">Events <span class="c" id="tabc-events"></span></button>
+      <button data-tab="gaps" id="tab-gaps" role="tab" aria-selected="false">Gaps &amp; ∅ <span class="c" id="tabc-gaps"></span></button>
+      <button data-tab="outliers" role="tab" aria-selected="false">Outliers <span class="c" id="tabc-outliers"></span></button>
+      <button data-tab="crossdim" id="tab-crossdim" role="tab" aria-selected="false">Cross-dimensional <span class="c" id="tabc-crossdim"></span></button>
+      <button data-tab="stats" role="tab" aria-selected="false">Statistics</button>
     </div>
 
-    <!-- Held-out prediction, present only when cross-validation was run. The
-         verdict is prose; the table below it is the coverage the trained system
-         reaches on masked reflexes against three baselines a linguist already
-         knows how to weigh. -->
-    <div class="baseline predictive" id="predictive-panel" hidden>
-      <h2>Held-out prediction</h2>
-      <p id="predictive-body"></p>
-      <div class="scroll"><table class="classes" id="predictive-table">
-        <thead><tr><th>model</th><th>top-1</th><th>top-k</th><th>log-loss</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-    </div>
-
-    <div class="panels">
+    <!-- CORRESPONDENCES -->
+    <div class="tabpane on" data-pane="corr" role="tabpanel">
       <div class="panel">
         <h2>Correspondence classes</h2>
         <p class="hint" id="classes-hint">Select one to see the alignments it rests on.</p>
         <!-- A real corpus trains a hundred-odd classes; a comparativist arrives
              looking for one segment. The filter matches the written
              correspondence and its environment, and the chips narrow to the
-             cut a question is actually about — the changes, the recurring ones,
-             one side of the pair. -->
+             cut a question is actually about. -->
         <div class="table-tools">
           <input id="class-filter" type="text" spellcheck="false"
                  placeholder="filter, e.g. p ~ f, or “before a vowel”"
@@ -202,70 +217,120 @@
         </table></div>
       </div>
 
-      <div class="panel">
-        <h2>Alignments</h2>
-        <!-- Past two lects the alignments are one block per lect pair; this
-             narrows them (and the gap pane) to a single pair. Hidden on a
-             two-lect corpus, which has only one. -->
+      <!-- Spans of more than one segment, from the pair models: one fact, not
+           several segment correspondences. Hidden when nothing promoted. -->
+      <div class="panel chunks" id="chunks-panel" hidden>
+        <h2>Multi-segment correspondences</h2>
+        <p class="hint" id="chunks-hint"></p>
+        <div class="scroll"><table class="classes" id="chunks">
+          <thead><tr><th>pair</th><th>correspondence</th><th>count</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+    </div>
+
+    <!-- ALIGNMENTS — first-class. The ribbon draws each cognate set's alignment
+         as two lanes joined by lines, so a segment answering zero, one or several
+         segments, and a reordering, are visible rather than inferred. -->
+    <div class="tabpane" data-pane="align" role="tabpanel">
+      <!-- Set when a class/event/gap/outlier is selected elsewhere: says what is
+           being shown and offers the way back to everything. -->
+      <div class="aln-selection" id="aln-selection" hidden></div>
+      <div class="aln-head">
         <div class="lect-pair-wrap" id="lect-pair-wrap" hidden>
           <label for="lect-pair">lect pair</label>
           <select id="lect-pair" aria-label="Filter alignments by lect pair"></select>
         </div>
-        <p class="hint" id="alignments-hint">Select a column to see which class it belongs to.</p>
-        <div class="scroll"><div class="alignments" id="alignments"></div></div>
+        <span class="spacer"></span>
+        <div class="aln-view" id="aln-view" role="group" aria-label="Alignment view">
+          <button data-view="ribbon" class="on">Ribbon</button>
+          <button data-view="cols">Columns</button>
+        </div>
+      </div>
+      <p class="hint" id="alignments-hint">Select a correspondence to see the cognate sets it rests on.</p>
+      <div class="alignments" id="alignments"></div>
+    </div>
+
+    <!-- EVENTS -->
+    <div class="tabpane" data-pane="events" role="tabpanel">
+      <div class="panel events">
+        <h2>Classes that look like one change</h2>
+        <p class="hint" id="events-hint"></p>
+        <div class="scroll"><table class="classes" id="events">
+          <thead><tr><th>event</th><th>count</th><th>sets</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
       </div>
     </div>
 
-    <!-- Spans of more than one segment, from the pair models: one fact, not
-         several segment correspondences. Hidden when nothing promoted. -->
-    <div class="panel chunks" id="chunks-panel" hidden>
-      <h2>Multi-segment correspondences</h2>
-      <p class="hint" id="chunks-hint"></p>
-      <div class="scroll"><table class="classes" id="chunks">
-        <thead><tr><th>pair</th><th>correspondence</th><th>count</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
+    <!-- GAPS -->
+    <div class="tabpane" data-pane="gaps" role="tabpanel">
+      <div class="panel gaps" id="gaps-panel">
+        <h2>Correspondences to ∅</h2>
+        <p class="hint" id="gaps-hint"></p>
+        <div class="scroll"><table class="classes" id="gaps">
+          <thead><tr><th>correspondence</th><th>count</th><th>rate · 95% CI</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
-    <div class="panel events">
-      <h2>Classes that look like one change</h2>
-      <p class="hint" id="events-hint"></p>
-      <div class="scroll"><table class="classes" id="events">
-        <thead><tr><th>event</th><th>count</th><th>sets</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
+    <!-- OUTLIERS (residue) -->
+    <div class="tabpane" data-pane="outliers" role="tabpanel">
+      <div class="panel residue">
+        <h2>Residue</h2>
+        <p class="hint" id="residue-hint"></p>
+        <div class="scroll"><table class="classes" id="residue">
+          <thead><tr><th>cognate set</th><th>z</th><th>cost/segment</th><th class="conf-col">confidence</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
-    <div class="panel crossdim" id="crossdim-panel">
-      <h2>Cross-dimensional rules</h2>
-      <p class="hint" id="crossdim-hint"></p>
-      <div class="scroll"><table class="classes" id="crossdim">
-        <thead><tr><th>rule</th><th>count</th><th>vs.</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
+    <!-- CROSS-DIMENSIONAL -->
+    <div class="tabpane" data-pane="crossdim" role="tabpanel">
+      <div class="panel crossdim" id="crossdim-panel">
+        <h2>Cross-dimensional rules</h2>
+        <p class="hint" id="crossdim-hint"></p>
+        <div class="scroll"><table class="classes" id="crossdim">
+          <thead><tr><th>rule</th><th>count</th><th>vs.</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
     </div>
 
-    <!-- Segments that answer to nothing across a lect pair, read off the
-         per-pair tables and written as x ~ ∅. Hidden when a corpus has none. -->
-    <div class="panel gaps" id="gaps-panel">
-      <h2>Correspondences to ∅</h2>
-      <p class="hint" id="gaps-hint"></p>
-      <div class="scroll"><table class="classes" id="gaps">
-        <thead><tr><th>correspondence</th><th>count</th><th>rate · 95% CI</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
+    <!-- STATISTICS — the slower checks and the provenance live here so they never
+         crowd the correspondences. -->
+    <div class="tabpane" data-pane="stats" role="tabpanel">
+      <!-- Whether the pairings carry more cross-lect structure than a shuffle of
+           them does. Present only when the shuffled baseline was run. -->
+      <div class="baseline" id="baseline-panel" hidden>
+        <h2>Is there a relationship?</h2>
+        <p id="baseline-body"></p>
+      </div>
+
+      <!-- Held-out prediction, present only when cross-validation was run. -->
+      <div class="baseline predictive" id="predictive-panel" hidden>
+        <h2>Held-out prediction</h2>
+        <p id="predictive-body"></p>
+        <div class="scroll"><table class="classes" id="predictive-table">
+          <thead><tr><th>model</th><th>top-1</th><th>top-k</th><th>log-loss</th></tr></thead>
+          <tbody></tbody>
+        </table></div>
+      </div>
+
+      <p class="stats-empty" id="stats-empty"></p>
+
+      <!-- What a citation of this run needs: the feature system and its version,
+           a checksum of the exact corpus, and the settings the model was trained
+           under. -->
+      <details class="provenance" id="provenance">
+        <summary>Provenance, to cite and reproduce this run</summary>
+        <dl id="provenance-body"></dl>
+      </details>
     </div>
 
-    <div class="panel residue">
-      <h2>Residue</h2>
-      <p class="hint" id="residue-hint"></p>
-      <div class="scroll"><table class="classes" id="residue">
-        <thead><tr><th>cognate set</th><th>z</th><th>cost/segment</th><th class="conf-col">confidence</th></tr></thead>
-        <tbody></tbody>
-      </table></div>
-    </div>
-
-    <div class="controls">
+    <div class="controls download-bar">
       <button id="download-json">Download JSON</button>
       <button id="download-summary">Download summary</button>
       <button id="copy-summary">Copy summary</button>
@@ -276,19 +341,11 @@
       <span class="spacer"></span>
       <span class="version" id="timing"></span>
     </div>
-    <p class="example-note">
+    <p class="example-note download-note">
       A snapshot for inspection, not an interchange format. It holds one best
       answer, without the uncertainty a historical claim needs.
     </p>
 
-    <!-- What a citation of this run needs: the feature system and its version,
-         a checksum of the exact corpus, and the settings the model was trained
-         under. Emitted on every run and, until this block, only ever in the
-         JSON download. -->
-    <details class="provenance" id="provenance">
-      <summary>Provenance, to cite and reproduce this run</summary>
-      <dl id="provenance-body"></dl>
-    </details>
   </div>
 
 </div>

@@ -33,6 +33,10 @@ let selectedPair = null;
 let baselineSupported = true;
 let modelChunks = null;
 let modelDrift = null;
+/* Which results tab is showing, and how the alignments are drawn. The ribbon is
+   the default view; columns are the compact fallback for scanning many sets. */
+let currentTab = "corr";
+let alnView = "ribbon";
 
 /* The classes table is a view over one array, so filtering and sorting are
    state the view reads rather than a rebuild of the model. classRows is built
@@ -52,6 +56,11 @@ function startWorker() {
     if (message.type === "ready") {
       ready = true;
       runButton.disabled = false;
+      /* The startup baseline probe is a real train, so its progress callback
+         leaves the bar showing a stage no visitor asked for; clear it once the
+         engine reports ready. */
+      progress.classList.remove("active");
+      $("progress-label").textContent = "";
       $("version").textContent = "v" + message.version;
       fetch("BUILD_INFO").then(r => r.ok ? r.text() : "").then(text => {
         const m = text.match(/^git_commit\s+(\S+)/m);
@@ -222,6 +231,8 @@ function finish({ json, chunks, drift, elapsedMs }) {
   modelDrift = parseExtras(drift, "drift");
   $("timing").textContent = (elapsedMs / 1000).toFixed(2) + "s";
   render();
+  /* The onboarding gives up its space once there is a result to read. */
+  $("empty").hidden = true;
   results.classList.add("active");
 }
 
@@ -386,8 +397,8 @@ function buildClassRow(entry, conditioned) {
   sets.title = "distinct cognate sets behind this row";
 
   row.append(corr, count, sets, rateCell(entry.uncertainty));
-  row.addEventListener("click", () => select(entry.id));
-  makeActivatable(row, () => select(entry.id), "button");
+  row.addEventListener("click", () => selectClass(entry.id));
+  makeActivatable(row, () => selectClass(entry.id), "button");
   row.setAttribute("aria-selected", entry.id === selectedClass ? "true" : "false");
   return row;
 }
@@ -613,8 +624,8 @@ function renderEvents() {
     sets.textContent = event.supporting_cognates.length;
     sets.title = `${event.class_ids.length} member classes`;
     row.append(corr, count, sets);
-    row.addEventListener("click", () => selectEvent(ei));
-    makeActivatable(row, () => selectEvent(ei), "button");
+    row.addEventListener("click", () => selectEventAndShow(ei));
+    makeActivatable(row, () => selectEventAndShow(ei), "button");
     body.appendChild(row);
   }
 }
@@ -651,16 +662,14 @@ function selectEvent(eventIndex) {
   }
 
   updateAlignmentVisibility();
-  for (const col of $("alignments").querySelectorAll(".col")) {
-    const ids = JSON.parse(col.dataset.classes);
-    col.classList.toggle("lit",
-      memberIds !== null && ids.some((id) => memberIds.has(id)));
-  }
+  litAlignmentLinks(memberIds);
 
   const shown = $("alignments").querySelectorAll(".alignment:not(.hidden)").length;
   $("alignments-hint").textContent = selectedEvent === null
-    ? "Select a column to see which class it belongs to."
+    ? "Select a correspondence to see the cognate sets it rests on, or a link to jump back to its class."
     : `${shown} of ${model.alignments.length} alignments realise this event's ${memberIds.size} classes.`;
+  updateAlignSelectionUI(selectedEvent !== null
+    ? `event ${eventCorrespondence(events[selectedEvent])}` : null);
 }
 
 /* Rules where a segmental feature on one lect predicts a suprasegmental value
@@ -778,8 +787,8 @@ function renderGaps() {
     const classId = gapClassId(pair.source_lect, pair.target_lect, gap);
     if (classId !== null) {
       tr.dataset.classId = String(classId);
-      tr.addEventListener("click", () => select(classId, true));
-      makeActivatable(tr, () => select(classId, true), "button");
+      tr.addEventListener("click", () => selectClass(classId));
+      makeActivatable(tr, () => selectClass(classId), "button");
     }
     body.appendChild(tr);
   }
@@ -854,8 +863,8 @@ function renderResidue() {
     conf.textContent = typeof row.confidence === "number" ? `${Math.round(row.confidence * 100)}%` : "";
 
     tr.append(id, z, cost, conf);
-    tr.addEventListener("click", () => selectSet(row.cognate_id));
-    makeActivatable(tr, () => selectSet(row.cognate_id), "button");
+    tr.addEventListener("click", () => selectSetAndShow(row.cognate_id));
+    makeActivatable(tr, () => selectSetAndShow(row.cognate_id), "button");
     body.appendChild(tr);
   }
 }
@@ -900,13 +909,12 @@ function selectSet(cognateId) {
     row.setAttribute("aria-selected", "false");
   }
   updateAlignmentVisibility();
-  for (const col of $("alignments").querySelectorAll(".col")) {
-    col.classList.remove("lit");
-  }
+  litAlignmentLinks(null);
   const hint = $("alignments-hint");
   hint.textContent = selectedSet === null
-    ? "Select a column to see which class it belongs to."
+    ? "Select a correspondence to see the cognate sets it rests on, or a link to jump back to its class."
     : `Showing ${selectedSet}. Select it again to show every set.`;
+  updateAlignSelectionUI(selectedSet !== null ? `cognate set ${selectedSet}` : null);
 }
 
 /* The lect-pair selector, shown only past two lects. A multi-lect corpus aligns
@@ -954,9 +962,160 @@ function applyPairFilter() {
   }
 }
 
+/* ---- alignment ribbon -------------------------------------------------- */
+
+/* The ribbon draws one cognate set's alignment as two lanes joined by lines,
+   read straight off `alignment.links` — each link is one span of source
+   graphemes answering one span of target graphemes. The line count says the
+   relation the columns cannot: a fan is one segment answering several, a dashed
+   line to ∅ is a loss or an insertion, crossing lines are a reordering.
+
+   Built with the SVG namespace, which the test's DOM shim does not provide, so
+   this returns null there and the columns below carry the data and the tests.
+   The columns stay in the DOM regardless; the ribbon is the default view over
+   them. */
+const RIB_FS = 13;
+const RIB_MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace';
+
+function ribbonMeasure() {
+  try {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas && canvas.getContext && canvas.getContext("2d");
+    if (ctx) {
+      ctx.font = RIB_FS + "px " + RIB_MONO;
+      return (t) => ctx.measureText(t || "∅").width;
+    }
+  } catch (error) { /* fall through to the estimate */ }
+  return (t) => (t ? [...t].length : 1) * 8.2;
+}
+
+/* Whether two spans are the same multiset of graphemes in a different order --
+   a reordering, drawn as crossing lines matched by identical grapheme rather
+   than as a substitution. */
+function isPermutation(a, b) {
+  if (a.length !== b.length || a.length < 2) {
+    return false;
+  }
+  const sort = (xs) => [...xs].map((c) => c.g).sort();
+  const sa = sort(a), sb = sort(b);
+  if (sa.some((g, i) => g !== sb[i])) {
+    return false;
+  }
+  return a.some((c, i) => c.g !== b[i].g);
+}
+
+function buildRibbon(alignment) {
+  if (!document.createElementNS) {
+    return null;
+  }
+  const NS = "http://www.w3.org/2000/svg";
+  const measure = ribbonMeasure();
+  const chipW = (t) => Math.max(18, Math.ceil(measure(t || "∅")) + 14);
+
+  const PADX = 6, GAP = 9, CHH = 22, SY = 6, TY = 58;
+  const SBOT = SY + CHH, TTOP = TY, TBOT = TY + CHH;
+  let sx = PADX, tx = PADX;
+  const layout = [];
+  for (const link of alignment.links) {
+    const s = link.source.map((g) => { const w = chipW(g); const c = { g, x: sx, w, cx: sx + w / 2 }; sx += w + GAP; return c; });
+    const t = link.target.map((g) => { const w = chipW(g); const c = { g, x: tx, w, cx: tx + w / 2 }; tx += w + GAP; return c; });
+    layout.push({ link, s, t });
+  }
+  const width = Math.max(sx, tx, 80) + PADX;
+  const height = TY + CHH + 8;               /* the target lane sits at TY..TY+CHH */
+  const svg = document.createElementNS(NS, "svg");
+  svg.setAttribute("class", "ribbon");
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.setAttribute("width", String(width));
+  svg.setAttribute("height", String(height));
+  svg.setAttribute("role", "img");
+
+  const el = (name, attrs, parent) => {
+    const node = document.createElementNS(NS, name);
+    for (const k in attrs) { node.setAttribute(k, attrs[k]); }
+    (parent || svg).appendChild(node);
+    return node;
+  };
+  const pathV = (x1, y1, x2, y2) => {
+    const my = (y1 + y2) / 2;
+    return `M${x1} ${y1} C${x1} ${my} ${x2} ${my} ${x2} ${y2}`;
+  };
+
+  for (const { link, s, t } of layout) {
+    const ids = link.classes || [];
+    const group = el("g", { class: "rib-link" });
+    group.dataset.classes = JSON.stringify(ids);
+
+    const clampX = (x) => Math.max(PADX, Math.min(width - PADX, x));
+    const line = (a, b, cls) => el("path", { d: pathV(a, SBOT, b, TTOP), class: "ln" + (cls ? " " + cls : "") }, group);
+    const nullNode = (x, y) => el("text", { x, y, "text-anchor": "middle", class: "rib-nul" }, group).appendChild(document.createTextNode("∅"));
+
+    if (t.length === 0) {                    // loss: source answers nothing
+      const c = s[0]; const nx = clampX(Math.min(c.cx, tx + 6));
+      line(c.cx, nx, "gap"); nullNode(nx, TY + 15); s.forEach((k) => { k.chg = true; });
+    } else if (s.length === 0) {             // insertion: a segment from nothing
+      const c = t[0]; const nx = clampX(Math.min(c.cx, sx + 6));
+      el("path", { d: pathV(nx, SBOT, c.cx, TTOP), class: "ln gap" }, group);
+      el("text", { x: nx, y: SY + 16, "text-anchor": "middle", class: "rib-nul" }, group).appendChild(document.createTextNode("∅"));
+      t.forEach((k) => { k.chg = true; });
+    } else if (s.length === 1 || t.length === 1) {  // 1-1, split (1→n) or fusion (n→1)
+      const changed = !(s.length === 1 && t.length === 1 && s[0].g === t[0].g);
+      for (const sc of s) { for (const tc of t) { line(sc.cx, tc.cx, changed ? "chg" : ""); } }
+      if (changed) { s.forEach((k) => { k.chg = true; }); t.forEach((k) => { k.chg = true; }); }
+    } else if (isPermutation(s, t)) {          // reordering: crossing lines by identity
+      const used = new Set();
+      for (const sc of s) {
+        const j = t.findIndex((tc, i) => !used.has(i) && tc.g === sc.g);
+        if (j >= 0) { used.add(j); line(sc.cx, t[j].cx, "chg reorder"); sc.chg = true; t[j].chg = true; }
+      }
+    } else if (s.length === t.length) {        // n→n span: position-wise
+      for (let i = 0; i < s.length; i++) {
+        const changed = s[i].g !== t[i].g;
+        line(s[i].cx, t[i].cx, changed ? "chg" : "");
+        if (changed) { s[i].chg = true; t[i].chg = true; }
+      }
+    } else {                                   // uneven span: one bracketed chunk
+      const sL = Math.min(...s.map((c) => c.x)), sR = Math.max(...s.map((c) => c.x + c.w));
+      const tL = Math.min(...t.map((c) => c.x)), tR = Math.max(...t.map((c) => c.x + c.w));
+      el("path", { d: `M${sL} ${SBOT + 4} L${sL} ${SBOT + 1} L${sR} ${SBOT + 1} L${sR} ${SBOT + 4}`, class: "rib-brk" }, group);
+      el("path", { d: `M${tL} ${TTOP - 4} L${tL} ${TTOP - 1} L${tR} ${TTOP - 1} L${tR} ${TTOP - 4}`, class: "rib-brk" }, group);
+      el("path", { d: pathV((sL + sR) / 2, SBOT + 4, (tL + tR) / 2, TTOP - 4), class: "ln chg" }, group);
+      s.forEach((k) => { k.chg = true; }); t.forEach((k) => { k.chg = true; });
+    }
+
+    const chip = (c, laneY, lower) => {
+      el("rect", { x: c.x, y: laneY, width: c.w, height: CHH, class: "rib-ch" + (c.chg ? " chg" : "") }, group);
+      const text = el("text", { x: c.cx, y: laneY + 15, "text-anchor": "middle", class: "rib-tx" + (lower ? " b" : "") }, group);
+      text.appendChild(document.createTextNode(c.g));
+    };
+    for (const c of s) { chip(c, SY, false); }
+    for (const c of t) { chip(c, TY, true); }
+
+    if (ids.length) {
+      const activate = (event) => { event.stopPropagation(); selectFromAlignment(ids[0]); };
+      group.addEventListener("click", activate);
+      makeActivatable(group, activate, "button");
+      const say = `${link.source.join("") || "∅"} to ${link.target.join("") || "∅"}; show its class`;
+      group.setAttribute("aria-label", say);
+    }
+  }
+  return svg;
+}
+
+/* Light the alignment links -- columns and ribbon alike -- that realise any of a
+   set of class ids. Null clears the lighting. The columns keep the class-select
+   test honest; the ribbon rides the same data. */
+function litAlignmentLinks(ids) {
+  for (const el of $("alignments").querySelectorAll(".col, .rib-link")) {
+    const list = JSON.parse(el.dataset.classes || "[]");
+    el.classList.toggle("lit", ids !== null && list.some((id) => ids.has(id)));
+  }
+}
+
 function renderAlignments() {
   const container = $("alignments");
   container.innerHTML = "";
+  container.classList.toggle("show-cols", alnView === "cols");
 
   if (!model.alignments || !model.alignments.length) {
     container.innerHTML = '<div class="empty">No alignments were produced.</div>';
@@ -983,6 +1142,8 @@ function renderAlignments() {
     pair.textContent = `  ${alignment.lect_a} ${src} ~ ${alignment.lect_b} ${tgt}`;
     gloss.appendChild(pair);
 
+    const ribbon = buildRibbon(alignment);
+
     const cols = document.createElement("div");
     cols.className = "cols";
     for (const link of alignment.links) {
@@ -1002,11 +1163,12 @@ function renderAlignments() {
       col.append(top, bottom);
 
       /* Selecting a column reveals the class it belongs to, which is the
-       * reverse of selecting a class to see its columns. */
+       * reverse of selecting a class to see its columns: it jumps back to the
+       * correspondence table with that class in view. */
       if (ids.length) {
         const activate = (event) => {
           event.stopPropagation();
-          select(ids[0], true);
+          selectFromAlignment(ids[0]);
         };
         col.addEventListener("click", activate);
         makeActivatable(col, activate, "button");
@@ -1016,7 +1178,11 @@ function renderAlignments() {
       cols.appendChild(col);
     }
 
-    block.append(gloss, cols);
+    block.append(gloss);
+    if (ribbon) {
+      block.appendChild(ribbon);
+    }
+    block.appendChild(cols);
     container.appendChild(block);
   }
 }
@@ -1047,21 +1213,108 @@ function select(classId, scrollToClass) {
   }
 
   updateAlignmentVisibility();
-  for (const col of $("alignments").querySelectorAll(".col")) {
-    const ids = JSON.parse(col.dataset.classes);
-    col.classList.toggle("lit", selectedClass !== null && ids.includes(selectedClass));
-  }
+  litAlignmentLinks(selectedClass !== null ? new Set([selectedClass]) : null);
 
+  const cls = classById(selectedClass);
   const shown = $("alignments").querySelectorAll(".alignment:not(.hidden)").length;
   $("alignments-hint").textContent = selectedClass === null
-    ? "Select a column to see which class it belongs to."
+    ? "Select a correspondence to see the cognate sets it rests on, or a link to jump back to its class."
     : `${shown} of ${model.alignments.length} alignments realise this class.`;
+  updateAlignSelectionUI(cls ? `correspondence ${correspondence(cls)}` : null);
 
   if (scrollToClass && selectedClass !== null) {
     const row = $("classes").querySelector(`tr[data-class-id="${selectedClass}"]`);
     if (row) {
       row.scrollIntoView({ block: "nearest" });
     }
+  }
+}
+
+/* ---- results tabs and cross-navigation --------------------------------- */
+
+/* Show one results tab. Empty tabs (no gaps, no cross-dimensional rules) are
+   hidden by updateResultTabs; this only switches among the shown ones. */
+function showResultTab(name) {
+  currentTab = name;
+  for (const button of $("result-tabs").querySelectorAll("button")) {
+    const on = button.dataset.tab === name;
+    button.classList.toggle("on", on);
+    button.setAttribute("aria-selected", on ? "true" : "false");
+  }
+  for (const pane of $("results").querySelectorAll(".tabpane")) {
+    pane.classList.toggle("on", pane.dataset.pane === name);
+  }
+}
+
+/* The count each tab carries, and which tabs are worth showing at all. */
+function updateResultTabs() {
+  const set = (id, n) => { const el = $(id); if (el) { el.textContent = String(n); } };
+  set("tabc-corr", model.classes.unconditioned.length + model.classes.conditioned.length);
+  set("tabc-align", (model.alignments || []).length);
+  set("tabc-events", (model.proposed_events || []).length);
+  const gapCount = (model.pairwise || []).reduce((a, p) => a + ((p.gaps || []).length), 0);
+  set("tabc-gaps", gapCount);
+  set("tabc-outliers", (model.outliers || []).length);
+  const xdim = (model.cross_dimensional || []).length;
+  set("tabc-crossdim", xdim);
+  const gapsTab = $("tab-gaps"); if (gapsTab) { gapsTab.hidden = gapCount === 0; }
+  const xdimTab = $("tab-crossdim"); if (xdimTab) { xdimTab.hidden = xdim === 0; }
+
+  const noStats = $("baseline-panel").hidden && $("predictive-panel").hidden;
+  const note = $("stats-empty");
+  if (note) {
+    note.textContent = noStats
+      ? "No resampling check was run. Turn on “Is there a relationship?” or "
+        + "“Do the rules predict?” under Statistics & options above, then Run again."
+      : "";
+  }
+}
+
+/* The banner atop the Alignments tab: what the current selection has filtered
+   the ribbons to, and the way back to all of them. Also keeps the tab's count
+   badge in step with what is shown. */
+function updateAlignSelectionUI(label) {
+  const total = (model.alignments || []).length;
+  const shown = $("alignments").querySelectorAll(".alignment:not(.hidden)").length;
+  const badge = $("tabc-align");
+  if (badge) {
+    const filtered = selectedClass !== null || selectedEvent !== null || selectedSet !== null;
+    badge.textContent = String(filtered ? shown : total);
+  }
+  const banner = $("aln-selection");
+  if (!banner) {
+    return;
+  }
+  banner.innerHTML = "";
+  if (!label) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  const text = document.createElement("span");
+  text.className = "aln-sel-label";
+  text.textContent = `${shown} of ${total} alignments · ${label}`;
+  const clear = document.createElement("button");
+  clear.className = "aln-sel-clear";
+  clear.textContent = "show all";
+  clear.addEventListener("click", () => select(null));
+  banner.append(text, clear);
+}
+
+/* Selecting a correspondence, an event, an outlier or a gap answers the same
+   question -- which alignments -- so each jumps to the Alignments tab with the
+   ribbons filtered. Clicking a link there jumps back to the table. Deselecting
+   stays put. */
+function selectClass(id) { select(id); if (selectedClass !== null) { showResultTab("align"); } }
+function selectEventAndShow(index) { selectEvent(index); if (selectedEvent !== null) { showResultTab("align"); } }
+function selectSetAndShow(id) { selectSet(id); if (selectedSet !== null) { showResultTab("align"); } }
+function selectFromAlignment(id) { select(id, true); showResultTab("corr"); }
+
+function setAlnView(view) {
+  alnView = view;
+  $("alignments").classList.toggle("show-cols", view === "cols");
+  for (const button of $("aln-view").querySelectorAll("button")) {
+    button.classList.toggle("on", button.dataset.view === view);
   }
 }
 
@@ -1108,6 +1361,8 @@ function render() {
   renderClasses();
   renderAlignments();
   renderLectPair();
+  updateResultTabs();
+  showResultTab("corr");
   select(null);
   selectedClass = null;
 }
@@ -1332,6 +1587,8 @@ function loadCorpus(path, format) {
   editor.value = CORPORA[path] || "";
   setFormat(format || "wide");
   results.classList.remove("active");
+  /* A fresh corpus has no result yet, so the onboarding comes back until Run. */
+  $("empty").hidden = false;
   $("error").innerHTML = "";
 }
 
@@ -1577,6 +1834,19 @@ $("copy-markdown").addEventListener("click", () => {
 
 $("format").addEventListener("change", (event) => setFormat(event.target.value));
 $("lect-pair").addEventListener("change", applyPairFilter);
+
+$("result-tabs").addEventListener("click", (event) => {
+  const button = event.target.closest && event.target.closest("button");
+  if (button && button.dataset.tab) {
+    showResultTab(button.dataset.tab);
+  }
+});
+$("aln-view").addEventListener("click", (event) => {
+  const button = event.target.closest && event.target.closest("button");
+  if (button && button.dataset.view) {
+    setAlnView(button.dataset.view);
+  }
+});
 
 wireClassTools();
 
