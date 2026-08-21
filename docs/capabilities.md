@@ -55,11 +55,11 @@ Trained through the wide loader with default options.
 | finnish_estonian | estonian, finnish | 48 | 3 |
 | georgian_svan | georgian, svan | 75 | 3 |
 | harmony_synthetic | derived, proto | 14 | 2 |
-| latin_french | french, latin | 107 | 2 |
-| latin_italian | italian, latin | 96 | 11 |
-| latin_spanish | latin, spanish | 95 | 8 |
+| latin_french | french, latin | 108 | 2 |
+| latin_italian | italian, latin | 93 | 12 |
+| latin_spanish | latin, spanish | 94 | 8 |
 | length_conditioned_synthetic | derived, proto | 13 | 1 |
-| mandarin_historical | mandarin, middle_chinese | 84 | 2 |
+| mandarin_historical | mandarin, middle_chinese | 85 | 3 |
 | morph_boundary_synthetic | derived, proto | 15 | 0 |
 | navajo_chipewyan | chipewyan, navajo | 64 | 0 |
 | oe_english | modern_english, old_english | 81 | 7 |
@@ -67,7 +67,7 @@ Trained through the wide loader with default options.
 | stress_conditioned_synthetic | derived, proto | 20 | 2 |
 | swahili_zulu | swahili, zulu | 57 | 0 |
 | tone_3way_synthetic | daughter_a, daughter_b, proto | 44 | 0 |
-| tone_chinese_like | cantonese, mandarin | 110 | 5 |
+| tone_chinese_like | cantonese, mandarin | 110 | 6 |
 | tone_chinese_like_clean | cantonese, mandarin | 44 | 0 |
 | tone_synthetic | src, tgt | 11 | 0 |
 | tone_vietnamese_like | hanoi, saigon | 39 | 0 |

@@ -70,7 +70,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 48 classes · 3 conditioned · cost/segment −1.77"
+    "stats": "2 lects · 40 cognate sets · 48 classes · 3 conditioned · cost/segment −1.72"
   },
   {
     "path": "experiments/latin_spanish/cognates.tsv",
@@ -79,7 +79,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 103 cognate sets · 95 classes · 8 conditioned · cost/segment −1.97"
+    "stats": "2 lects · 103 cognate sets · 94 classes · 8 conditioned · cost/segment −1.83"
   },
   {
     "path": "experiments/ppn_hawaiian/cognates.tsv",
@@ -88,7 +88,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 94 cognate sets · 37 classes · 2 conditioned · cost/segment −1.98"
+    "stats": "2 lects · 94 cognate sets · 37 classes · 2 conditioned · cost/segment −1.95"
   },
   {
     "path": "testdata/soundlaws/grimm.tsv",
@@ -97,7 +97,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 29 cognate sets · 43 classes · 1 conditioned · cost/segment −1.57"
+    "stats": "2 lects · 29 cognate sets · 43 classes · 3 conditioned · cost/segment −1.41"
   },
   {
     "path": "testdata/soundlaws/graded_1_adjacent.tsv",
@@ -106,7 +106,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.54"
+    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.13"
   },
   {
     "path": "testdata/soundlaws/verner.tsv",
@@ -115,7 +115,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 28 classes · 4 conditioned · cost/segment −1.89"
+    "stats": "2 lects · 40 cognate sets · 28 classes · 4 conditioned · cost/segment −1.81"
   },
   {
     "path": "testdata/soundlaws/grassmann.tsv",
@@ -142,7 +142,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "4 lects · 96 cognate sets · 164 classes · 8 conditioned · cost/segment −1.65"
+    "stats": "4 lects · 96 cognate sets · 161 classes · 8 conditioned · cost/segment −1.58"
   },
   {
     "path": "experiments/tone_chinese_like_clean/cognates.tsv",
@@ -160,7 +160,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 80 cognate sets · 95 classes · none conditioned · cost/segment −0.33",
+    "stats": "2 lects · 80 cognate sets · 95 classes · none conditioned · cost/segment −0.32",
     "baseline": true
   },
   {
@@ -170,7 +170,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 37 cognate sets · 43 classes · 2 conditioned · cost/segment −1.74",
+    "stats": "2 lects · 37 cognate sets · 43 classes · 2 conditioned · cost/segment −1.59",
     "baseline": true
   },
   {
@@ -180,7 +180,7 @@ const CORPUS_LIST = [
     "group": "Start here",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 17 classes · 2 conditioned · cost/segment −1.72"
+    "stats": "2 lects · 40 cognate sets · 17 classes · 2 conditioned · cost/segment −1.64"
   },
   {
     "path": "testdata/soundlaws/compensatory_lengthening.tsv",
@@ -189,7 +189,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 30 cognate sets · 26 classes · 2 conditioned · cost/segment −1.91"
+    "stats": "2 lects · 30 cognate sets · 26 classes · 2 conditioned · cost/segment −1.77"
   },
   {
     "path": "testdata/soundlaws/conditioned_confound.tsv",
@@ -198,7 +198,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 16 cognate sets · 8 classes · 2 conditioned · cost/segment −1.63"
+    "stats": "2 lects · 16 cognate sets · 8 classes · 2 conditioned · cost/segment −1.37"
   },
   {
     "path": "testdata/soundlaws/graded_0_unconditioned.tsv",
@@ -216,7 +216,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.57"
+    "stats": "2 lects · 40 cognate sets · 9 classes · 2 conditioned · cost/segment −1.10"
   },
   {
     "path": "testdata/soundlaws/graded_3_stress.tsv",
@@ -225,7 +225,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 14 classes · 1 conditioned · cost/segment −1.16"
+    "stats": "2 lects · 40 cognate sets · 14 classes · 1 conditioned · cost/segment −1.15"
   },
   {
     "path": "testdata/soundlaws/graded_4_conjunction.tsv",
@@ -234,7 +234,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 9 classes · 3 conditioned · cost/segment −1.51"
+    "stats": "2 lects · 40 cognate sets · 9 classes · 3 conditioned · cost/segment −1.33"
   },
   {
     "path": "testdata/soundlaws/graded_5_distance_two.tsv",
@@ -243,7 +243,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 11 classes · 1 conditioned · cost/segment −1.72"
+    "stats": "2 lects · 40 cognate sets · 11 classes · 1 conditioned · cost/segment −1.31"
   },
   {
     "path": "testdata/soundlaws/graded_6_existential.tsv",
@@ -261,7 +261,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 13 classes · 4 conditioned · cost/segment −1.45"
+    "stats": "2 lects · 40 cognate sets · 13 classes · 4 conditioned · cost/segment −1.37"
   },
   {
     "path": "testdata/soundlaws/graded_8_weight.tsv",
@@ -288,7 +288,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 38 cognate sets · 26 classes · none conditioned · cost/segment −2.18"
+    "stats": "2 lects · 38 cognate sets · 28 classes · 2 conditioned · cost/segment −2.03"
   },
   {
     "path": "testdata/soundlaws/lenition.tsv",
@@ -297,7 +297,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 24 cognate sets · 40 classes · 3 conditioned · cost/segment −1.61"
+    "stats": "2 lects · 24 cognate sets · 40 classes · 3 conditioned · cost/segment −1.66"
   },
   {
     "path": "testdata/soundlaws/metathesis_adjacent.tsv",
@@ -315,7 +315,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 30 cognate sets · 14 classes · none conditioned · cost/segment −1.05"
+    "stats": "2 lects · 30 cognate sets · 12 classes · none conditioned · cost/segment −0.86"
   },
   {
     "path": "testdata/soundlaws/morphological_rhotacism.tsv",
@@ -324,7 +324,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 56 cognate sets · 12 classes · 4 conditioned · cost/segment −1.56"
+    "stats": "2 lects · 56 cognate sets · 12 classes · 4 conditioned · cost/segment −1.37"
   },
   {
     "path": "testdata/soundlaws/natural_class.tsv",
@@ -342,7 +342,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 64 cognate sets · 15 classes · 2 conditioned · cost/segment −1.49"
+    "stats": "2 lects · 64 cognate sets · 15 classes · 2 conditioned · cost/segment −1.48"
   },
   {
     "path": "testdata/soundlaws/opaque_umlaut.tsv",
@@ -351,7 +351,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "3 lects · 48 cognate sets · 24 classes · 2 conditioned · cost/segment −1.85"
+    "stats": "3 lects · 48 cognate sets · 24 classes · 2 conditioned · cost/segment −1.54"
   },
   {
     "path": "testdata/soundlaws/place_assimilation.tsv",
@@ -360,7 +360,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 18 classes · 2 conditioned · cost/segment −2.03"
+    "stats": "2 lects · 40 cognate sets · 18 classes · 2 conditioned · cost/segment −1.61"
   },
   {
     "path": "testdata/soundlaws/place_dissimilation.tsv",
@@ -369,7 +369,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 36 cognate sets · 13 classes · 2 conditioned · cost/segment −1.57"
+    "stats": "2 lects · 36 cognate sets · 13 classes · 2 conditioned · cost/segment −1.36"
   },
   {
     "path": "testdata/soundlaws/rhotacism.tsv",
@@ -378,7 +378,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.73"
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.66"
   },
   {
     "path": "testdata/soundlaws/rhotacism_reordered.tsv",
@@ -387,7 +387,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.73"
+    "stats": "2 lects · 31 cognate sets · 22 classes · 3 conditioned · cost/segment −1.66"
   },
   {
     "path": "testdata/soundlaws/rounding_harmony.tsv",
@@ -396,7 +396,7 @@ const CORPUS_LIST = [
     "group": "Sound laws",
     "format": "tsv",
     "readable": true,
-    "stats": "2 lects · 48 cognate sets · 14 classes · 1 conditioned · cost/segment −1.85"
+    "stats": "2 lects · 48 cognate sets · 14 classes · 1 conditioned · cost/segment −1.39"
   },
   {
     "path": "experiments/arabic_hebrew/cognates.tsv",
@@ -405,7 +405,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 32 cognate sets · 43 classes · 2 conditioned · cost/segment −1.51"
+    "stats": "2 lects · 32 cognate sets · 43 classes · 2 conditioned · cost/segment −1.45"
   },
   {
     "path": "experiments/georgian_svan/cognates.tsv",
@@ -423,7 +423,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 96 cognate sets · 107 classes · 2 conditioned · cost/segment −1.25"
+    "stats": "2 lects · 96 cognate sets · 108 classes · 2 conditioned · cost/segment −1.21"
   },
   {
     "path": "experiments/latin_italian/cognates.tsv",
@@ -432,7 +432,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 95 cognate sets · 96 classes · 11 conditioned · cost/segment −2.11"
+    "stats": "2 lects · 95 cognate sets · 93 classes · 12 conditioned · cost/segment −2.02"
   },
   {
     "path": "experiments/mandarin_historical/cognates.tsv",
@@ -441,7 +441,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 84 classes · 2 conditioned · cost/segment −2.27"
+    "stats": "2 lects · 40 cognate sets · 85 classes · 3 conditioned · cost/segment −2.26"
   },
   {
     "path": "experiments/navajo_chipewyan/cognates.tsv",
@@ -450,7 +450,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 32 cognate sets · 64 classes · none conditioned · cost/segment −1.44"
+    "stats": "2 lects · 32 cognate sets · 64 classes · none conditioned · cost/segment −1.34"
   },
   {
     "path": "experiments/oe_english/cognates.tsv",
@@ -459,7 +459,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 100 cognate sets · 81 classes · 7 conditioned · cost/segment −2.48"
+    "stats": "2 lects · 100 cognate sets · 81 classes · 7 conditioned · cost/segment −2.38"
   },
   {
     "path": "experiments/swahili_zulu/cognates.tsv",
@@ -468,7 +468,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 30 cognate sets · 57 classes · none conditioned · cost/segment −1.49"
+    "stats": "2 lects · 30 cognate sets · 57 classes · none conditioned · cost/segment −1.48"
   },
   {
     "path": "experiments/turkish_azerbaijani/cognates.tsv",
@@ -477,7 +477,7 @@ const CORPUS_LIST = [
     "group": "Real languages",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 41 cognate sets · 38 classes · 3 conditioned · cost/segment −2.04"
+    "stats": "2 lects · 41 cognate sets · 38 classes · 3 conditioned · cost/segment −1.94"
   },
   {
     "path": "experiments/harmony_synthetic/cognates.tsv",
@@ -486,7 +486,7 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 45 cognate sets · 14 classes · 2 conditioned · cost/segment −1.35"
+    "stats": "2 lects · 45 cognate sets · 14 classes · 2 conditioned · cost/segment −1.34"
   },
   {
     "path": "experiments/length_conditioned_synthetic/cognates.tsv",
@@ -504,7 +504,7 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 24 cognate sets · 15 classes · none conditioned · cost/segment −1.86"
+    "stats": "2 lects · 24 cognate sets · 15 classes · none conditioned · cost/segment −1.35"
   },
   {
     "path": "experiments/stress_conditioned_synthetic/cognates.tsv",
@@ -513,7 +513,7 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 36 cognate sets · 20 classes · 2 conditioned · cost/segment −1.38"
+    "stats": "2 lects · 36 cognate sets · 20 classes · 2 conditioned · cost/segment −1.36"
   },
   {
     "path": "experiments/tone_3way_synthetic/cognates.tsv",
@@ -531,7 +531,7 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 73 cognate sets · 110 classes · 5 conditioned · cost/segment −2.55"
+    "stats": "2 lects · 73 cognate sets · 110 classes · 6 conditioned · cost/segment −2.42"
   },
   {
     "path": "experiments/tone_synthetic/cognates.tsv",
@@ -549,7 +549,7 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 74 cognate sets · 39 classes · none conditioned · cost/segment −2.80"
+    "stats": "2 lects · 74 cognate sets · 39 classes · none conditioned · cost/segment −2.71"
   },
   {
     "path": "experiments/tone_yoruba_like/cognates.tsv",
@@ -567,6 +567,6 @@ const CORPUS_LIST = [
     "group": "Synthetic phenomena",
     "format": "wide",
     "readable": true,
-    "stats": "2 lects · 40 cognate sets · 14 classes · 1 conditioned · cost/segment −1.46"
+    "stats": "2 lects · 40 cognate sets · 14 classes · 1 conditioned · cost/segment −1.45"
   }
 ];
