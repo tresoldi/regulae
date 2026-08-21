@@ -136,6 +136,13 @@ rg_status rg_score_link(
         asymmetry = -asymmetry;
     }
     *out = pair_cost + RG_DEFAULT_GAP_COST * (double)asymmetry + RG_DEFAULT_CHUNK_PENALTY * (double)asymmetry;
+    {
+        size_t pairing[RG_MAX_REORDER_SPAN];
+        if (!rg_link_is_reordering_internal(source, source_count, target, target_count, pairing)) {
+            *out += rg_chunk_prior_penalty_internal(ctx, source, source_count, target, target_count)
+                  * RG_CHUNK_CLASS_PENALTY_SCALE;
+        }
+    }
     return RG_OK;
 }
 
@@ -743,6 +750,10 @@ rg_status rg_score_link_with_context_model_internal(
             total += pair_cost;
         }
         *out = total + RG_DEFAULT_GAP_COST * (double)asymmetry + RG_DEFAULT_CHUNK_PENALTY * (double)asymmetry;
+        if (!reordering) {
+            *out += rg_chunk_prior_penalty_internal(ctx, source, source_count, target, target_count)
+                  * RG_CHUNK_CLASS_PENALTY_SCALE;
+        }
         return RG_OK;
     }
     {

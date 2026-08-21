@@ -420,6 +420,7 @@ rg_status promote_chunk_rows(
         double reduction;
         double delta_bic;
         double log_z_sum = 0.0;
+        double prior_penalty;
         size_t k_params;
         size_t j;
         if (candidates[i].count < min_chunk_obs) {
@@ -437,7 +438,11 @@ rg_status promote_chunk_rows(
         k_params = candidates[i].source_count > candidates[i].target_count
             ? candidates[i].source_count
             : candidates[i].target_count;
-        delta_bic = -2.0 * reduction + (double)k_params * log(n_observations);
+        prior_penalty = rg_chunk_prior_penalty_internal(
+            ctx,
+            candidates[i].source, candidates[i].source_count,
+            candidates[i].target, candidates[i].target_count);
+        delta_bic = -2.0 * reduction + ((double)k_params + prior_penalty) * log(n_observations);
         if (delta_bic >= 0.0) {
             continue;
         }

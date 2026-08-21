@@ -8,6 +8,11 @@
 #define RG_DEFAULT_GAP_COST 0.5
 #define RG_DEFAULT_CHUNK_PENALTY 0.25
 #define RG_CHUNK_COMPLEXITY_PENALTY 1e-9
+/* How much each unit of linguistic-plausibility prior (from
+ * rg_chunk_prior_penalty_internal) costs in the DP link score.
+ * Tier 3 (cross-class, prior 4) pays 4 * 0.20 = 0.80, enough to
+ * push the DP toward 1-to-1 links that preserve conditioning context. */
+#define RG_CHUNK_CLASS_PENALTY_SCALE 0.20
 /* Two alignments can carry mathematically identical cost; which one the DP
  * keeps then comes down to the order floating-point error happens to fall in.
  * A later candidate must beat the incumbent by more than this to displace it,
@@ -398,6 +403,19 @@ rg_status rg_chunk_transparency_internal(
     const rg_chunk_row *rows,
     size_t row_count,
     double *out
+);
+
+/* Linguistic-plausibility prior for chunk promotion, returned as extra
+ * effective parameters added to the BIC test.  Tier 1 (known processes
+ * like monophthongization, affricatization, nasal fusion) returns 0;
+ * tier 2 (same phonological class) returns 2; tier 3 (cross-class
+ * without a recognised pattern) returns 4. */
+double rg_chunk_prior_penalty_internal(
+    const rg_context *ctx,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count
 );
 
 /* Half of -log P(t|s) plus half of -log P(s|t), with no log-Z offset. Returns 0

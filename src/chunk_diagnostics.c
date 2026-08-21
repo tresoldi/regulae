@@ -384,3 +384,170 @@ rg_status rg_chunk_transparency_internal(
     *out = score;
     return RG_OK;
 }
+
+/* ------------------------------------------------------------------ */
+/* Linguistic-plausibility prior for chunk promotion.                  */
+/* ------------------------------------------------------------------ */
+
+static int all_segments_vowel(const rg_context *ctx, const rg_segment *segments, size_t count) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (!segment_has(ctx, &segments[i], "vowel")) {
+            return 0;
+        }
+    }
+    return count > 0;
+}
+
+static int all_segments_consonant(const rg_context *ctx, const rg_segment *segments, size_t count) {
+    size_t i;
+    for (i = 0; i < count; i++) {
+        if (segment_has(ctx, &segments[i], "vowel")) {
+            return 0;
+        }
+    }
+    return count > 0;
+}
+
+static int is_affrication_pattern(
+    const rg_context *ctx,
+    const rg_segment *source, size_t source_count,
+    const rg_segment *target, size_t target_count
+) {
+    if (source_count == 2 && target_count == 1) {
+        if (segment_has(ctx, &source[0], "stop") && segment_has(ctx, &source[1], "fricative") &&
+            segment_has(ctx, &target[0], "affricate")) {
+            return 1;
+        }
+    }
+    if (source_count == 1 && target_count == 2) {
+        if (segment_has(ctx, &source[0], "affricate") &&
+            segment_has(ctx, &target[0], "stop") && segment_has(ctx, &target[1], "fricative")) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int is_prenasalization_pattern(
+    const rg_context *ctx,
+    const rg_segment *source, size_t source_count,
+    const rg_segment *target, size_t target_count
+) {
+    const rg_segment *pair;
+    size_t pair_count;
+    if (source_count == 2 && target_count == 1) {
+        pair = source;
+        pair_count = source_count;
+    } else if (source_count == 1 && target_count == 2) {
+        pair = target;
+        pair_count = target_count;
+    } else {
+        return 0;
+    }
+    (void)pair_count;
+    if (segment_has(ctx, &pair[0], "nasal") &&
+        (segment_has(ctx, &pair[1], "stop") || segment_has(ctx, &pair[1], "affricate"))) {
+        return 1;
+    }
+    if ((segment_has(ctx, &pair[0], "stop") || segment_has(ctx, &pair[0], "affricate")) &&
+        segment_has(ctx, &pair[1], "nasal")) {
+        return 1;
+    }
+    return 0;
+}
+
+static int is_nasal_fusion_pattern(
+    const rg_context *ctx,
+    const rg_segment *source, size_t source_count,
+    const rg_segment *target, size_t target_count
+) {
+    const rg_segment *longer;
+    size_t longer_count;
+    const rg_segment *shorter;
+    size_t shorter_count;
+    if (source_count > target_count) {
+        longer = source; longer_count = source_count;
+        shorter = target; shorter_count = target_count;
+    } else {
+        longer = target; longer_count = target_count;
+        shorter = source; shorter_count = source_count;
+    }
+    if (longer_count != 2 || shorter_count != 1) {
+        return 0;
+    }
+    if (!segment_has(ctx, &shorter[0], "vowel")) {
+        return 0;
+    }
+    if ((segment_has(ctx, &longer[0], "vowel") && segment_has(ctx, &longer[1], "nasal")) ||
+        (segment_has(ctx, &longer[0], "nasal") && segment_has(ctx, &longer[1], "vowel"))) {
+        return 1;
+    }
+    return 0;
+}
+
+static int is_glide_pattern(
+    const rg_context *ctx,
+    const rg_segment *source, size_t source_count,
+    const rg_segment *target, size_t target_count
+) {
+    const rg_segment *longer;
+    size_t longer_count;
+    size_t i;
+    int has_vowel = 0;
+    int has_approx = 0;
+    if (source_count == target_count) {
+        return 0;
+    }
+    longer = source_count > target_count ? source : target;
+    longer_count = source_count > target_count ? source_count : target_count;
+    if (longer_count > 3) {
+        return 0;
+    }
+    for (i = 0; i < longer_count; i++) {
+        if (segment_has(ctx, &longer[i], "vowel")) {
+            has_vowel = 1;
+        }
+        if (segment_has(ctx, &longer[i], "approximant")) {
+            has_approx = 1;
+        }
+    }
+    return has_vowel && has_approx;
+}
+
+double rg_chunk_prior_penalty_internal(
+    const rg_context *ctx,
+    const rg_segment *source,
+    size_t source_count,
+    const rg_segment *target,
+    size_t target_count
+) {
+    int src_all_v = all_segments_vowel(ctx, source, source_count);
+    int src_all_c = all_segments_consonant(ctx, source, source_count);
+    int tgt_all_v = all_segments_vowel(ctx, target, target_count);
+    int tgt_all_c = all_segments_consonant(ctx, target, target_count);
+
+    if (src_all_v && tgt_all_v && source_count != target_count) {
+        return 0.0;
+    }
+
+    if (src_all_c && tgt_all_c) {
+        if (is_affrication_pattern(ctx, source, source_count, target, target_count) ||
+            is_prenasalization_pattern(ctx, source, source_count, target, target_count)) {
+            return 0.0;
+        }
+    }
+
+    if (is_nasal_fusion_pattern(ctx, source, source_count, target, target_count)) {
+        return 0.0;
+    }
+    if (is_glide_pattern(ctx, source, source_count, target, target_count)) {
+        return 0.0;
+    }
+
+    if ((src_all_v && tgt_all_v) || (src_all_c && tgt_all_c)) {
+        return 2.0;
+    }
+
+    return 4.0;
+}
