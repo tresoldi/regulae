@@ -457,6 +457,49 @@ check('a change stated on one class still reaches the events pane', () => {
     `the event row does not name the fronting: ${rendered[0].textContent}`);
 });
 
+/* An event that conditions on something has to show it, or the row reads as an
+   unconditioned correspondence and the half that makes it a finding is gone.
+   conditioned_confound is `k ~ tʃ` after a sonorant, and is built so the corpus
+   cannot tell that conditioner from "before a front vowel" -- so the row has to
+   carry the tie as well. */
+check('an event shows the environment its members condition on', () => {
+  const confound = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/soundlaws/conditioned_confound.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  assert.equal(confound.proposed_events.length, 1, 'fixture stopped stating one change');
+  assert.ok(confound.proposed_events[0].environment_alternatives > 0,
+    'fixture stopped being confounded');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(confound), elapsedMs: 1 } });
+
+  const cells = byId.get('events').querySelectorAll('td.env-cell');
+  assert.equal(cells.length, 1, 'the events table has no environment column');
+  assert.notEqual(cells[0].textContent.replace('tied', '').trim(), '—',
+    'the event row shows no environment');
+  assert.match(cells[0].textContent, /sonorant/,
+    `the environment is not the one the class conditions on: ${cells[0].textContent}`);
+  assert.match(cells[0].textContent, /tied/,
+    'the row does not mark the environment as one the corpus cannot pin down');
+
+  /* And where there is nothing to condition on, the column says so plainly
+     rather than being left to read as an environment of none. Grimm's shifts
+     are unconditioned; the corpus also states one conditioned vowel class,
+     which is an event in its own right and does carry an environment, so this
+     checks the displacement rows rather than all of them. */
+  const grimm = JSON.parse(execFileSync(
+    cli, ['train', '--json', join(repo, 'testdata/soundlaws/grimm.tsv')],
+    { encoding: 'utf8', maxBuffer: 1 << 28 }));
+  const shifts = grimm.proposed_events.filter((e) => e.axis === 'displacement');
+  assert.ok(shifts.length > 1, 'grimm stopped grouping its shifts');
+  worker.onmessage({ data: { type: 'result', json: JSON.stringify(grimm), elapsedMs: 1 } });
+  const cellsByRow = byId.get('events').querySelectorAll('td.env-cell');
+  assert.equal(cellsByRow.length, grimm.proposed_events.length, 'a row is missing its cell');
+  for (let i = 0; i < grimm.proposed_events.length; i += 1) {
+    if (grimm.proposed_events[i].axis !== 'displacement') continue;
+    assert.equal(cellsByRow[i].textContent, '—',
+      'an unconditioned grouping claimed an environment');
+  }
+});
+
 /* And when the pane really is empty, it says why rather than "(none)": a bare
    "(none)" reads as "the change was not found". metathesis_adjacent conditions
    nothing -- what moved there is the order of two segments, which is a chunk. */

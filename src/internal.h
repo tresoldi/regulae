@@ -200,6 +200,12 @@ void rg_segment_clear_internal(rg_segment *segment);
 rg_status rg_segment_copy_internal(const rg_segment *src, rg_segment *out);
 void rg_context_spec_clear_internal(rg_context_spec *context);
 rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_spec *out);
+/* What both environments state and nothing else; empty when they share none. */
+rg_status rg_context_spec_intersect_internal(
+    const rg_context_spec *a,
+    const rg_context_spec *b,
+    rg_context_spec *out
+);
 rg_status rg_feature_constraint_copy_internal(
     const rg_feature_constraint *src,
     rg_feature_constraint *out

@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 41
+#define RG_ABI_VERSION 42
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -845,7 +845,42 @@ typedef struct rg_event_member {
      * event says whether every lect managed it. */
     const char *const *class_features;
     size_t class_feature_count;
+    /* The environment every member class states at this slot, and nothing
+     * else. Empty when they share none, and when there is none to share.
+     *
+     * Intersected rather than taken from a member, because the members were
+     * each searched on their own and one routinely carries a predicate the
+     * others did not need: on Verner both members turn on primary stress in
+     * Proto-Germanic and one also picked up "before a vowel" in Gothic.
+     * Publishing that member's environment would state the incidental conjunct
+     * as part of the law.
+     *
+     * An empty spec means different things on different axes, and `axis` on the
+     * event says which: under RG_EVENT_AXIS_OUTCOME the members differ in
+     * environment by design and the emptiness is the finding, while under
+     * RG_EVENT_AXIS_DISPLACEMENT there was never an environment at all. Owned;
+     * `rg_context_spec_constraint_count` is 0 when empty. */
+    rg_context_spec context;
 } rg_event_member;
+
+/* What holds an event's members together -- and so what an empty
+ * `rg_event_member.context` on it means. */
+typedef enum rg_event_axis {
+    /* One environment, several outcomes: a change across a class of segments.
+     * The members' shared environment is on each member. Also the axis of a
+     * conditioned change that grouped with nothing, where `class_id_count` is
+     * 1 and the "shared" environment is simply that class's own. */
+    RG_EVENT_AXIS_ENVIRONMENT = 0,
+    /* One outcome, several environments: a change stated as a decision list.
+     * The members differ in environment -- that is the axis -- so the shared
+     * environment is normally empty and its emptiness is not a finding about
+     * conditioning. Read the member classes through `class_ids` for the
+     * disjunction. */
+    RG_EVENT_AXIS_OUTCOME = 1,
+    /* No environment: unconditioned classes held together by what they
+     * displace. Nothing was conditioned, so nothing is stated. */
+    RG_EVENT_AXIS_DISPLACEMENT = 2
+} rg_event_axis;
 
 /* Several conditioned classes that look like one change.
  *
@@ -904,6 +939,20 @@ typedef struct rg_proposed_event_row {
     size_t supporting_cognate_count;
     /* Whether every lect named its grapheme set with a feature. */
     bool featurally_definable;
+    /* What holds the members together, and so how to read an empty
+     * `rg_event_member.context`. */
+    rg_event_axis axis;
+    /* Rival conditioners the corpus cannot tell this event's environment from,
+     * taken as the largest any member reports. 0 when the environment is
+     * pinned, or when there is no environment.
+     *
+     * The same flag `rg_multi_class_row` carries (§4.3), lifted so that an
+     * event stating an environment also states whether that environment is the
+     * one doing the work. On `testdata/soundlaws/conditioned_confound.tsv` the
+     * change is committed after a sonorant and "before a front vowel" carves
+     * the same split, so the event names one conditioner and this says the
+     * corpus cannot choose between them. */
+    int environment_alternatives;
     /* The weakest member's evidence: the lowest `search_margin` and the
      * highest (least negative) `delta_score` any member class carries, so both
      * read as "every member clears at least this".

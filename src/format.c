@@ -1000,6 +1000,31 @@ char *rg_format_multi_model(const rg_multi_model *model, const rg_format_model_o
                     builder_append(&builder, "]");
                 }
             }
+            /* The environment every member states, per lect, in the same
+             * spelling a conditioned class row uses. A change without its
+             * conditioning is a different claim from the one that was found. */
+            for (m = 0; m < event->member_count; m++) {
+                const rg_event_member *member = &event->members[m];
+                if (rg_context_spec_constraint_count(&member->context) == 0) {
+                    continue;
+                }
+                builder_appendf(&builder, "  %s:", member->lect_id);
+                append_context(&builder, &member->context);
+            }
+            /* An event grouped by its outcome has members that differ in
+             * environment -- that is the axis -- so an empty environment is
+             * not a finding about conditioning and must not read as one. */
+            if (event->axis == RG_EVENT_AXIS_OUTCOME) {
+                builder_appendf(&builder, "  one change, %lu environments (see members)",
+                                (unsigned long)event->class_id_count);
+            }
+            if (event->environment_alternatives > 0) {
+                builder_appendf(&builder,
+                                "  [%d rival conditioner%s: the corpus cannot tell this "
+                                "environment from another]",
+                                event->environment_alternatives,
+                                event->environment_alternatives == 1 ? "" : "s");
+            }
             /* A set no feature picks out may still be the set a change applied
              * to; saying so is not the same as doubting the grouping. */
             if (!event->featurally_definable) {

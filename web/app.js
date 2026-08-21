@@ -11,7 +11,7 @@
 
 /* global CORPORA, CORPUS_LIST, GUIDE_STEPS,
    correspondence, decisionOrder, environment, eventCorrespondence,
-   eventDisplacement, isIdentity, residueReading */
+   eventDisplacement, eventEnvironment, isIdentity, residueReading */
 
 const $ = (id) => document.getElementById(id);
 
@@ -608,11 +608,11 @@ function renderEvents() {
   body.innerHTML = "";
   const events = model.proposed_events || [];
   $("events-hint").textContent = events.length
-    ? "Classes that differ only in their graphemes and share an environment or "
-      + "a feature displacement. Whether a single pooled rule beats them isn't decided here."
+    ? "Classes that look like one change, with the environment every member of "
+      + "each states. Whether a single pooled rule beats the several isn't decided here."
     : emptyEventsReading();
   if (!events.length) {
-    body.innerHTML = '<tr><td colspan="3" class="empty">(none)</td></tr>';
+    body.innerHTML = '<tr><td colspan="4" class="empty">(none)</td></tr>';
     return;
   }
   for (let ei = 0; ei < events.length; ei++) {
@@ -636,6 +636,24 @@ function renderEvents() {
       rule.textContent = `Δ: ${disp}`;
       corr.appendChild(rule);
     }
+    /* The environment the members share, in its own column as the
+       correspondence table has it. A change without its conditioning is a
+       different claim from the one that was found. */
+    const env = document.createElement("td");
+    env.className = "env-cell";
+    const reading = eventEnvironment(event);
+    env.textContent = reading || "—";
+    if (!reading) {
+      env.classList.add("empty");
+    }
+    if (event.environment_alternatives > 0) {
+      const tied = document.createElement("span");
+      tied.className = "chip tied";
+      tied.textContent = "tied";
+      tied.title = `${event.environment_alternatives} other environment(s) carve this `
+        + "split the same way, and the corpus cannot say which conditions it";
+      env.appendChild(tied);
+    }
     const count = document.createElement("td");
     count.className = "count";
     count.textContent = event.count % 1 === 0 ? event.count : event.count.toFixed(1);
@@ -643,7 +661,7 @@ function renderEvents() {
     sets.className = "sets";
     sets.textContent = event.supporting_cognates.length;
     sets.title = `${event.class_ids.length} member classes`;
-    row.append(corr, count, sets);
+    row.append(corr, env, count, sets);
     row.addEventListener("click", () => selectEventAndShow(ei));
     makeActivatable(row, () => selectEventAndShow(ei), "button");
     body.appendChild(row);

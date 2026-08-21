@@ -53,6 +53,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The three shapes a grouping can take.
+ *
+ * A change split per segment states one environment over several outcomes;
+ * a change stated over a disjunction states one outcome over several
+ * environments; an unconditioned change has no environment and is held
+ * together by what it displaces. They are the same claim -- these rows are
+ * one change -- read along different axes, and each needs its own predicate. */
+typedef enum group_mode {
+    /* Same environment, differing outcomes: the natural-class shape. */
+    GROUP_BY_ENVIRONMENT = 0,
+    /* Same outcome, differing environments: the decision-list shape. RUKI is
+     * four rules with one outcome, and `graded_7_disjunction` is built to be
+     * exactly this -- four conditioned rows, all of them `f ~ p`, under four
+     * environments no single predicate covers. Every one of them is one change,
+     * and the table could not say so because the environment predicate
+     * *required* the outcomes to differ. */
+    GROUP_BY_OUTCOME = 1,
+    /* No environment: held together by a shared feature displacement. */
+    GROUP_BY_DISPLACEMENT = 2
+} group_mode;
+
 /* Which suprasegmental dimensions each lect writes anywhere in this table.
  *
  * A dimension one lect never writes is a transcription convention, not a
@@ -749,6 +770,7 @@ static void event_row_clear(rg_proposed_event_row *row) {
             rg_free_owned_internal(supra->stress);
             free(supra);
         }
+        rg_context_spec_clear_internal(&member->context);
         member->graphemes = 0;
         member->class_features = 0;
         member->suprasegmentals = 0;
@@ -902,10 +924,51 @@ static rg_status member_suprasegmentals(
     return RG_OK;
 }
 
+/* The environment every member states at this slot, folded across them.
+ *
+ * A conditioned class carries one spec per slot; an unconditioned one carries
+ * none, and then there is nothing to intersect and nothing to say. */
+static rg_status member_environment(
+    const rg_multi_class_row *classes,
+    const size_t *indices,
+    size_t index_count,
+    size_t slot,
+    rg_context_spec *out
+) {
+    size_t i;
+    rg_status status;
+    rg_context_spec_init_empty(out);
+    if (classes[indices[0]].contexts == 0) {
+        return RG_OK;
+    }
+    status = rg_context_spec_copy_internal(&classes[indices[0]].contexts[slot], out);
+    if (status != RG_OK) {
+        return status;
+    }
+    for (i = 1; i < index_count; i++) {
+        rg_context_spec folded;
+        if (classes[indices[i]].contexts == 0) {
+            rg_context_spec_clear_internal(out);
+            rg_context_spec_init_empty(out);
+            return RG_OK;
+        }
+        status = rg_context_spec_intersect_internal(
+            out, &classes[indices[i]].contexts[slot], &folded);
+        if (status != RG_OK) {
+            rg_context_spec_clear_internal(out);
+            return status;
+        }
+        rg_context_spec_clear_internal(out);
+        *out = folded;
+    }
+    return RG_OK;
+}
+
 /* One event out of the classes at `indices`. */
 static rg_status build_event(
     const rg_context *ctx,
     const supra_scope *scope,
+    group_mode mode,
     const rg_cognate_set *cognates,
     size_t cognate_count,
     const rg_multi_class_row *classes,
@@ -949,12 +1012,20 @@ static rg_status build_event(
         if (i == 0 || row->evidence.delta_score > out->delta_score) {
             out->delta_score = row->evidence.delta_score;
         }
+        /* The least identifiable member's flag: an event is only as pinned as
+         * its worst-pinned rule. */
+        if (row->environment_alternatives > out->environment_alternatives) {
+            out->environment_alternatives = row->environment_alternatives;
+        }
         for (k = 0; k < row->supporting_cognate_count && status == RG_OK; k++) {
             status = string_array_add(&cognate_ids, &cognate_id_count,
                                       row->supporting_cognates[k]);
         }
     }
     out->featurally_definable = true;
+    out->axis = mode == GROUP_BY_OUTCOME ? RG_EVENT_AXIS_OUTCOME
+              : mode == GROUP_BY_DISPLACEMENT ? RG_EVENT_AXIS_DISPLACEMENT
+                                              : RG_EVENT_AXIS_ENVIRONMENT;
 
     for (slot = 0; slot < first->segment_count && status == RG_OK; slot++) {
         char **graphemes = 0;
@@ -1002,6 +1073,11 @@ static rg_status build_event(
                 break;
             }
             members[slot].suprasegmentals = supra;
+        }
+        status = member_environment(classes, indices, index_count, slot,
+                                    &members[slot].context);
+        if (status != RG_OK) {
+            break;
         }
         /* A slot contributing one grapheme is not a class and needs no feature
          * to name it; only the slots that vary have to be nameable. */
@@ -1211,27 +1287,6 @@ static int group_states_a_displacement(
     return shared_count > 0;
 }
 
-/* The three shapes a grouping can take.
- *
- * A change split per segment states one environment over several outcomes;
- * a change stated over a disjunction states one outcome over several
- * environments; an unconditioned change has no environment and is held
- * together by what it displaces. They are the same claim -- these rows are
- * one change -- read along different axes, and each needs its own predicate. */
-typedef enum group_mode {
-    /* Same environment, differing outcomes: the natural-class shape. */
-    GROUP_BY_ENVIRONMENT = 0,
-    /* Same outcome, differing environments: the decision-list shape. RUKI is
-     * four rules with one outcome, and `graded_7_disjunction` is built to be
-     * exactly this -- four conditioned rows, all of them `f ~ p`, under four
-     * environments no single predicate covers. Every one of them is one change,
-     * and the table could not say so because the environment predicate
-     * *required* the outcomes to differ. */
-    GROUP_BY_OUTCOME = 1,
-    /* No environment: held together by a shared feature displacement. */
-    GROUP_BY_DISPLACEMENT = 2
-} group_mode;
-
 /* Two conditioned classes state one outcome under different environments when
  * every slot agrees on the outcome and some slot disagrees on the environment.
  * The mirror of classes_share_an_environment, and deliberately not its
@@ -1377,7 +1432,7 @@ static rg_status group_classes(
             break;
         }
         *rows = next;
-        status = build_event(ctx, &scope, cognates, cognate_count, classes,
+        status = build_event(ctx, &scope, mode, cognates, cognate_count, classes,
                              indices, member_count, &(*rows)[*row_count]);
         if (status == RG_OK) {
             (*row_count)++;
@@ -1455,8 +1510,8 @@ static rg_status add_single_conditioned_changes(
             break;
         }
         *rows = next;
-        status = build_event(ctx, &scope, cognates, cognate_count, classes,
-                             &index, 1, &(*rows)[*row_count]);
+        status = build_event(ctx, &scope, GROUP_BY_ENVIRONMENT, cognates, cognate_count,
+                             classes, &index, 1, &(*rows)[*row_count]);
         if (status == RG_OK) {
             (*row_count)++;
         }

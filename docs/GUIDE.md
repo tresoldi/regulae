@@ -110,6 +110,16 @@ stop→fricative and disagree on place, and that shared step is what groups them
 Click an event row: the member classes light up in the table, and the
 alignments filter to the cognate sets behind them.
 
+Each event states the environment **every** member of it conditions on, in its
+own column. Only the shared part: the members were searched separately, so one
+routinely carries a conjunct the others did not need, and on Verner's Law the
+event states `following_stress[primary]` and drops the "before a vowel" that
+one member also picked up. Where the members differ in environment — that is
+what a decision-list grouping *is* — the column says so instead of going blank,
+because a blank there would read as unconditioned. A `tied` chip marks an
+environment the corpus cannot tell from a rival, the same flag a correspondence
+row carries.
+
 A change that lands on a single segment still appears, alone, with a member
 count of one — vowel harmony, umlaut and rhotacism are each one class in these
 corpora, and a pane that showed only groupings was blank on exactly the corpora

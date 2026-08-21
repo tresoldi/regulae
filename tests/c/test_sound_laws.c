@@ -2190,6 +2190,116 @@ static void test_admitting_single_changes_does_not_move_the_baseline(rg_context 
     rg_corpus_free(corpus);
 }
 
+/* An event states the environment its members condition on.
+ *
+ * Without it the row reads as an unconditioned correspondence: the confound
+ * fixture's `k ~ tʃ` happens after a sonorant and nowhere else, and an event
+ * that says only `k ~ tʃ` has dropped the half that makes it a finding. The
+ * same fixture is built so the corpus cannot tell that conditioner from
+ * "before a front vowel", and the event has to carry that too, or it states a
+ * conditioner more confidently than the corpus can. */
+static void test_an_event_states_its_environment(rg_context *ctx) {
+    rg_corpus *corpus = load("conditioned_confound");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "A", "k");
+    size_t m;
+    int stated = 0;
+
+    assert(event != 0);
+    assert(event->axis == RG_EVENT_AXIS_ENVIRONMENT);
+    for (m = 0; m < event->member_count; m++) {
+        if (rg_context_spec_constraint_count(&event->members[m].context) > 0) {
+            stated = 1;
+        }
+    }
+    assert(stated);
+    /* And it says the corpus cannot pin that environment down. */
+    assert(event->environment_alternatives > 0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* The environment an event states is what every member states, not what one of
+ * them happened to pick up.
+ *
+ * Each split is searched on its own, so a member routinely carries a conjunct
+ * the others did not need. On Grassmann both members turn on an aspirate
+ * somewhere ahead in Proto-Indo-European, and one also acquired "next syllable
+ * open" on the Greek side. The law is the shared half; publishing the member's
+ * whole environment would state the incidental conjunct as part of it. */
+static void test_an_event_states_only_the_shared_environment(rg_context *ctx) {
+    rg_corpus *corpus = load("grassmann");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "greek", "k,t");
+    size_t m;
+    const rg_context_spec *pie = 0;
+    const rg_context_spec *greek = 0;
+
+    assert(event != 0);
+    assert(event->class_id_count == 2);
+    for (m = 0; m < event->member_count; m++) {
+        if (strcmp(event->members[m].lect_id, "pie") == 0) {
+            pie = &event->members[m].context;
+        } else {
+            greek = &event->members[m].context;
+        }
+    }
+    assert(pie != 0 && greek != 0);
+
+    /* The law: an aspirate somewhere ahead. */
+    assert(pie->somewhere_following_count == 1);
+    assert(strcmp(pie->somewhere_following[0].feature, "aspirated") == 0);
+
+    /* And not the conjunct only one member carried. */
+    assert(rg_context_spec_constraint_count(greek) == 0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* A grouping whose members differ in environment must not claim one.
+ *
+ * The disjunction fixture is one outcome under four environments no single
+ * predicate covers -- that difference is what groups them. There is nothing
+ * shared to state, and an empty environment would read as "unconditioned",
+ * which is the opposite of the finding. The axis is what says so. */
+static void test_a_grouping_by_outcome_claims_no_shared_environment(rg_context *ctx) {
+    rg_corpus *corpus = load("graded_7_disjunction");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "daughter", "f");
+    size_t m;
+
+    assert(event != 0);
+    assert(event->class_id_count > 1);
+    assert(event->axis == RG_EVENT_AXIS_OUTCOME);
+    for (m = 0; m < event->member_count; m++) {
+        assert(rg_context_spec_constraint_count(&event->members[m].context) == 0);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
+/* An unconditioned grouping has no environment and says so by its axis, not by
+ * an empty field a reader has to interpret. */
+static void test_a_displacement_grouping_states_no_environment(rg_context *ctx) {
+    rg_corpus *corpus = load("grimm");
+    rg_multi_model *model = train(ctx, corpus);
+    const rg_proposed_event_row *event = event_over(model, "gmc", "f,x,\xce\xb8");
+    size_t m;
+
+    assert(event != 0);
+    assert(event->axis == RG_EVENT_AXIS_DISPLACEMENT);
+    assert(event->environment_alternatives == 0);
+    for (m = 0; m < event->member_count; m++) {
+        assert(rg_context_spec_constraint_count(&event->members[m].context) == 0);
+    }
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* The table is ranked by the evidence behind each grouping.
  *
  * It used to come out in the order the grouping passes run, which is an
@@ -2256,6 +2366,10 @@ int main(void) {
     test_an_annotation_only_one_lect_carries_is_not_an_event(ctx);
     test_a_change_on_one_segment_is_still_an_event(ctx);
     test_admitting_single_changes_does_not_move_the_baseline(ctx);
+    test_an_event_states_its_environment(ctx);
+    test_an_event_states_only_the_shared_environment(ctx);
+    test_a_grouping_by_outcome_claims_no_shared_environment(ctx);
+    test_a_displacement_grouping_states_no_environment(ctx);
     test_events_are_ranked_by_their_pooled_count(ctx);
     test_a_conditioned_class_publishes_its_contrast(ctx);
     test_a_conditioned_row_publishes_its_contrast(ctx);

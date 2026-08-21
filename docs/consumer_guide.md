@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 41. The public surface has moved since this
+`RG_ABI_VERSION` is 42. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1055,6 +1055,18 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **42** — a proposed event states its environment. `rg_event_member` gained
+  `context`, the `rg_context_spec` every member class states at that slot and
+  nothing else — intersected rather than taken from a member, because each
+  split was searched on its own and one routinely carries a conjunct the others
+  did not need (on Verner, one member also picked up "before a vowel" in
+  Gothic; the shared half is the law). `rg_proposed_event_row` gained `axis`
+  (`rg_event_axis`: environment, outcome, displacement) and
+  `environment_alternatives`, the largest any member reports. The axis is what
+  makes an empty `context` readable: under `OUTCOME` the members differ in
+  environment by design, under `DISPLACEMENT` there was never one. In the JSON
+  the member gains `context` only where non-empty, and the event gains `axis`
+  and `environment_alternatives`. Additive.
 - **41** — `rg_event_member` gained `suprasegmentals`: the tone, length and
   stress one lect carries across a proposed event's member classes, or NULL
   where it carries none. One value rather than an array parallel to

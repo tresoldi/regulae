@@ -298,6 +298,134 @@ rg_status rg_context_spec_copy_internal(const rg_context_spec *src, rg_context_s
     return RG_OK;
 }
 
+/* The published slots hold `const` pointers, so growing one goes through the
+ * owning alias the same way rg_feature_constraint_array_copy_internal does. */
+static rg_status context_spec_append_feature(
+    const rg_feature_constraint **items,
+    size_t *count,
+    const rg_feature_constraint *item
+) {
+    rg_feature_constraint *owned = (rg_feature_constraint *)rg_owned_internal(*items);
+    rg_feature_constraint *next =
+        (rg_feature_constraint *)realloc(owned, (*count + 1) * sizeof(*next));
+    rg_status status;
+    if (next == 0) {
+        return RG_ERR_OOM;
+    }
+    *items = next;
+    status = rg_feature_constraint_copy_internal(item, &next[*count]);
+    if (status != RG_OK) {
+        return status;
+    }
+    (*count)++;
+    return RG_OK;
+}
+
+static rg_status context_spec_append_distance(
+    const rg_distance_constraint **items,
+    size_t *count,
+    const rg_distance_constraint *item
+) {
+    rg_distance_constraint *owned = (rg_distance_constraint *)rg_owned_internal(*items);
+    rg_distance_constraint *next =
+        (rg_distance_constraint *)realloc(owned, (*count + 1) * sizeof(*next));
+    rg_status status;
+    if (next == 0) {
+        return RG_ERR_OOM;
+    }
+    *items = next;
+    next[*count].offset = item->offset;
+    status = rg_feature_constraint_copy_internal(&item->constraint,
+                                                 &next[*count].constraint);
+    if (status != RG_OK) {
+        return status;
+    }
+    (*count)++;
+    return RG_OK;
+}
+
+/* What two environments both state, and nothing else.
+ *
+ * A proposed event groups classes that were each searched on their own, so one
+ * member routinely carries a predicate the others did not need: on Verner both
+ * members turn on primary stress in Proto-Germanic and one of them also picked
+ * up "before a vowel" on the Gothic side. Publishing that member's environment
+ * as the event's would state the incidental conjunct as part of the law.
+ * Intersecting leaves `following_stress[primary]`, which is the law.
+ *
+ * Empty is a real answer -- an event grouped by its outcome has members that
+ * differ in environment by design, and the emptiness is the finding. The
+ * event's axis says which case a reader is looking at.
+ *
+ * Over the slot list, like copy and compare, so a predicate added to
+ * RG_ENV_SLOTS cannot slip out of the intersection and quietly survive into an
+ * event that does not hold it. */
+rg_status rg_context_spec_intersect_internal(
+    const rg_context_spec *a,
+    const rg_context_spec *b,
+    rg_context_spec *out
+) {
+    rg_status status;
+    if (a == 0 || b == 0 || out == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    rg_context_spec_init_empty(out);
+#define INTERSECT_STRING(name, key)                                             \
+    if (!string_absent(a->name) && string_equal(a->name, b->name)) {            \
+        out->name = rg_strdup_internal(a->name);                               \
+        if (out->name == 0) {                                                  \
+            rg_context_spec_clear_internal(out);                               \
+            return RG_ERR_OOM;                                                 \
+        }                                                                      \
+    }
+    RG_ENV_STRING_SLOTS(INTERSECT_STRING)
+#undef INTERSECT_STRING
+#define INTERSECT_FEATURES(name, label, key)                                    \
+    {                                                                          \
+        size_t i;                                                              \
+        for (i = 0; i < a->name##_count; i++) {                                \
+            size_t j;                                                          \
+            for (j = 0; j < b->name##_count; j++) {                            \
+                if (!feature_constraint_equal(a->name[i], b->name[j])) {       \
+                    continue;                                                  \
+                }                                                              \
+                status = context_spec_append_feature(                          \
+                    &out->name, &out->name##_count, &a->name[i]);              \
+                if (status != RG_OK) {                                         \
+                    rg_context_spec_clear_internal(out);                       \
+                    return status;                                             \
+                }                                                              \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
+    }
+#define INTERSECT_DISTANCES(name, label, key)                                   \
+    {                                                                          \
+        size_t i;                                                              \
+        for (i = 0; i < a->name##_count; i++) {                                \
+            size_t j;                                                          \
+            for (j = 0; j < b->name##_count; j++) {                            \
+                if (a->name[i].offset != b->name[j].offset ||                  \
+                    !feature_constraint_equal(a->name[i].constraint,           \
+                                              b->name[j].constraint)) {        \
+                    continue;                                                  \
+                }                                                              \
+                status = context_spec_append_distance(                         \
+                    &out->name, &out->name##_count, &a->name[i]);              \
+                if (status != RG_OK) {                                         \
+                    rg_context_spec_clear_internal(out);                       \
+                    return status;                                             \
+                }                                                              \
+                break;                                                         \
+            }                                                                  \
+        }                                                                      \
+    }
+    RG_ENV_SLOTS(INTERSECT_FEATURES, INTERSECT_DISTANCES)
+#undef INTERSECT_FEATURES
+#undef INTERSECT_DISTANCES
+    return RG_OK;
+}
+
 void rg_context_spec_clear_internal(rg_context_spec *context) {
     if (context == 0) {
         return;

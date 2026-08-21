@@ -99,6 +99,30 @@ function environment(entry) { // eslint-disable-line no-unused-vars
   return parts.join(" · ");
 }
 
+/* The environment an event's members all state, read like a class row's.
+ *
+ * Empty means two different things and the axis says which: on an event
+ * grouped by its outcome the members differ in environment -- that is what
+ * groups them -- and an empty cell there would read as "unconditioned", which
+ * is the opposite. On a displacement grouping there was no environment to
+ * begin with. */
+function eventEnvironment(event) { // eslint-disable-line no-unused-vars
+  const parts = [];
+  for (const member of event.members) {
+    const bits = describeContext(member.context);
+    if (bits) {
+      parts.push(`${member.lect} — ${bits}`);
+    }
+  }
+  if (parts.length) {
+    return parts.join(" · ");
+  }
+  if (event.axis === "outcome") {
+    return `one change, ${event.class_ids.length} environments — see members`;
+  }
+  return "";
+}
+
 /* A cross-dimensional rule: a segmental feature on one lect predicting a
  * suprasegmental value on another (tonogenesis is the type case). Written as a
  * correspondence, never a rewrite -- the conditioned lect *carries* the value

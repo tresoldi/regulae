@@ -308,6 +308,13 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
             cJSON_AddItemToArray(features, cJSON_CreateString(member->class_features[j]));
         }
         cJSON_AddItemToObject(entry, "class_features", features);
+        /* Only where the members share one, as on a class segment. */
+        if (rg_context_spec_constraint_count(&member->context) > 0) {
+            cJSON *context = json_context(&member->context);
+            if (context != 0) {
+                cJSON_AddItemToObject(entry, "context", context);
+            }
+        }
         cJSON_AddItemToArray(members, entry);
     }
     cJSON_AddItemToObject(out, "members", members);
@@ -317,6 +324,13 @@ static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
     cJSON_AddItemToObject(out, "supporting_cognates", support);
     cJSON_AddNumberToObject(out, "count", row->count);
     cJSON_AddBoolToObject(out, "featurally_definable", row->featurally_definable);
+    /* What holds the members together, and so how to read a member with no
+     * context: "outcome" means they differ in environment by design. */
+    cJSON_AddStringToObject(out, "axis",
+                            row->axis == RG_EVENT_AXIS_OUTCOME ? "outcome"
+                          : row->axis == RG_EVENT_AXIS_DISPLACEMENT ? "displacement"
+                                                                    : "environment");
+    cJSON_AddNumberToObject(out, "environment_alternatives", row->environment_alternatives);
     cJSON_AddNumberToObject(out, "search_margin", row->search_margin);
     cJSON_AddNumberToObject(out, "delta_score", row->delta_score);
     if (row->shared_displacement_count > 0) {
