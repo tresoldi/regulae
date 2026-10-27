@@ -7,6 +7,10 @@
 
 #define RG_DEFAULT_GAP_COST 0.5
 #define RG_DEFAULT_CHUNK_PENALTY 0.25
+/* How far below two gaps a capped substitution sits: enough to win the tie
+ * against a deletion and insertion side by side, small enough not to reorder
+ * anything else. See rg_score_link_with_context_model_internal. */
+#define RG_SUBSTITUTION_CAP_MARGIN 1e-6
 #define RG_CHUNK_COMPLEXITY_PENALTY 1e-9
 /* How much each unit of linguistic-plausibility prior (from
  * rg_chunk_prior_penalty_internal) costs in the DP link score.

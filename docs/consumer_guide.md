@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 45. The public surface has moved since this
+`RG_ABI_VERSION` is 46. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1034,7 +1034,7 @@ contract.
 public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
-signature or ownership change. It is at **45**.
+signature or ownership change. It is at **46**.
 
 **The JSON export is named and versioned.** `export_kind` is
 `"surface_relationship_model"` — the maximum-a-posteriori surface
@@ -1072,6 +1072,14 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **46** — `rg_train_options` gained `cap_substitution_cost` (default false;
+  JSON option `cap_substitution_cost`, CLI `--cap-substitutions`). With it on,
+  a 1:1 substitution under the trained model is priced at no more than the two
+  gaps it could otherwise be aligned as, so a rare substitution is no longer
+  written as a deletion beside an insertion (`k/ /n`). Off by default because
+  substitution noise then reaches the identity classes, where the split search
+  can find chance environments for it. Struct layout change on
+  `rg_train_options`.
 - **45** — `rg_bic_config` gained `class_deletion_outcomes` (default false;
   JSON option `class_deletion_outcomes`, CLI `--deletion-outcomes`). With it
   on, a lect that lost the segment enters the multi-lect class split search

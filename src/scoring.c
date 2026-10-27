@@ -787,6 +787,17 @@ rg_status rg_score_link_with_context_model_internal(
             layered_cost = seg_cost;
         }
         *out = layered_cost + model->tone_weight * tonal_model_cost(model, source[0].tone, target[0].tone);
+        /* With `cap_substitution_cost`, a substitution never costs more than
+         * the deletion and insertion it could otherwise be written as. A gap
+         * is priced at the fixed RG_DEFAULT_GAP_COST while a pair the model
+         * has barely seen is priced at its surprisal, which runs to several
+         * nats; uncapped, a rare substitution is cheaper as two indels side by
+         * side (`k/ /n`). The cap sits just under the two gaps so the DP keeps
+         * the substitution rather than breaking the tie the other way. */
+        if (options != 0 && options->cap_substitution_cost &&
+            *out > 2.0 * RG_DEFAULT_GAP_COST - RG_SUBSTITUTION_CAP_MARGIN) {
+            *out = 2.0 * RG_DEFAULT_GAP_COST - RG_SUBSTITUTION_CAP_MARGIN;
+        }
     }
     return RG_OK;
 }

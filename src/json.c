@@ -901,6 +901,7 @@ static cJSON *json_provenance(
     cJSON_AddNumberToObject(opts, "predictive_abstention_threshold", resolved.predictive_abstention_threshold);
     cJSON_AddNumberToObject(opts, "predictive_top_k", resolved.predictive_top_k);
     cJSON_AddNumberToObject(opts, "ibm1_prior", resolved.ibm1_prior);
+    cJSON_AddBoolToObject(opts, "cap_substitution_cost", resolved.cap_substitution_cost);
 
     cJSON_AddStringToObject(bic, "split_scorer", rg_split_scorer_string(resolved.bic.split_scorer));
     cJSON_AddStringToObject(bic, "class_outcome_mode", rg_class_outcome_mode_string(resolved.bic.class_outcome_mode));
@@ -1601,6 +1602,21 @@ rg_status rg_json_read_train_options_internal(
             if (status != RG_OK) {
                 break;
             }
+            continue;
+        }
+
+        /* Whether a substitution is priced at no more than two gaps; see
+         * rg_train_options.cap_substitution_cost. */
+        if (strcmp(key, "cap_substitution_cost") == 0) {
+            if (!cJSON_IsBool(item)) {
+                status = RG_ERR_PARSE;
+                if (error_detail != 0 && error_detail_size > 0) {
+                    snprintf(error_detail, error_detail_size,
+                             "option \"cap_substitution_cost\" must be true or false");
+                }
+                break;
+            }
+            out->cap_substitution_cost = cJSON_IsTrue(item) ? true : false;
             continue;
         }
 

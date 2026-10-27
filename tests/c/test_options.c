@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 45);
+    assert(rg_abi_version() == 46);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -43,6 +43,7 @@ int main(void) {
 
     rg_train_options_init_defaults(&options);
     assert(options.max_chunk_size == RG_DEFAULT_MAX_CHUNK_SIZE);
+    assert(options.cap_substitution_cost == false);
     assert(fabs(options.temperature - 1.0) < 1e-12);
     assert(fabs(options.concentration - 5.0) < 1e-12);
     assert(options.max_iter == 30);
