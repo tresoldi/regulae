@@ -328,7 +328,7 @@ lifts a directed pairwise corpus into cognate sets.
 
 `include/regulae.h` is the API contract; `RG_ABI_VERSION`
 moves on any layout, signature or ownership change. It is at
-**44**. `docs/consumer_guide.md` §7 has the full list of rules;
+**45**. `docs/consumer_guide.md` §7 has the full list of rules;
 a few of the design choices it reflects:
 
 - Each published table is handed out whole — the rows and a count

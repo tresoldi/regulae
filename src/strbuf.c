@@ -52,6 +52,9 @@ void builder_appendf(string_builder *builder, const char *format, ...) {
         return;
     }
     va_start(args, format);
+    /* `args` was started just above; LLVM 18's analyzer loses va_start on
+     * glibc's va_list and reports it uninitialised here. */
+    /* NOLINTNEXTLINE(clang-analyzer-valist.Uninitialized) */
     written = vsnprintf(scratch, sizeof(scratch), format, args);
     va_end(args);
     if (written < 0) {

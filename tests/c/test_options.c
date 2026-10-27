@@ -12,7 +12,7 @@ int main(void) {
     assert(rg_version_major() == 0);
     assert(rg_version_minor() == 1);
     assert(rg_version_patch() == 0);
-    assert(rg_abi_version() == 44);
+    assert(rg_abi_version() == 45);
     assert(strcmp(rg_status_string(RG_OK), "ok") == 0);
 
     rg_bic_config_init_defaults(&bic);
@@ -38,6 +38,8 @@ int main(void) {
     assert(bic.class_outcome_mode == RG_CLASS_OUTCOME_PER_SISTER_LECT);
     assert(strcmp(rg_class_outcome_mode_string(bic.class_outcome_mode),
                   "per_sister_lect") == 0);
+    /* Off: a deleting lect is read as absent by the class split search. */
+    assert(bic.class_deletion_outcomes == false);
 
     rg_train_options_init_defaults(&options);
     assert(options.max_chunk_size == RG_DEFAULT_MAX_CHUNK_SIZE);

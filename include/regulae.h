@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 44
+#define RG_ABI_VERSION 45
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -165,6 +165,21 @@ typedef struct rg_bic_config {
     /* How a multi-lect class split is charged for its added outcome
      * parameters -- see rg_class_outcome_mode. */
     rg_class_outcome_mode class_outcome_mode;
+    /* Whether a lect that lost the segment enters the class split search with
+     * the gap as its outcome. Off (the default), a deleting lect is read as
+     * absent from the observation, so a two-lect deletion has nothing to
+     * condition and "lost here, kept there" is never a contrast: a deletion
+     * restricted to an environment comes out unconditioned. On, the gap is an
+     * outcome like any other and a conditioned deletion is found the way a
+     * conditioned substitution is. A gap is never a pivot either way -- it has
+     * no position to read an environment from.
+     *
+     * Off by default because it also admits the gaps that chunk decomposition
+     * produces (a memorised `n k ~ n` contributes `k ~ ∅`), which can move the
+     * environment of a small rule: on testdata/soundlaws/lenition.tsv the
+     * /k/ rule is stated as `R _` rather than `V _`. Only the multi-lect class
+     * search reads this. */
+    bool class_deletion_outcomes;
 } rg_bic_config;
 
 typedef enum rg_observation_unit {

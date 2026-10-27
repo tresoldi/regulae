@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generates the graded conditioning ladder under testdata/soundlaws/.
 
-Ten corpora with the same shape and the same change -- proto /p/ answers to
+Eleven corpora with the same shape and the same change -- proto /p/ answers to
 daughter /f/ -- differing only in what conditions it. The point is to separate
 "the tool cannot find this pattern" from "the tool cannot find patterns of this
 *kind*". A single fixture that fails tells you something is wrong; a ladder
@@ -246,3 +246,14 @@ build("graded_8_weight", weight)
 build("graded_9_lost_trigger",
       lambda o, v1, v2: (f"{o} {v1} p {v2}",
                          f"{o} {v1} {'f' if v2 in FRONT else 'p'}"))
+
+
+# 10. The outcome is a deletion. Rung 1's environment exactly -- before a front
+#     vowel -- with /p/ lost rather than spirantised, and kept before a back
+#     vowel as the contrast. Deletion is among the commonest conditioned
+#     changes (intervocalic loss, syncope, loss of final consonants), and the
+#     only thing that sets this rung apart from rung 1 is that the outcome is
+#     a gap rather than a segment.
+build("graded_10_deletion",
+      lambda o, v1, v2: (f"{o} {v1} p {v2}",
+                         f"{o} {v1} {v2}" if v2 in FRONT else f"{o} {v1} p {v2}"))

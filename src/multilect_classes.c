@@ -1905,14 +1905,22 @@ rg_status multi_lect_context_discovery(
             if (obs->segment_count < 2 || obs->segment_count > 64) {
                 continue;
             }
-            /* A gap conditions nothing and has no position to read a context
-             * from, so it is neither a pivot nor a sister: the conditioning
-             * search sees the class as if the deleting lect were absent. */
+            /* A gap has no position to read a context from, so it is never a
+             * pivot. As a sister it is dropped by default, and the search sees
+             * the class as if the deleting lect were absent -- which leaves a
+             * two-lect deletion with no sister at all, so a deletion restricted
+             * to an environment can only come out unconditioned. With
+             * `class_deletion_outcomes` the gap is an outcome like any other
+             * and a conditioned deletion is found the way a conditioned
+             * substitution is. */
             if (grapheme_is_gap(obs->graphemes[p])) {
                 continue;
             }
             for (q = 0; q < obs->segment_count; q++) {
-                if (q == p || grapheme_is_gap(obs->graphemes[q])) {
+                if (q == p) {
+                    continue;
+                }
+                if (grapheme_is_gap(obs->graphemes[q]) && !options->bic.class_deletion_outcomes) {
                     continue;
                 }
                 sister_lects[sister_count] = obs->lects[q];
