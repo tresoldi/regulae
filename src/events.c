@@ -189,7 +189,7 @@ static int row_lects_all_attest(
                               : dimension[0] == 'l' ? scope->length
                                                     : scope->stress;
             if (strcmp(scope->lect_ids[k], row->lect_ids[slot]) == 0) {
-                attested = marks[k];
+                attested = marks[k] != 0;
                 break;
             }
         }
@@ -1090,6 +1090,15 @@ static rg_status build_event(
                                       row->supporting_cognates[k]);
         }
     }
+    /* Checked here, not left to the next call: the rival search below assigns
+     * `status` again, which used to swallow an out-of-memory from the loop
+     * above and leak what it had collected. */
+    if (status != RG_OK) {
+        free(members);
+        free(class_ids);
+        string_array_free(cognate_ids, cognate_id_count);
+        return status;
+    }
     out->featurally_definable = true;
     {
         rg_environment_rival *rivals = 0;
@@ -1099,6 +1108,7 @@ static rg_status build_event(
         if (status != RG_OK) {
             free(members);
             free(class_ids);
+            string_array_free(cognate_ids, cognate_id_count);
             return status;
         }
         size_t r;

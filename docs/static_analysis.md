@@ -103,6 +103,28 @@ function to return the entry rather than write it through an out-param, so
 instead of a postcondition that held only by inspection. Annotating it would
 have hidden a contract that genuinely was not enforced.
 
+## The CI image moved: 20 findings (2026-10)
+
+master's clang-tidy job had been failing since the runner image picked up a
+newer clang-tidy (LLVM 18). Twenty findings, none in code that had changed.
+
+Two were real and are fixed. In `events.c`, an out-of-memory while collecting an
+event's supporting cognates was overwritten by the next status assignment, so
+the error was lost and the collected strings leaked; it is now checked where it
+happens. In `loader_wide.c`, the status of attaching a `<lect>_length` column
+was never read, so a malformed length cell was accepted silently; it now fails
+the load as a malformed tone cell already did.
+
+Four were tidied: two branch clones in the syllable code (same behaviour, one
+condition each), and a `signed char` flag read as `int`.
+
+Fourteen were `bugprone-sizeof-expression` warning about `sizeof(*p)` where `p`
+is an array of pointers, which is the right size for the allocation. Its
+`WarnOnSizeOfPointerToAggregate` option is set to false in `.clang-tidy`; the
+rest of the check stays on. The last, `clang-analyzer-valist.Uninitialized` on
+the `vsnprintf` in `builder_appendf`, is an analyzer false positive on glibc's
+`va_list` immediately after `va_start`, and is suppressed there with the reason.
+
 ## Two measurement errors worth remembering
 
 Both produced a *clean* result from a broken measurement, which is the
