@@ -24,7 +24,7 @@ wrapper. Where a name differs, the C accessor is given alongside.
 **Where this document and `include/regulae.h` disagree, the header
 is right.**
 
-`RG_ABI_VERSION` is 44. The public surface has moved since this
+`RG_ABI_VERSION` is 45. The public surface has moved since this
 guide was first written: every published table is handed out whole
 rather than through a count/index pair (§4.9); the fields that say
 what a search decided moved into one `evidence` member (§4.6); a
@@ -1034,7 +1034,7 @@ contract.
 public struct changes its layout, so it moves the version whether
 or not it breaks a source-level consumer. The rule is:
 `RG_ABI_VERSION` moves on any exported struct layout, enum,
-signature or ownership change. It is at **44**.
+signature or ownership change. It is at **45**.
 
 **The JSON export is named and versioned.** `export_kind` is
 `"surface_relationship_model"` — the maximum-a-posteriori surface
@@ -1072,6 +1072,16 @@ time rather than silently, which is the intent.
   metathesis — which the monotone DP cannot express. The pairwise
   progress stage count is now dynamic (ten with IBM, nine without).
   Struct layout change on `rg_train_options`.
+- **45** — `rg_bic_config` gained `class_deletion_outcomes` (default false;
+  JSON option `class_deletion_outcomes`, CLI `--deletion-outcomes`). With it
+  on, a lect that lost the segment enters the multi-lect class split search
+  with the gap as its outcome instead of being read as absent, so a deletion
+  restricted to an environment can be published as a conditioned class
+  (`∅ ~ p / proto: _ E` on `graded_10_deletion`); by default the same corpus
+  publishes the loss and the retention as two unconditioned classes. It is off
+  by default because it also admits the gaps that chunk decomposition
+  produces, which can move the environment of a rule resting on a handful of
+  observations. Struct layout change on `rg_bic_config`.
 - **44** — a rival says which kind it is. `rg_environment_rival` gained
   `same_partition` and `search_margin`. True is a **confound**: it carves
   exactly the same observations, so no evidence collected this way could

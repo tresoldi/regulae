@@ -904,6 +904,7 @@ static cJSON *json_provenance(
 
     cJSON_AddStringToObject(bic, "split_scorer", rg_split_scorer_string(resolved.bic.split_scorer));
     cJSON_AddStringToObject(bic, "class_outcome_mode", rg_class_outcome_mode_string(resolved.bic.class_outcome_mode));
+    cJSON_AddBoolToObject(bic, "class_deletion_outcomes", resolved.bic.class_deletion_outcomes);
     cJSON_AddNumberToObject(bic, "split_prior_concentration", resolved.bic.split_prior_concentration);
     cJSON_AddNumberToObject(bic, "delta_bic_threshold", resolved.bic.delta_bic_threshold);
     cJSON_AddNumberToObject(bic, "min_split_observations", resolved.bic.min_split_observations);
@@ -1600,6 +1601,21 @@ rg_status rg_json_read_train_options_internal(
             if (status != RG_OK) {
                 break;
             }
+            continue;
+        }
+
+        /* Whether a deleting lect enters the class split search with the gap
+         * as its outcome; see rg_bic_config.class_deletion_outcomes. */
+        if (strcmp(key, "class_deletion_outcomes") == 0) {
+            if (!cJSON_IsBool(item)) {
+                status = RG_ERR_PARSE;
+                if (error_detail != 0 && error_detail_size > 0) {
+                    snprintf(error_detail, error_detail_size,
+                             "option \"class_deletion_outcomes\" must be true or false");
+                }
+                break;
+            }
+            out->bic.class_deletion_outcomes = cJSON_IsTrue(item) ? true : false;
             continue;
         }
 

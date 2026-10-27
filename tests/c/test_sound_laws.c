@@ -771,6 +771,37 @@ static double contrast_of(const rg_multi_model *model, const char *a, const char
     return -1.0;
 }
 
+/* Rung 10: rung 1's environment with a gap for an outcome. By default the
+ * class search reads a deleting lect as absent, so a two-lect deletion has no
+ * sister and nothing to condition: the loss and the retention come out as two
+ * unconditioned classes. `class_deletion_outcomes` makes the gap an outcome,
+ * and the deletion is then stated exactly as rung 1's spirantisation is. Both
+ * halves are asserted, so the default cannot change without this failing. */
+static void test_a_conditioned_deletion_is_conditioned(rg_context *ctx) {
+    rg_corpus *corpus = load("graded_10_deletion");
+    size_t count = rg_corpus_cognate_count(corpus);
+    const rg_cognate_set *sets = rg_corpus_cognate_at(corpus, 0);
+    rg_train_options options;
+    rg_multi_model *model = train(ctx, corpus);
+
+    assert(has_correspondence(model, "p", RG_GAP_GRAPHEME));
+    assert(has_correspondence(model, "p", "p"));
+    assert(!has_conditioned(model, "p", RG_GAP_GRAPHEME, "front"));
+    rg_multi_model_free(model);
+
+    model = 0;
+    rg_train_options_init_defaults(&options);
+    options.bic.class_deletion_outcomes = true;
+    assert(rg_train_model(ctx, sets, count, &options, &model) == RG_OK);
+    assert(has_correspondence(model, "p", RG_GAP_GRAPHEME));
+    assert(has_conditioned(model, "p", RG_GAP_GRAPHEME, "front"));
+    /* The environment covers every instance of the loss, as rung 1's does. */
+    assert(contrast_of(model, "p", RG_GAP_GRAPHEME) == 0.0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* A trigger set that is not a natural class, which is the RUKI law's shape:
  * PIE *s retracts after *r, *u, *k and *i in Indo-Iranian, Balto-Slavic,
  * Armenian and Albanian, and after nothing else. Two of the four are high
@@ -2536,6 +2567,7 @@ int main(void) {
     test_chunk_transparency_filters_the_least_readable_chunks(ctx);
     test_place_dissimilation(ctx);
     test_conditioning_ladder(ctx);
+    test_a_conditioned_deletion_is_conditioned(ctx);
     test_a_disjunctive_trigger_comes_out_as_a_decision_list(ctx);
     test_a_second_description_of_one_rule_is_not_a_second_rule(ctx);
     test_syllable_weight_is_stated_in_one_rule(ctx);

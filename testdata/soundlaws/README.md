@@ -256,7 +256,8 @@ thing `regulae check` reports and nobody runs.
 ## The graded ladder — `graded_*.tsv`
 
 Ten corpora with the same shape and the same change, proto /p/ answering to
-daughter /f/, differing only in what conditions it. Regenerate with
+daughter /f/, differing only in what conditions it, and an eleventh that keeps
+rung 1's environment and loses the /p/ instead. Regenerate with
 `scripts/graded.py`.
 
 A single fixture that fails tells you something is wrong. A ladder tells you
@@ -274,6 +275,7 @@ where the ceiling is:
 | 7 | any one of four unrelated segments | yes, as a decision list: `pre[close:+]`, `pre[stop:+]`, `pre[trill:+]` |
 | 8 | the weight of the preceding syllable | **partly** — one of the two things that make a syllable heavy |
 | 9 | a segment the daughter has since lost | yes, `fol[front:+]`, read off the proto |
+| 10 | rung 1, with deletion for an outcome | **only with `class_deletion_outcomes`** — by default the loss is unconditioned |
 
 Rung 8 is the ceiling, and it is asserted as it stands so that raising it shows
 up as a test that has to be rewritten rather than as one that starts passing by
