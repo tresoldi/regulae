@@ -42,6 +42,15 @@
 #       error under scripts/check.sh. A second opinion on the same question
 #       only adds noise.
 #
+# One check option is turned down rather than the check disabled:
+#
+#   bugprone-sizeof-expression.WarnOnSizeOfPointerToAggregate
+#       14 findings once the CI image moved to a clang-tidy that enables it,
+#       every one `calloc(n, sizeof(*p))` where `p` is an array of pointers --
+#       `sizeof(*p)` is the size of a pointer because the elements are
+#       pointers, which is exactly what the allocation needs. The rest of
+#       bugprone-sizeof-expression stays on.
+#
 # Note that the Checks: value below is a YAML block scalar: a '#' inside it is
 # part of the string, not a comment. Putting the reasoning there once silently
 # corrupted the check list and turned a clean baseline into 101 findings.
@@ -67,6 +76,9 @@ Checks: >
 # not held to regulae's warnings either; holding it to regulae's analyzer would
 # mean starting to carry them.
 HeaderFilterRegex: '(src|include)/[^/]*\.h$'
+
+CheckOptions:
+  bugprone-sizeof-expression.WarnOnSizeOfPointerToAggregate: false
 
 FormatStyle: none
 WarningsAsErrors: ''

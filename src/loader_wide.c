@@ -386,6 +386,10 @@ rg_status load_wide_tsv(
             if (length_cols[c] >= 0) {
                 status = attach_dimension(cell(row, length_cols[c]), form.segments,
                                           form.segment_count, RG_DIMENSION_LENGTH);
+                if (status != RG_OK) {
+                    loader_form_clear(&form);
+                    break;
+                }
             }
             if (tone_cols[c] >= 0) {
                 status = attach_dimension(cell(row, tone_cols[c]), form.segments, form.segment_count, RG_DIMENSION_TONE);

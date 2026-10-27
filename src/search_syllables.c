@@ -315,11 +315,11 @@ rg_status syllable_data_build(
         for (i = 0; i < n; i++) {
             size_t syl = out->syllable_of[i];
             size_t nuc = nucleus_of_syl[syl];
-            if (nuc >= starts[syl + 1]) {
-                out->syllable_role[i] = "coda";
-            } else if (i < nuc) {
+            /* A syllable with no nucleus is all coda; otherwise what precedes
+             * the nucleus is onset and what follows it is coda. */
+            if (nuc < starts[syl + 1] && i < nuc) {
                 out->syllable_role[i] = "onset";
-            } else if (i == nuc) {
+            } else if (nuc < starts[syl + 1] && i == nuc) {
                 out->syllable_role[i] = "nucleus";
             } else {
                 out->syllable_role[i] = "coda";
@@ -336,9 +336,7 @@ rg_status syllable_data_build(
     }
     for (i = 0; i < n; i++) {
         size_t syl = out->syllable_of[i];
-        if (syllable_count <= 1) {
-            out->syllable_position[i] = "initial";
-        } else if (syl == 0) {
+        if (syllable_count <= 1 || syl == 0) {
             out->syllable_position[i] = "initial";
         } else if (syl == syllable_count - 1) {
             out->syllable_position[i] = "final";
