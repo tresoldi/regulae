@@ -555,6 +555,61 @@ static void test_adding_a_lect_recovers_the_conditioned_rule(rg_context *ctx) {
     }
 }
 
+/* Observations in unconditioned classes that have a gap on some side. */
+static double gap_observations(const rg_multi_model *model, double *out_total) {
+    size_t i;
+    double gaps = 0.0;
+    double total = 0.0;
+    for (i = 0; i < rg_multi_model_unconditioned_class_count(model); i++) {
+        const rg_multi_class_row *row = rg_multi_model_unconditioned_class_at(model, i);
+        size_t j;
+        int gap = 0;
+        for (j = 0; j < row->segment_count; j++) {
+            if (strcmp(row->graphemes[j], RG_GAP_GRAPHEME) == 0) {
+                gap = 1;
+            }
+        }
+        total += row->count;
+        if (gap) {
+            gaps += row->count;
+        }
+    }
+    *out_total = total;
+    return gaps;
+}
+
+/* `arity_2` has no insertion or deletion in it: its noise substitutes one
+ * segment for another in place, and a missing lect is a missing row rather
+ * than a gap. By default about one aligned observation in seven still lands in
+ * a gap class, because a substitution the model has barely seen costs more
+ * than a deletion and an insertion side by side, and the aligner writes
+ * `k/ /n` for `k/n`. `cap_substitution_cost` prices a substitution at no more
+ * than the two gaps, and the gaps all but disappear. The rule itself is found
+ * either way. */
+static void test_a_substitution_is_not_written_as_two_gaps(rg_context *ctx) {
+    rg_corpus *corpus = load("restraint", "arity_2");
+    rg_multi_model *model = train(ctx, corpus, 0);
+    rg_train_options options;
+    double total = 0.0;
+    double gaps = gap_observations(model, &total);
+
+    assert(gaps > 0.1 * total);
+    rg_multi_model_free(model);
+
+    model = 0;
+    rg_train_options_init_defaults(&options);
+    options.cap_substitution_cost = true;
+    assert(rg_train_model(ctx, rg_corpus_cognate_at(corpus, 0),
+                          rg_corpus_cognate_count(corpus), &options, &model) == RG_OK);
+    gaps = gap_observations(model, &total);
+    assert(gaps < 0.02 * total);
+    assert(has_correspondence(model, "k", "q"));
+    assert(conditioned_rows_naming(model, "k", "q", 0) > 0);
+
+    rg_multi_model_free(model);
+    rg_corpus_free(corpus);
+}
+
 /* The evidence floor for a trigger one syllable away.
  *
  * `sparse_*` measures the floor for a change conditioned by the immediate
@@ -684,6 +739,7 @@ int main(void) {
     test_sixteen_sets_recover_the_conditioned_surface_contrast(ctx);
     test_a_neutralisation_keeps_stable_surface_correlates_explicit(ctx);
     test_adding_a_lect_recovers_the_conditioned_rule(ctx);
+    test_a_substitution_is_not_written_as_two_gaps(ctx);
     test_a_trigger_a_syllable_away_needs_five_a_side(ctx);
     test_an_unconditioned_relationship_commits_but_nothing_stands(ctx);
     rg_context_free(ctx);

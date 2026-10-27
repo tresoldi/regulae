@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 45
+#define RG_ABI_VERSION 46
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -253,6 +253,15 @@ typedef struct rg_train_options {
      * probabilities as the Dirichlet prior. 0 runs the step; negative
      * (the default) skips it. */
     int ibm1_prior;
+    /* Price a substitution under the trained model at no more than the
+     * deletion and insertion it could otherwise be written as. A gap costs
+     * the fixed default while a pair the model has barely seen costs its
+     * surprisal, so without the cap a rare substitution is aligned as two
+     * indels side by side (`k/ /n`) -- a loss and an epenthesis neither form
+     * shows. Off by default: on corpora with substitution noise the noise then
+     * lands in the identity classes, where the split search can find chance
+     * environments for it (testdata/restraint/arity_4). */
+    bool cap_substitution_cost;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
