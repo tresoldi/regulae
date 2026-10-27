@@ -84,6 +84,9 @@ static int usage(void) {
     printf("                                     the class split search with the gap\n");
     printf("                                     as its outcome, so a conditioned\n");
     printf("                                     deletion can be found\n");
+    printf("  --cap-substitutions                price a substitution at no more\n");
+    printf("                                     than the two gaps it could be\n");
+    printf("                                     aligned as\n");
     return 0;
 }
 
@@ -628,7 +631,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
                          rg_split_scorer scorer, double split_prior,
                          double search_gamma, double split_threshold,
                          double long_split_threshold, int small_sample,
-                         int deletion_outcomes,
+                         int deletion_outcomes, int substitution_cap,
                          int predictive_folds, int predictive_seed) {
     rg_load_diagnosis load_diagnosis;
     rg_context *ctx = 0;
@@ -688,6 +691,7 @@ static int command_train(const char *path, const char *format, int pairwise, int
         options.bic.multi_lect_bic_small_sample_correction = small_sample != 0;
     }
     options.bic.class_deletion_outcomes = deletion_outcomes != 0;
+    options.cap_substitution_cost = substitution_cap != 0;
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
         report_failure(ctx, "training", status);
@@ -990,6 +994,7 @@ int main(int argc, char **argv) {
     double long_split_threshold = NAN;
     int small_sample = -1;
     int deletion_outcomes = 0;
+    int substitution_cap = 0;
     int i;
 
     if (argc < 2 || strcmp(argv[1], "help") == 0 || strcmp(argv[1], "--help") == 0 || strcmp(argv[1], "-h") == 0) {
@@ -1033,6 +1038,8 @@ int main(int argc, char **argv) {
             small_sample = 1;
         } else if (strcmp(argv[i], "--deletion-outcomes") == 0) {
             deletion_outcomes = 1;
+        } else if (strcmp(argv[i], "--cap-substitutions") == 0) {
+            substitution_cap = 1;
         } else if (strcmp(argv[i], "--tune-search") == 0) {
             tune_search = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
@@ -1063,7 +1070,7 @@ int main(int argc, char **argv) {
                              tune_search, permutation_seed, feature_system,
                              scorer, split_prior, search_gamma, split_threshold,
                              long_split_threshold, small_sample,
-                             deletion_outcomes,
+                             deletion_outcomes, substitution_cap,
                              predictive_folds, predictive_seed);
     }
     if (strcmp(argv[1], "outliers") == 0) {
