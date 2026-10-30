@@ -252,6 +252,10 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_options PRIVATE regulae::regulae)
     add_test(NAME options COMMAND test_options)
 
+    add_executable(test_alignment_sampling tests/c/test_alignment_sampling.c)
+    target_link_libraries(test_alignment_sampling PRIVATE regulae::regulae m)
+    add_test(NAME alignment_sampling COMMAND test_alignment_sampling)
+
     add_executable(test_context tests/c/test_context.c)
     target_link_libraries(test_context PRIVATE regulae::regulae)
     add_test(NAME context COMMAND test_context)

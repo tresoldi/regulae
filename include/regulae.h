@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 46
+#define RG_ABI_VERSION 47
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -262,6 +262,14 @@ typedef struct rg_train_options {
      * lands in the identity classes, where the split search can find chance
      * environments for it (testdata/restraint/arity_4). */
     bool cap_substitution_cost;
+    /* Draw every alignment from p(path) proportional to exp(-cost(path) / T)
+     * instead of taking the cheapest path: forward filtering over the same
+     * moves, then backward sampling. 0 (the default) is the cheapest path, as
+     * before. The draw for a form pair is seeded from alignment_sampling_seed
+     * and the two forms, so it does not depend on call order. Ensemble members
+     * set it (docs/ensembles.md). */
+    double alignment_sampling_temperature;
+    int alignment_sampling_seed;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;

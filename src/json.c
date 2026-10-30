@@ -897,6 +897,11 @@ static cJSON *json_provenance(
     cJSON_AddBoolToObject(opts, "tune_search_penalty", resolved.tune_search_penalty);
     cJSON_AddNumberToObject(opts, "predictive_folds", resolved.predictive_folds);
     cJSON_AddNumberToObject(opts, "predictive_seed", resolved.predictive_seed);
+    if (resolved.alignment_sampling_temperature > 0.0) {
+        cJSON_AddNumberToObject(opts, "alignment_sampling_temperature",
+                                resolved.alignment_sampling_temperature);
+        cJSON_AddNumberToObject(opts, "alignment_sampling_seed", resolved.alignment_sampling_seed);
+    }
     cJSON_AddNumberToObject(opts, "predictive_min_groups", resolved.predictive_min_groups);
     cJSON_AddNumberToObject(opts, "predictive_abstention_threshold", resolved.predictive_abstention_threshold);
     cJSON_AddNumberToObject(opts, "predictive_top_k", resolved.predictive_top_k);
@@ -1564,6 +1569,8 @@ rg_status rg_json_read_train_options_internal(
         NUMBER_FIELD("predictive_abstention_threshold", predictive_abstention_threshold, double)
         NUMBER_FIELD("predictive_top_k", predictive_top_k, int)
         NUMBER_FIELD("ibm1_prior", ibm1_prior, int)
+        NUMBER_FIELD("alignment_sampling_temperature", alignment_sampling_temperature, double)
+        NUMBER_FIELD("alignment_sampling_seed", alignment_sampling_seed, int)
         NUMBER_FIELD("split_prior_concentration", bic.split_prior_concentration, double)
         NUMBER_FIELD("delta_bic_threshold", bic.delta_bic_threshold, double)
         NUMBER_FIELD("min_split_observations", bic.min_split_observations, int)

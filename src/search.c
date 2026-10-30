@@ -1,6 +1,7 @@
 #include "search_internal.h"
 
 #include <math.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -11,6 +12,59 @@ typedef struct rg_dp_step {
     size_t target_count;
     int has_step;
 } rg_dp_step;
+
+/* One candidate move into a cell, kept only when alignments are sampled. */
+typedef struct rg_dp_move {
+    size_t cell;
+    rg_dp_step step;
+    double move_cost;
+} rg_dp_move;
+
+/* splitmix64: the per-pair stream for a sampled alignment. */
+static uint64_t sample_mix(uint64_t x) {
+    x += 0x9E3779B97F4A7C15ULL;
+    x = (x ^ (x >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    x = (x ^ (x >> 27)) * 0x94D049BB133111EBULL;
+    return x ^ (x >> 31);
+}
+
+static uint64_t sample_hash_text(uint64_t h, const char *text) {
+    const unsigned char *p = (const unsigned char *)(text == 0 ? "" : text);
+    while (*p != 0) {
+        h = (h ^ *p++) * 0x100000001B3ULL;
+    }
+    return (h ^ 0x1F) * 0x100000001B3ULL;
+}
+
+/* The seed of a pair's draw: the sampling seed and the two forms' graphemes,
+ * so the draw is reproducible and independent of the order of calls. */
+static uint64_t sample_seed(const rg_train_options *options, const rg_form *a, const rg_form *b) {
+    uint64_t h = 0xCBF29CE484222325ULL ^ (uint64_t)(unsigned int)options->alignment_sampling_seed;
+    size_t i;
+    for (i = 0; i < a->segment_count; i++) {
+        h = sample_hash_text(h, a->segments[i].grapheme);
+    }
+    h = sample_hash_text(h, "|");
+    for (i = 0; i < b->segment_count; i++) {
+        h = sample_hash_text(h, b->segments[i].grapheme);
+    }
+    return sample_mix(h);
+}
+
+static double sample_uniform(uint64_t *state) {
+    *state = sample_mix(*state);
+    return (double)(*state >> 11) * (1.0 / 9007199254740992.0);
+}
+
+static double log_add_exp(double a, double b) {
+    if (isinf(a) && a < 0) {
+        return b;
+    }
+    if (isinf(b) && b < 0) {
+        return a;
+    }
+    return a > b ? a + log1p(exp(b - a)) : b + log1p(exp(a - b));
+}
 
 void form_clear(rg_form *form) {
     size_t i;
@@ -125,6 +179,14 @@ static rg_status align_forms_internal(
     size_t rev_count = 0;
     size_t rev_cap = 0;
     rg_status status = RG_OK;
+    /* Sampling: log of the summed path weight into each cell, and every
+     * candidate move, so the traceback can draw instead of taking the minimum. */
+    double temperature = options != 0 ? options->alignment_sampling_temperature : 0.0;
+    int sampling = temperature > 0.0;
+    double *log_mass = 0;
+    rg_dp_move *moves = 0;
+    size_t move_count = 0;
+    size_t move_cap = 0;
 
     if (ctx == 0 || source == 0 || target == 0 || out == 0 || (source->segment_count > 0 && source->segments == 0) || (target->segment_count > 0 && target->segments == 0)) {
         return RG_ERR_INVALID_ARGUMENT;
@@ -177,6 +239,8 @@ static rg_status align_forms_internal(
         syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
+       free(log_mass);
+       free(moves);
         return RG_ERR_OOM;
     }
     for (i = 0; i <= n; i++) {
@@ -185,6 +249,17 @@ static rg_status align_forms_internal(
         }
     }
     cost[0] = 0.0;
+    if (sampling) {
+        log_mass = (double *)malloc((n + 1) * (m + 1) * sizeof(*log_mass));
+        if (log_mass == 0) {
+            status = RG_ERR_OOM;
+        } else {
+            for (i = 0; i < (n + 1) * (m + 1); i++) {
+                log_mass[i] = -INFINITY;
+            }
+            log_mass[0] = 0.0;
+        }
+    }
     for (i = 0; i <= n && status == RG_OK; i++) {
         for (j = 0; j <= m && status == RG_OK; j++) {
             size_t k_max;
@@ -329,6 +404,30 @@ static rg_status align_forms_internal(
                           + cross_dimensional_link_adjustment(ctx, model, source, i - k,
                                                               target, j - l, k, l)
                           + RG_CHUNK_COMPLEXITY_PENALTY * (double)((int)k + (int)l - 2);
+                    if (sampling && !isinf(log_mass[(i - k) * width + (j - l)])) {
+                        double move_cost = total - prev;
+                        if (move_count == move_cap) {
+                            size_t next_cap = move_cap == 0 ? 256 : move_cap * 2;
+                            rg_dp_move *grown = (rg_dp_move *)realloc(moves, next_cap * sizeof(*moves));
+                            if (grown == 0) {
+                                status = RG_ERR_OOM;
+                                break;
+                            }
+                            moves = grown;
+                            move_cap = next_cap;
+                        }
+                        moves[move_count].cell = i * width + j;
+                        moves[move_count].step.prev_i = i - k;
+                        moves[move_count].step.prev_j = j - l;
+                        moves[move_count].step.source_count = k;
+                        moves[move_count].step.target_count = l;
+                        moves[move_count].step.has_step = 1;
+                        moves[move_count].move_cost = move_cost;
+                        move_count++;
+                        log_mass[i * width + j] = log_add_exp(
+                            log_mass[i * width + j],
+                            log_mass[(i - k) * width + (j - l)] - move_cost / temperature);
+                    }
                     if (total < cost[i * width + j] - RG_TIE_EPSILON) {
                         cost[i * width + j] = total;
                         back[i * width + j].prev_i = i - k;
@@ -348,12 +447,16 @@ static rg_status align_forms_internal(
         syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
+       free(log_mass);
+       free(moves);
         return status;
     }
     alignment = (rg_alignment *)calloc(1, sizeof(*alignment));
     if (alignment == 0) {
         free(cost);
         free(back);
+        free(log_mass);
+        free(moves);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
         feature_matrix_clear(target_features, target_feature_counts, m);
@@ -368,11 +471,52 @@ static rg_status align_forms_internal(
         rg_alignment_free(alignment);
         free(cost);
         free(back);
+        free(log_mass);
+        free(moves);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
         feature_matrix_clear(target_features, target_feature_counts, m);
         syllable_data_clear(&target_syllables);
         return status;
+    }
+    if (sampling && status == RG_OK) {
+        /* Backward sampling: from the end, draw each predecessor in proportion
+         * to the path mass it carries into the cell. Moves were appended in
+         * cell order, so a cell's moves are one contiguous run. */
+        uint64_t rng = sample_seed(options, source, target);
+        size_t cell = n * width + m;
+        size_t lo = move_count;
+        while (cell != 0 && status == RG_OK) {
+            size_t hi;
+            double u;
+            double acc = 0.0;
+            size_t pick;
+            size_t q;
+            while (lo > 0 && moves[lo - 1].cell > cell) {
+                lo--;
+            }
+            hi = lo;
+            while (lo > 0 && moves[lo - 1].cell == cell) {
+                lo--;
+            }
+            if (lo == hi || isinf(log_mass[cell])) {
+                status = RG_ERR_PARSE;
+                break;
+            }
+            u = sample_uniform(&rng);
+            pick = hi - 1;
+            for (q = lo; q < hi; q++) {
+                const rg_dp_move *mv = &moves[q];
+                size_t prev_cell = mv->step.prev_i * width + mv->step.prev_j;
+                acc += exp(log_mass[prev_cell] - mv->move_cost / temperature - log_mass[cell]);
+                if (u < acc) {
+                    pick = q;
+                    break;
+                }
+            }
+            back[cell] = moves[pick].step;
+            cell = moves[pick].step.prev_i * width + moves[pick].step.prev_j;
+        }
     }
     i = n;
     j = m;
@@ -434,6 +578,8 @@ static rg_status align_forms_internal(
         rg_alignment_free(alignment);
         free(cost);
         free(back);
+        free(log_mass);
+        free(moves);
         feature_matrix_clear(source_features, source_feature_counts, n);
         syllable_data_clear(&syllables);
         feature_matrix_clear(target_features, target_feature_counts, m);
@@ -443,6 +589,8 @@ static rg_status align_forms_internal(
     free(rev_links);
     free(cost);
     free(back);
+   free(log_mass);
+   free(moves);
     feature_matrix_clear(source_features, source_feature_counts, n);
     syllable_data_clear(&syllables);
     feature_matrix_clear(target_features, target_feature_counts, m);

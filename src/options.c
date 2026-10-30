@@ -69,6 +69,8 @@ void rg_train_options_init_defaults(rg_train_options *options) {
     options->predictive_top_k = 3;
     options->ibm1_prior = -1;
     options->cap_substitution_cost = false;
+    options->alignment_sampling_temperature = 0.0;
+    options->alignment_sampling_seed = 0;
     options->progress = 0;
     options->progress_user_data = 0;
 }
