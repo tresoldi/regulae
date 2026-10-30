@@ -169,6 +169,97 @@ static PyObject *py_train(PyObject *self, PyObject *args, PyObject *kwargs) {
     return result;
 }
 
+static PyObject *py_train_ensemble(PyObject *self, PyObject *args, PyObject *kwargs) {
+    static char *keywords[] = {"corpus_text", "format", "options_json", "members", "seed",
+                               "temperature", "partitions", NULL};
+    Py_ssize_t members = 50;
+    int seed = 20261030;
+    double temperature = 1.0;
+    int partitions = 0;
+    rg_ensemble_options eopts;
+    rg_ensemble *ensemble = NULL;
+    const char *corpus_text = NULL;
+    const char *format = "wide";
+    const char *options_json = NULL;
+    rg_context *ctx;
+    rg_corpus *corpus = NULL;
+    rg_train_options options;
+    char detail[256];
+    char *json;
+    rg_status status;
+    PyObject *result;
+
+    (void)self;
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|zznidp", keywords,
+                                     &corpus_text, &format, &options_json, &members, &seed,
+                                     &temperature, &partitions)) {
+        return NULL;
+    }
+    ctx = shared_context();
+    if (ctx == NULL) {
+        PyErr_SetString(rg_py_error, "could not create the feature context");
+        return NULL;
+    }
+    if (corpus_text[0] == '\0') {
+        PyErr_SetString(PyExc_ValueError, "the corpus is empty");
+        return NULL;
+    }
+
+    detail[0] = '\0';
+    status = rg_train_options_from_json(options_json, &options, detail, sizeof(detail));
+    if (status != RG_OK) {
+        raise_status(status, detail);
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    status = parse_corpus(ctx, corpus_text, format, &corpus);
+    Py_END_ALLOW_THREADS
+    if (status != RG_OK) {
+        char message[256];
+        if (describe_grapheme_error(ctx, status, message, sizeof(message))) {
+            raise_status(status, message);
+        } else if (status == RG_ERR_UNSUPPORTED_OPTION) {
+            PyErr_Format(PyExc_ValueError, "unknown corpus format: %s", format);
+        } else {
+            raise_status(status, "the corpus could not be read");
+        }
+        return NULL;
+    }
+    if (rg_corpus_cognate_count(corpus) == 0) {
+        rg_corpus_free(corpus);
+        PyErr_SetString(PyExc_ValueError, "no cognate set had two or more lects");
+        return NULL;
+    }
+
+    Py_BEGIN_ALLOW_THREADS
+    rg_ensemble_options_init_defaults(&eopts);
+    eopts.member_count = members > 0 ? (size_t)members : 0;
+    eopts.seed = seed;
+    eopts.alignment_temperature = temperature;
+    status = rg_train_ensemble(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                               &options, &eopts, &ensemble);
+    Py_END_ALLOW_THREADS
+    if (status != RG_OK) {
+        char message[256];
+        int described = describe_grapheme_error(ctx, status, message, sizeof(message));
+        rg_corpus_free(corpus);
+        raise_status(status, described ? message : NULL);
+        return NULL;
+    }
+
+    json = rg_ensemble_to_json(ensemble, partitions);
+    rg_ensemble_free(ensemble);
+    rg_corpus_free(corpus);
+    if (json == NULL) {
+        PyErr_SetString(rg_py_error, "could not render the ensemble");
+        return NULL;
+    }
+    result = PyUnicode_FromString(json);
+    rg_string_free(json);
+    return result;
+}
+
 /* segment(word) -> json str: how one written word will be read, so a caller can
  * check its input before a full run. */
 static PyObject *py_segment(PyObject *self, PyObject *args) {
@@ -226,6 +317,10 @@ static PyMethodDef methods[] = {
     {"train", (PyCFunction)py_train, METH_VARARGS | METH_KEYWORDS,
      "train(corpus_text, format='wide', options_json=None) -> str\n\n"
      "Train a model on a corpus and return it as JSON."},
+    {"train_ensemble", (PyCFunction)py_train_ensemble, METH_VARARGS | METH_KEYWORDS,
+     "train_ensemble(corpus_text, format='wide', options_json=None, members=50, seed=20261030,\n"
+     "               temperature=1.0, partitions=False) -> str\n\n"
+     "Train an ensemble and return the regulae_package JSON (docs/ensembles.md)."},
     {"segment", py_segment, METH_VARARGS,
      "segment(word) -> str\n\nSegment one written word and return it as JSON."},
     {"version", py_version, METH_NOARGS, "Return the library version string."},

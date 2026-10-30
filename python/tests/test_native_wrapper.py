@@ -105,3 +105,19 @@ def test_unknown_grapheme_raises() -> None:
 
 def test_segment_lifts_tone() -> None:
     assert regulae.segment("t a⁵⁵") == ["t", "a"]
+
+
+def test_train_ensemble_returns_a_c1_package() -> None:
+    import pathlib
+
+    corpus = pathlib.Path(__file__).resolve().parents[2] / "testdata" / "corpora" / "real_latin_spanish.tsv"
+    package = regulae.train_ensemble(corpus, fmt="tsv", members=3, temperature=0.25, partitions=True)
+    assert package["export_kind"] == "regulae_package"
+    assert package["approx_hint"] == "C1"
+    assert package["ensemble"]["members"] == 3
+    assert len(package["members"]) == 3
+    assert all("partition" in m for m in package["members"])
+    inclusion = [c["inclusion"] for c in package["summary"]["classes"]]
+    assert inclusion and all(0.0 < p <= 1.0 for p in inclusion)
+    again = regulae.train_ensemble(corpus, fmt="tsv", members=3, temperature=0.25, partitions=True)
+    assert again == package

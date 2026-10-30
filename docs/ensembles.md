@@ -1,6 +1,6 @@
 # Ensembles, soft cognacy, partial cognacy and lost-trigger traces
 
-**Status: design, 2026-10-30. Being implemented on branch `claude/ensembles`.**
+**Status (2026-10-30): the ensemble is implemented** (`rg_train_ensemble`, `rg_ensemble_to_json`, `regulae train --ensemble N`, `regulae.train_ensemble`); soft cognacy, partial cognacy and the lost-trigger record are next, on branch `claude/ensembles`.
 This is Stage C of `tresoldi/framework` `roadmap_beyond_columns.md`. The
 constitution requires regulae's egress to historia to be *ensembles or weighted
 samples* (§5.2). A single best-fit system is tier C0, which allows no claim
@@ -105,3 +105,26 @@ sister lost the trigger, or never had it. The record carries:
 
 It is a typed trace for historia's latent-segment proposals (framework
 `08_latent_elements.md` §6). It is not a claim about direction.
+
+## First measurements (Latin–Spanish, `testdata/corpora/real_latin_spanish.tsv`, 103 sets, 20 members)
+
+| alignment temperature | classes seen | unconditioned with inclusion ≥ 0.9 | unconditioned < 0.2 | the single model's 6 conditioned rows: inclusion |
+|---|---|---|---|---|
+| 0 (best path, resampling only) | 280 | 59 | 10 | 0.30, 0.65, 0.45, 0.25, 0.60, 0.10 |
+| 0.25 | 283 | 54 | 22 | 0.20, 0.65, 0.50, 0.10, 0.55, 0.00 |
+| 1 | 370 | 60 | 106 | 0.15, 0.25, 0.10, 0.00, 0.15, 0.10 |
+
+* **Resampling alone unsettles every environment.** None of the single
+  model's conditioned rows survives in more than 65% of members even at
+  temperature 0. The single-model export does not show this; the ensemble is
+  the first place it is visible.
+* **Read by correspondence, the conditioning is stable** (`summary.conditioned_correspondences`,
+  temperature 0). *o ~ o* is conditioned in 100% of members, *u ~ o* in 95%,
+  *p ~ b* in 75% and *k ~ θ* in 65%. The environment that conditions each
+  varies between near-equivalent predicates (`consonant` and `consonantal`).
+* **Temperature 1 is too hot for these costs.** The DP costs are
+  pseudo-surprisals, not a normalised likelihood. At T = 1 the sampled
+  alignments add about a hundred classes that appear in under 20% of members
+  (alignment noise such as *latin:e ~ spanish:r*). The temperature therefore
+  needs a principled choice, which is open; the default is still 1.
+* **Cost:** 30 s (T = 0) to 60 s (T = 1) for 20 members in a release build.

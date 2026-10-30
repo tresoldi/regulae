@@ -77,6 +77,33 @@ def train_model(
     return MultiLectModel.from_json(json.loads(payload))
 
 
+def train_ensemble(
+    source: str | os.PathLike[str],
+    *,
+    fmt: str = "wide",
+    options: Mapping[str, Any] | None = None,
+    members: int = 50,
+    seed: int = 20261030,
+    temperature: float = 1.0,
+    partitions: bool = False,
+) -> dict[str, Any]:
+    """Train an ensemble and return the ``regulae_package`` (docs/ensembles.md).
+
+    Each member resamples the observation groups with Bayesian-bootstrap
+    weights, retrains the whole pipeline, and draws its alignments at
+    ``temperature`` (0 is the cheapest path). The package carries the members
+    and a summary keyed by content: inclusion probability and rate interval
+    per class, per pair correspondence, and per correspondence conditioned
+    under any environment. A single model (``train_model``) is tier C0; this
+    is C1, the minimum the framework allows for claim export.
+    """
+    options_json = json.dumps(dict(options)) if options else None
+    payload = _native.train_ensemble(
+        _corpus_text(source), fmt, options_json, members, seed, temperature, partitions
+    )
+    return json.loads(payload)
+
+
 def segment(word: str) -> list[str]:
     """Segment one written word into graphemes, as the C core reads it.
 
@@ -114,6 +141,7 @@ __all__ = [
     "__version__",
     "abi_version",
     "segment",
+    "train_ensemble",
     "train_model",
     "version",
 ]
