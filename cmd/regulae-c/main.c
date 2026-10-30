@@ -64,8 +64,14 @@ static int usage(void) {
     printf("  --ensemble <n>                     train <n> ensemble members and print\n");
     printf("                                     the regulae_package JSON (C1 egress)\n");
     printf("  --ensemble-seed <n>                reproducible ensemble seed\n");
-    printf("  --alignment-temperature <t>        sampled-alignment temperature (1)\n");
+    printf("  --alignment-temperature <t|calibrate>\n");
+    printf("                                     sampled-alignment temperature (1), or\n");
+    printf("                                     chosen by held-out log loss\n");
     printf("  --partitions                       include per-member partitions\n");
+    printf("  --cognacy-pairs <file>             soft cognacy: <file> holds form_a,\n");
+    printf("                                     form_b, weight; the corpus is then a\n");
+    printf("                                     forms table (form_id, lect_id,\n");
+    printf("                                     meaning, segments); with --ensemble\n");
     printf("  --predictive-folds <n>             dependency-group-held-out folds;\n");
     printf("                                     selects rules inside training only\n");
     printf("  --predictive-seed <n>              reproducible group-fold seed\n");
@@ -635,6 +641,8 @@ static size_t ensemble_members = 0;
 static int ensemble_seed = -1;
 static double ensemble_temperature = -1.0;
 static int ensemble_partitions = 0;
+static int ensemble_calibrate = 0;
+static const char *cognacy_pairs = 0;
 
 static int command_train(const char *path, const char *format, int pairwise, int human,
                          int json, int permutations, int tune_search,
@@ -662,13 +670,20 @@ static int command_train(const char *path, const char *format, int pairwise, int
             return fail("selecting feature system", status);
         }
     }
-    status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
-    if (status != RG_OK) {
-        report_load_failure(ctx, status, &load_diagnosis);
+    if (cognacy_pairs != 0 && ensemble_members == 0) {
         rg_context_free(ctx);
-        return 1;
+        fprintf(stderr, "regulae: --cognacy-pairs needs --ensemble <n>: soft cognacy is sampled per member\n");
+        return 2;
     }
-    if (rg_corpus_doublet_set_count(corpus) > 0) {
+    if (cognacy_pairs == 0) {
+        status = load_corpus_with_context(ctx, path, format, &corpus, &load_diagnosis);
+        if (status != RG_OK) {
+            report_load_failure(ctx, status, &load_diagnosis);
+            rg_context_free(ctx);
+            return 1;
+        }
+    }
+    if (corpus != 0 && rg_corpus_doublet_set_count(corpus) > 0) {
         fprintf(stderr, "regulae: %lu cognate sets carry a doublet; the corpus reads as %lu extra "
                 "sets, each with its share of the confidence\n",
                 (unsigned long)rg_corpus_doublet_set_count(corpus),
@@ -714,6 +729,40 @@ static int command_train(const char *path, const char *format, int pairwise, int
         }
         if (ensemble_temperature >= 0.0) {
             eopts.alignment_temperature = ensemble_temperature;
+        }
+        eopts.calibrate_temperature = ensemble_calibrate != 0;
+        if (cognacy_pairs != 0) {
+            rg_soft_corpus *soft = 0;
+            size_t form_count = 0;
+            size_t edge_count = 0;
+            const rg_soft_form *soft_forms;
+            const rg_cognacy_edge *edges;
+            status = rg_soft_corpus_load(path, 0, cognacy_pairs, 0, &soft, &load_diagnosis);
+            if (status != RG_OK) {
+                report_load_failure(ctx, status, &load_diagnosis);
+                rg_context_free(ctx);
+                return 1;
+            }
+            soft_forms = rg_soft_corpus_forms(soft, &form_count);
+            edges = rg_soft_corpus_edges(soft, &edge_count);
+            status = rg_train_ensemble_soft(ctx, soft_forms, form_count, edges, edge_count,
+                                            &options, &eopts, &ensemble);
+            if (status == RG_OK) {
+                char *soft_text = rg_ensemble_to_json(ensemble, ensemble_partitions);
+                rg_ensemble_free(ensemble);
+                rg_soft_corpus_free(soft);
+                rg_context_free(ctx);
+                if (soft_text == 0) {
+                    return fail("rendering json", RG_ERR_OOM);
+                }
+                puts(soft_text);
+                rg_string_free(soft_text);
+                return 0;
+            }
+            rg_soft_corpus_free(soft);
+            report_failure(ctx, "ensemble training", status);
+            rg_context_free(ctx);
+            return 1;
         }
         status = rg_train_ensemble(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
                                    &options, &eopts, &ensemble);
@@ -1058,7 +1107,14 @@ int main(int argc, char **argv) {
         } else if (strcmp(argv[i], "--ensemble-seed") == 0 && i + 1 < argc) {
             ensemble_seed = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--alignment-temperature") == 0 && i + 1 < argc) {
-            ensemble_temperature = strtod(argv[++i], 0);
+            if (strcmp(argv[i + 1], "calibrate") == 0) {
+                ensemble_calibrate = 1;
+                i++;
+            } else {
+                ensemble_temperature = strtod(argv[++i], 0);
+            }
+        } else if (strcmp(argv[i], "--cognacy-pairs") == 0 && i + 1 < argc) {
+            cognacy_pairs = argv[++i];
         } else if (strcmp(argv[i], "--partitions") == 0) {
             ensemble_partitions = 1;
         } else if (strcmp(argv[i], "--permutation-seed") == 0 && i + 1 < argc) {

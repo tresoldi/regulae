@@ -1,6 +1,6 @@
 # Ensembles, soft cognacy, partial cognacy and lost-trigger traces
 
-**Status (2026-10-30): the ensemble is implemented** (`rg_train_ensemble`, `rg_ensemble_to_json`, `regulae train --ensemble N`, `regulae.train_ensemble`); soft cognacy, partial cognacy and the lost-trigger record are next, on branch `claude/ensembles`.
+**Status (2026-10-30):** the ensemble, temperature calibration and soft cognacy are implemented (`rg_train_ensemble`, `rg_train_ensemble_soft`, `rg_calibrate_alignment_temperature`, `rg_ensemble_to_json`; CLI `regulae train --ensemble N [--alignment-temperature calibrate] [--cognacy-pairs pairs.tsv]`; Python `regulae.train_ensemble`). The lost-trigger record and partial cognacy are next, on branch `claude/ensembles`.
 This is Stage C of `tresoldi/framework` `roadmap_beyond_columns.md`. The
 constitution requires regulae's egress to historia to be *ensembles or weighted
 samples* (§5.2). A single best-fit system is tier C0, which allows no claim
@@ -125,6 +125,48 @@ It is a typed trace for historia's latent-segment proposals (framework
 * **Temperature 1 is too hot for these costs.** The DP costs are
   pseudo-surprisals, not a normalised likelihood. At T = 1 the sampled
   alignments add about a hundred classes that appear in under 20% of members
-  (alignment noise such as *latin:e ~ spanish:r*). The temperature therefore
-  needs a principled choice, which is open; the default is still 1.
+  (alignment noise such as *latin:e ~ spanish:r*). The temperature is
+  therefore calibrated (next section).
 * **Cost:** 30 s (T = 0) to 60 s (T = 1) for 20 members in a release build.
+
+## Temperature calibration (author's decision, 2026-10-30)
+
+`rg_calibrate_alignment_temperature` trains with group-held-out predictive
+folds at each temperature on a grid (0, 0.05, 0.1, 0.25, 0.5, 1). Each
+temperature is averaged over sampling seeds, and the one with the lowest mean
+held-out log loss of conditioned reflexes is kept, ties going to the colder
+temperature. Held-out reflexes are always scored on the cheapest alignment
+(`best_path_options` in `predictive.c`), so only the training changes with the
+temperature and the comparison is fair. `--alignment-temperature calibrate`
+runs it before an ensemble, and the scores go into the package under
+`ensemble.temperature_calibration`.
+
+**Latin–Spanish** (5 folds, 3 seeds per temperature):
+
+| T | 0 | 0.05 | 0.1 | 0.25 | 0.5 | 1 |
+|---|---|---|---|---|---|---|
+| held-out log loss | **0.769** | 0.772 | 0.773 | 0.793 | 0.857 | 0.978 |
+
+Held-out loss rises steadily with temperature, so the calibrated temperature
+is 0. On this corpus, single sampled alignments make the model predict held-out
+reflexes worse. The ensemble's uncertainty then comes from resampling and,
+with soft cognacy, from the partition. A likely reason is that each training
+run sees one path per pair. Expected counts over all paths (soft EM, from the
+same forward pass plus a backward one) would use alignment ambiguity without
+that noise, and are the natural next step if alignment uncertainty is wanted
+in the counts.
+
+## Soft cognacy, as built
+
+`rg_soft_corpus_load` reads a forms table (`form_id lect_id meaning segments`,
+with the TSV loader's optional tone, stress and breaks) and a pairs table
+(`form_a form_b weight`). `rg_train_ensemble_soft` samples one partition per
+member, as described under "One member", and the observation groups are the
+meanings. When calibration is asked for, it runs on the partition of edges with
+weight ≥ 0.5. The package says `condition_on: sampled_partitions`, and each
+member lists its `cognate_sets` (the form ids of each set).
+
+**Romance check:** the 4-lect corpus (381 forms) was given its true pairs at
+weight 0.9 and 30 decoy edges between meanings at 0.3. Ten members at
+temperature 0 took 68 s. They held 86–93 sets each (decoys sometimes merge two
+meanings), with mean set size 3.96 (at most 4, one form per lect).

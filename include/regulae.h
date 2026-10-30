@@ -1816,7 +1816,50 @@ typedef struct rg_ensemble_options {
     size_t member_count;
     int seed;
     double alignment_temperature;
+    /* Choose alignment_temperature by held-out predictive log loss first
+     * (rg_calibrate_alignment_temperature over its default grid), and record
+     * the scores in the export. */
+    bool calibrate_temperature;
+    int calibration_folds;
+    int calibration_repeats;
 } rg_ensemble_options;
+
+/* One temperature's held-out score. `log_loss_mean` is the confidence-weighted
+ * log loss of held-out reflexes under group-held-out folds, averaged over
+ * `repeats` sampling seeds (one at temperature 0, which draws nothing); the
+ * held-out reflexes are scored on the cheapest alignment at every
+ * temperature, so only the training changes. */
+typedef struct rg_temperature_score {
+    double temperature;
+    double log_loss_mean;
+    double log_loss_sd;
+    size_t repeats;
+    size_t observations;
+} rg_temperature_score;
+
+#define RG_TEMPERATURE_GRID_DEFAULT_COUNT 6
+
+/* Scores each temperature in `grid` (NULL: 0, 0.05, 0.1, 0.25, 0.5, 1) and
+ * writes the one with the lowest mean held-out log loss to *best. `scores`
+ * receives grid_count entries. RG_ERR_UNSUPPORTED_OPTION when the corpus is
+ * too small for group-held-out folds (predictive status descriptive-only). */
+RG_API rg_status rg_calibrate_alignment_temperature(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const double *grid,
+    size_t grid_count,
+    int folds,
+    int repeats,
+    rg_temperature_score *scores,
+    double *best
+);
+/* The calibration an ensemble ran, if any: count 0 when it did not. */
+RG_API const rg_temperature_score *rg_ensemble_temperature_scores(
+    const rg_ensemble *ensemble,
+    size_t *count
+);
 
 RG_API void rg_ensemble_options_init_defaults(rg_ensemble_options *options);
 RG_API rg_status rg_train_ensemble(
@@ -1829,7 +1872,56 @@ RG_API rg_status rg_train_ensemble(
 );
 RG_API size_t rg_ensemble_member_count(const rg_ensemble *ensemble);
 RG_API const rg_multi_model *rg_ensemble_member_at(const rg_ensemble *ensemble, size_t index);
-/* The weight factor each cognate set carried in a member (mean 1). */
+/* Soft cognacy (docs/ensembles.md): forms, and pairwise cognacy weights
+ * between them (cognator's q(pairs)). Each member keeps every edge with
+ * probability equal to its weight, takes connected components as cognate
+ * sets, and where a component holds several forms of one lect, draws one of
+ * them. The Bayesian bootstrap then resamples meanings. Temperature
+ * calibration, when asked for, runs on the partition of edges with weight at
+ * least 0.5. */
+typedef struct rg_soft_form {
+    const char *form_id;
+    const char *lect_id;
+    const char *meaning;
+    rg_form form;
+} rg_soft_form;
+
+typedef struct rg_cognacy_edge {
+    size_t a;
+    size_t b;
+    double weight;
+} rg_cognacy_edge;
+
+/* Loads a soft-cognacy corpus from a forms table (form_id, lect_id, meaning,
+ * segments, and optionally tone, stress, breaks, read as the TSV loader reads
+ * them) and a pairs table (form_a, form_b, weight in [0, 1]). Each source is a
+ * path, or text when the path is NULL. */
+typedef struct rg_soft_corpus rg_soft_corpus;
+RG_API rg_status rg_soft_corpus_load(
+    const char *forms_path,
+    const char *forms_text,
+    const char *pairs_path,
+    const char *pairs_text,
+    rg_soft_corpus **out,
+    rg_load_diagnosis *diagnosis
+);
+RG_API const rg_soft_form *rg_soft_corpus_forms(const rg_soft_corpus *corpus, size_t *count);
+RG_API const rg_cognacy_edge *rg_soft_corpus_edges(const rg_soft_corpus *corpus, size_t *count);
+RG_API void rg_soft_corpus_free(rg_soft_corpus *corpus);
+
+RG_API rg_status rg_train_ensemble_soft(
+    const rg_context *ctx,
+    const rg_soft_form *forms,
+    size_t form_count,
+    const rg_cognacy_edge *edges,
+    size_t edge_count,
+    const rg_train_options *options,
+    const rg_ensemble_options *ensemble_options,
+    rg_ensemble **out
+);
+
+/* The weight factor each of a member's cognate sets carried (mean 1 over the
+ * observation groups). With soft cognacy each member has its own sets. */
 RG_API const double *rg_ensemble_member_set_weights(
     const rg_ensemble *ensemble,
     size_t index,

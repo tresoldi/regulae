@@ -500,13 +500,19 @@ struct rg_ensemble {
     rg_multi_model **members;
     size_t member_count;
     int *member_seeds;
+    /* Per member: its cognate sets' ids, their member forms (form ids joined
+     * by spaces; soft cognacy only), and the weight factor each carried. */
+    size_t *set_counts;
+    char ***set_ids;
+    char ***set_forms;
     double **set_weights;
-    size_t cognate_count;
-    char **cognate_ids;
+    int sampled_partitions;
     rg_ensemble_options options;
     rg_observation_unit unit;
     size_t group_count;
     char *feature_system;
+    rg_temperature_score *temperature_scores;
+    size_t temperature_score_count;
 };
 
 #endif

@@ -171,7 +171,9 @@ static PyObject *py_train(PyObject *self, PyObject *args, PyObject *kwargs) {
 
 static PyObject *py_train_ensemble(PyObject *self, PyObject *args, PyObject *kwargs) {
     static char *keywords[] = {"corpus_text", "format", "options_json", "members", "seed",
-                               "temperature", "partitions", NULL};
+                               "temperature", "partitions", "calibrate", "pairs_text", NULL};
+    int calibrate = 0;
+    const char *pairs_text = NULL;
     Py_ssize_t members = 50;
     int seed = 20261030;
     double temperature = 1.0;
@@ -190,9 +192,9 @@ static PyObject *py_train_ensemble(PyObject *self, PyObject *args, PyObject *kwa
     PyObject *result;
 
     (void)self;
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|zznidp", keywords,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "s|zznidppz", keywords,
                                      &corpus_text, &format, &options_json, &members, &seed,
-                                     &temperature, &partitions)) {
+                                     &temperature, &partitions, &calibrate, &pairs_text)) {
         return NULL;
     }
     ctx = shared_context();
@@ -210,6 +212,46 @@ static PyObject *py_train_ensemble(PyObject *self, PyObject *args, PyObject *kwa
     if (status != RG_OK) {
         raise_status(status, detail);
         return NULL;
+    }
+
+    if (pairs_text != NULL) {
+        /* Soft cognacy: corpus_text is a forms table, pairs_text the weights. */
+        rg_soft_corpus *soft = NULL;
+        rg_load_diagnosis diagnosis;
+        size_t form_count = 0;
+        size_t edge_count = 0;
+        const rg_soft_form *soft_forms;
+        const rg_cognacy_edge *edges;
+        status = rg_soft_corpus_load(NULL, corpus_text, NULL, pairs_text, &soft, &diagnosis);
+        if (status != RG_OK) {
+            raise_status(status, "the soft-cognacy corpus could not be read");
+            return NULL;
+        }
+        soft_forms = rg_soft_corpus_forms(soft, &form_count);
+        edges = rg_soft_corpus_edges(soft, &edge_count);
+        rg_ensemble_options_init_defaults(&eopts);
+        eopts.member_count = members > 0 ? (size_t)members : 0;
+        eopts.seed = seed;
+        eopts.alignment_temperature = temperature;
+        eopts.calibrate_temperature = calibrate != 0;
+        Py_BEGIN_ALLOW_THREADS
+        status = rg_train_ensemble_soft(ctx, soft_forms, form_count, edges, edge_count,
+                                        &options, &eopts, &ensemble);
+        Py_END_ALLOW_THREADS
+        rg_soft_corpus_free(soft);
+        if (status != RG_OK) {
+            raise_status(status, NULL);
+            return NULL;
+        }
+        json = rg_ensemble_to_json(ensemble, partitions);
+        rg_ensemble_free(ensemble);
+        if (json == NULL) {
+            PyErr_SetString(rg_py_error, "could not render the ensemble");
+            return NULL;
+        }
+        result = PyUnicode_FromString(json);
+        rg_string_free(json);
+        return result;
     }
 
     Py_BEGIN_ALLOW_THREADS
@@ -237,6 +279,7 @@ static PyObject *py_train_ensemble(PyObject *self, PyObject *args, PyObject *kwa
     eopts.member_count = members > 0 ? (size_t)members : 0;
     eopts.seed = seed;
     eopts.alignment_temperature = temperature;
+    eopts.calibrate_temperature = calibrate != 0;
     status = rg_train_ensemble(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
                                &options, &eopts, &ensemble);
     Py_END_ALLOW_THREADS

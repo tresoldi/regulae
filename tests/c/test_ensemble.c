@@ -144,6 +144,83 @@ int main(void) {
         sets[0].confidence = 1.0;
     }
 
+    /* Soft cognacy: every set's two forms at weight 0.9, a decoy third form
+     * of the new lect at 0.3, and a cross-meaning edge at 0.05. */
+    {
+        rg_soft_form soft[SETS * 3];
+        rg_cognacy_edge edges[SETS * 2 + 1];
+        char form_ids[SETS * 3][12];
+        char meanings[SETS][8];
+        word decoys[SETS];
+        size_t edge_count = 0;
+        rg_ensemble *s1 = 0;
+        rg_ensemble *s2 = 0;
+        char *t1;
+        char *t2;
+        size_t distinct_counts = 0;
+        size_t last = (size_t)-1;
+        for (i = 0; i < SETS; i++) {
+            size_t l;
+            snprintf(meanings[i], sizeof(meanings[i]), "m%02zu", i);
+            decoys[i] = make("s u n a");
+            for (l = 0; l < 3; l++) {
+                rg_soft_form *f = &soft[i * 3 + l];
+                memset(f, 0, sizeof(*f));
+                snprintf(form_ids[i * 3 + l], sizeof(form_ids[0]), "f%02zu_%zu", i, l);
+                f->form_id = form_ids[i * 3 + l];
+                f->lect_id = l == 0 ? "old" : "new";
+                f->meaning = meanings[i];
+                f->form.lect_id = f->lect_id;
+                if (l < 2) {
+                    f->form.segments = words[i][l].segs;
+                    f->form.segment_count = words[i][l].n;
+                } else {
+                    f->form.segments = decoys[i].segs;
+                    f->form.segment_count = decoys[i].n;
+                }
+            }
+            edges[edge_count].a = i * 3;
+            edges[edge_count].b = i * 3 + 1;
+            edges[edge_count++].weight = 0.9;
+            edges[edge_count].a = i * 3;
+            edges[edge_count].b = i * 3 + 2;
+            edges[edge_count++].weight = 0.3;
+        }
+        edges[edge_count].a = 0;
+        edges[edge_count].b = 4;
+        edges[edge_count++].weight = 0.05;
+
+        rg_ensemble_options_init_defaults(&eopts);
+        eopts.member_count = 6;
+        eopts.alignment_temperature = 0.0;
+        assert(rg_train_ensemble_soft(ctx, soft, SETS * 3, edges, edge_count, &options, &eopts, &s1) == RG_OK);
+        assert(rg_ensemble_member_count(s1) == 6);
+        for (m = 0; m < 6; m++) {
+            size_t count = 0;
+            rg_ensemble_member_set_weights(s1, m, &count);
+            assert(count > 0 && count <= SETS);
+            if (count != last) {
+                distinct_counts++;
+                last = count;
+            }
+        }
+        /* Sampled partitions differ between members. */
+        assert(distinct_counts >= 2);
+        assert(rg_train_ensemble_soft(ctx, soft, SETS * 3, edges, edge_count, &options, &eopts, &s2) == RG_OK);
+        t1 = rg_ensemble_to_json(s1, 1);
+        t2 = rg_ensemble_to_json(s2, 1);
+        assert(t1 != 0 && t2 != 0 && strcmp(t1, t2) == 0);
+        assert(strstr(t1, "\"condition_on\":\"sampled_partitions\"") != 0);
+        assert(strstr(t1, "\"cognate_sets\"") != 0);
+        rg_string_free(t1);
+        rg_string_free(t2);
+        rg_ensemble_free(s1);
+        rg_ensemble_free(s2);
+        /* An edge weight outside [0, 1] is refused. */
+        edges[0].weight = 1.2;
+        assert(rg_train_ensemble_soft(ctx, soft, SETS * 3, edges, edge_count, &options, &eopts, &s1) == RG_ERR_INVALID_ARGUMENT);
+    }
+
     rg_ensemble_free(a);
     rg_context_free(ctx);
     printf("ensemble: ok\n");

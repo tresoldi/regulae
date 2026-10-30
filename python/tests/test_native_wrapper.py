@@ -121,3 +121,25 @@ def test_train_ensemble_returns_a_c1_package() -> None:
     assert inclusion and all(0.0 < p <= 1.0 for p in inclusion)
     again = regulae.train_ensemble(corpus, fmt="tsv", members=3, temperature=0.25, partitions=True)
     assert again == package
+
+
+def test_train_ensemble_with_soft_cognacy(tmp_path) -> None:
+    forms = ["form_id\tlect_id\tmeaning\tsegments"]
+    pairs = ["form_a\tform_b\tweight"]
+    words = [("p a t a", "p a d a"), ("k a p a", "k a b a"), ("t o p a", "t o b a"),
+             ("m a t a", "m a d a"), ("l u p a", "l u b a"), ("s a p o", "s a b o")]
+    for i, (old, new) in enumerate(words):
+        forms.append(f"o{i}\told\tm{i}\t{old}")
+        forms.append(f"n{i}\tnew\tm{i}\t{new}")
+        pairs.append(f"o{i}\tn{i}\t0.8")
+    (tmp_path / "forms.tsv").write_text("\n".join(forms) + "\n", encoding="utf-8")
+    (tmp_path / "pairs.tsv").write_text("\n".join(pairs) + "\n", encoding="utf-8")
+    package = regulae.train_ensemble(
+        tmp_path / "forms.tsv", cognacy_pairs=tmp_path / "pairs.tsv", members=4, temperature=0
+    )
+    assert package["condition_on"] == "sampled_partitions"
+    counts = {len(m["cognate_sets"]) for m in package["members"]}
+    assert all(1 <= c <= len(words) for c in counts)
+    for member in package["members"]:
+        for cognate_set in member["cognate_sets"]:
+            assert len(cognate_set["forms"].split()) == 2

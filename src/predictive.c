@@ -6,6 +6,23 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* Held-out reflexes are always scored on the cheapest alignment. A model
+ * trained on sampled alignments is still evaluated on fixed ones, so the
+ * evaluation does not get noisier as the training temperature rises; that is
+ * what lets held-out log loss compare temperatures. */
+static const rg_train_options *best_path_options(
+    const rg_train_options *options,
+    rg_train_options *scratch
+) {
+    if (options == 0 || options->alignment_sampling_temperature <= 0.0) {
+        return options;
+    }
+    *scratch = *options;
+    scratch->alignment_sampling_temperature = 0.0;
+    return scratch;
+}
+
+
 #define RG_PREDICTIVE_CALIBRATION_BINS 10
 #define RG_PREDICTIVE_RULE_MIN_OBSERVATIONS 8
 #define RG_PREDICTIVE_FLOOR 1e-12
@@ -988,9 +1005,13 @@ static rg_status score_leave_one_lect_out_target(
         /* Prediction is evaluated per reflex. Letting a promoted chunk absorb
          * a changed segment makes that segment disappear from the denominator
          * and rewards the model for declining its hardest cases. */
-        status = rg_align_forms_with_model(ctx, direction->model, options,
-                                           &source_form->form, &target_form->form,
-                                           1, &alignment);
+        {
+            rg_train_options scratch;
+            status = rg_align_forms_with_model(ctx, direction->model,
+                                               best_path_options(options, &scratch),
+                                               &source_form->form, &target_form->form,
+                                               1, &alignment);
+        }
         if (status != RG_OK) {
             break;
         }
@@ -1189,8 +1210,11 @@ static rg_status score_one_pair(
     }
     /* See the leave-one-lect-out path above: learned chunks still affected
      * training, but a held-out categorical reflex must remain an observation. */
-    status = rg_align_forms_with_model(ctx, fold_model, options, source, target,
-                                       1, &alignment);
+    {
+        rg_train_options scratch;
+        status = rg_align_forms_with_model(ctx, fold_model, best_path_options(options, &scratch),
+                                           source, target, 1, &alignment);
+    }
     if (status == RG_OK) {
         status = rg_form_position_contexts_internal(ctx, target, &target_contexts,
                                                     &target_context_count);

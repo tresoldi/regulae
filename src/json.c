@@ -1845,7 +1845,8 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
     cJSON_AddStringToObject(root, "feature_system",
                             ensemble->feature_system != 0 ? ensemble->feature_system : "");
     cJSON_AddStringToObject(root, "approx_hint", "C1");
-    cJSON_AddStringToObject(root, "condition_on", "caller_cognate_sets");
+    cJSON_AddStringToObject(root, "condition_on",
+                            ensemble->sampled_partitions ? "sampled_partitions" : "caller_cognate_sets");
     meta = cJSON_AddObjectToObject(root, "ensemble");
     if (meta != 0) {
         cJSON_AddNumberToObject(meta, "members", (double)ensemble->member_count);
@@ -1855,6 +1856,22 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
         cJSON_AddStringToObject(meta, "member_weights", "equal");
         cJSON_AddStringToObject(meta, "observation_unit", rg_observation_unit_string(ensemble->unit));
         cJSON_AddNumberToObject(meta, "group_count", (double)ensemble->group_count);
+        if (ensemble->temperature_score_count > 0) {
+            cJSON *cal = cJSON_AddArrayToObject(meta, "temperature_calibration");
+            for (i = 0; i < ensemble->temperature_score_count; i++) {
+                const rg_temperature_score *score = &ensemble->temperature_scores[i];
+                cJSON *entry = cJSON_CreateObject();
+                if (entry == 0) {
+                    break;
+                }
+                cJSON_AddNumberToObject(entry, "temperature", score->temperature);
+                cJSON_AddNumberToObject(entry, "heldout_log_loss", score->log_loss_mean);
+                cJSON_AddNumberToObject(entry, "heldout_log_loss_sd", score->log_loss_sd);
+                cJSON_AddNumberToObject(entry, "repeats", (double)score->repeats);
+                cJSON_AddNumberToObject(entry, "observations", (double)score->observations);
+                cJSON_AddItemToArray(cal, entry);
+            }
+        }
     }
     members = cJSON_AddArrayToObject(root, "members");
     for (m = 0; m < ensemble->member_count && !failed; m++) {
@@ -1880,8 +1897,24 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
         cJSON_AddNumberToObject(member, "seed", ensemble->member_seeds[m]);
         cJSON_AddNumberToObject(member, "weight", 1.0 / (double)ensemble->member_count);
         weights = cJSON_AddArrayToObject(member, "set_weights");
-        for (i = 0; i < ensemble->cognate_count; i++) {
+        for (i = 0; i < ensemble->set_counts[m]; i++) {
             cJSON_AddItemToArray(weights, cJSON_CreateNumber(ensemble->set_weights[m][i]));
+        }
+        if (ensemble->sampled_partitions) {
+            /* The member's own cognate sets: which forms its sampled partition
+             * put together. */
+            cJSON *sets_json = cJSON_AddArrayToObject(member, "cognate_sets");
+            for (i = 0; i < ensemble->set_counts[m]; i++) {
+                cJSON *set = cJSON_CreateObject();
+                if (set == 0) {
+                    failed = 1;
+                    break;
+                }
+                cJSON_AddStringToObject(set, "cognate_id", ensemble->set_ids[m][i]);
+                cJSON_AddStringToObject(set, "forms",
+                    ensemble->set_forms[m] != 0 ? ensemble->set_forms[m][i] : "");
+                cJSON_AddItemToArray(sets_json, set);
+            }
         }
         keys = (char **)calloc(unconditioned_count + conditioned_count + 1, sizeof(*keys));
         if (keys == 0) {
@@ -2017,8 +2050,8 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
                 }
                 cJSON_AddItemToArray(partition, entry);
                 cJSON_AddStringToObject(entry, "cognate_id",
-                    position->cognate_index < ensemble->cognate_count
-                        ? ensemble->cognate_ids[position->cognate_index] : "");
+                    position->cognate_index < ensemble->set_counts[m]
+                        ? ensemble->set_ids[m][position->cognate_index] : "");
                 cells = cJSON_AddArrayToObject(entry, "positions");
                 for (s = 0; s < position->segment_count; s++) {
                     cJSON *cell = cJSON_CreateObject();

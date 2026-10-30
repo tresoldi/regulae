@@ -84,8 +84,9 @@ def train_ensemble(
     options: Mapping[str, Any] | None = None,
     members: int = 50,
     seed: int = 20261030,
-    temperature: float = 1.0,
+    temperature: float | str = 1.0,
     partitions: bool = False,
+    cognacy_pairs: str | os.PathLike[str] | None = None,
 ) -> dict[str, Any]:
     """Train an ensemble and return the ``regulae_package`` (docs/ensembles.md).
 
@@ -96,10 +97,24 @@ def train_ensemble(
     per class, per pair correspondence, and per correspondence conditioned
     under any environment. A single model (``train_model``) is tier C0; this
     is C1, the minimum the framework allows for claim export.
+
+    ``temperature="calibrate"`` first chooses it by held-out log loss over
+    the default grid. With ``cognacy_pairs`` (form_a, form_b, weight), the
+    source is a forms table (form_id, lect_id, meaning, segments) and each
+    member samples its own cognate partition from the weights.
     """
     options_json = json.dumps(dict(options)) if options else None
+    calibrate = temperature == "calibrate"
     payload = _native.train_ensemble(
-        _corpus_text(source), fmt, options_json, members, seed, temperature, partitions
+        _corpus_text(source),
+        fmt,
+        options_json,
+        members,
+        seed,
+        1.0 if calibrate else float(temperature),
+        partitions,
+        calibrate,
+        None if cognacy_pairs is None else _corpus_text(cognacy_pairs),
     )
     return json.loads(payload)
 

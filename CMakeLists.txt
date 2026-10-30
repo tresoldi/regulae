@@ -123,6 +123,7 @@ add_library(regulae
     src/loader_corpus.c
     src/loader_wide.c
     src/loader_tsv.c
+    src/loader_soft.c
     src/loader_gled.c
     src/loader_arcaverborum.c
     src/chunk_diagnostics.c
