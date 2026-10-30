@@ -268,6 +268,10 @@ if(REGULAE_BUILD_TESTS)
     target_compile_definitions(test_partial_cognacy PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
     add_test(NAME partial_cognacy COMMAND test_partial_cognacy)
 
+    add_executable(test_soft_morphemes tests/c/test_soft_morphemes.c)
+    target_link_libraries(test_soft_morphemes PRIVATE regulae::regulae)
+    add_test(NAME soft_morphemes COMMAND test_soft_morphemes)
+
     add_executable(test_alignment_sampling tests/c/test_alignment_sampling.c)
     target_link_libraries(test_alignment_sampling PRIVATE regulae::regulae m)
     add_test(NAME alignment_sampling COMMAND test_alignment_sampling)

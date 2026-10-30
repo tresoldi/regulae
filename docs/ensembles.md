@@ -246,7 +246,19 @@ sonorant, morpheme index 1, and an open previous syllable.
 * Morpheme sets cut from one word are not independent, but each is its own
   observation group in the bootstrap. A consumer that wants them resampled
   together can tie them with `etymon_group`.
-* The wide, GLED and soft loaders do not yet read per-morpheme ids.
+* The wide and GLED loaders do not yet read per-morpheme ids. The soft
+  loader reads morpheme-level pairs (below).
+
+**Morpheme-level soft cognacy.** The soft loader's pairs table may carry
+`morph_a` and `morph_b`, 0-based morpheme indices over each form's `breaks`.
+This is the shape cognator's partial-cognacy export writes. When those
+columns are present, every form is expanded into morpheme nodes
+`form_id#k`, and each node is a span pointing at its whole word. A form
+without breaks is one node, `#0`, and keeps its own frame. Pairs connect
+nodes, partitions are sampled over nodes, and the ensemble's cognate sets
+list node ids. The partial-cognacy machinery above then reads environments
+from the whole word. An index past a form's morphemes is a parse error with
+its line (`tests/c/test_soft_morphemes.c`).
 
 ## Soft EM (ABI 49)
 
