@@ -294,6 +294,35 @@ the word", over 5 of those sets (*os, focus, novem, novus, costa*). The
 diphthongisation is conditioned by stress, not by that, so the row is best
 read as a chance environment that the softened counts let through.
 
+**Romance, 4 lects** (`real_romance_4lect.tsv`, same grid):
+
+| T | 0 | 0.05 | 0.1 | 0.25 | 0.5 | 1 |
+|---|---|---|---|---|---|---|
+| held-out log loss | 1.051 | 1.047 | 1.043 | **1.037** | 1.096 | 1.312 |
+
+Here soft EM does help. Loss falls steadily to T = 0.25, which the
+calibration chooses, and is 1.3% below hard EM there. Sampled alignments
+never got below hard EM on this corpus (best 1.051 at T = 0). The gain is
+small, it comes from one fold partition, and soft EM is deterministic, so no
+spread over seeds is available to judge it by.
+
+What changes in the model at T = 0.25: conditioned classes go from 8 to 12.
+Read by correspondence, 6 are shared and 6 are new:
+* Latin *p* : Italian *p* : Spanish *b* : French *v* is the Western Romance
+  lenition of intervocalic *p* (*sapere > sapere, saber, savoir*). Hard EM
+  has no conditioned row for it.
+* The other new rows are the vowel correspondences *o ~ o ~ ɔ*, *u ~ o ~ ø*
+  and two three-lect *o / u ~ o* subsets.
+
+Two conditioned vowel identities (*e ~ e ~ e ~ a* and *i ~ i ~ i ~ i*) are
+dropped. Rare unconditioned classes (total count < 2) are almost unchanged:
+92 under hard EM, 95 under soft. Where several correspondences compete for
+one segment, expected counts let the second reading keep enough mass to be
+tested as a conditioned split.
+
+The two corpora disagree, so the default stays at hard EM. Calibrate per
+corpus with `--soft-em calibrate`.
+
 One caveat applies to the comparison. Held-out reflexes are scored on the
 cheapest path at every temperature, which is a Viterbi reading. Soft EM
 might do better under a scorer that marginalises over alignments as well.
