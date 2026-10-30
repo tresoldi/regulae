@@ -147,8 +147,17 @@ runs it before an ensemble, and the scores go into the package under
 |---|---|---|---|---|---|---|
 | held-out log loss | **0.769** | 0.772 | 0.773 | 0.793 | 0.857 | 0.978 |
 
-Held-out loss rises steadily with temperature, so the calibrated temperature
-is 0. On this corpus, single sampled alignments make the model predict held-out
+**Romance, 4 lects** (`real_romance_4lect.tsv`, same grid; T = 0 is
+deterministic, so it is run once):
+
+| T | 0 | 0.05 | 0.1 | 0.25 | 0.5 | 1 |
+|---|---|---|---|---|---|---|
+| held-out log loss | **1.051** | 1.058 ± 0.009 | 1.063 ± 0.008 | 1.060 ± 0.013 | 1.115 ± 0.031 | 1.391 ± 0.039 |
+
+On both corpora held-out loss rises with temperature, so the calibrated
+temperature is 0. On Romance, 0.05–0.25 sit within about two seed SDs of
+each other but all above 0. The 4-lect run took about 2.5 hours in a release
+build. On this corpus, single sampled alignments make the model predict held-out
 reflexes worse. The ensemble's uncertainty then comes from resampling and,
 with soft cognacy, from the partition. A likely reason is that each training
 run sees one path per pair. Expected counts over all paths (soft EM, from the
