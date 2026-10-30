@@ -111,7 +111,7 @@ static void parse_form(const char *raw, rg_segment **segments_out, size_t *count
 }
 
 static rg_form form_view(const char *lect, const rg_segment *segments, size_t count, const int *breaks, size_t break_count) {
-    rg_form form;
+    rg_form form = {0};
     form.lect_id = lect;
     form.segments = segments;
     form.segment_count = count;

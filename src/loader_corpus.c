@@ -160,6 +160,133 @@ int string_list_contains(const char *const *items, size_t count, const char *val
     return 0;
 }
 
+/* The next blank-separated token of a writable string, or 0 at its end. */
+static char *next_token(char **cursor) {
+    char *start = *cursor;
+    char *end;
+    while (*start == ' ' || *start == '\t') {
+        start++;
+    }
+    if (*start == '\0') {
+        *cursor = start;
+        return 0;
+    }
+    end = start;
+    while (*end != '\0' && *end != ' ' && *end != '\t') {
+        end++;
+    }
+    if (*end != '\0') {
+        *end++ = '\0';
+    }
+    *cursor = end;
+    return start;
+}
+
+static int int_cmp(const void *a, const void *b) {
+    int x = *(const int *)a;
+    int y = *(const int *)b;
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+rg_status corpus_add_morpheme_spans(rg_corpus *corpus, loader_form *form, const char *ids,
+                                    double confidence, int has_confidence) {
+    size_t bounds[66];
+    size_t bound_count = 0;
+    size_t word_index;
+    char *copy;
+    char *tok;
+    char *cursor;
+    size_t morpheme = 0;
+    size_t i;
+    rg_status status = RG_OK;
+
+    /* The morphemes: [0, b1), [b1, b2), ... [bk, n), from the form's breaks. */
+    bounds[bound_count++] = 0;
+    if (form->morpheme_break_count > 64) {
+        return RG_ERR_PARSE;
+    }
+    if (form->morpheme_break_count > 0) {
+        int sorted[64];
+        memcpy(sorted, form->morpheme_breaks, form->morpheme_break_count * sizeof(int));
+        qsort(sorted, form->morpheme_break_count, sizeof(int), int_cmp);
+        for (i = 0; i < form->morpheme_break_count; i++) {
+            if (sorted[i] > 0 && (size_t)sorted[i] < form->segment_count &&
+                (size_t)sorted[i] != bounds[bound_count - 1]) {
+                bounds[bound_count++] = (size_t)sorted[i];
+            }
+        }
+    }
+    bounds[bound_count++] = form->segment_count;
+
+    if (corpus->word_count == corpus->word_cap) {
+        size_t cap = corpus->word_cap == 0 ? 16 : corpus->word_cap * 2;
+        loader_form *grown = (loader_form *)realloc(corpus->words, cap * sizeof(*grown));
+        if (grown == 0) {
+            return RG_ERR_OOM;
+        }
+        corpus->words = grown;
+        corpus->word_cap = cap;
+    }
+    copy = rg_strdup_internal(ids);
+    if (copy == 0) {
+        return RG_ERR_OOM;
+    }
+    /* Count first, so a mismatch refuses the row before anything moves. */
+    cursor = copy;
+    while (next_token(&cursor) != 0) {
+        morpheme++;
+    }
+    free(copy);
+    if (morpheme != bound_count - 1) {
+        return RG_ERR_PARSE;
+    }
+    word_index = corpus->word_count;
+    corpus->words[corpus->word_count++] = *form;
+    memset(form, 0, sizeof(*form));
+    form = &corpus->words[word_index];
+
+    copy = rg_strdup_internal(ids);
+    if (copy == 0) {
+        return RG_ERR_OOM;
+    }
+    morpheme = 0;
+    cursor = copy;
+    for (tok = next_token(&cursor); tok != 0 && status == RG_OK;
+         tok = next_token(&cursor), morpheme++) {
+        rg_form view;
+        loader_form span;
+        loader_cognate *cognate;
+        if (strcmp(tok, "-") == 0) {
+            continue;
+        }
+        memset(&view, 0, sizeof(view));
+        view.segments = form->segments + bounds[morpheme];
+        view.segment_count = bounds[morpheme + 1] - bounds[morpheme];
+        status = loader_form_from(&view, form->lect_id, &span);
+        if (status != RG_OK) {
+            break;
+        }
+        span.word_ref = word_index + 1;
+        span.word_offset = bounds[morpheme];
+        cognate = corpus_ensure_cognate(corpus, tok);
+        if (cognate == 0) {
+            loader_form_clear(&span);
+            status = RG_ERR_OOM;
+            break;
+        }
+        if (has_confidence && (!cognate->has_confidence || confidence < cognate->confidence)) {
+            cognate->confidence = confidence;
+            cognate->has_confidence = 1;
+        }
+        status = cognate_append_form(cognate, &span);
+        if (status != RG_OK) {
+            loader_form_clear(&span);
+        }
+    }
+    free(copy);
+    return status;
+}
+
 /* Publishes borrowed rg_cognate_set views over the accumulated data, dropping
  * cognate sets with fewer than min_lects forms. */
 /* How many ways one cognate may be expanded. A doublet in one lect gives two,
@@ -239,6 +366,23 @@ rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
         }
         kept += combinations;
     }
+    if (corpus->word_count > 0) {
+        corpus->word_views = (rg_form *)calloc(corpus->word_count, sizeof(*corpus->word_views));
+        if (corpus->word_views == 0) {
+            return RG_ERR_OOM;
+        }
+        for (i = 0; i < corpus->word_count; i++) {
+            const loader_form *word = &corpus->words[i];
+            rg_form *view = &corpus->word_views[i];
+            view->lect_id = word->lect_id;
+            view->segments = word->segments;
+            view->segment_count = word->segment_count;
+            view->morpheme_breaks = word->morpheme_breaks;
+            view->morpheme_break_count = word->morpheme_break_count;
+            view->syllable_breaks = word->syllable_breaks;
+            view->syllable_break_count = word->syllable_break_count;
+        }
+    }
     corpus->view = (rg_cognate_set *)calloc(kept == 0 ? 1 : kept, sizeof(*corpus->view));
     corpus->view_forms = (rg_cognate_form **)calloc(kept == 0 ? 1 : kept, sizeof(*corpus->view_forms));
     if (corpus->view == 0 || corpus->view_forms == 0) {
@@ -292,6 +436,10 @@ rg_status corpus_publish(rg_corpus *corpus, int min_lects) {
                 forms[g].form.morpheme_break_count = source->morpheme_break_count;
                 forms[g].form.syllable_breaks = source->syllable_breaks;
                 forms[g].form.syllable_break_count = source->syllable_break_count;
+                if (source->word_ref > 0 && source->word_ref <= corpus->word_count) {
+                    forms[g].form.word = &corpus->word_views[source->word_ref - 1];
+                    forms[g].form.word_offset = source->word_offset;
+                }
             }
             corpus->view[kept].cognate_id = cognate->cognate_id;
             corpus->view[kept].etymon_group = cognate->etymon_group;
@@ -356,6 +504,11 @@ void rg_corpus_free(rg_corpus *corpus) {
     }
     free(corpus->view_forms);
     free(corpus->view);
+    for (i = 0; i < corpus->word_count; i++) {
+        loader_form_clear(&corpus->words[i]);
+    }
+    free(corpus->words);
+    free(corpus->word_views);
     free(corpus);
 }
 

@@ -176,6 +176,10 @@ static rg_status align_forms_internal(
     const rg_feature_constraint **target_features = 0;
     size_t *target_feature_counts = 0;
     syllable_data target_syllables;
+    const rg_form *source_word;
+    const rg_form *target_word;
+    size_t source_offset;
+    size_t target_offset;
     size_t rev_count = 0;
     size_t rev_cap = 0;
     rg_status status = RG_OK;
@@ -198,33 +202,43 @@ static rg_status align_forms_internal(
     if (max_chunk_size < 1) {
         return RG_ERR_INVALID_ARGUMENT;
     }
+    if (!form_span_valid(source) || !form_span_valid(target)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
     n = source->segment_count;
     m = target->segment_count;
+    /* Environments are built on the whole word a span sits in (rg_form.word);
+     * the DP itself runs over the span, and indexes the word's arrays at the
+     * span's offset. */
+    source_word = form_context_word(source);
+    target_word = form_context_word(target);
+    source_offset = form_context_offset(source);
+    target_offset = form_context_offset(target);
     memset(&syllables, 0, sizeof(syllables));
     memset(&target_syllables, 0, sizeof(target_syllables));
     if (model != 0) {
-        status = feature_matrix_build(ctx, source, &source_features, &source_feature_counts);
+        status = feature_matrix_build(ctx, source_word, &source_features, &source_feature_counts);
         if (status != RG_OK) {
             return status;
         }
         if (model->has_target_conditioned) {
-            status = feature_matrix_build(ctx, target, &target_features, &target_feature_counts);
+            status = feature_matrix_build(ctx, target_word, &target_features, &target_feature_counts);
             if (status == RG_OK) {
-                status = syllable_data_build(ctx, target, target_features, target_feature_counts,
+                status = syllable_data_build(ctx, target_word, target_features, target_feature_counts,
                                              &target_syllables);
             }
         }
         if (status != RG_OK) {
-            feature_matrix_clear(source_features, source_feature_counts, source->segment_count);
-            feature_matrix_clear(target_features, target_feature_counts, target->segment_count);
+            feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
+            feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
             syllable_data_clear(&target_syllables);
             return status;
         }
-        status = syllable_data_build(ctx, source, source_features, source_feature_counts, &syllables);
+        status = syllable_data_build(ctx, source_word, source_features, source_feature_counts, &syllables);
         if (status != RG_OK) {
-            feature_matrix_clear(source_features, source_feature_counts, n);
+            feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
             syllable_data_clear(&syllables);
-            feature_matrix_clear(target_features, target_feature_counts, m);
+            feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
             syllable_data_clear(&target_syllables);
             return status;
         }
@@ -233,9 +247,9 @@ static rg_status align_forms_internal(
     cost = (double *)calloc((n + 1) * (m + 1), sizeof(*cost));
     back = (rg_dp_step *)calloc((n + 1) * (m + 1), sizeof(*back));
     if (cost == 0 || back == 0) {
-        feature_matrix_clear(source_features, source_feature_counts, n);
+        feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
         syllable_data_clear(&syllables);
-        feature_matrix_clear(target_features, target_feature_counts, m);
+        feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
@@ -346,22 +360,22 @@ static rg_status align_forms_internal(
                         rg_context_spec target_link_context;
                         int have_target = model->has_target_conditioned;
                         build_link_context_borrowed(
-                            source,
+                            source_word,
                             source_features,
                             source_feature_counts,
                             &syllables,
-                            i - k,
+                            source_offset + (i - k),
                             k,
                             l,
                             &link_context
                         );
                         if (have_target) {
                             build_link_context_borrowed(
-                                target,
+                                target_word,
                                 target_features,
                                 target_feature_counts,
                                 &target_syllables,
-                                j - l,
+                                target_offset + (j - l),
                                 l,
                                 k,
                                 &target_link_context
@@ -441,9 +455,9 @@ static rg_status align_forms_internal(
         }
     }
     if (status != RG_OK) {
-        feature_matrix_clear(source_features, source_feature_counts, n);
+        feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
         syllable_data_clear(&syllables);
-        feature_matrix_clear(target_features, target_feature_counts, m);
+        feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         free(cost);
         free(back);
@@ -457,9 +471,9 @@ static rg_status align_forms_internal(
         free(back);
         free(log_mass);
         free(moves);
-        feature_matrix_clear(source_features, source_feature_counts, n);
+        feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
         syllable_data_clear(&syllables);
-        feature_matrix_clear(target_features, target_feature_counts, m);
+        feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         return RG_ERR_OOM;
     }
@@ -473,9 +487,9 @@ static rg_status align_forms_internal(
         free(back);
         free(log_mass);
         free(moves);
-        feature_matrix_clear(source_features, source_feature_counts, n);
+        feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
         syllable_data_clear(&syllables);
-        feature_matrix_clear(target_features, target_feature_counts, m);
+        feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         return status;
     }
@@ -546,6 +560,8 @@ static rg_status align_forms_internal(
             target,
             step.prev_j,
             step.target_count,
+            source_word,
+            source_offset,
             source_features,
             source_feature_counts,
             &syllables,
@@ -580,9 +596,9 @@ static rg_status align_forms_internal(
         free(back);
         free(log_mass);
         free(moves);
-        feature_matrix_clear(source_features, source_feature_counts, n);
+        feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
         syllable_data_clear(&syllables);
-        feature_matrix_clear(target_features, target_feature_counts, m);
+        feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         return status;
     }
@@ -591,9 +607,9 @@ static rg_status align_forms_internal(
     free(back);
    free(log_mass);
    free(moves);
-    feature_matrix_clear(source_features, source_feature_counts, n);
+    feature_matrix_clear(source_features, source_feature_counts, source_word->segment_count);
     syllable_data_clear(&syllables);
-    feature_matrix_clear(target_features, target_feature_counts, m);
+    feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
     syllable_data_clear(&target_syllables);
     *out = alignment;
     return RG_OK;

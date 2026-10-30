@@ -37,6 +37,10 @@ typedef struct loader_form {
     size_t morpheme_break_count;
     int *syllable_breaks;
     size_t syllable_break_count;
+    /* A morpheme span (partial cognacy): 1 + the index of its whole word in
+     * rg_corpus.words, and where the span starts in it. 0: its own word. */
+    size_t word_ref;
+    size_t word_offset;
 } loader_form;
 
 typedef struct loader_cognate {
@@ -61,6 +65,12 @@ struct rg_corpus {
     size_t doublet_expansion_count;
     rg_cognate_form **view_forms;
     size_t view_form_group_count;
+    /* Whole words whose morphemes were entered as spans, and their published
+     * views, which the spans' rg_form.word points at. */
+    loader_form *words;
+    size_t word_count;
+    size_t word_cap;
+    rg_form *word_views;
 };
 
 
@@ -100,6 +110,11 @@ rg_status cognate_append_form(loader_cognate *cognate, loader_form *form);
 rg_status cognate_set_groups(loader_cognate *cognate, const char *etymon_group,
                              const char *source_group);
 rg_status corpus_publish(rg_corpus *corpus, int min_lects);
+/* Moves `form` into the corpus's whole words and enters one span per morpheme
+ * into the cognate set its id names ("-" for none), as partial cognacy. The
+ * ids are space-separated, one per morpheme of the form's morpheme breaks. */
+rg_status corpus_add_morpheme_spans(rg_corpus *corpus, loader_form *form, const char *ids,
+                                    double confidence, int has_confidence);
 void loader_cognate_clear(loader_cognate *cognate);
 
 /* ---- the four readers, called by the public entry points in loaders.c --------*/

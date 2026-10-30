@@ -16,8 +16,8 @@ static rg_segment seg(const char *g) {
 static void test_names_the_grapheme(rg_context *ctx) {
     rg_segment source[2];
     rg_segment target[2];
-    rg_form a;
-    rg_form b;
+    rg_form a = {0};
+    rg_form b = {0};
     rg_alignment *alignment = 0;
     const char *grapheme = 0;
     const char *system = 0;
@@ -52,8 +52,8 @@ static void test_names_the_grapheme(rg_context *ctx) {
 static void test_source_markup_is_told_apart(rg_context *ctx) {
     rg_segment source[1];
     rg_segment target[1];
-    rg_form a;
-    rg_form b;
+    rg_form a = {0};
+    rg_form b = {0};
     rg_alignment *alignment = 0;
     const char *grapheme = 0;
     rg_grapheme_diagnosis diagnosis;
@@ -103,8 +103,8 @@ static void test_diagnosis_localises_the_break(rg_context *ctx) {
 static void test_latest_failure_wins(rg_context *ctx) {
     rg_segment source[1];
     rg_segment target[1];
-    rg_form a;
-    rg_form b;
+    rg_form a = {0};
+    rg_form b = {0};
     rg_alignment *alignment = 0;
     const char *grapheme = 0;
 
@@ -134,8 +134,8 @@ static void test_latest_failure_wins(rg_context *ctx) {
 static void test_cached_failure_still_names_it(rg_context *ctx) {
     rg_segment source[1];
     rg_segment target[1];
-    rg_form a;
-    rg_form b;
+    rg_form a = {0};
+    rg_form b = {0};
     rg_alignment *alignment = 0;
     const char *grapheme = 0;
     int i;

@@ -61,7 +61,20 @@ void form_clear(rg_form *form);
 
 /* ---- search_context.c: the environment an aligned position sits in */
 rg_status build_link_context( const rg_form *source, const rg_feature_constraint *const *source_features, const size_t *source_feature_counts, const syllable_data *syllables, size_t source_start, size_t source_count, size_t target_count, rg_context_spec *out );
-rg_status link_from_slice( const rg_context *ctx, const rg_form *source, size_t source_start, size_t source_count, const rg_form *target, size_t target_start, size_t target_count, const rg_feature_constraint *const *source_features, const size_t *source_feature_counts, const syllable_data *syllables, rg_link *out );
+/* The word a form's environments are read from, and where the form sits in
+ * it: the form itself at 0 unless it is a morpheme span (rg_form.word). */
+static inline const rg_form *form_context_word(const rg_form *form) {
+    return form->word != 0 ? form->word : form;
+}
+static inline size_t form_context_offset(const rg_form *form) {
+    return form->word != 0 ? form->word_offset : 0;
+}
+/* A span must lie inside its word, segment for segment. */
+int form_span_valid(const rg_form *form);
+/* `context_source` is the word the link's environment is read from and
+ * `context_offset` where the aligned span starts in it; the segments come
+ * from `source`. */
+rg_status link_from_slice( const rg_context *ctx, const rg_form *source, size_t source_start, size_t source_count, const rg_form *target, size_t target_start, size_t target_count, const rg_form *context_source, size_t context_offset, const rg_feature_constraint *const *source_features, const size_t *source_feature_counts, const syllable_data *syllables, rg_link *out );
 void build_link_context_borrowed( const rg_form *source, const rg_feature_constraint *const *source_features, const size_t *source_feature_counts, const syllable_data *syllables, size_t source_start, size_t source_count, size_t target_count, rg_context_spec *out );
 void morpheme_placement( const rg_form *form, size_t start, size_t end, const char **out_position, const char **out_index );
 

@@ -34,7 +34,7 @@ static void test_breaks_match_go_reference(rg_context *ctx) {
     size_t c;
     for (c = 0; c < sizeof(cases) / sizeof(cases[0]); c++) {
         rg_segment segments[8];
-        rg_form form;
+        rg_form form = {0};
         int *breaks = 0;
         size_t break_count = 0;
         size_t i;
@@ -67,7 +67,7 @@ static void test_breaks_match_go_reference(rg_context *ctx) {
  * phonotactics and must be returned unchanged. */
 static void test_supplied_breaks_are_respected(rg_context *ctx) {
     rg_segment segments[5];
-    rg_form form;
+    rg_form form = {0};
     int supplied[2] = {1, 4};
     int *breaks = 0;
     size_t break_count = 0;
@@ -96,7 +96,7 @@ static void test_supplied_breaks_are_respected(rg_context *ctx) {
  * Go bridge, which maps an unresolved grapheme to an absent feature set. */
 static void test_unknown_grapheme_does_not_fail(rg_context *ctx) {
     rg_segment segments[3];
-    rg_form form;
+    rg_form form = {0};
     int *breaks = 0;
     size_t break_count = 0;
 
@@ -116,7 +116,7 @@ static void test_unknown_grapheme_does_not_fail(rg_context *ctx) {
 /* Syllable count for a word given as a space-free list of graphemes. */
 static size_t syllable_count(rg_context *ctx, const char *const *graphemes, size_t n) {
     rg_segment segments[16];
-    rg_form form;
+    rg_form form = {0};
     int *breaks = 0;
     size_t break_count = 0;
     size_t i;
@@ -161,7 +161,7 @@ static void test_clicks_and_implosives_are_stops(rg_context *ctx) {
     static const char *click_word[] = { "k", "a", "m", "\xc7\x80", "o" };
     static const char *implosive_word[] = { "k", "a", "m", "\xc9\x93", "o" };
     rg_segment segments[8];
-    rg_form form;
+    rg_form form = {0};
     int *breaks = 0;
     size_t break_count = 0;
     size_t i;

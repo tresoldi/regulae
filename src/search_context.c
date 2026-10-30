@@ -406,6 +406,8 @@ rg_status rg_form_position_contexts_internal(
     size_t *feature_counts = 0;
     syllable_data syllables;
     rg_context_spec *contexts = 0;
+    const rg_form *word;
+    size_t offset;
     size_t i;
     rg_status status;
 
@@ -417,36 +419,63 @@ rg_status rg_form_position_contexts_internal(
     if (form->segment_count == 0) {
         return RG_OK;
     }
+    if (!form_span_valid(form)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    /* A morpheme span reads its environments off the whole word; position i
+     * of the span is position offset + i of the word. */
+    word = form_context_word(form);
+    offset = form_context_offset(form);
     memset(&syllables, 0, sizeof(syllables));
-    status = feature_matrix_build(ctx, form, &features, &feature_counts);
+    status = feature_matrix_build(ctx, word, &features, &feature_counts);
     if (status != RG_OK) {
         return status;
     }
-    status = syllable_data_build(ctx, form, features, feature_counts, &syllables);
+    status = syllable_data_build(ctx, word, features, feature_counts, &syllables);
     if (status != RG_OK) {
-        feature_matrix_clear(features, feature_counts, form->segment_count);
+        feature_matrix_clear(features, feature_counts, word->segment_count);
         return status;
     }
     contexts = (rg_context_spec *)calloc(form->segment_count, sizeof(*contexts));
     if (contexts == 0) {
-        feature_matrix_clear(features, feature_counts, form->segment_count);
+        feature_matrix_clear(features, feature_counts, word->segment_count);
         syllable_data_clear(&syllables);
         return RG_ERR_OOM;
     }
     for (i = 0; i < form->segment_count; i++) {
-        status = build_link_context(form, features, feature_counts, &syllables, i, 1, 1, &contexts[i]);
+        status = build_link_context(word, features, feature_counts, &syllables, offset + i, 1, 1,
+                                    &contexts[i]);
         if (status != RG_OK) {
             rg_context_spec_array_free_internal(contexts, i);
-            feature_matrix_clear(features, feature_counts, form->segment_count);
+            feature_matrix_clear(features, feature_counts, word->segment_count);
             syllable_data_clear(&syllables);
             return status;
         }
     }
-    feature_matrix_clear(features, feature_counts, form->segment_count);
+    feature_matrix_clear(features, feature_counts, word->segment_count);
     syllable_data_clear(&syllables);
     *out = contexts;
     *out_count = form->segment_count;
     return RG_OK;
+}
+
+int form_span_valid(const rg_form *form) {
+    size_t i;
+    if (form->word == 0) {
+        return 1;
+    }
+    if (form->word == form || form->word->word != 0 ||
+        form->word_offset + form->segment_count > form->word->segment_count) {
+        return 0;
+    }
+    for (i = 0; i < form->segment_count; i++) {
+        const char *a = form->segments[i].grapheme;
+        const char *b = form->word->segments[form->word_offset + i].grapheme;
+        if (a == 0 || b == 0 || strcmp(a, b) != 0) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 rg_status link_from_slice(
@@ -457,6 +486,8 @@ rg_status link_from_slice(
     const rg_form *target,
     size_t target_start,
     size_t target_count,
+    const rg_form *context_source,
+    size_t context_offset,
     const rg_feature_constraint *const *source_features,
     const size_t *source_feature_counts,
     const syllable_data *syllables,
@@ -476,11 +507,11 @@ rg_status link_from_slice(
     }
     if (source_features != 0 && source_feature_counts != 0) {
         status = build_link_context(
-            source,
+            context_source,
             source_features,
             source_feature_counts,
             syllables,
-            source_start,
+            context_offset + source_start,
             source_count,
             target_count,
             &out->context

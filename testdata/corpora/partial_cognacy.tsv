@@ -1,0 +1,49 @@
+cognate_id	lect_id	segments	breaks	morpheme_cognates
+	a	t a p a t a	2	F00 S00
+	b	t a b a t a	2	F00 S00
+	a	m a p o t a	2	F01 S01
+	b	m a b o t a	2	F01 S01
+	a	n a p u t a	2	F02 S02
+	b	n a b u t a	2	F02 S02
+	a	s a p e t a	2	F03 S03
+	b	s a b e t a	2	F03 S03
+	a	l a p a t o	2	F04 S04
+	b	l a b a t o	2	F04 S04
+	a	r a p o t o	2	F05 S05
+	b	r a b o t o	2	F05 S05
+	a	t a p u t o	2	F06 S06
+	b	t a b u t o	2	F06 S06
+	a	m a p e t o	2	F07 S07
+	b	m a b e t o	2	F07 S07
+	a	n a p a t u	2	F08 S08
+	b	n a b a t u	2	F08 S08
+	a	s a p o t u	2	F09 S09
+	b	s a b o t u	2	F09 S09
+	a	l a p u t u	2	F10 S10
+	b	l a b u t u	2	F10 S10
+	a	r a p e t u	2	F11 S11
+	b	r a b e t u	2	F11 S11
+W00	a	p a t a		
+W00	b	p a t a		
+W01	a	p o t a		
+W01	b	p o t a		
+W02	a	p u t a		
+W02	b	p u t a		
+W03	a	p e t a		
+W03	b	p e t a		
+W04	a	p a t o		
+W04	b	p a t o		
+W05	a	p o t o		
+W05	b	p o t o		
+W06	a	p u t o		
+W06	b	p u t o		
+W07	a	p e t o		
+W07	b	p e t o		
+W08	a	p a t u		
+W08	b	p a t u		
+W09	a	p o t u		
+W09	b	p o t u		
+W10	a	p u t u		
+W10	b	p u t u		
+W11	a	p e t u		
+W11	b	p e t u		

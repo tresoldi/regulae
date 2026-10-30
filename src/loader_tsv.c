@@ -187,6 +187,7 @@ rg_status load_tsv(
     long syllables_col = -1;
     long length_col = -1;
     long stress_col = -1;
+    long morpheme_cognates_col = -1;
     size_t r;
     rg_status status;
 
@@ -258,6 +259,9 @@ rg_status load_tsv(
                                  ? "syllables" : opts.syllable_breaks_column);
     length_col = column_index(&table, opts.length_column == 0 ? "length" : opts.length_column);
     stress_col = column_index(&table, opts.stress_column);
+    /* Partial cognacy: one cognate id per morpheme of the row's breaks, "-"
+     * for a morpheme with none (docs/ensembles.md). */
+    morpheme_cognates_col = column_index(&table, "morpheme_cognates");
 
     corpus = (rg_corpus *)calloc(1, sizeof(*corpus));
     if (corpus == 0) {
@@ -271,6 +275,8 @@ rg_status load_tsv(
         char *lect_id = trim_copy(cell(row, lect_col));
         char *etymon_group = etymon_group_col < 0 ? 0 : trim_copy(cell(row, etymon_group_col));
         char *source_group = source_group_col < 0 ? 0 : trim_copy(cell(row, source_group_col));
+        char *morpheme_ids = morpheme_cognates_col < 0 ? 0 : trim_copy(cell(row, morpheme_cognates_col));
+        int partial;
         loader_cognate *cognate;
         loader_form form;
 
@@ -278,14 +284,16 @@ rg_status load_tsv(
 
         if (cognate_id == 0 || lect_id == 0 ||
             (etymon_group_col >= 0 && etymon_group == 0) ||
-            (source_group_col >= 0 && source_group == 0)) {
+            (source_group_col >= 0 && source_group == 0) ||
+            (morpheme_cognates_col >= 0 && morpheme_ids == 0)) {
             status = RG_ERR_OOM;
             goto row_done;
         }
+        partial = morpheme_ids != 0 && morpheme_ids[0] != '\0';
         /* An unlabelled row is skipped rather than refused: a wordlist with a
          * blank line in it is not a broken file. status stays RG_OK, so the
          * loop continues. */
-        if (cognate_id[0] == '\0' || lect_id[0] == '\0') {
+        if ((cognate_id[0] == '\0' && !partial) || lect_id[0] == '\0') {
             goto row_done;
         }
         status = parse_segments(cell(row, segments_col), 0, &form.segments, &form.segment_count, 0, 0);
@@ -327,6 +335,39 @@ rg_status load_tsv(
             if (status != RG_OK) {
                 goto row_done;
             }
+        }
+        if (partial) {
+            /* The row's morphemes go to their own sets and the word is kept
+             * whole for their environments; the row's cognate_id, if any, is
+             * not a set of its own. */
+            double value = 1.0;
+            int has_value = 0;
+            if (confidence_col >= 0) {
+                char *raw = trim_copy(cell(row, confidence_col));
+                if (raw == 0) {
+                    status = RG_ERR_OOM;
+                    goto row_done;
+                }
+                if (raw[0] != '\0') {
+                    char *endptr = 0;
+                    value = strtod(raw, &endptr);
+                    has_value = !(endptr == raw || (endptr != 0 && *endptr != '\0'));
+                    if (!has_value) {
+                        free(raw);
+                        status = RG_ERR_PARSE;
+                        goto row_done;
+                    }
+                }
+                free(raw);
+            }
+            form.lect_id = lect_id;
+            lect_id = 0;
+            status = corpus_add_morpheme_spans(corpus, &form, morpheme_ids, value, has_value);
+            if (status == RG_ERR_PARSE) {
+                loader_fail(diagnosis, r + 2,
+                            "morpheme_cognates must give one id per morpheme of the row's breaks");
+            }
+            goto row_done;
         }
         cognate = corpus_ensure_cognate(corpus, cognate_id);
         if (cognate == 0) {
@@ -394,6 +435,7 @@ rg_status load_tsv(
         free(lect_id);
         free(etymon_group);
         free(source_group);
+        free(morpheme_ids);
         if (status != RG_OK) {
             break;
         }

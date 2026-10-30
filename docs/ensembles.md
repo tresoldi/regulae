@@ -1,6 +1,6 @@
 # Ensembles, soft cognacy, partial cognacy and lost-trigger traces
 
-**Status (2026-10-30):** the ensemble, temperature calibration, soft cognacy and the lost-trigger record are implemented (`rg_train_ensemble`, `rg_train_ensemble_soft`, `rg_calibrate_alignment_temperature`, `rg_ensemble_to_json`, `rg_multi_model_lost_triggers`; CLI `regulae train --ensemble N [--alignment-temperature calibrate] [--cognacy-pairs pairs.tsv]`; Python `regulae.train_ensemble`). Partial cognacy is next, on branch `claude/ensembles`.
+**Status (2026-10-30):** the ensemble, temperature calibration, soft cognacy and the lost-trigger record and per-morpheme partial cognacy are implemented (`rg_train_ensemble`, `rg_train_ensemble_soft`, `rg_calibrate_alignment_temperature`, `rg_ensemble_to_json`, `rg_multi_model_lost_triggers`, `rg_form.word`; CLI `regulae train --ensemble N [--alignment-temperature calibrate] [--cognacy-pairs pairs.tsv]`; Python `regulae.train_ensemble`; the TSV loader's `morpheme_cognates` column), on branch `claude/ensembles`.
 This is Stage C of `tresoldi/framework` `roadmap_beyond_columns.md`. The
 constitution requires regulae's egress to historia to be *ensembles or weighted
 samples* (§5.2). A single best-fit system is tier C0, which allows no claim
@@ -202,3 +202,39 @@ the trigger is the second half of the Latin geminate, which Spanish lost.
 trigger in place. *u ~ o* after a short-nucleus syllable holds at 0.91.
 Whether Spanish vowels fail "voiced" here is a property of the feature system
 in use, and a reader of the trace has to check the environment it names.
+
+## Partial cognacy, as built (ABI 48)
+
+`rg_form` gains `word` and `word_offset`. A form with `word` set is one
+morpheme of that word: its `segments` are the span's, the alignment DP runs
+over the span alone, and every environment is built on the whole word at the
+span's offset. That covers the DP's link contexts, the per-position contexts
+class discovery and the predictive folds read, and the cross-dimensional
+neighbour reads (`model_crossdim.c`, `search_cost.c`). A span that does not
+match its word segment for segment, or runs past its end, is refused with
+`RG_ERR_INVALID_ARGUMENT`. `word` NULL is the old behaviour, so every corpus
+hashes as before. Callers that fill an `rg_form` field by field must now zero
+it; the in-tree tests that did not were fixed.
+
+The TSV loader reads an optional `morpheme_cognates` column: one id per
+morpheme of the row's `breaks`, with `-` for a morpheme that has no set. Such a
+row's morphemes go to the sets they name, the row's own `cognate_id` may be
+empty and is not used as a set, and the whole word is kept by the corpus for
+the spans to point at. A count that does not match the morphemes is a parse
+error with the line.
+
+**Check** (`testdata/corpora/partial_cognacy.tsv`,
+`tests/c/test_partial_cognacy.c`). There are 12 compounds whose second
+morpheme starts with *p*, and lect *b* voices that *p* after the first
+morpheme's vowel. There are also 12 simplex words whose *p* is word-initial
+and stays *p*. Read alone, the span's *p* has no left neighbour and no
+boundary, so it cannot be told from the simplex *p*. Read in its word, the
+model finds *a:p ~ b:b* conditioned and states it as morpheme-initial. Its
+rivals are the readings that cross the boundary: preceding vowel, preceding
+sonorant, morpheme index 1, and an open previous syllable.
+
+**Open:**
+* Morpheme sets cut from one word are not independent, but each is its own
+  observation group in the bootstrap. A consumer that wants them resampled
+  together can tie them with `etymon_group`.
+* The wide, GLED and soft loaders do not yet read per-morpheme ids.

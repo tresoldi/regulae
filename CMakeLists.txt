@@ -263,6 +263,11 @@ if(REGULAE_BUILD_TESTS)
     target_link_libraries(test_lost_triggers PRIVATE regulae::regulae m)
     add_test(NAME lost_triggers COMMAND test_lost_triggers)
 
+    add_executable(test_partial_cognacy tests/c/test_partial_cognacy.c)
+    target_link_libraries(test_partial_cognacy PRIVATE regulae::regulae)
+    target_compile_definitions(test_partial_cognacy PRIVATE REGULAE_SOURCE_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+    add_test(NAME partial_cognacy COMMAND test_partial_cognacy)
+
     add_executable(test_alignment_sampling tests/c/test_alignment_sampling.c)
     target_link_libraries(test_alignment_sampling PRIVATE regulae::regulae m)
     add_test(NAME alignment_sampling COMMAND test_alignment_sampling)

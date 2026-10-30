@@ -19,7 +19,18 @@
  * merges a positional environment into a featural one, and a rule stated over
  * that union cannot be read as either. Positions off the end of the form are
  * excluded from both sides of the contrast rather than assigned to one. */
+/* A neighbour of a morpheme span is read from its whole word (rg_form.word):
+ * `index` is relative to the span and is moved into the word's frame. */
+static const rg_form *xdim_word_frame(const rg_form *form, int *index) {
+    if (form != 0 && form->word != 0) {
+        *index += (int)form->word_offset;
+        return form->word;
+    }
+    return form;
+}
+
 static int context_position_exists(const rg_form *form, int index) {
+    form = xdim_word_frame(form, &index);
     return form != 0 && index >= 0 && (size_t)index < form->segment_count;
 }
 
@@ -27,6 +38,7 @@ static int segment_has_context_feature(const rg_context *ctx, const rg_form *for
     const rg_feature_set *features = 0;
     rg_status status;
     int found = 0;
+    form = xdim_word_frame(form, &index);
     if (ctx == 0 || form == 0 || feature == 0 || index < 0 || (size_t)index >= form->segment_count) {
         return 0;
     }
@@ -787,10 +799,12 @@ static int xdim_predicate_holds(
     for (d = 0; d < sizeof(xdim_dimension_names) / sizeof(xdim_dimension_names[0]); d++) {
         if (strcmp(predicate->feature, xdim_dimension_names[d]) == 0) {
             const char *value;
-            if (index < 0 || (size_t)index >= form->segment_count) {
+            int at = index;
+            const rg_form *frame = xdim_word_frame(form, &at);
+            if (at < 0 || (size_t)at >= frame->segment_count) {
                 return 0;
             }
-            value = segment_dimension_value(&form->segments[index], xdim_dimension_names[d]);
+            value = segment_dimension_value(&frame->segments[at], xdim_dimension_names[d]);
             return value != 0 && strcmp(value, predicate->value) == 0;
         }
     }

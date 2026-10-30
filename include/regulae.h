@@ -289,6 +289,15 @@ typedef struct rg_form {
     size_t syllable_break_count;
     const int *morpheme_breaks;
     size_t morpheme_break_count;
+    /* Partial cognacy (docs/ensembles.md): when set, this form is one
+     * morpheme of `word`, starting at segment `word_offset`, and `segments`
+     * are that span's. Alignment sees only the span; environments are read
+     * from the whole word, so a morpheme-initial segment after a vowel in the
+     * preceding morpheme is still intervocalic. The span's own breaks are
+     * ignored for environments; the word's apply. NULL (the default): the
+     * form is its own word. */
+    const struct rg_form *word;
+    size_t word_offset;
 } rg_form;
 
 typedef struct rg_feature_constraint {

@@ -81,6 +81,11 @@ static int cross_dimensional_environment_holds(
     if (rg_context_spec_constraint_count(environment) == 0) {
         return 0;
     }
+    /* A morpheme span's neighbours are its word's (rg_form.word). */
+    if (form->word != 0) {
+        position += form->word_offset;
+        form = form->word;
+    }
     return cross_dimensional_slot_holds(ctx, form, (int)position - 1,
                                         environment->preceding, environment->preceding_count) &&
            cross_dimensional_slot_holds(ctx, form, (int)position,

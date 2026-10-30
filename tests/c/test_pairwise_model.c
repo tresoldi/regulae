@@ -23,7 +23,7 @@ static rg_segment seg(const char *g) {
 }
 
 static rg_form form(const char *lect, const rg_segment *segments, size_t count) {
-    rg_form f;
+    rg_form f = {0};
     f.lect_id = lect;
     f.segments = segments;
     f.segment_count = count;
