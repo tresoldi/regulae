@@ -1,6 +1,6 @@
 # Ensembles, soft cognacy, partial cognacy and lost-trigger traces
 
-**Status (2026-10-30):** the ensemble, temperature calibration and soft cognacy are implemented (`rg_train_ensemble`, `rg_train_ensemble_soft`, `rg_calibrate_alignment_temperature`, `rg_ensemble_to_json`; CLI `regulae train --ensemble N [--alignment-temperature calibrate] [--cognacy-pairs pairs.tsv]`; Python `regulae.train_ensemble`). The lost-trigger record and partial cognacy are next, on branch `claude/ensembles`.
+**Status (2026-10-30):** the ensemble, temperature calibration, soft cognacy and the lost-trigger record are implemented (`rg_train_ensemble`, `rg_train_ensemble_soft`, `rg_calibrate_alignment_temperature`, `rg_ensemble_to_json`, `rg_multi_model_lost_triggers`; CLI `regulae train --ensemble N [--alignment-temperature calibrate] [--cognacy-pairs pairs.tsv]`; Python `regulae.train_ensemble`). Partial cognacy is next, on branch `claude/ensembles`.
 This is Stage C of `tresoldi/framework` `roadmap_beyond_columns.md`. The
 constitution requires regulae's egress to historia to be *ensembles or weighted
 samples* (§5.2). A single best-fit system is tier C0, which allows no claim
@@ -170,3 +170,35 @@ member lists its `cognate_sets` (the form ids of each set).
 weight 0.9 and 30 decoy edges between meanings at 0.3. Ten members at
 temperature 0 took 68 s. They held 86–93 sets each (decoys sometimes merge two
 meanings), with mean set size 3.96 (at most 4, one form per lect).
+
+## Lost-trigger traces, as built (ABI 48)
+
+`rg_multi_model_lost_triggers` returns one `rg_lost_trigger_row` per
+(conditioned class, pivot environment, sister lect), computed in training
+from the positions the model already keeps for each class (`src/traces.c`).
+Only positions where the environment holds on the pivot are read: a class
+merged from two pivots carries a context from each, and a position need
+satisfy only one. At each such position the environment is tested at the
+sister's aligned segment in the sister's own form; `tested` and `holds` are
+the cognate-confidence weights, and a sister gap goes to `untestable`. The
+model export carries the rows under `lost_triggers` (with `holds_rate`). The
+package matches them across members on the conditioned class's content, the
+pivot and the sister, and summarises the rate under
+`summary.lost_triggers`.
+
+**Law of palatals in miniature** (`tests/c/test_lost_triggers.c`). Greek and
+Latin keep *e*. Sanskrit palatalises *k* before *e* and *i* and then merges
+*e* into back *ɑ*. The class *k ~ k ~ c* before a front vowel, on the Greek
+pivot, holds at every Latin position (1.0) and at half the Sanskrit ones
+(0.5): the *ci* words keep the trigger, the *cɑ* words lost it. The same
+corpus also traces *ɑ ~ e* after a palatal on the Sanskrit pivot at 0.0 in
+Greek. The record is not directional, and says so.
+
+**Latin–Spanish** (`real_latin_spanish.tsv`, single model). Six conditioned
+classes trace. *l ~ ʎ* before a voiced segment (*collum > cuello*,
+*capillus > cabello*, *stella*, *caballus*, 4 sets) holds at 0.0 in Spanish:
+the trigger is the second half of the Latin geminate, which Spanish lost.
+*p ~ b* and *t ~ d* after a vowel hold at 1.0, since lenition left its
+trigger in place. *u ~ o* after a short-nucleus syllable holds at 0.91.
+Whether Spanish vowels fail "voiced" here is a property of the feature system
+in use, and a reader of the trace has to check the environment it names.

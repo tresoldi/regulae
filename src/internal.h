@@ -150,6 +150,8 @@ struct rg_multi_model {
     size_t cross_dimensional_count;
     rg_proposed_event_row *proposed_events;
     size_t proposed_event_count;
+    rg_lost_trigger_row *lost_triggers;
+    size_t lost_trigger_count;
     size_t unpaired_set_count;
     rg_corpus_fit fit;
 };

@@ -139,6 +139,14 @@ typedef struct reconciled_observation {
     size_t bucket_index;
 } reconciled_observation;
 
+/* Fills model->lost_triggers from the class positions; see traces.c. */
+rg_status rg_lost_triggers_build_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_multi_model *model
+);
+
 /* Small shared helpers over the model's own storage. */
 void string_array_clear(char **items, size_t count);
 double cognate_weight(const rg_cognate_set *cognate);

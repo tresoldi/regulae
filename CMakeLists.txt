@@ -141,6 +141,7 @@ add_library(regulae
     src/multilect_fit.c
     src/multilect_pairs.c
     src/multilect_reconcile.c
+    src/traces.c
     src/options.c
     src/predictive.c
     src/scoring.c
@@ -257,6 +258,10 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_ensemble tests/c/test_ensemble.c)
     target_link_libraries(test_ensemble PRIVATE regulae::regulae m)
     add_test(NAME ensemble COMMAND test_ensemble)
+
+    add_executable(test_lost_triggers tests/c/test_lost_triggers.c)
+    target_link_libraries(test_lost_triggers PRIVATE regulae::regulae m)
+    add_test(NAME lost_triggers COMMAND test_lost_triggers)
 
     add_executable(test_alignment_sampling tests/c/test_alignment_sampling.c)
     target_link_libraries(test_alignment_sampling PRIVATE regulae::regulae m)

@@ -202,6 +202,7 @@ void rg_multi_model_free(rg_multi_model *model) {
     free(model->conditioned_classes);
     free(model->cross_dimensional_rows);
     rg_proposed_events_free_internal(model->proposed_events, model->proposed_event_count);
+    free(model->lost_triggers);
     for (i = 0; i < model->class_position_count; i++) {
         free(model->class_positions[i].lect_indices);
         free(model->class_positions[i].positions);
@@ -477,6 +478,9 @@ rg_status train_model_internal(
         );
     }
     if (status == RG_OK) {
+        status = rg_lost_triggers_build_internal(ctx, cognates, cognate_count, model);
+    }
+    if (status == RG_OK) {
         status = lift_cross_dimensional_rows(model);
     }
     if (status == RG_OK) {
@@ -528,6 +532,7 @@ RG_MULTI_TABLE(rg_multi_model_unconditioned_classes, rg_multi_class_row, uncondi
 RG_MULTI_TABLE(rg_multi_model_conditioned_classes, rg_multi_class_row, conditioned_classes, conditioned_class_count)
 RG_MULTI_TABLE(rg_multi_model_cross_dimensional_rows, rg_multi_cross_dimensional_row, cross_dimensional_rows, cross_dimensional_count)
 RG_MULTI_TABLE(rg_multi_model_proposed_events, rg_proposed_event_row, proposed_events, proposed_event_count)
+RG_MULTI_TABLE(rg_multi_model_lost_triggers, rg_lost_trigger_row, lost_triggers, lost_trigger_count)
 
 #undef RG_MULTI_TABLE
 

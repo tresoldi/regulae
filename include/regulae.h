@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 47
+#define RG_ABI_VERSION 48
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -1084,6 +1084,36 @@ typedef struct rg_proposed_event_row {
     size_t shared_displacement_count;
 } rg_proposed_event_row;
 
+/* A lost-trigger trace (docs/ensembles.md): one conditioned class, one of its
+ * pivot environments, and one sister lect.
+ *
+ * At every aligned position that realises the class and where the environment
+ * holds on the pivot, the same environment is tested at the sister's aligned
+ * segment, in the sister's own form. `holds / tested` is how often the sister
+ * still shows the trigger there. A low rate says the sister lost it or never
+ * had it -- the Sanskrit *e > a that leaves c ~ k with no front vowel in
+ * Sanskrit. It is a trace for a latent-segment proposal, not a claim about
+ * direction, and not a verdict that anything was lost: an environment that is
+ * simply rare in the sister reads the same way.
+ *
+ * Positions where the sister's segment is a gap have no position to read an
+ * environment from; their weight goes to `untestable`. Weights are the cognate
+ * sets' confidences. */
+typedef struct rg_lost_trigger_row {
+    /* The conditioned class, as `class_id` on rg_multi_class_row. */
+    int class_id;
+    const char *pivot_lect;
+    /* Borrowed from the class's contexts; valid while the model lives. */
+    const rg_context_spec *environment;
+    const char *sister_lect;
+    const char *sister_grapheme;
+    double tested;
+    double holds;
+    double untestable;
+    /* Distinct cognate sets among the tested positions. */
+    size_t tested_cognate_count;
+} rg_lost_trigger_row;
+
 /* How one lect writes a sound that another lect in the same corpus writes as a
  * sequence -- see rg_find_transcription_drift. */
 typedef enum rg_drift_kind {
@@ -1975,6 +2005,12 @@ RG_API const rg_proposed_event_row *rg_multi_model_proposed_events(
 );
 
 RG_API const rg_multi_cross_dimensional_row *rg_multi_model_cross_dimensional_rows(
+    const rg_multi_model *model,
+    size_t *count
+);
+/* Lost-trigger traces, one per (conditioned class, pivot, sister) with at least
+ * one tested position, in class order. Borrowed, valid while the model lives. */
+RG_API const rg_lost_trigger_row *rg_multi_model_lost_triggers(
     const rg_multi_model *model,
     size_t *count
 );

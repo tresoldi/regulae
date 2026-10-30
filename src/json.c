@@ -344,6 +344,28 @@ static cJSON *json_class(const rg_multi_class_row *row, int with_contexts) {
 /* Conditioned classes that look like one change. A proposal: every member is
  * published in its own right under `classes.conditioned`, and `class_ids`
  * points at them rather than replacing them. */
+static cJSON *json_lost_trigger(const rg_lost_trigger_row *row) {
+    cJSON *out = cJSON_CreateObject();
+    if (out == 0) {
+        return 0;
+    }
+    cJSON_AddNumberToObject(out, "class_id", row->class_id);
+    cJSON_AddStringToObject(out, "pivot_lect", row->pivot_lect);
+    cJSON_AddItemToObject(out, "environment", json_context(row->environment));
+    cJSON_AddStringToObject(out, "sister_lect", row->sister_lect);
+    cJSON_AddStringToObject(out, "sister_grapheme", row->sister_grapheme);
+    cJSON_AddNumberToObject(out, "tested", row->tested);
+    cJSON_AddNumberToObject(out, "holds", row->holds);
+    if (row->tested > 0.0) {
+        cJSON_AddNumberToObject(out, "holds_rate", row->holds / row->tested);
+    } else {
+        cJSON_AddNullToObject(out, "holds_rate");
+    }
+    cJSON_AddNumberToObject(out, "untestable", row->untestable);
+    cJSON_AddNumberToObject(out, "tested_sets", (double)row->tested_cognate_count);
+    return out;
+}
+
 static cJSON *json_proposed_event(const rg_proposed_event_row *row) {
     cJSON *out = cJSON_CreateObject();
     cJSON *ids;
@@ -1191,6 +1213,24 @@ char *rg_json_from_multi_model_internal(
         cJSON_Delete(root);
         return 0;
     }
+    cJSON_AddItemToObject(root, "lost_triggers", array);
+    {
+        const rg_lost_trigger_row *traces = rg_multi_model_lost_triggers(model, &table_count);
+        for (i = 0; i < table_count; i++) {
+            cJSON *entry = json_lost_trigger(&traces[i]);
+            if (entry == 0) {
+                cJSON_Delete(root);
+                return 0;
+            }
+            cJSON_AddItemToArray(array, entry);
+        }
+    }
+
+    array = cJSON_CreateArray();
+    if (array == 0) {
+        cJSON_Delete(root);
+        return 0;
+    }
     cJSON_AddItemToObject(root, "proposed_events", array);
     {
         const rg_proposed_event_row *events = rg_multi_model_proposed_events(model, &table_count);
@@ -1818,6 +1858,7 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
     ensemble_table classes;
     ensemble_table pairs;
     ensemble_table conditioned_any;
+    ensemble_table traces;
     size_t m;
     size_t i;
     char *text = 0;
@@ -1829,6 +1870,8 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
     memset(&classes, 0, sizeof(classes));
     memset(&pairs, 0, sizeof(pairs));
     memset(&conditioned_any, 0, sizeof(conditioned_any));
+    memset(&traces, 0, sizeof(traces));
+    traces.members = ensemble->member_count;
     conditioned_any.members = ensemble->member_count;
     classes.members = ensemble->member_count;
     pairs.members = ensemble->member_count;
@@ -2033,6 +2076,64 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
                 slot->rates[m] = rows[i].source_total > 0.0 ? rows[i].count / rows[i].source_total : 0.0;
             }
         }
+        if (!failed) {
+            /* Lost-trigger traces, matched across members on the conditioned
+             * class's content, its pivot and the sister; the rate is how often
+             * the sister still shows the trigger. */
+            size_t trace_count = 0;
+            const rg_lost_trigger_row *rows = rg_multi_model_lost_triggers(model, &trace_count);
+            cJSON *member_traces = cJSON_AddArrayToObject(member, "lost_triggers");
+            for (i = 0; i < trace_count && !failed; i++) {
+                const rg_lost_trigger_row *row = &rows[i];
+                size_t id = (size_t)row->class_id;
+                char *key;
+                size_t key_len;
+                int created;
+                ensemble_entry *class_slot;
+                ensemble_entry *slot;
+                cJSON *entry;
+                if (row->class_id < 0 || id >= unconditioned_count + conditioned_count ||
+                    keys[id] == 0 || row->tested <= 0.0) {
+                    continue;
+                }
+                key_len = strlen(keys[id]) + strlen(row->pivot_lect) + strlen(row->sister_lect) + 3;
+                key = (char *)malloc(key_len);
+                if (key == 0) {
+                    failed = 1;
+                    break;
+                }
+                snprintf(key, key_len, "%s\t%s\t%s", keys[id], row->pivot_lect, row->sister_lect);
+                class_slot = ensemble_lookup(&classes, keys[id], &created);
+                slot = ensemble_lookup(&traces, key, &created);
+                free(key);
+                if (slot == 0 || class_slot == 0) {
+                    failed = 1;
+                    break;
+                }
+                if (created) {
+                    slot->identity = cJSON_CreateObject();
+                    if (slot->identity != 0) {
+                        cJSON_AddNumberToObject(slot->identity, "class", (double)(class_slot - classes.items));
+                        cJSON_AddStringToObject(slot->identity, "pivot_lect", row->pivot_lect);
+                        cJSON_AddItemToObject(slot->identity, "environment", json_context(row->environment));
+                        cJSON_AddStringToObject(slot->identity, "sister_lect", row->sister_lect);
+                        cJSON_AddStringToObject(slot->identity, "sister_grapheme", row->sister_grapheme);
+                    }
+                }
+                slot->rates[m] = row->holds / row->tested;
+                entry = cJSON_CreateObject();
+                if (entry == 0) {
+                    failed = 1;
+                    break;
+                }
+                cJSON_AddNumberToObject(entry, "trace", (double)(slot - traces.items));
+                cJSON_AddNumberToObject(entry, "tested", row->tested);
+                cJSON_AddNumberToObject(entry, "holds", row->holds);
+                cJSON_AddNumberToObject(entry, "untestable", row->untestable);
+                cJSON_AddNumberToObject(entry, "tested_sets", (double)row->tested_cognate_count);
+                cJSON_AddItemToArray(member_traces, entry);
+            }
+        }
         if (include_partitions && !failed) {
             /* Which class each aligned position of each cognate set realised in
              * this member: the member's soft synchronic partition. */
@@ -2110,6 +2211,19 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
             cJSON_AddItemToArray(any, entry);
         }
     }
+    {
+        cJSON *lost = cJSON_AddArrayToObject(summary, "lost_triggers");
+        for (i = 0; i < traces.count && !failed; i++) {
+            cJSON *entry = cJSON_Duplicate(traces.items[i].identity, 1);
+            if (entry == 0 || ensemble_summary_fields(entry, &traces.items[i], ensemble->member_count) == 0) {
+                cJSON_Delete(entry);
+                failed = 1;
+                break;
+            }
+            cJSON_AddNumberToObject(entry, "trace", (double)i);
+            cJSON_AddItemToArray(lost, entry);
+        }
+    }
     summary_pairs = cJSON_AddArrayToObject(summary, "pairwise");
     for (i = 0; i < pairs.count && !failed; i++) {
         cJSON *entry = cJSON_Duplicate(pairs.items[i].identity, 1);
@@ -2127,5 +2241,6 @@ char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
     ensemble_table_clear(&classes);
     ensemble_table_clear(&pairs);
     ensemble_table_clear(&conditioned_any);
+    ensemble_table_clear(&traces);
     return text;
 }
