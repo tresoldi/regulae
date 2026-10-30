@@ -4,6 +4,7 @@
 
 #include "cJSON.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1671,4 +1672,427 @@ rg_status rg_json_read_train_options_internal(
         rg_train_options_init_defaults(out);
     }
     return status;
+}
+
+/* -- the ensemble export (framework interchange.md section 3.5) ----------------- */
+
+typedef struct ensemble_entry {
+    char *key;
+    cJSON *identity;
+    int conditioned;
+    double *rates; /* one per member; NAN where the member lacks it */
+} ensemble_entry;
+
+typedef struct ensemble_table {
+    ensemble_entry *items;
+    size_t count;
+    size_t cap;
+    size_t members;
+} ensemble_table;
+
+static ensemble_entry *ensemble_lookup(ensemble_table *table, const char *key, int *created) {
+    size_t i;
+    *created = 0;
+    for (i = 0; i < table->count; i++) {
+        if (strcmp(table->items[i].key, key) == 0) {
+            return &table->items[i];
+        }
+    }
+    if (table->count == table->cap) {
+        size_t cap = table->cap == 0 ? 64 : table->cap * 2;
+        ensemble_entry *grown = (ensemble_entry *)realloc(table->items, cap * sizeof(*grown));
+        if (grown == 0) {
+            return 0;
+        }
+        table->items = grown;
+        table->cap = cap;
+    }
+    {
+        ensemble_entry *entry = &table->items[table->count];
+        size_t m;
+        memset(entry, 0, sizeof(*entry));
+        entry->key = rg_strdup_internal(key);
+        entry->rates = (double *)malloc((table->members + 1) * sizeof(double));
+        if (entry->key == 0 || entry->rates == 0) {
+            free(entry->key);
+            free(entry->rates);
+            return 0;
+        }
+        for (m = 0; m < table->members; m++) {
+            entry->rates[m] = NAN;
+        }
+        table->count++;
+        *created = 1;
+        return entry;
+    }
+}
+
+static void ensemble_table_clear(ensemble_table *table) {
+    size_t i;
+    for (i = 0; i < table->count; i++) {
+        free(table->items[i].key);
+        free(table->items[i].rates);
+        cJSON_Delete(table->items[i].identity);
+    }
+    free(table->items);
+    memset(table, 0, sizeof(*table));
+}
+
+static int double_cmp(const void *a, const void *b) {
+    double x = *(const double *)a;
+    double y = *(const double *)b;
+    return x < y ? -1 : (x > y ? 1 : 0);
+}
+
+/* Inclusion probability, and the mean and 95% percentile interval of the rate
+ * over the members that contain the row. */
+static cJSON *ensemble_summary_fields(cJSON *out, const ensemble_entry *entry, size_t members) {
+    double *present = (double *)malloc((members + 1) * sizeof(double));
+    size_t n = 0;
+    size_t m;
+    double sum = 0.0;
+    cJSON *rate;
+    if (present == 0) {
+        return 0;
+    }
+    for (m = 0; m < members; m++) {
+        if (!isnan(entry->rates[m])) {
+            present[n++] = entry->rates[m];
+            sum += entry->rates[m];
+        }
+    }
+    qsort(present, n, sizeof(double), double_cmp);
+    cJSON_AddNumberToObject(out, "inclusion", members > 0 ? (double)n / (double)members : 0.0);
+    cJSON_AddNumberToObject(out, "members_with", (double)n);
+    rate = cJSON_CreateObject();
+    if (rate != 0 && n > 0) {
+        size_t lo = (size_t)floor(0.025 * (double)(n - 1) + 0.5);
+        size_t hi = (size_t)floor(0.975 * (double)(n - 1) + 0.5);
+        cJSON_AddNumberToObject(rate, "mean", sum / (double)n);
+        cJSON_AddNumberToObject(rate, "lower", present[lo]);
+        cJSON_AddNumberToObject(rate, "upper", present[hi]);
+    }
+    cJSON_AddItemToObject(out, "rate", rate);
+    free(present);
+    return out;
+}
+
+/* A class's identity across members: its segments (lect, grapheme,
+ * suprasegmentals) and, on a conditioned row, their contexts. Never class_id,
+ * which is a rank inside one model. */
+static char *class_key(const rg_multi_class_row *row, int conditioned, cJSON **identity) {
+    cJSON *full = json_class(row, conditioned);
+    cJSON *segments;
+    char *text;
+    if (full == 0) {
+        return 0;
+    }
+    segments = cJSON_DetachItemFromObject(full, "segments");
+    cJSON_Delete(full);
+    if (segments == 0) {
+        return 0;
+    }
+    text = cJSON_PrintUnformatted(segments);
+    *identity = segments;
+    return text;
+}
+
+static double class_total(const rg_multi_model *model) {
+    size_t count = 0;
+    size_t i;
+    double total = 0.0;
+    const rg_multi_class_row *rows = rg_multi_model_unconditioned_classes(model, &count);
+    for (i = 0; i < count; i++) {
+        total += rows[i].count;
+    }
+    return total;
+}
+
+char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions) {
+    cJSON *root;
+    cJSON *meta;
+    cJSON *members;
+    cJSON *summary;
+    cJSON *summary_classes;
+    cJSON *summary_pairs;
+    ensemble_table classes;
+    ensemble_table pairs;
+    ensemble_table conditioned_any;
+    size_t m;
+    size_t i;
+    char *text = 0;
+    int failed = 0;
+
+    if (ensemble == 0) {
+        return 0;
+    }
+    memset(&classes, 0, sizeof(classes));
+    memset(&pairs, 0, sizeof(pairs));
+    memset(&conditioned_any, 0, sizeof(conditioned_any));
+    conditioned_any.members = ensemble->member_count;
+    classes.members = ensemble->member_count;
+    pairs.members = ensemble->member_count;
+    root = cJSON_CreateObject();
+    if (root == 0) {
+        return 0;
+    }
+    cJSON_AddBoolToObject(root, "ok", 1);
+    cJSON_AddStringToObject(root, "export_kind", "regulae_package");
+    cJSON_AddNumberToObject(root, "schema_version", 1);
+    cJSON_AddStringToObject(root, "role", "q_synchronic");
+    cJSON_AddStringToObject(root, "producer", "regulae");
+    cJSON_AddStringToObject(root, "regulae_version", rg_version_string());
+    cJSON_AddStringToObject(root, "feature_system",
+                            ensemble->feature_system != 0 ? ensemble->feature_system : "");
+    cJSON_AddStringToObject(root, "approx_hint", "C1");
+    cJSON_AddStringToObject(root, "condition_on", "caller_cognate_sets");
+    meta = cJSON_AddObjectToObject(root, "ensemble");
+    if (meta != 0) {
+        cJSON_AddNumberToObject(meta, "members", (double)ensemble->member_count);
+        cJSON_AddNumberToObject(meta, "seed", ensemble->options.seed);
+        cJSON_AddNumberToObject(meta, "alignment_temperature", ensemble->options.alignment_temperature);
+        cJSON_AddStringToObject(meta, "weighting", "bayesian_bootstrap");
+        cJSON_AddStringToObject(meta, "member_weights", "equal");
+        cJSON_AddStringToObject(meta, "observation_unit", rg_observation_unit_string(ensemble->unit));
+        cJSON_AddNumberToObject(meta, "group_count", (double)ensemble->group_count);
+    }
+    members = cJSON_AddArrayToObject(root, "members");
+    for (m = 0; m < ensemble->member_count && !failed; m++) {
+        const rg_multi_model *model = ensemble->members[m];
+        cJSON *member = cJSON_CreateObject();
+        cJSON *weights;
+        cJSON *member_classes;
+        cJSON *member_pairs;
+        char **keys = 0;
+        size_t unconditioned_count = 0;
+        size_t conditioned_count = 0;
+        const rg_multi_class_row *unconditioned = rg_multi_model_unconditioned_classes(model, &unconditioned_count);
+        const rg_multi_class_row *conditioned = rg_multi_model_conditioned_classes(model, &conditioned_count);
+        double total = class_total(model);
+        size_t p;
+
+        if (member == 0) {
+            failed = 1;
+            break;
+        }
+        cJSON_AddItemToArray(members, member);
+        cJSON_AddNumberToObject(member, "index", (double)m);
+        cJSON_AddNumberToObject(member, "seed", ensemble->member_seeds[m]);
+        cJSON_AddNumberToObject(member, "weight", 1.0 / (double)ensemble->member_count);
+        weights = cJSON_AddArrayToObject(member, "set_weights");
+        for (i = 0; i < ensemble->cognate_count; i++) {
+            cJSON_AddItemToArray(weights, cJSON_CreateNumber(ensemble->set_weights[m][i]));
+        }
+        keys = (char **)calloc(unconditioned_count + conditioned_count + 1, sizeof(*keys));
+        if (keys == 0) {
+            failed = 1;
+            break;
+        }
+        member_classes = cJSON_AddArrayToObject(member, "classes");
+        for (i = 0; i < unconditioned_count + conditioned_count && !failed; i++) {
+            int is_conditioned = i >= unconditioned_count;
+            const rg_multi_class_row *row = is_conditioned ? &conditioned[i - unconditioned_count]
+                                                           : &unconditioned[i];
+            cJSON *identity = 0;
+            cJSON *entry;
+            int created;
+            ensemble_entry *slot;
+            keys[i] = class_key(row, is_conditioned, &identity);
+            if (keys[i] == 0) {
+                failed = 1;
+                break;
+            }
+            slot = ensemble_lookup(&classes, keys[i], &created);
+            if (slot == 0) {
+                cJSON_Delete(identity);
+                failed = 1;
+                break;
+            }
+            if (created) {
+                slot->identity = identity;
+                slot->conditioned = is_conditioned;
+            } else {
+                cJSON_Delete(identity);
+            }
+            /* A key can recur inside one member (a decision list may hold one
+             * tuple under several environments only if the environments
+             * differ, which the key includes); the counts add. */
+            slot->rates[m] = (isnan(slot->rates[m]) ? 0.0 : slot->rates[m]) +
+                             (total > 0.0 ? row->count / total : 0.0);
+            if (is_conditioned) {
+                /* The same correspondence conditioned by any environment: an
+                 * environment found as `consonant` in one member and
+                 * `consonantal` in another is one conditioning. */
+                cJSON *bare = 0;
+                char *bare_key = class_key(row, 0, &bare);
+                ensemble_entry *any = bare_key != 0 ? ensemble_lookup(&conditioned_any, bare_key, &created) : 0;
+                if (any == 0) {
+                    cJSON_Delete(bare);
+                    cJSON_free(bare_key);
+                    failed = 1;
+                    break;
+                }
+                if (created) {
+                    any->identity = bare;
+                    any->conditioned = 1;
+                } else {
+                    cJSON_Delete(bare);
+                }
+                any->rates[m] = (isnan(any->rates[m]) ? 0.0 : any->rates[m]) +
+                                (total > 0.0 ? row->count / total : 0.0);
+                cJSON_free(bare_key);
+            }
+            entry = cJSON_CreateObject();
+            if (entry == 0) {
+                failed = 1;
+                break;
+            }
+            cJSON_AddNumberToObject(entry, "class", (double)(slot - classes.items));
+            cJSON_AddNumberToObject(entry, "count", row->count);
+            cJSON_AddNumberToObject(entry, "supporting_sets", (double)row->supporting_cognate_count);
+            cJSON_AddItemToArray(member_classes, entry);
+        }
+        member_pairs = cJSON_AddArrayToObject(member, "pairwise");
+        for (p = 0; p < rg_multi_model_pair_model_count(model) && !failed; p++) {
+            const rg_multi_pair_model_row *pair = rg_multi_model_pair_model_at(model, p);
+            size_t row_count = 0;
+            const rg_segment_count_row *rows = rg_pairwise_model_segment_counts(pair->model, &row_count);
+            cJSON *pair_entry = cJSON_CreateObject();
+            cJSON *segments;
+            if (pair_entry == 0) {
+                failed = 1;
+                break;
+            }
+            cJSON_AddItemToArray(member_pairs, pair_entry);
+            cJSON_AddStringToObject(pair_entry, "source_lect", pair->lect_a);
+            cJSON_AddStringToObject(pair_entry, "target_lect", pair->lect_b);
+            segments = cJSON_AddArrayToObject(pair_entry, "segments");
+            for (i = 0; i < row_count; i++) {
+                cJSON *entry = cJSON_CreateObject();
+                char key[512];
+                int created;
+                ensemble_entry *slot;
+                if (entry == 0) {
+                    failed = 1;
+                    break;
+                }
+                cJSON_AddStringToObject(entry, "source", rows[i].source);
+                cJSON_AddStringToObject(entry, "target", rows[i].target);
+                cJSON_AddNumberToObject(entry, "count", rows[i].count);
+                cJSON_AddNumberToObject(entry, "source_total", rows[i].source_total);
+                cJSON_AddItemToArray(segments, entry);
+                snprintf(key, sizeof(key), "%s\t%s\t%s\t%s", pair->lect_a, pair->lect_b,
+                         rows[i].source, rows[i].target);
+                slot = ensemble_lookup(&pairs, key, &created);
+                if (slot == 0) {
+                    failed = 1;
+                    break;
+                }
+                if (created) {
+                    slot->identity = cJSON_CreateObject();
+                    if (slot->identity != 0) {
+                        cJSON_AddStringToObject(slot->identity, "source_lect", pair->lect_a);
+                        cJSON_AddStringToObject(slot->identity, "target_lect", pair->lect_b);
+                        cJSON_AddStringToObject(slot->identity, "source", rows[i].source);
+                        cJSON_AddStringToObject(slot->identity, "target", rows[i].target);
+                    }
+                }
+                slot->rates[m] = rows[i].source_total > 0.0 ? rows[i].count / rows[i].source_total : 0.0;
+            }
+        }
+        if (include_partitions && !failed) {
+            /* Which class each aligned position of each cognate set realised in
+             * this member: the member's soft synchronic partition. */
+            cJSON *partition = cJSON_AddArrayToObject(member, "partition");
+            for (i = 0; i < model->class_position_count && !failed; i++) {
+                const rg_class_position *position = &model->class_positions[i];
+                cJSON *entry = cJSON_CreateObject();
+                cJSON *cells;
+                cJSON *ids;
+                size_t s;
+                size_t k;
+                if (entry == 0) {
+                    failed = 1;
+                    break;
+                }
+                cJSON_AddItemToArray(partition, entry);
+                cJSON_AddStringToObject(entry, "cognate_id",
+                    position->cognate_index < ensemble->cognate_count
+                        ? ensemble->cognate_ids[position->cognate_index] : "");
+                cells = cJSON_AddArrayToObject(entry, "positions");
+                for (s = 0; s < position->segment_count; s++) {
+                    cJSON *cell = cJSON_CreateObject();
+                    if (cell == 0) {
+                        failed = 1;
+                        break;
+                    }
+                    cJSON_AddStringToObject(cell, "lect", model->lect_ids[position->lect_indices[s]]);
+                    cJSON_AddNumberToObject(cell, "position", (double)position->positions[s]);
+                    cJSON_AddItemToArray(cells, cell);
+                }
+                ids = cJSON_AddArrayToObject(entry, "classes");
+                for (k = 0; k < position->class_id_count; k++) {
+                    int id = position->class_ids[k];
+                    if (id >= 0 && (size_t)id < unconditioned_count + conditioned_count && keys[id] != 0) {
+                        int created;
+                        ensemble_entry *slot = ensemble_lookup(&classes, keys[id], &created);
+                        if (slot != 0) {
+                            cJSON_AddItemToArray(ids, cJSON_CreateNumber((double)(slot - classes.items)));
+                        }
+                    }
+                }
+            }
+        }
+        for (i = 0; i < unconditioned_count + conditioned_count; i++) {
+            cJSON_free(keys[i]);
+        }
+        free(keys);
+    }
+
+    summary = cJSON_AddObjectToObject(root, "summary");
+    summary_classes = cJSON_AddArrayToObject(summary, "classes");
+    for (i = 0; i < classes.count && !failed; i++) {
+        cJSON *entry = cJSON_CreateObject();
+        if (entry == 0 || ensemble_summary_fields(entry, &classes.items[i], ensemble->member_count) == 0) {
+            cJSON_Delete(entry);
+            failed = 1;
+            break;
+        }
+        cJSON_AddNumberToObject(entry, "class", (double)i);
+        cJSON_AddBoolToObject(entry, "conditioned", classes.items[i].conditioned);
+        cJSON_AddItemToObject(entry, "segments", cJSON_Duplicate(classes.items[i].identity, 1));
+        cJSON_AddItemToArray(summary_classes, entry);
+    }
+    {
+        cJSON *any = cJSON_AddArrayToObject(summary, "conditioned_correspondences");
+        for (i = 0; i < conditioned_any.count && !failed; i++) {
+            cJSON *entry = cJSON_CreateObject();
+            if (entry == 0 ||
+                ensemble_summary_fields(entry, &conditioned_any.items[i], ensemble->member_count) == 0) {
+                cJSON_Delete(entry);
+                failed = 1;
+                break;
+            }
+            cJSON_AddItemToObject(entry, "segments", cJSON_Duplicate(conditioned_any.items[i].identity, 1));
+            cJSON_AddItemToArray(any, entry);
+        }
+    }
+    summary_pairs = cJSON_AddArrayToObject(summary, "pairwise");
+    for (i = 0; i < pairs.count && !failed; i++) {
+        cJSON *entry = cJSON_Duplicate(pairs.items[i].identity, 1);
+        if (entry == 0 || ensemble_summary_fields(entry, &pairs.items[i], ensemble->member_count) == 0) {
+            cJSON_Delete(entry);
+            failed = 1;
+            break;
+        }
+        cJSON_AddItemToArray(summary_pairs, entry);
+    }
+    if (!failed) {
+        text = cJSON_PrintUnformatted(root);
+    }
+    cJSON_Delete(root);
+    ensemble_table_clear(&classes);
+    ensemble_table_clear(&pairs);
+    ensemble_table_clear(&conditioned_any);
+    return text;
 }

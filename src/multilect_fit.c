@@ -265,7 +265,7 @@ rg_status bootstrap_class_intervals(
  * it that has a trained model. This is the corpus's goodness of fit read one
  * set at a time: the outlier diagnostic z-scores it across sets, and the fit
  * summary averages it. */
-static rg_observation_unit resolve_bootstrap_unit(
+rg_observation_unit resolve_bootstrap_unit(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     rg_observation_unit requested
@@ -306,7 +306,7 @@ static int same_observation_group(
            strcmp(left->cognate_id, right->cognate_id) == 0;
 }
 
-static rg_status observation_groups(
+rg_status observation_groups(
     const rg_cognate_set *cognates,
     size_t cognate_count,
     rg_observation_unit unit,

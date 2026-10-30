@@ -493,4 +493,20 @@ rg_status rg_percentile_interval(
     rg_uncertainty_estimate *out
 );
 
+
+/* An ensemble's members and what each was trained on. The cognate ids are
+ * copies, so the ensemble outlives the caller's corpus. */
+struct rg_ensemble {
+    rg_multi_model **members;
+    size_t member_count;
+    int *member_seeds;
+    double **set_weights;
+    size_t cognate_count;
+    char **cognate_ids;
+    rg_ensemble_options options;
+    rg_observation_unit unit;
+    size_t group_count;
+    char *feature_system;
+};
+
 #endif

@@ -1798,6 +1798,50 @@ RG_API rg_status rg_train_model(
     rg_multi_model **out
 );
 RG_API void rg_multi_model_free(rg_multi_model *model);
+
+/* An ensemble of surface relationship models (docs/ensembles.md): the C1
+ * egress the framework requires, where a single model is C0.
+ *
+ * Each member resamples the observation groups with Bayesian-bootstrap
+ * weights (Dirichlet(1, ..., 1), scaled to mean 1 and multiplied into each
+ * set's confidence), retrains the whole pipeline, and draws its alignments
+ * from the alignment distribution at `alignment_temperature`. Members are
+ * equally weighted. Inside a member the permutation baseline, the bootstrap
+ * and the predictive folds are off: a member's standing is `unmeasured`, and
+ * the ensemble's spread is the uncertainty. The NML scorer is refused
+ * (RG_ERR_UNSUPPORTED_OPTION): it cannot take non-integer weights. */
+typedef struct rg_ensemble rg_ensemble;
+
+typedef struct rg_ensemble_options {
+    size_t member_count;
+    int seed;
+    double alignment_temperature;
+} rg_ensemble_options;
+
+RG_API void rg_ensemble_options_init_defaults(rg_ensemble_options *options);
+RG_API rg_status rg_train_ensemble(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const rg_ensemble_options *ensemble_options,
+    rg_ensemble **out
+);
+RG_API size_t rg_ensemble_member_count(const rg_ensemble *ensemble);
+RG_API const rg_multi_model *rg_ensemble_member_at(const rg_ensemble *ensemble, size_t index);
+/* The weight factor each cognate set carried in a member (mean 1). */
+RG_API const double *rg_ensemble_member_set_weights(
+    const rg_ensemble *ensemble,
+    size_t index,
+    size_t *count
+);
+/* The `regulae_package` export (framework interchange.md section 3.5): the
+ * members, their weights and seeds, per-pair tables and classes, optionally
+ * the per-member partitions (cognate set, lect, position -> class), and the
+ * summary across members: each class's and correspondence's inclusion
+ * probability and rate interval. Free with rg_string_free; NULL on failure. */
+RG_API char *rg_ensemble_to_json(const rg_ensemble *ensemble, int include_partitions);
+RG_API void rg_ensemble_free(rg_ensemble *ensemble);
 /* Cognate sets that carried fewer than two forms, and so contributed no
  * correspondence. Not an error: a form whose cognates are in lects the corpus
  * did not sample has nothing to align against, and every cognate-coded

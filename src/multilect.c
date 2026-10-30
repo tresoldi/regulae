@@ -295,6 +295,17 @@ rg_status rg_train_model(
     const rg_train_options *options,
     rg_multi_model **out
 ) {
+    return train_model_internal(ctx, cognates, cognate_count, options, 0, out);
+}
+
+rg_status train_model_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    int unbounded_confidence,
+    rg_multi_model **out
+) {
     rg_multi_model *model;
     rg_progress_state progress;
     rg_train_options resolved_options;
@@ -318,7 +329,9 @@ rg_status rg_train_model(
             rg_multi_model_free(model);
             return RG_ERR_INVALID_ARGUMENT;
         }
-        if (cognates[c].confidence < 0.0 || cognates[c].confidence > 1.0) {
+        if (cognates[c].confidence < 0.0 ||
+            (!unbounded_confidence && cognates[c].confidence > 1.0) ||
+            !isfinite(cognates[c].confidence)) {
             rg_multi_model_free(model);
             return RG_ERR_INVALID_ARGUMENT;
         }

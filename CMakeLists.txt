@@ -112,6 +112,7 @@ add_library(regulae
     third_party/cjson/cJSON.c
     src/context.c
     src/drift.c
+    src/ensemble.c
     src/environment.c
     src/memory.c
     src/format.c
@@ -251,6 +252,10 @@ if(REGULAE_BUILD_TESTS)
     add_executable(test_options tests/c/test_options.c)
     target_link_libraries(test_options PRIVATE regulae::regulae)
     add_test(NAME options COMMAND test_options)
+
+    add_executable(test_ensemble tests/c/test_ensemble.c)
+    target_link_libraries(test_ensemble PRIVATE regulae::regulae m)
+    add_test(NAME ensemble COMMAND test_ensemble)
 
     add_executable(test_alignment_sampling tests/c/test_alignment_sampling.c)
     target_link_libraries(test_alignment_sampling PRIVATE regulae::regulae m)

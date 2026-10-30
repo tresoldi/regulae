@@ -61,6 +61,11 @@ static int usage(void) {
     printf("                                     alignments and outliers\n");
     printf("  --permutations <n>                 calibrate the fit against <n>\n");
     printf("  --permutation-seed <n>             reproducible shuffle seed\n");
+    printf("  --ensemble <n>                     train <n> ensemble members and print\n");
+    printf("                                     the regulae_package JSON (C1 egress)\n");
+    printf("  --ensemble-seed <n>                reproducible ensemble seed\n");
+    printf("  --alignment-temperature <t>        sampled-alignment temperature (1)\n");
+    printf("  --partitions                       include per-member partitions\n");
     printf("  --predictive-folds <n>             dependency-group-held-out folds;\n");
     printf("                                     selects rules inside training only\n");
     printf("  --predictive-seed <n>              reproducible group-fold seed\n");
@@ -625,6 +630,12 @@ static void report_load_failure(
     report_failure(ctx, "loading corpus", status);
 }
 
+/* `train --ensemble <n>`: the regulae_package export instead of one model. */
+static size_t ensemble_members = 0;
+static int ensemble_seed = -1;
+static double ensemble_temperature = -1.0;
+static int ensemble_partitions = 0;
+
 static int command_train(const char *path, const char *format, int pairwise, int human,
                          int json, int permutations, int tune_search,
                          int permutation_seed, const char *feature_system,
@@ -692,6 +703,37 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     options.bic.class_deletion_outcomes = deletion_outcomes != 0;
     options.cap_substitution_cost = substitution_cap != 0;
+    if (ensemble_members > 0) {
+        rg_ensemble_options eopts;
+        rg_ensemble *ensemble = 0;
+        char *text;
+        rg_ensemble_options_init_defaults(&eopts);
+        eopts.member_count = ensemble_members;
+        if (ensemble_seed >= 0) {
+            eopts.seed = ensemble_seed;
+        }
+        if (ensemble_temperature >= 0.0) {
+            eopts.alignment_temperature = ensemble_temperature;
+        }
+        status = rg_train_ensemble(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus),
+                                   &options, &eopts, &ensemble);
+        if (status != RG_OK) {
+            report_failure(ctx, "ensemble training", status);
+            rg_corpus_free(corpus);
+            rg_context_free(ctx);
+            return 1;
+        }
+        text = rg_ensemble_to_json(ensemble, ensemble_partitions);
+        rg_ensemble_free(ensemble);
+        rg_corpus_free(corpus);
+        rg_context_free(ctx);
+        if (text == 0) {
+            return fail("rendering json", RG_ERR_OOM);
+        }
+        puts(text);
+        rg_string_free(text);
+        return 0;
+    }
     status = rg_train_model(ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, &model);
     if (status != RG_OK) {
         report_failure(ctx, "training", status);
@@ -1011,6 +1053,14 @@ int main(int argc, char **argv) {
             top_k = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--permutations") == 0 && i + 1 < argc) {
             permutations = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--ensemble") == 0 && i + 1 < argc) {
+            ensemble_members = (size_t)atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--ensemble-seed") == 0 && i + 1 < argc) {
+            ensemble_seed = atoi(argv[++i]);
+        } else if (strcmp(argv[i], "--alignment-temperature") == 0 && i + 1 < argc) {
+            ensemble_temperature = strtod(argv[++i], 0);
+        } else if (strcmp(argv[i], "--partitions") == 0) {
+            ensemble_partitions = 1;
         } else if (strcmp(argv[i], "--permutation-seed") == 0 && i + 1 < argc) {
             permutation_seed = atoi(argv[++i]);
         } else if (strcmp(argv[i], "--predictive-folds") == 0 && i + 1 < argc) {

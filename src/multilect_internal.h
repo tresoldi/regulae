@@ -55,6 +55,33 @@ rg_status run_permutation_baseline(
     size_t lect_count,
     permutation_baseline *out
 );
+/* The observational units a resample draws: AUTO resolved, and every cognate
+ * set's group index. Shared by the bootstrap and the ensemble. */
+rg_observation_unit resolve_bootstrap_unit(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_observation_unit requested
+);
+rg_status observation_groups(
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    rg_observation_unit unit,
+    size_t **out_group_of,
+    size_t *out_group_count
+);
+
+/* rg_train_model, with the [0, 1] check on confidence lifted when
+ * `unbounded_confidence` is set: ensemble members carry Bayesian-bootstrap
+ * weights with mean 1, which exceed 1. Nothing else differs. */
+rg_status train_model_internal(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    int unbounded_confidence,
+    rg_multi_model **out
+);
+
 rg_status bootstrap_class_intervals(
     rg_multi_model *model,
     const rg_cognate_set *cognates,
