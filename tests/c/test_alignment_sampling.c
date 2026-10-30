@@ -197,6 +197,99 @@ int main(void) {
         }
     }
 
+    /* (5) Soft EM's E-step: the forward-backward link posteriors are the
+     * marginals of the very distribution the sampler draws from. */
+    {
+        word s = make("a k t e");
+        word t = make("a t e");
+        rg_form fs = form("A", &s);
+        rg_form ft = form("B", &t);
+        rg_train_options sampled = options;
+        rg_link_posterior *post = 0;
+        size_t post_count = 0;
+        double freq[MAX_SEG][MAX_SEG];
+        double row_sum[MAX_SEG];
+        int draws = 4000;
+        int d;
+        size_t q;
+        memset(freq, 0, sizeof(freq));
+        memset(row_sum, 0, sizeof(row_sum));
+        assert(rg_align_link_posteriors(ctx, model, &options, &fs, &ft, 0, 1.0, &post, &post_count) == RG_OK);
+        assert(post_count > 0);
+        sampled.alignment_sampling_temperature = 1.0;
+        for (d = 0; d < draws; d++) {
+            rg_alignment *a = 0;
+            size_t li;
+            size_t si = 0;
+            size_t ti = 0;
+            sampled.alignment_sampling_seed = 10000 + d;
+            assert(rg_align_forms_with_model(ctx, model, &sampled, &fs, &ft, 0, &a) == RG_OK);
+            for (li = 0; li < rg_alignment_link_count(a); li++) {
+                const rg_link *link = rg_alignment_link_at(a, li);
+                if (link->source_count == 1 && link->target_count == 1) {
+                    freq[si][ti] += 1.0 / (double)draws;
+                }
+                si += link->source_count;
+                ti += link->target_count;
+            }
+            rg_alignment_free(a);
+        }
+        for (q = 0; q < post_count; q++) {
+            const rg_link_posterior *p = &post[q];
+            assert(p->source_index < s.n && p->target_index < t.n);
+            assert(p->probability > 0.0 && p->probability <= 1.0);
+            row_sum[p->source_index] += p->probability;
+            printf("posterior %zu~%zu %.4f sampled %.4f\n", p->source_index, p->target_index,
+                   p->probability, freq[p->source_index][p->target_index]);
+            assert(fabs(p->probability - freq[p->source_index][p->target_index]) < 0.03);
+            freq[p->source_index][p->target_index] = 0.0;
+        }
+        /* No sampled 1-to-1 link the posteriors missed. */
+        for (q = 0; q < MAX_SEG * MAX_SEG; q++) {
+            assert(freq[q / MAX_SEG][q % MAX_SEG] < 0.01);
+        }
+        for (q = 0; q < s.n; q++) {
+            assert(row_sum[q] <= 1.0 + 1e-9);
+        }
+        rg_link_posteriors_free(post);
+
+        /* A vanishing temperature puts all the mass on the cheapest path. */
+        assert(rg_align_link_posteriors(ctx, model, &options, &fs, &ft, 0, 1e-6, &post, &post_count) == RG_OK);
+        {
+            size_t li;
+            size_t si = 0;
+            size_t ti = 0;
+            size_t ones = 0;
+            for (li = 0; li < rg_alignment_link_count(best); li++) {
+                const rg_link *link = rg_alignment_link_at(best, li);
+                if (link->source_count == 1 && link->target_count == 1) {
+                    for (q = 0; q < post_count; q++) {
+                        if (post[q].source_index == si && post[q].target_index == ti) {
+                            assert(post[q].probability > 0.999);
+                            ones++;
+                        }
+                    }
+                }
+                si += link->source_count;
+                ti += link->target_count;
+            }
+            assert(ones > 0);
+        }
+        rg_link_posteriors_free(post);
+        assert(rg_align_link_posteriors(ctx, model, &options, &fs, &ft, 0, 0.0, &post, &post_count) == RG_ERR_INVALID_ARGUMENT);
+    }
+
+    /* Soft EM trains, and a negative temperature is refused. */
+    {
+        rg_train_options soft = options;
+        rg_pairwise_model *soft_model = 0;
+        soft.alignment_posterior_temperature = 0.25;
+        assert(rg_train_pairwise(ctx, pairs, corpus_count, &soft, &soft_model) == RG_OK);
+        rg_pairwise_model_free(soft_model);
+        soft.alignment_posterior_temperature = -1.0;
+        assert(rg_train_pairwise(ctx, pairs, corpus_count, &soft, &soft_model) == RG_ERR_INVALID_ARGUMENT);
+    }
+
     rg_alignment_free(best);
     rg_pairwise_model_free(model);
     rg_context_free(ctx);

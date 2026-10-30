@@ -40,7 +40,10 @@ static const double default_temperature_grid[RG_TEMPERATURE_GRID_DEFAULT_COUNT] 
     0.0, 0.05, 0.1, 0.25, 0.5, 1.0
 };
 
-rg_status rg_calibrate_alignment_temperature(
+/* One routine for both temperatures. `posterior` 0 calibrates the sampled
+ * alignments' temperature, averaged over `repeats` seeds; 1 calibrates soft
+ * EM's posterior temperature, which draws nothing and is run once. */
+static rg_status calibrate_temperature(
     const rg_context *ctx,
     const rg_cognate_set *cognates,
     size_t cognate_count,
@@ -49,6 +52,7 @@ rg_status rg_calibrate_alignment_temperature(
     size_t grid_count,
     int folds,
     int repeats,
+    int posterior,
     rg_temperature_score *scores,
     double *best
 ) {
@@ -86,7 +90,7 @@ rg_status rg_calibrate_alignment_temperature(
     *best = grid[0];
     for (t = 0; t < grid_count; t++) {
         double temperature = grid[t];
-        int draws = temperature > 0.0 ? repeats : 1;
+        int draws = temperature > 0.0 && !posterior ? repeats : 1;
         double sum = 0.0;
         double sum_sq = 0.0;
         int r;
@@ -101,8 +105,12 @@ rg_status rg_calibrate_alignment_temperature(
             const rg_corpus_fit *fit;
             rg_status status;
             double loss;
-            trial.alignment_sampling_temperature = temperature;
-            trial.alignment_sampling_seed = 1 + r;
+            if (posterior) {
+                trial.alignment_posterior_temperature = temperature;
+            } else {
+                trial.alignment_sampling_temperature = temperature;
+                trial.alignment_sampling_seed = 1 + r;
+            }
             status = train_model_internal(ctx, cognates, cognate_count, &trial, 0, &model);
             if (status != RG_OK) {
                 return status;
@@ -131,6 +139,37 @@ rg_status rg_calibrate_alignment_temperature(
         }
     }
     return RG_OK;
+}
+
+rg_status rg_calibrate_alignment_temperature(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const double *grid,
+    size_t grid_count,
+    int folds,
+    int repeats,
+    rg_temperature_score *scores,
+    double *best
+) {
+    return calibrate_temperature(ctx, cognates, cognate_count, options, grid, grid_count,
+                                 folds, repeats, 0, scores, best);
+}
+
+rg_status rg_calibrate_posterior_temperature(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const double *grid,
+    size_t grid_count,
+    int folds,
+    rg_temperature_score *scores,
+    double *best
+) {
+    return calibrate_temperature(ctx, cognates, cognate_count, options, grid, grid_count,
+                                 folds, 1, 1, scores, best);
 }
 
 const rg_temperature_score *rg_ensemble_temperature_scores(

@@ -248,6 +248,25 @@ static rg_status update_segment_counts(
         if (weight <= 0.0) {
             continue;
         }
+        if (options->alignment_posterior_temperature > 0.0) {
+            /* Soft EM: every 1-to-1 link at its posterior probability, so an
+             * ambiguous pair spreads its count over the readings it allows
+             * instead of handing all of it to whichever path is cheapest. */
+            rg_link_posterior *posteriors = 0;
+            size_t posterior_count = 0;
+            status = rg_align_link_posteriors_internal(
+                ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size,
+                options->alignment_posterior_temperature, &posteriors, &posterior_count);
+            for (j = 0; j < posterior_count && status == RG_OK; j++) {
+                status = add_segment_count(
+                    &rows, &row_count, &row_cap,
+                    pairs[i].source.segments[posteriors[j].source_index].grapheme,
+                    pairs[i].target.segments[posteriors[j].target_index].grapheme,
+                    weight * posteriors[j].probability);
+            }
+            free(posteriors);
+            continue;
+        }
         status = rg_align_forms_with_model(ctx, model, options, &pairs[i].source, &pairs[i].target, max_chunk_size, &alignment);
         if (status != RG_OK) {
             break;
@@ -615,6 +634,9 @@ rg_status rg_train_pairwise_internal(
     if (opts == 0) {
         rg_train_options_init_defaults(&defaults);
         opts = &defaults;
+    }
+    if (!isfinite(opts->alignment_posterior_temperature) || opts->alignment_posterior_temperature < 0.0) {
+        return RG_ERR_INVALID_ARGUMENT;
     }
     max_iter = opts->max_iter <= 0 ? 1 : opts->max_iter;
     eps = opts->convergence_eps <= 0.0 ? 1e-4 : opts->convergence_eps;

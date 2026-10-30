@@ -286,6 +286,17 @@ rg_status rg_context_from_candidate_internal(
     rg_context_spec *out
 );
 
+rg_status rg_align_link_posteriors_internal(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_form *source,
+    const rg_form *target,
+    int max_chunk_size,
+    double temperature,
+    rg_link_posterior **out,
+    size_t *out_count
+);
 /* One context per segment position of the form, each a 1-segment window, so
  * observation contexts match the contexts the DP attaches to 1-to-1 links. */
 rg_status rg_form_position_contexts_internal(

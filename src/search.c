@@ -149,6 +149,11 @@ rg_status form_copy(const rg_form *src, rg_form *out) {
     return RG_OK;
 }
 
+/* `posteriors`, when not NULL, receives every 1-to-1 link's posterior
+ * probability under p(path) proportional to exp(-cost / posterior_temperature):
+ * the same forward mass sampling uses, a backward pass over the same moves,
+ * and forward * backward / Z per move. The returned alignment is then the
+ * cheapest path; sampling is off for the call. */
 static rg_status align_forms_internal(
     const rg_context *ctx,
     const rg_pairwise_model *model,
@@ -156,6 +161,9 @@ static rg_status align_forms_internal(
     const rg_form *source,
     const rg_form *target,
     int max_chunk_size,
+    double posterior_temperature,
+    rg_link_posterior **posteriors,
+    size_t *posterior_count,
     rg_alignment **out
 ) {
     size_t n;
@@ -185,8 +193,11 @@ static rg_status align_forms_internal(
     rg_status status = RG_OK;
     /* Sampling: log of the summed path weight into each cell, and every
      * candidate move, so the traceback can draw instead of taking the minimum. */
-    double temperature = options != 0 ? options->alignment_sampling_temperature : 0.0;
-    int sampling = temperature > 0.0;
+    int want_posteriors = posteriors != 0 && posterior_temperature > 0.0 && model != 0;
+    double temperature = want_posteriors ? posterior_temperature
+                         : (options != 0 ? options->alignment_sampling_temperature : 0.0);
+    int sampling = !want_posteriors && temperature > 0.0;
+    int need_mass = sampling || want_posteriors;
     double *log_mass = 0;
     rg_dp_move *moves = 0;
     size_t move_count = 0;
@@ -196,6 +207,10 @@ static rg_status align_forms_internal(
         return RG_ERR_INVALID_ARGUMENT;
     }
     *out = 0;
+    if (posteriors != 0) {
+        *posteriors = 0;
+        *posterior_count = 0;
+    }
     if (max_chunk_size == 0) {
         max_chunk_size = RG_DEFAULT_MAX_CHUNK_SIZE;
     }
@@ -263,7 +278,7 @@ static rg_status align_forms_internal(
         }
     }
     cost[0] = 0.0;
-    if (sampling) {
+    if (need_mass) {
         log_mass = (double *)malloc((n + 1) * (m + 1) * sizeof(*log_mass));
         if (log_mass == 0) {
             status = RG_ERR_OOM;
@@ -418,7 +433,7 @@ static rg_status align_forms_internal(
                           + cross_dimensional_link_adjustment(ctx, model, source, i - k,
                                                               target, j - l, k, l)
                           + RG_CHUNK_COMPLEXITY_PENALTY * (double)((int)k + (int)l - 2);
-                    if (sampling && !isinf(log_mass[(i - k) * width + (j - l)])) {
+                    if (need_mass && !isinf(log_mass[(i - k) * width + (j - l)])) {
                         double move_cost = total - prev;
                         if (move_count == move_cap) {
                             size_t next_cap = move_cap == 0 ? 256 : move_cap * 2;
@@ -492,6 +507,63 @@ static rg_status align_forms_internal(
         feature_matrix_clear(target_features, target_feature_counts, target_word->segment_count);
         syllable_data_clear(&target_syllables);
         return status;
+    }
+    if (want_posteriors && status == RG_OK) {
+        /* Backward pass. Moves were appended in ascending cell order and a move
+         * always leaves a lower cell, so walking them in reverse finishes every
+         * cell's backward mass before any move into it is read. */
+        double *log_back = (double *)malloc((n + 1) * (m + 1) * sizeof(*log_back));
+        double log_z = log_mass[n * width + m];
+        size_t q;
+        size_t emitted = 0;
+        rg_link_posterior *items = 0;
+        if (log_back == 0) {
+            status = RG_ERR_OOM;
+        } else if (isinf(log_z)) {
+            free(log_back);
+            log_back = 0;
+        } else {
+            for (q = 0; q < (n + 1) * (m + 1); q++) {
+                log_back[q] = -INFINITY;
+            }
+            log_back[n * width + m] = 0.0;
+            for (q = move_count; q > 0; q--) {
+                const rg_dp_move *mv = &moves[q - 1];
+                size_t prev_cell = mv->step.prev_i * width + mv->step.prev_j;
+                if (!isinf(log_back[mv->cell])) {
+                    log_back[prev_cell] = log_add_exp(log_back[prev_cell],
+                                                      log_back[mv->cell] - mv->move_cost / temperature);
+                }
+            }
+            items = (rg_link_posterior *)malloc((move_count + 1) * sizeof(*items));
+            if (items == 0) {
+                status = RG_ERR_OOM;
+            }
+            for (q = 0; q < move_count && status == RG_OK; q++) {
+                const rg_dp_move *mv = &moves[q];
+                size_t prev_cell = mv->step.prev_i * width + mv->step.prev_j;
+                double probability;
+                if (mv->step.source_count != 1 || mv->step.target_count != 1 ||
+                    isinf(log_back[mv->cell])) {
+                    continue;
+                }
+                probability = exp(log_mass[prev_cell] - mv->move_cost / temperature +
+                                  log_back[mv->cell] - log_z);
+                if (probability > 1e-12) {
+                    items[emitted].source_index = mv->step.prev_i;
+                    items[emitted].target_index = mv->step.prev_j;
+                    items[emitted].probability = probability > 1.0 ? 1.0 : probability;
+                    emitted++;
+                }
+            }
+            if (status == RG_OK) {
+                *posteriors = items;
+                *posterior_count = emitted;
+            } else {
+                free(items);
+            }
+            free(log_back);
+        }
     }
     if (sampling && status == RG_OK) {
         /* Backward sampling: from the end, draw each predecessor in proportion
@@ -622,7 +694,7 @@ rg_status rg_align_forms(
     int max_chunk_size,
     rg_alignment **out
 ) {
-    return align_forms_internal(ctx, 0, 0, source, target, max_chunk_size, out);
+    return align_forms_internal(ctx, 0, 0, source, target, max_chunk_size, 0.0, 0, 0, out);
 }
 
 rg_status rg_align_forms_with_model(
@@ -637,7 +709,56 @@ rg_status rg_align_forms_with_model(
     if (model == 0) {
         return RG_ERR_INVALID_ARGUMENT;
     }
-    return align_forms_internal(ctx, model, options, source, target, max_chunk_size, out);
+    return align_forms_internal(ctx, model, options, source, target, max_chunk_size, 0.0, 0, 0, out);
+}
+
+rg_status rg_align_link_posteriors_internal(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_form *source,
+    const rg_form *target,
+    int max_chunk_size,
+    double temperature,
+    rg_link_posterior **out,
+    size_t *out_count
+) {
+    rg_alignment *alignment = 0;
+    rg_status status;
+    if (model == 0 || out == 0 || out_count == 0 || !(temperature > 0.0)) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    status = align_forms_internal(ctx, model, options, source, target, max_chunk_size,
+                                  temperature, out, out_count, &alignment);
+    rg_alignment_free(alignment);
+    if (status != RG_OK) {
+        free(*out);
+        *out = 0;
+        *out_count = 0;
+    }
+    return status;
+}
+
+rg_status rg_align_link_posteriors(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_form *source,
+    const rg_form *target,
+    int max_chunk_size,
+    double temperature,
+    rg_link_posterior **out,
+    size_t *out_count
+) {
+    if (ctx == 0 || source == 0 || target == 0) {
+        return RG_ERR_INVALID_ARGUMENT;
+    }
+    return rg_align_link_posteriors_internal(ctx, model, options, source, target, max_chunk_size,
+                                             temperature, out, out_count);
+}
+
+void rg_link_posteriors_free(rg_link_posterior *posteriors) {
+    free(posteriors);
 }
 
 void rg_alignment_free(rg_alignment *alignment) {

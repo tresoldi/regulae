@@ -67,6 +67,9 @@ static int usage(void) {
     printf("  --alignment-temperature <t|calibrate>\n");
     printf("                                     sampled-alignment temperature (1), or\n");
     printf("                                     chosen by held-out log loss\n");
+    printf("  --soft-em <t|calibrate>            soft EM: count links at their\n");
+    printf("                                     posterior under temperature <t>, or\n");
+    printf("                                     choose <t> by held-out log loss\n");
     printf("  --partitions                       include per-member partitions\n");
     printf("  --cognacy-pairs <file>             soft cognacy: <file> holds form_a,\n");
     printf("                                     form_b, weight; the corpus is then a\n");
@@ -643,6 +646,8 @@ static double ensemble_temperature = -1.0;
 static int ensemble_partitions = 0;
 static int ensemble_calibrate = 0;
 static const char *cognacy_pairs = 0;
+static double soft_em_temperature = 0.0;
+static int soft_em_calibrate = 0;
 
 static int command_train(const char *path, const char *format, int pairwise, int human,
                          int json, int permutations, int tune_search,
@@ -718,6 +723,32 @@ static int command_train(const char *path, const char *format, int pairwise, int
     }
     options.bic.class_deletion_outcomes = deletion_outcomes != 0;
     options.cap_substitution_cost = substitution_cap != 0;
+    options.alignment_posterior_temperature = soft_em_temperature;
+    if (soft_em_calibrate) {
+        rg_temperature_score scores[RG_TEMPERATURE_GRID_DEFAULT_COUNT];
+        double chosen = 0.0;
+        size_t t;
+        if (corpus == 0) {
+            rg_context_free(ctx);
+            fprintf(stderr, "regulae: --soft-em calibrate needs a cognate-set corpus\n");
+            return 2;
+        }
+        status = rg_calibrate_posterior_temperature(
+            ctx, rg_corpus_cognates(corpus), rg_corpus_cognate_count(corpus), &options, 0,
+            RG_TEMPERATURE_GRID_DEFAULT_COUNT, 0, scores, &chosen);
+        if (status != RG_OK) {
+            report_failure(ctx, "soft EM calibration", status);
+            rg_corpus_free(corpus);
+            rg_context_free(ctx);
+            return 1;
+        }
+        for (t = 0; t < RG_TEMPERATURE_GRID_DEFAULT_COUNT; t++) {
+            fprintf(stderr, "regulae: soft EM T=%g held-out log loss %.4f\n",
+                    scores[t].temperature, scores[t].log_loss_mean);
+        }
+        fprintf(stderr, "regulae: soft EM temperature %g\n", chosen);
+        options.alignment_posterior_temperature = chosen;
+    }
     if (ensemble_members > 0) {
         rg_ensemble_options eopts;
         rg_ensemble *ensemble = 0;
@@ -1112,6 +1143,13 @@ int main(int argc, char **argv) {
                 i++;
             } else {
                 ensemble_temperature = strtod(argv[++i], 0);
+            }
+        } else if (strcmp(argv[i], "--soft-em") == 0 && i + 1 < argc) {
+            if (strcmp(argv[i + 1], "calibrate") == 0) {
+                soft_em_calibrate = 1;
+                i++;
+            } else {
+                soft_em_temperature = strtod(argv[++i], 0);
             }
         } else if (strcmp(argv[i], "--cognacy-pairs") == 0 && i + 1 < argc) {
             cognacy_pairs = argv[++i];

@@ -247,3 +247,54 @@ sonorant, morpheme index 1, and an open previous syllable.
   observation group in the bootstrap. A consumer that wants them resampled
   together can tie them with `etymon_group`.
 * The wide, GLED and soft loaders do not yet read per-morpheme ids.
+
+## Soft EM (ABI 49)
+
+`rg_train_options.alignment_posterior_temperature` (*T*, default 0) turns
+the segment EM's M-step into expected counts. For each pair, the DP's
+forward log-mass (the one sampling uses) gets a backward pass over the same
+recorded moves. Every 1-to-1 link is then counted at its posterior,
+*forward · exp(−cost/T) · backward / Z*, instead of one path's links being
+counted at 1.
+* Chunk, gap and reordering links carry the rest of the mass and stay
+  uncounted, as in hard EM.
+* Only the segment counts take expectations. Every later stage (displacement,
+  context and class discovery, chunks, cross-dimensional rules) reads the
+  cheapest path under the model soft EM trained.
+* Convergence is still judged on the cheapest-path corpus cost, bounded by
+  `max_iter`.
+
+The posteriors are public: `rg_align_link_posteriors`. On a test pair they
+match the sampler's link frequencies at the same *T* to within sampling
+error (0.543 against 0.549, 0.311 against 0.317, over 4000 draws).
+`rg_calibrate_posterior_temperature` runs the held-out calibration on the
+same grid. Soft EM draws nothing, so each temperature is trained once. The
+CLI flag is `--soft-em <t|calibrate>`, and the JSON options key is
+`alignment_posterior_temperature`.
+
+**Latin–Spanish** (5 group-held-out folds; T = 0 is hard EM):
+
+| T | 0 | 0.05 | 0.1 | 0.25 | 0.5 | 1 |
+|---|---|---|---|---|---|---|
+| held-out log loss | **0.769** | 0.773 | 0.769 | 0.784 | 0.840 | 0.994 |
+
+Soft EM does not improve held-out prediction here. T = 0.1 ties hard EM
+(0.7687 against 0.7685), and hotter temperatures lose. At T = 1, soft EM
+(0.994) does worse than sampled alignments at T = 1 (0.978): expected counts
+take the mass of many implausible links at once, where a single sampled path
+takes only one. Both results say the same thing. The DP costs are
+pseudo-surprisals with fixed gap and chunk charges, not a normalised joint
+likelihood, so *exp(−cost)* is only a usable path distribution when it is
+sharpened well below T = 1.
+
+What soft EM changes in the model, at T = 0.1 and 0.25: all six of hard EM's
+conditioned classes survive, and one is added. It conditions the existing
+*o ~ w* (Spanish *ue* from *ŏ*, 8 sets) on "a fricative somewhere later in
+the word", over 5 of those sets (*os, focus, novem, novus, costa*). The
+diphthongisation is conditioned by stress, not by that, so the row is best
+read as a chance environment that the softened counts let through.
+
+One caveat applies to the comparison. Held-out reflexes are scored on the
+cheapest path at every temperature, which is a Viterbi reading. Soft EM
+might do better under a scorer that marginalises over alignments as well.
+That is not tested here.

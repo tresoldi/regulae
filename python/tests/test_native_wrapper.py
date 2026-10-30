@@ -143,3 +143,14 @@ def test_train_ensemble_with_soft_cognacy(tmp_path) -> None:
     for member in package["members"]:
         for cognate_set in member["cognate_sets"]:
             assert len(cognate_set["forms"].split()) == 2
+
+
+def test_soft_em_option_crosses_the_seam() -> None:
+    model = regulae.train_model(
+        DELETION_TSV, fmt="tsv", options={"alignment_posterior_temperature": 0.1}
+    )
+    assert model.unconditioned_classes
+    with pytest.raises(regulae.RegulaeError):
+        regulae.train_model(
+            DELETION_TSV, fmt="tsv", options={"alignment_posterior_temperature": -1.0}
+        )

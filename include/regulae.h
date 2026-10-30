@@ -25,7 +25,7 @@ extern "C" {
 #define RG_VERSION_MINOR 1
 #define RG_VERSION_PATCH 0
 #define RG_VERSION_STRING "0.1.0"
-#define RG_ABI_VERSION 48
+#define RG_ABI_VERSION 49
 #define RG_DEFAULT_MAX_CHUNK_SIZE 3
 /* merkmal's own default. It reads the same graphemes and returns the same
  * feature labels as "descriptive", but scores through its own dimensions, and
@@ -270,6 +270,14 @@ typedef struct rg_train_options {
      * set it (docs/ensembles.md). */
     double alignment_sampling_temperature;
     int alignment_sampling_seed;
+    /* Soft EM (docs/ensembles.md): the segment EM's M-step counts every 1-to-1
+     * link at its posterior probability under p(path) proportional to
+     * exp(-cost(path) / T), from a forward-backward pass over the alignment
+     * DP, instead of counting the links of one path. 0 (the default) is hard
+     * EM on the cheapest path, as before. Only the segment counts take
+     * expectations; every later stage reads the cheapest path under the
+     * model soft EM trained. */
+    double alignment_posterior_temperature;
     rg_progress_fn progress;
     void *progress_user_data;
 } rg_train_options;
@@ -1512,6 +1520,30 @@ RG_API rg_status rg_align_forms(
     int max_chunk_size,
     rg_alignment **out
 );
+/* One 1-to-1 link's posterior probability: the share of path mass, under
+ * p(path) proportional to exp(-cost(path) / temperature), on paths that align
+ * source segment `source_index` with target segment `target_index`. */
+typedef struct rg_link_posterior {
+    size_t source_index;
+    size_t target_index;
+    double probability;
+} rg_link_posterior;
+/* Every 1-to-1 link with posterior above 1e-12, from a forward-backward pass
+ * over the alignment DP (soft EM's E-step; docs/ensembles.md). Chunk, gap and
+ * reordering links carry the rest of the mass and are not listed. Caller frees
+ * with rg_link_posteriors_free. temperature must be > 0. */
+RG_API rg_status rg_align_link_posteriors(
+    const rg_context *ctx,
+    const rg_pairwise_model *model,
+    const rg_train_options *options,
+    const rg_form *source,
+    const rg_form *target,
+    int max_chunk_size,
+    double temperature,
+    rg_link_posterior **out,
+    size_t *out_count
+);
+RG_API void rg_link_posteriors_free(rg_link_posterior *posteriors);
 RG_API rg_status rg_align_forms_with_model(
     const rg_context *ctx,
     const rg_pairwise_model *model,
@@ -1891,6 +1923,20 @@ RG_API rg_status rg_calibrate_alignment_temperature(
     size_t grid_count,
     int folds,
     int repeats,
+    rg_temperature_score *scores,
+    double *best
+);
+/* The same calibration for soft EM's alignment_posterior_temperature, on the
+ * same default grid (0 is hard EM). Soft EM draws nothing, so each
+ * temperature is trained once and `repeats` is 1 in every score. */
+RG_API rg_status rg_calibrate_posterior_temperature(
+    const rg_context *ctx,
+    const rg_cognate_set *cognates,
+    size_t cognate_count,
+    const rg_train_options *options,
+    const double *grid,
+    size_t grid_count,
+    int folds,
     rg_temperature_score *scores,
     double *best
 );

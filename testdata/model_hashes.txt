@@ -38,7 +38,7 @@
      0  81b6f6a14259e6f33e75713de36195583a7be0814ed76776429e6bf913598bac  testdata/corpora/long_range.tsv
      1  e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  testdata/corpora/missing_lect_column.tsv
      0  a27f1c536e8e32b9618ffa332767f395b4486808ecfe0a85cf266d0d9374fd1e  testdata/corpora/morph_boundary.csv
-     0  990023b2932e077ce78ab7138d2a9d4958ba7667e5167a77f23a8ef46f8f5333  testdata/corpora/partial_cognacy.tsv
+     0  31d85e18ea87a1aec4077d09b1abf6aae6f390c313dbb2dc48c364e1dfc26b11  testdata/corpora/partial_cognacy.tsv
      0  64223b4eb4f9bb0d5feb558566ac5a3ff0a156e1286cdb4355cdcc4327936e5c  testdata/corpora/partial_coverage.tsv
      0  752247453b01a04776669fd2dd4d2534d4cdd72c45b479c4d3f45171b7921408  testdata/corpora/real_contaminated.tsv
      0  0ba24ce647917769a1929fa8a7b4c7f2c08db6266fa201bea71d7230615c2faf  testdata/corpora/real_latin_spanish.tsv
